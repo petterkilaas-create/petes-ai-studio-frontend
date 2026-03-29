@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+// --- NYE IMPORTER HER ---
+import { useUser } from "@clerk/nextjs";
+import { supabase } from "@/lib/supabase"; 
 
 const API = 'https://petes-ai-studio-backend-32654019163.europe-west1.run.app';
 
@@ -10,6 +13,9 @@ type GalleryImage = { name: string; raw: string; edited: string; approved?: bool
 type OrderArchive = { name: string; date: string; };
 
 export default function Home() {
+  // --- HENTER BRUKER FRA CLERK ---
+  const { user } = useUser();
+
   const [currentMode, setCurrentMode] = useState<'express' | 'staging'>('express');
   const [jobName, setJobName] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -151,7 +157,6 @@ export default function Home() {
     tCtx.putImageData(overlayData, 0, 0); ctx.drawImage(tempCanvas, 0, 0);
   };
 
-  // TYPESCRIPT FIX: Endret fra HTMLCanvasElement til HTMLDivElement
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { 
     isDrawing.current = true; 
     const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
@@ -167,7 +172,6 @@ export default function Home() {
     hiddenCtx.beginPath(); hiddenCtx.moveTo(x, y);
   };
 
-  // TYPESCRIPT FIX
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (cursorRef.current) { cursorRef.current.style.left = `${e.clientX}px`; cursorRef.current.style.top = `${e.clientY}px`; }
     if (isDrawing.current) drawOnCanvas(e);
@@ -181,7 +185,6 @@ export default function Home() {
       } 
   };
 
-  // TYPESCRIPT FIX
   const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => {
     const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
     if (!canvas || !hiddenCanvas || !isDrawing.current) return;
@@ -243,7 +246,18 @@ export default function Home() {
     const fd = new FormData(); fd.append('job_name', jobName);
     const cfg: any = {}; uploadedFiles.forEach(f => { fd.append('files', f.file); cfg[f.file.name] = { type: f.type, style: f.style }; });
     fd.append('config', JSON.stringify(cfg));
-    try { await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); pollProgress(); } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
+    try { 
+        await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
+        
+        // --- NY LOGIKK FOR SUPABASE LAGRING HER ---
+        await supabase.from('projects').insert([{ 
+          name: jobName, 
+          user_id: user?.id, 
+          status: 'express_started' 
+        }]);
+
+        pollProgress(); 
+    } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
 
   const startStagingRender = async () => {
@@ -261,7 +275,18 @@ export default function Home() {
           });
       });
       fd.append('config', JSON.stringify(cfg));
-      try { await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); pollProgress(); } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
+      try { 
+          await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); 
+          
+          // --- NY LOGIKK FOR SUPABASE LAGRING HER ---
+          await supabase.from('projects').insert([{ 
+            name: jobName, 
+            user_id: user?.id, 
+            status: 'staging_started' 
+          }]);
+
+          pollProgress(); 
+      } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
 
   const pollProgress = async () => {
@@ -270,7 +295,11 @@ export default function Home() {
         if (s.lifetime_completed) setTotalRenders(s.lifetime_completed);
         if (s.total > 0) {
             setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
-            if (s.status === 'finished') { setIsRendering(false); loadGallery(jobName); return; }
+            if (s.status === 'finished') { 
+                setIsRendering(false); 
+                loadGallery(jobName); 
+                return; 
+            }
         }
     } catch (e) {}
     setTimeout(pollProgress, 2000);
