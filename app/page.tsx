@@ -66,11 +66,11 @@ export default function Home() {
   };
 
   const addRoom = () => { const newId = roomCounter + 1; setRoomCounter(newId); setStagingRooms(prev => [...prev, { id: `room_${newId}`, style: "staging_scandi", hero_img_id: null, images: [] }]); };
-  const handleDragStart = (e: React.DragEvent, imgId: string) => { e.dataTransfer.setData("text/plain", imgId); e.dataTransfer.effectAllowed = "move"; (e.target as HTMLElement).style.opacity = "0.5"; };
-  const handleDragEnd = (e: React.DragEvent) => { (e.target as HTMLElement).style.opacity = "1"; };
-  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; e.currentTarget.classList.add("dragover"); };
-  const handleDragLeave = (e: React.DragEvent) => { e.currentTarget.classList.remove("dragover"); };
-  const handleDrop = (e: React.DragEvent, targetRoomId: string) => {
+  const handleDragStart = (e: React.DragEvent<HTMLElement>, imgId: string) => { e.dataTransfer.setData("text/plain", imgId); e.dataTransfer.effectAllowed = "move"; (e.target as HTMLElement).style.opacity = "0.5"; };
+  const handleDragEnd = (e: React.DragEvent<HTMLElement>) => { (e.target as HTMLElement).style.opacity = "1"; };
+  const handleDragOver = (e: React.DragEvent<HTMLElement>) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; e.currentTarget.classList.add("dragover"); };
+  const handleDragLeave = (e: React.DragEvent<HTMLElement>) => { e.currentTarget.classList.remove("dragover"); };
+  const handleDrop = (e: React.DragEvent<HTMLElement>, targetRoomId: string) => {
     e.preventDefault(); e.currentTarget.classList.remove("dragover");
     const imgId = e.dataTransfer.getData("text/plain"); if (!imgId) return;
     setStagingRooms(prev => {
@@ -95,7 +95,6 @@ export default function Home() {
   const updateRoomStyle = (roomId: string, newStyle: string) => { setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, style: newStyle } : r)); };
   const applyExpressAll = () => { setUploadedFiles(prev => prev.map(f => ({ ...f, type: globalType, style: globalStyle }))); };
 
-  // --- CANVAS STUDIO FIKSET ---
   const openCanvasStudio = (imgIdOrName: string, mode: 'mask' | 'retouch', customUrl: string | null = null) => {
     setCurrentCanvasImgId(imgIdOrName); setActiveModal(mode); setBrushSize(50);
     let targetUrl = customUrl;
@@ -152,8 +151,8 @@ export default function Home() {
     tCtx.putImageData(overlayData, 0, 0); ctx.drawImage(tempCanvas, 0, 0);
   };
 
-  // LØFT PENNEN FIKS
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => { 
+  // TYPESCRIPT FIX: Endret fra HTMLCanvasElement til HTMLDivElement
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { 
     isDrawing.current = true; 
     const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
     if (!canvas || !hiddenCanvas) return;
@@ -164,12 +163,12 @@ export default function Home() {
     const x = (e.clientX - rect.left) * (canvas.width / rect.width); 
     const y = (e.clientY - rect.top) * (canvas.height / rect.height);
     
-    // Nå løfter vi faktisk pennen og setter den ned på nytt punkt!
     ctx.beginPath(); ctx.moveTo(x, y);
     hiddenCtx.beginPath(); hiddenCtx.moveTo(x, y);
   };
 
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // TYPESCRIPT FIX
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (cursorRef.current) { cursorRef.current.style.left = `${e.clientX}px`; cursorRef.current.style.top = `${e.clientY}px`; }
     if (isDrawing.current) drawOnCanvas(e);
   };
@@ -182,7 +181,8 @@ export default function Home() {
       } 
   };
 
-  const drawOnCanvas = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // TYPESCRIPT FIX
+  const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => {
     const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
     if (!canvas || !hiddenCanvas || !isDrawing.current) return;
     const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d');
@@ -229,22 +229,12 @@ export default function Home() {
       }, 'image/png');
   };
 
-  // --- DOWNLOAD FIX ---
   const handleDownloadSingle = async (url: string, filename: string) => {
       try {
-          const response = await fetch(url);
-          const blob = await response.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = filename || 'render.jpg';
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-      } catch (error) {
-          window.open(url, '_blank');
-      }
+          const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'render.jpg';
+          document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      } catch (error) { window.open(url, '_blank'); }
   };
 
   const startExpressRender = async () => {
@@ -372,7 +362,6 @@ export default function Home() {
                             ))}
                           </div>
                           
-                          {/* FULL OPTIONS RESTORED */}
                           <div className="mt-8 flex justify-between items-center bg-[#0f172a] p-6 rounded-2xl border border-white/5">
                               <div className="flex gap-4">
                                   <select value={globalType} onChange={(e) => setGlobalType(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
@@ -499,9 +488,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* --- ALL MODALS (FIXED FULLSCREEN) --- */}
-      
-      {/* CANVAS MODAL (Mask & Retouch) */}
+      {/* --- ALL MODALS --- */}
       {(activeModal === 'mask' || activeModal === 'retouch') && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
             <div className="flex justify-between items-center w-[85vw] max-w-[1100px]">
@@ -540,7 +527,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* RERENDER MODAL FULL OPTIONS RESTORED */}
       {activeModal === 'rerender' && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
             <div className="bg-[#0f172a] rounded-3xl p-8 shadow-2xl border border-white/10 w-[500px]">
@@ -585,7 +571,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* COMPARE MODAL */}
       {activeModal === 'compare' && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center" onClick={() => setActiveModal('none')}>
             <div className="relative w-[90vw] max-w-[1100px] aspect-[3/2] rounded-[1.5rem] bg-black overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-white/10 cursor-col-resize" onMouseMove={handleSlider} onClick={(e) => e.stopPropagation()}>
