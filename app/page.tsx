@@ -10,7 +10,7 @@ const API = 'https://petes-ai-studio-backend-32654019163.europe-west1.run.app';
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; maskBlob: Blob | null; };
 type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; };
 type GalleryImage = { name: string; raw: string; edited: string; approved?: boolean; };
-type OrderArchive = { name: string; date: string; };
+type OrderArchive = { name: string; date: string; status: string; };
 
 export default function Home() {
   // --- HENTER BRUKER FRA CLERK ---
@@ -50,35 +50,36 @@ export default function Home() {
   const undoStack = useRef<ImageData[]>([]);
 
   useEffect(() => {
-  // 1. Hent totalt antall renders (som før)
-  fetch(`${API}/batch-progress/`).then(res => res.json()).then(data => { 
-    if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); 
-  }).catch(e => console.error(e));
+    // 1. Hent totalt antall renders (som før)
+    fetch(`${API}/batch-progress/`).then(res => res.json()).then(data => { 
+      if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); 
+    }).catch(e => console.error(e));
 
-  // 2. NYTT: Hent dine ekte prosjekter fra Supabase i stedet for API-et
-  const fetchMyProjects = async () => {
-    if (!user) return; // Vent til brukeren er logget inn
+    // 2. NYTT: Hent dine ekte prosjekter fra Supabase i stedet for API-et
+    const fetchMyProjects = async () => {
+      if (!user) return; // Vent til brukeren er logget inn
 
-    const { data, error } = await supabase
-      .from('projects')
-      .select('name, created_at') // Vi henter navn og dato
-      .eq('user_id', user.id)    // VIKTIG: Hent BARE dine egne prosjekter!
-      .order('created_at', { ascending: false }); // Nyeste øverst
+      const { data, error } = await supabase
+        .from('projects')
+        .select('name, created_at, status') // Vi henter navn, dato og status
+        .eq('user_id', user.id)    // VIKTIG: Hent BARE dine egne prosjekter!
+        .order('created_at', { ascending: false }); // Nyeste øverst
 
-    if (error) {
-      console.error("Feil ved henting av arkiv:", error);
-    } else if (data) {
-      // Vi gjør om Supabase-formatet til det formatet appen din forventer
-      const formattedOrders = data.map(p => ({
-        name: p.name,
-        date: new Date(p.created_at).toLocaleDateString('no-NO') // Fin norsk dato
-      }));
-      setArchiveOrders(formattedOrders);
-    }
-  };
+      if (error) {
+        console.error("Feil ved henting av arkiv:", error);
+      } else if (data) {
+        // Vi gjør om Supabase-formatet til det formatet appen din forventer
+        const formattedOrders = data.map(p => ({
+          name: p.name,
+          date: new Date(p.created_at).toLocaleDateString('no-NO'), // Fin norsk dato
+          status: p.status || 'processing'
+        }));
+        setArchiveOrders(formattedOrders);
+      }
+    };
 
-  fetchMyProjects();
-}, [user]); // Kjører på nytt når brukeren logger inn
+    fetchMyProjects();
+  }, [user]); // Kjører på nytt når brukeren logger inn
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
@@ -279,7 +280,7 @@ export default function Home() {
         await supabase.from('projects').insert([{ 
           name: jobName, 
           user_id: user?.id, 
-          status: 'express_started' 
+          status: 'processing' 
         }]);
 
         pollProgress(); 
@@ -308,7 +309,7 @@ export default function Home() {
           await supabase.from('projects').insert([{ 
             name: jobName, 
             user_id: user?.id, 
-            status: 'staging_started' 
+            status: 'processing' 
           }]);
 
           pollProgress(); 
@@ -323,6 +324,14 @@ export default function Home() {
             setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
             if (s.status === 'finished') { 
                 setIsRendering(false); 
+                
+                // Oppdater status i Supabase til 'completed'
+                await supabase
+                  .from('projects')
+                  .update({ status: 'completed' })
+                  .eq('name', jobName)
+                  .eq('user_id', user?.id);
+                  
                 loadGallery(jobName); 
                 return; 
             }
@@ -384,9 +393,28 @@ export default function Home() {
           <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Archive</h2>
           <div className="flex-1 overflow-y-auto space-y-2 pr-2">
             {archiveOrders.map(order => (
-                <div key={order.name} onClick={() => viewOrder(order.name)} className="cursor-pointer p-4 rounded-xl hover:bg-[#1e293b] border border-transparent hover:border-white/10 transition-all">
-                    <p className="text-[11px] font-black text-slate-200 uppercase">{order.name}</p>
-                    <p className="text-[9px] text-slate-500 font-bold">{order.date}</p>
+                <div 
+                  key={order.name} 
+                  onClick={() => viewOrder(order.name)} 
+                  className="cursor-pointer p-4 rounded-xl bg-[#0f172a]/50 hover:bg-[#1e293b] border border-white/5 hover:border-white/20 transition-all flex justify-between items-center group"
+                >
+                    <div>
+                        <p className="text-[11px] font-black text-slate-200 uppercase group-hover:text-[#009183] transition-colors">{order.name}</p>
+                        <p className="text-[9px] text-slate-500 font-bold">{order.date}</p>
+                    </div>
+                    
+                    {/* STATUS-INDIKATOR */}
+                    <div>
+                        {order.status === 'completed' || order.status === 'finished' ? (
+                            <span className="flex items-center gap-1.5 text-[8px] font-black text-[#00ff83] uppercase bg-[#00ff83]/10 px-2 py-1.5 rounded border border-[#00ff83]/20 shadow-[0_0_10px_rgba(0,255,131,0.1)]">
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#00ff83]"></div> Ready
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5 text-[8px] font-black text-yellow-400 uppercase bg-yellow-400/10 px-2 py-1.5 rounded border border-yellow-400/20">
+                                <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></div> Work
+                            </span>
+                        )}
+                    </div>
                 </div>
             ))}
           </div>
@@ -599,7 +627,7 @@ export default function Home() {
                         <select value={rerenderData.style} onChange={(e) => setRerenderData({...rerenderData, style: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183] transition-colors">
                             <optgroup label="Lighting & Weather">
                                 <option value="weather_rain_to_sun">Rain to Sun (Vått til tørt)</option>
-                                <option value="sunny_midday">Sunny Midday (Strålende sol)</option>
+                                <option value="sunny_midday">Sunny midday (Strålende sol)</option>
                                 <option value="dusk_blue_hour">Blue Hour (Kveldsfoto)</option>
                                 <option value="dusk_purple_orange">Purple Dusk (Solfall)</option>
                                 <option value="early_morning">Early Morning</option>
