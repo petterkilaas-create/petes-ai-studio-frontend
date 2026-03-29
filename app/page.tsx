@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "../supabaseClient"; 
 
-const API = 'https://petes-ai-studio-backend-32654019163.europe-west1.run.app';
+const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; maskBlob: Blob | null; };
 type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; };
