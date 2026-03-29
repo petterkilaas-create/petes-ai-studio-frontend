@@ -50,9 +50,35 @@ export default function Home() {
   const undoStack = useRef<ImageData[]>([]);
 
   useEffect(() => {
-    fetch(`${API}/batch-progress/`).then(res => res.json()).then(data => { if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); }).catch(e => console.error(e));
-    fetch(`${API}/list-orders/`).then(res => res.json()).then(data => { if(data.orders) setArchiveOrders(data.orders); }).catch(e => console.error(e));
-  }, []);
+  // 1. Hent totalt antall renders (som før)
+  fetch(`${API}/batch-progress/`).then(res => res.json()).then(data => { 
+    if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); 
+  }).catch(e => console.error(e));
+
+  // 2. NYTT: Hent dine ekte prosjekter fra Supabase i stedet for API-et
+  const fetchMyProjects = async () => {
+    if (!user) return; // Vent til brukeren er logget inn
+
+    const { data, error } = await supabase
+      .from('projects')
+      .select('name, created_at') // Vi henter navn og dato
+      .eq('user_id', user.id)    // VIKTIG: Hent BARE dine egne prosjekter!
+      .order('created_at', { ascending: false }); // Nyeste øverst
+
+    if (error) {
+      console.error("Feil ved henting av arkiv:", error);
+    } else if (data) {
+      // Vi gjør om Supabase-formatet til det formatet appen din forventer
+      const formattedOrders = data.map(p => ({
+        name: p.name,
+        date: new Date(p.created_at).toLocaleDateString('no-NO') // Fin norsk dato
+      }));
+      setArchiveOrders(formattedOrders);
+    }
+  };
+
+  fetchMyProjects();
+}, [user]); // Kjører på nytt når brukeren logger inn
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
