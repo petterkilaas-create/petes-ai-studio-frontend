@@ -540,8 +540,8 @@ const pollProgress = async () => {
                   </div>
                 )}
 
-                {isRendering && (
-                  <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500">
+                {isRendering && activeModal === 'none' && galleryImages.length === 0 && (
+  <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500">
                       <p className="font-black montserrat uppercase tracking-[0.3em] text-sm text-[#009183] animate-pulse">{progressStatus}</p>
                       <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10">
                           <div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-700" style={{ width: `${progressPct}%` }}></div>
