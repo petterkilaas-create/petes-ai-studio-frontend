@@ -316,27 +316,36 @@ export default function Home() {
       } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
 
-  const pollProgress = async () => {
+const pollProgress = async () => {
     try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${jobName}`); const s = await r.json();
+        const r = await fetch(`${API}/batch-progress/?job_name=${jobName}`); 
+        const s = await r.json();
+        
         if (s.lifetime_completed) setTotalRenders(s.lifetime_completed);
+        
         if (s.total > 0) {
-            setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
+            setProgressPct((s.completed / s.total) * 100); 
+            setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
+            
             if (s.status === 'finished') { 
                 setIsRendering(false); 
                 
-                // Oppdater status i Supabase til 'completed'
+                // --- HER ER MAGIEN (STEG 2) ---
+                // Vi forteller databasen at denne jobben er ferdig:
                 await supabase
                   .from('projects')
                   .update({ status: 'completed' })
                   .eq('name', jobName)
                   .eq('user_id', user?.id);
+                // ------------------------------
                   
                 loadGallery(jobName); 
                 return; 
             }
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error("Feil ved sjekking av fremdrift:", e);
+    }
     setTimeout(pollProgress, 2000);
   };
 
