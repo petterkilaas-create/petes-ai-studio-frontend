@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 // --- NYE IMPORTER HER ---
 import { useUser } from "@clerk/nextjs";
-import { supabase } from "@/lib/supabase"; 
+import { supabase } from "../supabaseClient"; 
 
 const API = 'https://petes-ai-studio-backend-32654019163.europe-west1.run.app';
 
