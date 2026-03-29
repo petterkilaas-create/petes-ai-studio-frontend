@@ -349,7 +349,14 @@ const pollProgress = async () => {
     setTimeout(pollProgress, 2000);
   };
 
-  const viewOrder = (name: string) => { setJobName(name); setUploadedFiles([]); setStagingRooms([]); setGalleryImages([]); loadGallery(name); };
+  const viewOrder = (name: string) => { 
+  setIsRendering(false); 
+  setJobName(name); 
+  setUploadedFiles([]); 
+  setStagingRooms([]); 
+  setGalleryImages([]); 
+  loadGallery(name); 
+};
   const loadGallery = async (name: string) => { try { const res = await fetch(`${API}/list-finished/?job_name=${name}`); const data = await res.json(); setGalleryImages(data.images); } catch (e) {} };
   const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(jobName); };
 
