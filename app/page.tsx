@@ -271,7 +271,6 @@ export default function Home() {
     apiCanvas.toBlob((b) => { setUploadedFiles(prev => prev.map(f => f.id === currentCanvasImgId ? { ...f, maskBlob: b } : f)); setActiveModal('none'); }, 'image/png');
   };
 
-  // OPPDATERT: Retouch lukker modal momentant og kjører progress bar
   const submitRetouch = async () => {
       if(!retouchPrompt) return;
       setActiveModal('none');
@@ -294,7 +293,7 @@ export default function Home() {
           const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
           try { 
               await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); 
-              pollProgress(jobName); // Setter i gang polling etter vi har sendt ordren
+              pollProgress(jobName); 
           } catch(e) { 
               console.error(e); 
               setProgressStatus("Error connecting to server!");
@@ -420,7 +419,6 @@ export default function Home() {
 
   const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(jobName); };
 
-  // OPPDATERT: Re-render lukker modal momentant og starter progress bar
   const submitRerender = async () => {
       setActiveModal('none');
       setIsRendering(true);
@@ -682,8 +680,9 @@ export default function Home() {
                   </div>
                 )}
 
-                {isRendering && activeModal === 'none' && galleryImages.length === 0 && (
-  <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500">
+                {/* OPPDATERT: Progress bar vises over galleriet når isRendering er true */}
+                {isRendering && activeModal === 'none' && (
+                  <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8">
                       <p className="font-black montserrat uppercase tracking-[0.3em] text-sm text-[#009183] animate-pulse">{progressStatus}</p>
                       <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10">
                           <div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-700" style={{ width: `${progressPct}%` }}></div>
@@ -691,7 +690,8 @@ export default function Home() {
                   </div>
                 )}
 
-                {galleryImages.length > 0 && !isRendering && (
+                {/* OPPDATERT: Galleriet forblir synlig selv om progress-baren lader */}
+                {galleryImages.length > 0 && (
                     <div className="animate-in fade-in slide-in-from-bottom-10 duration-500">
                         <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                             <h3 className="text-4xl font-black text-white montserrat uppercase">{jobName}</h3>
