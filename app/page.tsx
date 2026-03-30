@@ -1,19 +1,18 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-// --- NYE IMPORTER HER ---
 import { useUser } from "@clerk/nextjs";
 import { supabase } from "../supabaseClient"; 
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
-type UploadedFile = { id: string; file: File; url: string; type: string; style: string; maskBlob: Blob | null; };
+// --- NYTT: Lagt til "prompt" i typen ---
+type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; };
 type GalleryImage = { name: string; raw: string; edited: string; approved?: boolean; };
 type OrderArchive = { name: string; date: string; status: string; };
 
 export default function Home() {
-  // --- HENTER BRUKER FRA CLERK ---
   const { user } = useUser();
 
   const [currentMode, setCurrentMode] = useState<'express' | 'staging'>('express');
@@ -50,36 +49,29 @@ export default function Home() {
   const undoStack = useRef<ImageData[]>([]);
 
   useEffect(() => {
-    // 1. Hent totalt antall renders (som før)
     fetch(`${API}/batch-progress/`).then(res => res.json()).then(data => { 
       if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); 
     }).catch(e => console.error(e));
 
-    // 2. NYTT: Hent dine ekte prosjekter fra Supabase i stedet for API-et
     const fetchMyProjects = async () => {
-      if (!user) return; // Vent til brukeren er logget inn
-
+      if (!user) return;
       const { data, error } = await supabase
         .from('projects')
-        .select('name, created_at, status') // Vi henter navn, dato og status
-        .eq('user_id', user.id)    // VIKTIG: Hent BARE dine egne prosjekter!
-        .order('created_at', { ascending: false }); // Nyeste øverst
+        .select('name, created_at, status')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error("Feil ved henting av arkiv:", error);
-      } else if (data) {
-        // Vi gjør om Supabase-formatet til det formatet appen din forventer
+      if (!error && data) {
         const formattedOrders = data.map(p => ({
           name: p.name,
-          date: new Date(p.created_at).toLocaleDateString('no-NO'), // Fin norsk dato
+          date: new Date(p.created_at).toLocaleDateString('no-NO'),
           status: p.status || 'processing'
         }));
         setArchiveOrders(formattedOrders);
       }
     };
-
     fetchMyProjects();
-  }, [user]); // Kjører på nytt når brukeren logger inn
+  }, [user]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
@@ -87,17 +79,30 @@ export default function Home() {
     const newFiles: UploadedFile[] = [];
     for (let i = 0; i < e.target.files.length; i++) {
       if (e.target.files[i].type.startsWith("image/")) {
-        newFiles.push({ id: "img_" + Math.random().toString(36).substr(2, 9), file: e.target.files[i], url: URL.createObjectURL(e.target.files[i]), type: "exterior", style: "dusk_blue_hour", maskBlob: null });
+        // --- NYTT: default prompt er tom ---
+        newFiles.push({ id: "img_" + Math.random().toString(36).substr(2, 9), file: e.target.files[i], url: URL.createObjectURL(e.target.files[i]), type: globalType, style: globalStyle, prompt: "", maskBlob: null });
       }
     }
     setUploadedFiles(prev => [...prev, ...newFiles]);
     if (currentMode === 'staging' && stagingRooms.length === 0) addRoom();
   };
 
-  const createNewJob = () => { 
-    setJobName(""); setUploadedFiles([]); setStagingRooms([]); setRoomCounter(0); setGalleryImages([]); setIsRendering(false); setProgressPct(0); setActiveModal('none'); 
+  // --- NYE FUNKSJONER FOR FASE 1 ---
+  const removeFile = (id: string) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== id));
   };
 
+  const updateFileField = (id: string, field: keyof UploadedFile, value: any) => {
+    setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f));
+  };
+
+  const applyExpressAll = () => {
+    // Sletter også eventuelle custom prompts når du trykker Assign All
+    setUploadedFiles(prev => prev.map(f => ({ ...f, type: globalType, style: globalStyle, prompt: "" }))); 
+  };
+  // ----------------------------------
+
+  const createNewJob = () => { setJobName(""); setUploadedFiles([]); setStagingRooms([]); setRoomCounter(0); setGalleryImages([]); setIsRendering(false); setProgressPct(0); setActiveModal('none'); };
   const addRoom = () => { const newId = roomCounter + 1; setRoomCounter(newId); setStagingRooms(prev => [...prev, { id: `room_${newId}`, style: "staging_scandi", hero_img_id: null, images: [] }]); };
   const handleDragStart = (e: React.DragEvent<HTMLElement>, imgId: string) => { e.dataTransfer.setData("text/plain", imgId); e.dataTransfer.effectAllowed = "move"; (e.target as HTMLElement).style.opacity = "0.5"; };
   const handleDragEnd = (e: React.DragEvent<HTMLElement>) => { (e.target as HTMLElement).style.opacity = "1"; };
@@ -126,7 +131,6 @@ export default function Home() {
 
   const setHero = (roomId: string, imgId: string) => { setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, hero_img_id: imgId } : r)); };
   const updateRoomStyle = (roomId: string, newStyle: string) => { setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, style: newStyle } : r)); };
-  const applyExpressAll = () => { setUploadedFiles(prev => prev.map(f => ({ ...f, type: globalType, style: globalStyle }))); };
 
   const openCanvasStudio = (imgIdOrName: string, mode: 'mask' | 'retouch', customUrl: string | null = null) => {
     setCurrentCanvasImgId(imgIdOrName); setActiveModal(mode); setBrushSize(50);
@@ -271,21 +275,20 @@ export default function Home() {
     if (!jobName || uploadedFiles.length === 0) return;
     setIsRendering(true); setProgressPct(0); setProgressStatus("Uploading to cloud...");
     const fd = new FormData(); fd.append('job_name', jobName);
-    const cfg: any = {}; uploadedFiles.forEach(f => { fd.append('files', f.file); cfg[f.file.name] = { type: f.type, style: f.style }; });
+    
+    // --- NYTT: Tar nå med 'prompt' til backend ---
+    const cfg: any = {}; 
+    uploadedFiles.forEach(f => { 
+        fd.append('files', f.file); 
+        cfg[f.file.name] = { type: f.type, style: f.style, prompt: f.prompt }; 
+    });
+    // ----------------------------------------------
+    
     fd.append('config', JSON.stringify(cfg));
     try { 
         await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
-        
-        // --- NY LOGIKK FOR SUPABASE LAGRING HER ---
-        await supabase.from('projects').insert([{ 
-          name: jobName, 
-          user_id: user?.id, 
-          status: 'processing' 
-        }]);
-
-        // Legg den umiddelbart til i den lokale visningen så den dukker opp med en gang
+        await supabase.from('projects').insert([{ name: jobName, user_id: user?.id, status: 'processing' }]);
         setArchiveOrders(prev => [{ name: jobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
-
         pollProgress(); 
     } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
@@ -307,17 +310,8 @@ export default function Home() {
       fd.append('config', JSON.stringify(cfg));
       try { 
           await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); 
-          
-          // --- NY LOGIKK FOR SUPABASE LAGRING HER ---
-          await supabase.from('projects').insert([{ 
-            name: jobName, 
-            user_id: user?.id, 
-            status: 'processing' 
-          }]);
-
-          // Legg den umiddelbart til i den lokale visningen så den dukker opp med en gang
+          await supabase.from('projects').insert([{ name: jobName, user_id: user?.id, status: 'processing' }]);
           setArchiveOrders(prev => [{ name: jobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
-
           pollProgress(); 
       } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
@@ -326,47 +320,23 @@ const pollProgress = async () => {
     try {
         const r = await fetch(`${API}/batch-progress/?job_name=${jobName}`); 
         const s = await r.json();
-        
         if (s.lifetime_completed) setTotalRenders(s.lifetime_completed);
-        
         if (s.total > 0) {
             setProgressPct((s.completed / s.total) * 100); 
             setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
-            
             if (s.status === 'finished') { 
                 setIsRendering(false); 
-                
-                // Vi forteller databasen at denne jobben er ferdig:
-                await supabase
-                  .from('projects')
-                  .update({ status: 'completed' })
-                  .eq('name', jobName)
-                  .eq('user_id', user?.id);
-                
-                // --- HER ER MAGIEN SOM FIKSER CACHE-PROBLEMET DITT ---
-                // Vi forteller React om å oppdatere den lokale listen umiddelbart
-                setArchiveOrders(prev => prev.map(order => 
-                  order.name === jobName ? { ...order, status: 'completed' } : order
-                ));
-                  
+                await supabase.from('projects').update({ status: 'completed' }).eq('name', jobName).eq('user_id', user?.id);
+                setArchiveOrders(prev => prev.map(order => order.name === jobName ? { ...order, status: 'completed' } : order));
                 loadGallery(jobName); 
                 return; 
             }
         }
-    } catch (e) {
-        console.error("Feil ved sjekking av fremdrift:", e);
-    }
+    } catch (e) { console.error("Feil ved sjekking av fremdrift:", e); }
     setTimeout(pollProgress, 2000);
   };
 
-  const viewOrder = (name: string) => { 
-  setIsRendering(false); 
-  setJobName(name); 
-  setUploadedFiles([]); 
-  setStagingRooms([]); 
-  setGalleryImages([]); 
-  loadGallery(name); 
-};
+  const viewOrder = (name: string) => { setIsRendering(false); setJobName(name); setUploadedFiles([]); setStagingRooms([]); setGalleryImages([]); loadGallery(name); };
   const loadGallery = async (name: string) => { try { const res = await fetch(`${API}/list-finished/?job_name=${name}`); const data = await res.json(); setGalleryImages(data.images); } catch (e) {} };
   const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(jobName); };
 
@@ -382,10 +352,7 @@ const pollProgress = async () => {
       const percent = Math.max(0, Math.min(100, x));
       const beforeImg = document.getElementById('modalBefore');
       const handle = document.getElementById('modalHandle');
-      if (beforeImg && handle) {
-          beforeImg.style.clipPath = `inset(0 ${100 - percent}% 0 0)`;
-          handle.style.left = `${percent}%`;
-      }
+      if (beforeImg && handle) { beforeImg.style.clipPath = `inset(0 ${100 - percent}% 0 0)`; handle.style.left = `${percent}%`; }
   };
 
   useEffect(() => {
@@ -419,17 +386,11 @@ const pollProgress = async () => {
           <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Archive</h2>
           <div className="flex-1 overflow-y-auto space-y-2 pr-2">
             {archiveOrders.map(order => (
-                <div 
-                  key={order.name} 
-                  onClick={() => viewOrder(order.name)} 
-                  className="cursor-pointer p-4 rounded-xl bg-[#0f172a]/50 hover:bg-[#1e293b] border border-white/5 hover:border-white/20 transition-all flex justify-between items-center group"
-                >
+                <div key={order.name} onClick={() => viewOrder(order.name)} className="cursor-pointer p-4 rounded-xl bg-[#0f172a]/50 hover:bg-[#1e293b] border border-white/5 hover:border-white/20 transition-all flex justify-between items-center group">
                     <div>
                         <p className="text-[11px] font-black text-slate-200 uppercase group-hover:text-[#009183] transition-colors">{order.name}</p>
                         <p className="text-[9px] text-slate-500 font-bold">{order.date}</p>
                     </div>
-                    
-                    {/* STATUS-INDIKATOR */}
                     <div>
                         {order.status === 'completed' || order.status === 'finished' ? (
                             <span className="flex items-center gap-1.5 text-[8px] font-black text-[#00ff83] uppercase bg-[#00ff83]/10 px-2 py-1.5 rounded border border-[#00ff83]/20 shadow-[0_0_10px_rgba(0,255,131,0.1)]">
@@ -461,25 +422,65 @@ const pollProgress = async () => {
                   <div className="space-y-8 animate-in fade-in duration-300">
                       <div className="glass p-8">
                           <h2 className="font-bold uppercase text-xs tracking-widest text-slate-400 mb-6">Express Settings</h2>
-                          <div className="grid grid-cols-4 gap-6">
+                          
+                          {/* --- NY UI FOR INDIVIDUELLE BILDER --- */}
+                          <div className="grid grid-cols-3 gap-6">
                             {uploadedFiles.map((file) => (
-                              <div key={file.id} className="aspect-[3/2] rounded-xl overflow-hidden relative border border-slate-700">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={file.url} alt="upload" className="w-full h-full object-cover" />
-                                <div className="absolute bottom-0 inset-x-0 bg-black/80 p-2 text-[8px] text-white uppercase text-center">{file.type} | {file.style.replace(/_/g, ' ')}</div>
+                              <div key={file.id} className="bg-[#0f172a] rounded-xl overflow-hidden border border-slate-700 relative flex flex-col">
+                                {/* SLETTE-KNAPP */}
+                                <button onClick={() => removeFile(file.id)} className="absolute top-2 right-2 bg-red-500/80 text-white rounded-full w-6 h-6 flex items-center justify-center text-[10px] font-black z-10 hover:bg-red-600 transition-colors shadow">X</button>
+                                
+                                <div className="aspect-[3/2] relative border-b border-slate-700">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={file.url} alt="upload" className="w-full h-full object-cover" />
+                                </div>
+                                
+                                {/* INDIVIDUELLE VALG */}
+                                <div className="p-3 flex flex-col gap-2">
+                                    <div className="flex gap-2">
+                                        <select value={file.type} onChange={(e) => updateFileField(file.id, 'type', e.target.value)} className="w-1/2 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none focus:border-[#009183]">
+                                            <option value="exterior">Exterior</option>
+                                            <option value="interior">Interior</option>
+                                            <option value="drone">Drone</option>
+                                        </select>
+                                        <select value={file.style} onChange={(e) => updateFileField(file.id, 'style', e.target.value)} className="w-1/2 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none focus:border-[#009183]">
+                                            <optgroup label="Lighting">
+                                                <option value="weather_rain_to_sun">Rain to Sun</option>
+                                                <option value="sunny_midday">Sunny Midday</option>
+                                                <option value="dusk_blue_hour">Blue Hour</option>
+                                                <option value="dusk_purple_orange">Purple Dusk</option>
+                                                <option value="early_morning">Early Morning</option>
+                                            </optgroup>
+                                            <optgroup label="Season">
+                                                <option value="winter">Winter</option>
+                                                <option value="autumn">Autumn</option>
+                                                <option value="spring">Spring</option>
+                                                <option value="summer">Summer</option>
+                                            </optgroup>
+                                        </select>
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Custom prompt (overrides dropdowns)..." 
+                                        value={file.prompt} 
+                                        onChange={(e) => updateFileField(file.id, 'prompt', e.target.value)} 
+                                        className="w-full bg-[#0B1120] rounded-lg px-3 py-2 text-[10px] text-white outline-none border border-slate-700 focus:border-[#009183] placeholder-slate-600"
+                                    />
+                                </div>
                               </div>
                             ))}
                           </div>
-                          
+                          {/* -------------------------------------- */}
+
                           <div className="mt-8 flex justify-between items-center bg-[#0f172a] p-6 rounded-2xl border border-white/5">
                               <div className="flex gap-4">
                                   <select value={globalType} onChange={(e) => setGlobalType(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
                                   <select value={globalStyle} onChange={(e) => setGlobalStyle(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none">
                                       <optgroup label="Lighting & Weather">
-                                        <option value="weather_rain_to_sun">Rain to Sun (Vått til tørt)</option>
-                                        <option value="sunny_midday">Sunny Midday (Strålende sol)</option>
-                                        <option value="dusk_blue_hour">Blue Hour (Kveldsfoto)</option>
-                                        <option value="dusk_purple_orange">Purple Dusk (Solfall)</option>
+                                        <option value="weather_rain_to_sun">Rain to Sun</option>
+                                        <option value="sunny_midday">Sunny Midday</option>
+                                        <option value="dusk_blue_hour">Blue Hour</option>
+                                        <option value="dusk_purple_orange">Purple Dusk</option>
                                         <option value="early_morning">Early Morning</option>
                                       </optgroup>
                                       <optgroup label="Season">
@@ -509,8 +510,12 @@ const pollProgress = async () => {
                             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Unassigned Assets</h3>
                             <div className="drop-zone-room flex flex-wrap gap-2 p-2 min-h-[150px] w-full" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, 'unassigned')}>
                                 {unassignedFiles.map(file => (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img key={file.id} src={file.url} alt="Unassigned" draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className="draggable-img w-20 h-20 object-cover rounded-lg border border-slate-700 hover:border-[#009183]" />
+                                    <div key={file.id} className="relative group">
+                                        {/* NYTT SLETTE-IKON FOR STAGING */}
+                                        <button onClick={() => removeFile(file.id)} className="absolute -top-2 -right-2 bg-red-500/80 text-white rounded-full w-5 h-5 flex items-center justify-center text-[8px] font-black z-10 opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all shadow">X</button>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={file.url} alt="Unassigned" draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className="draggable-img w-20 h-20 object-cover rounded-lg border border-slate-700 hover:border-[#009183]" />
+                                    </div>
                                 ))}
                             </div>
                         </div>
@@ -523,7 +528,6 @@ const pollProgress = async () => {
                                         <select value={room.style} onChange={(e) => updateRoomStyle(room.id, e.target.value)} className="bg-[#0f172a] text-slate-300 rounded px-2 py-1 text-[9px] font-bold uppercase outline-none border border-slate-700">
                                             <option value="staging_scandi">Scandi Minimalism</option>
                                             <option value="staging_luxury">Classic Luxury</option>
-                                            {/* NY KATEGORI LAGT TIL HER */}
                                             <option value="staging_outdoor">Outdoor Lounge</option>
                                         </select>
                                     </div>
@@ -669,7 +673,6 @@ const pollProgress = async () => {
                             <optgroup label="Staging">
                                 <option value="staging_scandi">Scandi</option>
                                 <option value="staging_luxury">Luxury</option>
-                                {/* NY KATEGORI LAGT TIL HER OGSÅ */}
                                 <option value="staging_outdoor">Outdoor Lounge</option>
                             </optgroup>
                         </select>
