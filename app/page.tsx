@@ -712,33 +712,56 @@ export default function Home() {
                             <button onClick={() => window.location.href = `${API}/download-zip/${jobName}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-xl font-black uppercase text-[10px] hover:bg-[#009183] hover:text-white transition-colors">Export ZIP</button>
                         </div>
                         <div className="grid grid-cols-2 gap-10 pb-20">
-                            {galleryImages.map((img) => (
-                                <div key={img.name} className="group space-y-3">
-                                    <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] hover:shadow-[0_20px_40px_-15px_rgba(0,145,131,0.2)] hover:border-white/20 transition-all duration-300" onClick={() => { if(!img.video) { setCompareData({raw: img.raw, edited: img.edited}); setActiveModal('compare'); } }}>
-                                        <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(img.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all shadow-lg border border-red-900/50 hover:border-red-500" title="Delete Image">🗑️</button>
-                                        {img.video ? (
-                                            <>
-                                                <video src={img.video} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none" />
-                                                <div className="absolute top-4 left-4 bg-purple-600 text-white text-[9px] font-black px-3 py-1.5 rounded shadow-lg z-30 uppercase tracking-widest border border-purple-400/50">🎬 Cinematic Video</div>
-                                            </>
-                                        ) : (
-                                            /* eslint-disable-next-line @next/next/no-img-element */
-                                            <img src={img.edited} className="w-full h-full object-cover" alt="Rendered result" />
-                                        )}
-                                        {!img.video && <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center pointer-events-none z-20"><span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full transition-opacity backdrop-blur-sm">Click to Compare</span></div>}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {img.approved ? <div className="flex-1 py-3 bg-[#009183]/20 text-[#00b09f] font-black uppercase text-[10px] text-center rounded-xl border border-[#009183]/30">Approved</div> : <><button onClick={() => approveImage(img.name)} className="flex-1 py-3 bg-[#009183] text-white font-black uppercase text-[10px] rounded-xl hover:bg-[#00b09f] transition-all">Approve 4K</button><button onClick={() => openCanvasStudio(img.name, 'retouch', img.edited)} className="flex-1 py-3 bg-[#0f172a] border border-slate-700 text-slate-300 font-black uppercase text-[10px] rounded-xl hover:bg-slate-800 transition-colors">Retouch</button></>}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleDownloadSingle(img.video || img.edited, img.video ? img.name.replace('.jpg', '.mp4') : img.name)} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Download {img.video ? 'Video' : ''}</button>
-                                        <button onClick={() => { setCurrentCanvasImgId(img.name); setActiveModal('rerender'); }} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Re-Render</button>
-                                    </div>
-                                    {!img.video && (
-                                        <div className="flex mt-1">
-                                            <button onClick={() => { setCurrentCanvasImgId(img.name); setActiveModal('video'); }} className="flex-1 py-3 bg-purple-900/30 border border-purple-700/50 text-purple-400 font-black uppercase text-[10px] rounded-xl hover:bg-purple-800 hover:text-white hover:border-purple-500 transition-all shadow-[0_0_15px_rgba(147,51,234,0.15)] hover:shadow-[0_0_20px_rgba(147,51,234,0.4)]">🎬 Animate with Veo AI</button>
-                                        </div>
-                                    )}
+{galleryImages.map((item) => (
+    <div key={item.name} className="group space-y-3">
+        <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] transition-all duration-300">
+            
+            <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(item.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 transition-all shadow-lg border border-red-900/50">🗑️</button>
+
+            {item.type === 'video' ? (
+                <>
+                    <video src={item.url} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-10" />
+                    <div className="absolute top-4 left-4 bg-purple-600 text-white text-[9px] font-black px-3 py-1.5 rounded shadow-lg z-30 uppercase tracking-widest border border-purple-400/50">🎬 Cinematic Video</div>
+                </>
+            ) : (
+                <div onClick={() => { setCompareData({raw: item.raw || item.url, edited: item.url}); setActiveModal('compare'); }}>
+                    <img src={item.url} className="w-full h-full object-cover" alt="Rendered result" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center pointer-events-none z-20">
+                        <span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full transition-opacity backdrop-blur-sm">Click to Compare</span>
+                    </div>
+                </div>
+            )}
+        </div>
+        
+        <div className="flex gap-2">
+            {item.type === 'image' && (
+                <>
+                    {item.approved ? (
+                        <div className="flex-1 py-3 bg-[#009183]/20 text-[#00b09f] font-black uppercase text-[10px] text-center rounded-xl border border-[#009183]/30">Approved</div>
+                    ) : (
+                        <>
+                            <button onClick={() => approveImage(item.name)} className="flex-1 py-3 bg-[#009183] text-white font-black uppercase text-[10px] rounded-xl hover:bg-[#00b09f] transition-all">Approve 4K</button>
+                            <button onClick={() => openCanvasStudio(item.name, 'retouch', item.url)} className="flex-1 py-3 bg-[#0f172a] border border-slate-700 text-slate-300 font-black uppercase text-[10px] rounded-xl hover:bg-slate-800 transition-colors">Retouch</button>
+                        </>
+                    )}
+                </>
+            )}
+        </div>
+        
+        <div className="flex gap-2">
+            <button onClick={() => handleDownloadSingle(item.url, item.name)} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Download {item.type}</button>
+            {item.type === 'image' && (
+                <button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('rerender'); }} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Re-Render</button>
+            )}
+        </div>
+        
+        {item.type === 'image' && (
+            <div className="flex mt-1">
+                <button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('video'); }} className="flex-1 py-3 bg-purple-900/30 border border-purple-700/50 text-purple-400 font-black uppercase text-[10px] rounded-xl hover:bg-purple-800 hover:text-white shadow-[0_0_15px_rgba(147,51,234,0.15)] transition-all">🎬 Animate with Veo AI</button>
+            </div>
+        )}
+    </div>
+))}
                                 </div>
                             ))}
                         </div>
