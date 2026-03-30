@@ -8,7 +8,18 @@ const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.ap
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; };
-type GalleryImage = { name: string; raw: string; edited: string; approved?: boolean; video?: string; };
+
+// OPPDATERT TYPE FOR Å STØTTE VIDEO SOM EGET OBJEKT
+type GalleryImage = { 
+  name: string; 
+  url: string; 
+  type: 'image' | 'video'; 
+  raw?: string; 
+  edited?: string; 
+  approved?: boolean; 
+  video?: string; 
+};
+
 type OrderArchive = { name: string; date: string; status: string; };
 
 export default function Home() {
@@ -95,9 +106,6 @@ export default function Home() {
               }
               return prev;
             });
-          } else if (payload.eventType === 'DELETE') {
-            const deleted = payload.old as any;
-            setArchiveOrders(prev => prev.filter(o => o.name !== deleted.name));
           }
         }
       )
@@ -109,6 +117,7 @@ export default function Home() {
     };
   }, [user]);
 
+  // POLL-LOGIKK FOR Å STOPPE PROGRESS BAR
   useEffect(() => {
       const activeOrder = archiveOrders.find(o => o.name === jobName);
       if ((activeOrder?.status === 'completed' || activeOrder?.status === 'finished') && isRendering) {
@@ -139,6 +148,7 @@ export default function Home() {
       if (pollTimer.current) clearTimeout(pollTimer.current);
       setJobName(""); setUploadedFiles([]); setStagingRooms([]); setRoomCounter(0); setGalleryImages([]); setIsRendering(false); setProgressPct(0); setActiveModal('none'); 
   };
+
   const addRoom = () => { const newId = roomCounter + 1; setRoomCounter(newId); setStagingRooms(prev => [...prev, { id: `room_${newId}`, style: "staging_scandi", hero_img_id: null, images: [] }]); };
   const handleDragStart = (e: React.DragEvent<HTMLElement>, imgId: string) => { e.dataTransfer.setData("text/plain", imgId); e.dataTransfer.effectAllowed = "move"; (e.target as HTMLElement).style.opacity = "0.5"; };
   const handleDragEnd = (e: React.DragEvent<HTMLElement>) => { (e.target as HTMLElement).style.opacity = "1"; };
@@ -259,13 +269,8 @@ export default function Home() {
     if (!canvas || !hiddenCanvas) return;
     const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d');
     if (!ctx || !hiddenCtx) return;
-
-    const rect = canvas.getBoundingClientRect(); 
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width); 
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    
-    ctx.beginPath(); ctx.moveTo(x, y);
-    hiddenCtx.beginPath(); hiddenCtx.moveTo(x, y);
+    const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    ctx.beginPath(); ctx.moveTo(x, y); hiddenCtx.beginPath(); hiddenCtx.moveTo(x, y);
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -273,13 +278,7 @@ export default function Home() {
     if (isDrawing.current) drawOnCanvas(e);
   };
   
-  const handleCanvasMouseUp = () => { 
-      if (isDrawing.current) { 
-          saveCanvasState(); 
-          isDrawing.current = false; 
-          renderCanvas(); 
-      } 
-  };
+  const handleCanvasMouseUp = () => { if (isDrawing.current) { saveCanvasState(); isDrawing.current = false; renderCanvas(); } };
 
   const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => {
     const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
@@ -287,13 +286,8 @@ export default function Home() {
     const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d');
     if (!ctx || !hiddenCtx) return;
     const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    
-    hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round';
-    hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); 
-    
-    ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.strokeStyle = activeModal === 'mask' ? 'rgba(0, 255, 131, 0.4)' : 'rgba(239, 68, 68, 0.4)'; 
-    ctx.lineTo(x, y); ctx.stroke(); 
+    hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); 
+    ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = activeModal === 'mask' ? 'rgba(0, 255, 131, 0.4)' : 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); 
   };
 
   const saveFloorMask = () => {
@@ -312,14 +306,9 @@ export default function Home() {
   const submitRetouch = async () => {
       if(!retouchPrompt) return;
       setActiveModal('none');
-      
       setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
       if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
-
-      setIsRendering(true);
-      setProgressPct(0);
-      setProgressStatus("Initializing Retouch...");
-
+      setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch...");
       const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
       if (!canvas || !hiddenCanvas) return;
       const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height;
@@ -329,24 +318,17 @@ export default function Home() {
       const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
       for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } }
       aCtx.putImageData(maskData, 0, 0);
-      
       apiCanvas.toBlob(async (b) => {
           if(!b) return;
           const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
-          try { 
-              await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); 
-              pollProgress(jobName); 
-          } catch(e) { 
-              console.error(e); 
-              setProgressStatus("Error connecting to server!");
-          }
+          try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); pollProgress(jobName); } catch(e) { console.error(e); }
       }, 'image/png');
   };
 
   const handleDownloadSingle = async (url: string, filename: string) => {
       try {
           const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'render.jpg';
+          const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'file';
           document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       } catch (error) { window.open(url, '_blank'); }
   };
@@ -354,39 +336,22 @@ export default function Home() {
   const startExpressRender = async () => {
     if (!jobName || uploadedFiles.length === 0) return;
     if (pollTimer.current) clearTimeout(pollTimer.current);
-    
-    const safeJobName = jobName.replace(/ /g, "_");
-    setJobName(safeJobName);
-
+    const safeJobName = jobName.replace(/ /g, "_"); setJobName(safeJobName);
     setIsRendering(true); setProgressPct(0); setProgressStatus("Uploading to cloud...");
     const fd = new FormData(); fd.append('job_name', safeJobName);
-    
-    const cfg: any = {}; 
-    uploadedFiles.forEach(f => { 
-        fd.append('files', f.file); 
-        cfg[f.file.name] = { type: f.type, style: f.style, prompt: f.prompt }; 
-    });
-    
+    const cfg: any = {}; uploadedFiles.forEach(f => { fd.append('files', f.file); cfg[f.file.name] = { type: f.type, style: f.style, prompt: f.prompt }; });
     fd.append('config', JSON.stringify(cfg));
     try { 
         await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
-        if (user) {
-            await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
-        }
+        if (user) await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
         pollProgress(safeJobName); 
-    } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
+    } catch (error) { console.error(error); }
   };
 
   const startStagingRender = async () => {
       if (!jobName) return;
-      const assignedImageIds = stagingRooms.flatMap(r => r.images);
-      const unassigned = uploadedFiles.filter(f => !assignedImageIds.includes(f.id));
-      if (unassigned.length > 0) { alert("Please drag all images into a room before starting."); return; }
       if (pollTimer.current) clearTimeout(pollTimer.current);
-      
-      const safeJobName = jobName.replace(/ /g, "_");
-      setJobName(safeJobName);
-
+      const safeJobName = jobName.replace(/ /g, "_"); setJobName(safeJobName);
       setIsRendering(true); setProgressPct(0); setProgressStatus("Analyzing Spatial Data...");
       const fd = new FormData(); fd.append('job_name', safeJobName);
       const cfg: any = {};
@@ -399,38 +364,21 @@ export default function Home() {
       fd.append('config', JSON.stringify(cfg));
       try { 
           await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); 
-          if (user) {
-              await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
-          }
+          if (user) await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
           pollProgress(safeJobName); 
-      } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
+      } catch (error) { console.error(error); }
   };
 
   const pollProgress = async (pollingJobName: string) => {
     try {
         const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
         const s = await r.json();
-        
         if (s.lifetime_completed) setTotalRenders(s.lifetime_completed);
-        
-        if (s.status === 'error') {
-            setProgressStatus(`Error: ${s.message}`);
-            return;
-        }
-        
         if (s.total > 0 && s.status !== 'finished') {
             setProgressPct((s.completed / s.total) * 100); 
             setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
         }
-        
-        if (s.status === 'finished') {
-            // Vi henter galleriet manuelt med en gang vi får finished i polleren
-            loadGallery(pollingJobName);
-            return; 
-        }
-        
-    } catch (e) { console.error("Feil ved sjekking av fremdrift:", e); }
-    
+    } catch (e) { console.error(e); }
     pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
   };
 
@@ -445,9 +393,7 @@ export default function Home() {
           const res = await fetch(`${API}/list-finished/?job_name=${name}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
-      } catch (e) {
-          console.error(e);
-      } 
+      } catch (e) { console.error(e); } 
   };
 
   const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(jobName); };
@@ -458,16 +404,16 @@ export default function Home() {
       if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
       setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render...");
       const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
-      try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(jobName); } catch(e) { console.error(e); setProgressStatus("Error connecting to server!"); }
+      try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(jobName); } catch(e) { console.error(e); }
   };
 
   const submitVideo = async () => {
       setActiveModal('none');
       setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
       if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
-      setIsRendering(true); setProgressPct(0); setProgressStatus("Generating Cinematic Video Magic... (This takes 1-2 mins)");
+      setIsRendering(true); setProgressPct(0); setProgressStatus("Generating Cinematic Video Magic...");
       const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', videoPrompt);
-      try { await fetch(`${API}/generate-video/`, { method: 'POST', body: fd }); pollProgress(jobName); } catch(e) { console.error(e); setProgressStatus("Error connecting to server!"); }
+      try { await fetch(`${API}/generate-video/`, { method: 'POST', body: fd }); pollProgress(jobName); } catch(e) { console.error(e); }
   };
 
   const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -500,7 +446,7 @@ export default function Home() {
         </div>
         <div className="flex bg-[#0B1120] p-1 rounded-xl border border-slate-700">
           <button onClick={() => setCurrentMode('express')} className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${currentMode === 'express' ? 'bg-[#009183] text-white' : 'text-slate-500 hover:text-white'}`}>⚡ Express</button>
-          <button onClick={() => { setCurrentMode('staging'); if (stagingRooms.length===0 && uploadedFiles.length>0) addRoom(); }} className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${currentMode === 'staging' ? 'bg-[#009183] text-white' : 'text-slate-500 hover:text-white'}`}>🛋️ Staging</button>
+          <button onClick={() => setCurrentMode('staging')} className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${currentMode === 'staging' ? 'bg-[#009183] text-white' : 'text-slate-500 hover:text-white'}`}>🛋️ Staging</button>
         </div>
         <div className="flex items-center gap-6"><div className="text-right"><p className="text-2xl font-black text-[#009183] montserrat leading-none">{totalRenders}</p><p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Total Renders</p></div></div>
       </header>
@@ -508,18 +454,10 @@ export default function Home() {
       <main className="flex flex-1 overflow-hidden">
         <aside className="w-80 bg-[#0f172a]/50 border-r border-white/5 flex flex-col p-6 z-10">
           <button onClick={createNewJob} className="w-full py-4 bg-[#009183] text-white font-black uppercase text-sm tracking-widest rounded-xl hover:bg-[#00b09f] mb-8 transition-colors">+ New Project</button>
-          
           <div className="mb-4">
             <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Archive</h2>
-            <input 
-                type="text" 
-                placeholder="Search..." 
-                value={searchTerm} 
-                onChange={(e) => setSearchTerm(e.target.value)} 
-                className="w-full bg-[#0B1120] rounded-xl px-4 py-3 text-[10px] text-white outline-none border border-slate-700 focus:border-[#009183] placeholder-slate-600 uppercase tracking-widest font-bold"
-            />
+            <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-[#0B1120] rounded-xl px-4 py-3 text-[10px] text-white outline-none border border-slate-700 focus:border-[#009183] placeholder-slate-600 uppercase tracking-widest font-bold" />
           </div>
-
           <div className="flex-1 overflow-y-auto space-y-2 pr-2">
             {filteredOrders.map(order => (
                 <div key={order.name} onClick={() => viewOrder(order.name)} className="cursor-pointer p-4 rounded-xl bg-[#0f172a]/50 hover:bg-[#1e293b] border border-white/5 hover:border-white/20 transition-all flex flex-col gap-3 group">
@@ -530,17 +468,12 @@ export default function Home() {
                         </div>
                         <div>
                             {order.status === 'completed' || order.status === 'finished' ? (
-                                <span className="flex items-center gap-1.5 text-[8px] font-black text-[#00ff83] uppercase bg-[#00ff83]/10 px-2 py-1.5 rounded border border-[#00ff83]/20 shadow-[0_0_10px_rgba(0,255,131,0.1)]">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[#00ff83]"></div> Ready
-                                </span>
+                                <span className="flex items-center gap-1.5 text-[8px] font-black text-[#00ff83] uppercase bg-[#00ff83]/10 px-2 py-1.5 rounded border border-[#00ff83]/20 shadow-[0_0_10px_rgba(0,255,131,0.1)]"><div className="w-1.5 h-1.5 rounded-full bg-[#00ff83]"></div> Ready</span>
                             ) : (
-                                <span className="flex items-center gap-1.5 text-[8px] font-black text-yellow-400 uppercase bg-yellow-400/10 px-2 py-1.5 rounded border border-yellow-400/20">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></div> Work
-                                </span>
+                                <span className="flex items-center gap-1.5 text-[8px] font-black text-yellow-400 uppercase bg-yellow-400/10 px-2 py-1.5 rounded border border-yellow-400/20"><div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></div> Work</span>
                             )}
                         </div>
                     </div>
-                    
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity h-0 group-hover:h-auto overflow-hidden">
                         <button onClick={(e) => renameOrder(e, order.name)} className="flex-1 py-1.5 bg-[#0B1120] text-slate-400 hover:text-white rounded border border-slate-700 hover:border-[#009183] text-[9px] font-bold uppercase transition-colors">✏️ Edit</button>
                         <button onClick={(e) => deleteOrder(e, order.name)} className="flex-1 py-1.5 bg-red-950/30 text-red-400 hover:text-white rounded border border-red-900/50 hover:border-red-500 text-[9px] font-bold uppercase transition-colors">🗑️ Delete</button>
@@ -552,7 +485,6 @@ export default function Home() {
 
         <section className="flex-1 overflow-y-auto p-12 bg-[#0B1120] relative">
             <div className="max-w-6xl mx-auto space-y-8">
-                
                 {uploadedFiles.length === 0 && galleryImages.length === 0 && (
                   <div className="glass p-16 border-2 border-dashed border-slate-700 flex flex-col items-center gap-8">
                       <input type="text" value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="PROJECT NAME" className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-4xl font-black montserrat text-white outline-none focus:border-[#009183] uppercase pb-3" />
@@ -562,126 +494,66 @@ export default function Home() {
                 )}
 
                 {uploadedFiles.length > 0 && currentMode === 'express' && !isRendering && galleryImages.length === 0 && (
-                  <div className="space-y-8 animate-in fade-in duration-300">
-                      <div className="glass p-8">
-                          <h2 className="font-bold uppercase text-xs tracking-widest text-slate-400 mb-6">Express Settings</h2>
-                          <div className="grid grid-cols-3 gap-6">
-                            {uploadedFiles.map((file) => (
-                              <div key={file.id} className="bg-[#0f172a] rounded-xl overflow-hidden border border-slate-700 relative flex flex-col">
-                                <button onClick={() => removeFile(file.id)} className="absolute top-2 right-2 bg-red-500/80 text-white rounded-full w-6 h-6 flex items-center justify-center text-[10px] font-black z-10 hover:bg-red-600 transition-colors shadow">X</button>
-                                <div className="aspect-[3/2] relative border-b border-slate-700">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={file.url} alt="upload" className="w-full h-full object-cover" />
+                  <div className="space-y-8">
+                      <div className="grid grid-cols-3 gap-6">
+                        {uploadedFiles.map((file) => (
+                          <div key={file.id} className="bg-[#0f172a] rounded-xl overflow-hidden border border-slate-700 relative flex flex-col">
+                            <button onClick={() => removeFile(file.id)} className="absolute top-2 right-2 bg-red-500/80 text-white rounded-full w-6 h-6 flex items-center justify-center text-[10px] font-black z-10 hover:bg-red-600">X</button>
+                            <img src={file.url} alt={`Upload ${file.id}`} className="aspect-[3/2] object-cover" />
+                            <div className="p-3 flex flex-col gap-2">
+                                <div className="flex gap-2">
+                                    <select value={file.type} onChange={(e) => updateFileField(file.id, 'type', e.target.value)} className="w-1/2 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
+                                    <select value={file.style} onChange={(e) => updateFileField(file.id, 'style', e.target.value)} className="w-1/2 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none">
+                                        <optgroup label="Lighting"><option value="weather_rain_to_sun">Rain to Sun</option><option value="sunny_midday">Sunny Midday</option><option value="dusk_blue_hour">Blue Hour</option><option value="dusk_purple_orange">Purple Dusk</option><option value="early_morning">Early Morning</option></optgroup>
+                                        <optgroup label="Season"><option value="winter">Winter</option><option value="autumn">Autumn</option><option value="spring">Spring</option><option value="summer">Summer</option></optgroup>
+                                        <optgroup label="Staging"><option value="staging_scandi">Scandi</option><option value="staging_luxury">Luxury</option><option value="staging_outdoor">Outdoor Lounge</option></optgroup>
+                                    </select>
                                 </div>
-                                <div className="p-3 flex flex-col gap-2">
-                                    <div className="flex gap-2">
-                                        <select value={file.type} onChange={(e) => updateFileField(file.id, 'type', e.target.value)} className="w-1/2 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none focus:border-[#009183]">
-                                            <option value="exterior">Exterior</option>
-                                            <option value="interior">Interior</option>
-                                            <option value="drone">Drone</option>
-                                        </select>
-                                        <select value={file.style} onChange={(e) => updateFileField(file.id, 'style', e.target.value)} className="w-1/2 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none focus:border-[#009183]">
-                                            <optgroup label="Lighting">
-                                                <option value="weather_rain_to_sun">Rain to Sun</option>
-                                                <option value="sunny_midday">Sunny Midday</option>
-                                                <option value="dusk_blue_hour">Blue Hour</option>
-                                                <option value="dusk_purple_orange">Purple Dusk</option>
-                                                <option value="early_morning">Early Morning</option>
-                                            </optgroup>
-                                            <optgroup label="Season">
-                                                <option value="winter">Winter</option>
-                                                <option value="autumn">Autumn</option>
-                                                <option value="spring">Spring</option>
-                                                <option value="summer">Summer</option>
-                                            </optgroup>
-                                            <optgroup label="Staging (Single Image)">
-                                                <option value="staging_scandi">Scandi Minimalism</option>
-                                                <option value="staging_luxury">Classic Luxury</option>
-                                                <option value="staging_outdoor">Outdoor Lounge</option>
-                                            </optgroup>
-                                        </select>
-                                    </div>
-                                    <input type="text" placeholder="Custom prompt (overrides dropdowns)..." value={file.prompt} onChange={(e) => updateFileField(file.id, 'prompt', e.target.value)} className="w-full bg-[#0B1120] rounded-lg px-3 py-2 text-[10px] text-white outline-none border border-slate-700 focus:border-[#009183] placeholder-slate-600" />
-                                </div>
-                              </div>
-                            ))}
+                                <input type="text" placeholder="Custom prompt..." value={file.prompt} onChange={(e) => updateFileField(file.id, 'prompt', e.target.value)} className="w-full bg-[#0B1120] rounded-lg px-3 py-2 text-[10px] text-white outline-none border border-slate-700 focus:border-[#009183]" />
+                            </div>
                           </div>
-                          <div className="mt-8 flex justify-between items-center bg-[#0f172a] p-6 rounded-2xl border border-white/5">
-                              <div className="flex gap-4">
-                                  <select value={globalType} onChange={(e) => setGlobalType(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
-                                  <select value={globalStyle} onChange={(e) => setGlobalStyle(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none">
-                                      <optgroup label="Lighting & Weather">
-                                        <option value="weather_rain_to_sun">Rain to Sun</option>
-                                        <option value="sunny_midday">Sunny Midday</option>
-                                        <option value="dusk_blue_hour">Blue Hour</option>
-                                        <option value="dusk_purple_orange">Purple Dusk</option>
-                                        <option value="early_morning">Early Morning</option>
-                                      </optgroup>
-                                      <optgroup label="Season">
-                                        <option value="winter">Winter Wonderland</option>
-                                        <option value="autumn">Peak Autumn</option>
-                                        <option value="spring">Early Spring</option>
-                                        <option value="summer">Mid-Summer</option>
-                                      </optgroup>
-                                      <optgroup label="Staging (Single Image)">
-                                          <option value="staging_scandi">Scandi Minimalism</option>
-                                          <option value="staging_luxury">Classic Luxury</option>
-                                          <option value="staging_outdoor">Outdoor Lounge</option>
-                                      </optgroup>
-                                  </select>
-                                  <button onClick={applyExpressAll} className="bg-slate-800 text-white px-6 rounded-xl text-[10px] font-black uppercase hover:bg-slate-700 transition-colors">Assign All</button>
-                              </div>
-                              <button onClick={startExpressRender} className="px-10 py-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl hover:bg-[#00b09f] transition-colors shadow-[0_0_15px_rgba(0,145,131,0.3)]">Start Render</button>
+                        ))}
+                      </div>
+                      <div className="mt-8 flex justify-between items-center bg-[#0f172a] p-6 rounded-2xl border border-white/5">
+                          <div className="flex gap-4">
+                              <select value={globalType} onChange={(e) => setGlobalType(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
+                              <select value={globalStyle} onChange={(e) => setGlobalStyle(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="weather_rain_to_sun">Rain to Sun</option><option value="sunny_midday">Sunny Midday</option><option value="dusk_blue_hour">Blue Hour</option><option value="staging_scandi">Scandi Staging</option></select>
+                              <button onClick={applyExpressAll} className="bg-slate-800 text-white px-6 rounded-xl text-[10px] font-black uppercase">Assign All</button>
                           </div>
+                          <button onClick={startExpressRender} className="px-10 py-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl hover:bg-[#00b09f] shadow-[0_0_15px_rgba(0,145,131,0.3)]">Start Render</button>
                       </div>
                   </div>
                 )}
 
                 {uploadedFiles.length > 0 && currentMode === 'staging' && !isRendering && galleryImages.length === 0 && (
-                  <div className="glass p-8 bg-[#0f172a]/50 animate-in fade-in duration-300 border border-[#009183]/30">
+                  <div className="glass p-8 bg-[#0f172a]/50 border border-[#009183]/30">
                     <div className="flex justify-between items-center mb-6">
-                        <h2 className="font-bold uppercase text-xs tracking-widest text-[#009183]">Spatial Staging Workspace</h2>
-                        <button onClick={addRoom} className="px-4 py-2 border border-[#009183] text-[#009183] text-[10px] font-black uppercase rounded-lg hover:bg-[#009183] hover:text-white transition-colors">+ Add Room</button>
+                        <h2 className="font-bold uppercase text-xs tracking-widest text-[#009183]">Spatial Staging</h2>
+                        <button onClick={addRoom} className="px-4 py-2 border border-[#009183] text-[#009183] text-[10px] font-black uppercase rounded-lg">+ Add Room</button>
                     </div>
                     <div className="flex gap-8">
                         <div className="w-1/3 bg-[#0B1120] p-4 rounded-xl border border-slate-800">
-                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Unassigned Assets</h3>
-                            <div className="drop-zone-room flex flex-wrap gap-2 p-2 min-h-[150px] w-full" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, 'unassigned')}>
+                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Unassigned</h3>
+                            <div className="flex flex-wrap gap-2 p-2 min-h-[150px]" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, 'unassigned')}>
                                 {unassignedFiles.map(file => (
-                                    <div key={file.id} className="relative group">
-                                        <button onClick={() => removeFile(file.id)} className="absolute -top-2 -right-2 bg-red-500/80 text-white rounded-full w-5 h-5 flex items-center justify-center text-[8px] font-black z-10 opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all shadow">X</button>
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={file.url} alt="Unassigned" draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className="draggable-img w-20 h-20 object-cover rounded-lg border border-slate-700 hover:border-[#009183]" />
-                                    </div>
+                                    <img key={file.id} src={file.url} alt={`Unassigned ${file.id}`} draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className="w-20 h-20 object-cover rounded-lg border border-slate-700" />
                                 ))}
                             </div>
                         </div>
                         <div className="w-2/3 space-y-6">
                             {stagingRooms.map((room, index) => (
                                 <div key={room.id} className="bg-[#0B1120] p-5 rounded-xl border border-slate-800" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, room.id)}>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-[10px] font-black text-white uppercase tracking-widest">Room {index + 1}</h3>
-                                        <select value={room.style} onChange={(e) => updateRoomStyle(room.id, e.target.value)} className="bg-[#0f172a] text-slate-300 rounded px-2 py-1 text-[9px] font-bold uppercase outline-none border border-slate-700">
-                                            <option value="staging_scandi">Scandi Minimalism</option>
-                                            <option value="staging_luxury">Classic Luxury</option>
-                                            <option value="staging_outdoor">Outdoor Lounge</option>
-                                        </select>
-                                    </div>
-                                    <div className="drop-zone-room flex flex-wrap gap-4 p-4 min-h-[150px] w-full">
+                                    <div className="flex justify-between items-center mb-4"><h3 className="text-[10px] font-black text-white uppercase tracking-widest">Room {index + 1}</h3><select value={room.style} onChange={(e) => updateRoomStyle(room.id, e.target.value)} className="bg-[#0f172a] text-slate-300 rounded px-2 py-1 text-[9px] font-bold uppercase border border-slate-700 outline-none"><option value="staging_scandi">Scandi</option><option value="staging_luxury">Luxury</option></select></div>
+                                    <div className="flex flex-wrap gap-4 p-4 min-h-[150px]">
                                         {room.images.map(imgId => {
                                             const file = uploadedFiles.find(f => f.id === imgId);
                                             if (!file) return null;
                                             const isHero = room.hero_img_id === imgId;
                                             return (
                                                 <div key={file.id} className="relative w-24 h-24 group">
-                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img src={file.url} alt="Room img" draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className={`draggable-img w-full h-full object-cover rounded-lg border-2 ${isHero ? 'border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.4)]' : 'border-slate-700'}`} />
-                                                    <div onClick={() => openCanvasStudio(file.id, 'mask')} className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center rounded-lg transition-opacity backdrop-blur-sm z-10 cursor-pointer">
-                                                        <span className="text-white text-[8px] font-bold uppercase text-center mb-1">Canvas Tool</span>
-                                                        <span className="text-white text-[8px] font-black uppercase text-center border border-white px-2 py-1 rounded hover:bg-white hover:text-black transition-colors">🖌️ Mask</span>
-                                                    </div>
-                                                    {file.maskBlob && <div className="absolute bottom-1 right-1 bg-green-500 text-white text-[8px] font-black uppercase px-1 rounded z-20 shadow">Masked</div>}
-                                                    <div onClick={() => setHero(room.id, file.id)} className={`hero-star absolute -top-2 -left-2 text-2xl z-20 ${isHero ? 'is-hero' : ''}`}>⭐️</div>
+                                                    <img src={file.url} alt={`Staging ${file.id}`} draggable onDragStart={(e) => handleDragStart(e, file.id)} className={`w-full h-full object-cover rounded-lg border-2 ${isHero ? 'border-yellow-400' : 'border-slate-700'}`} />
+                                                    <div onClick={() => openCanvasStudio(file.id, 'mask')} className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-lg cursor-pointer transition-opacity"><span className="text-white text-[8px] font-black uppercase border border-white px-2 py-1 rounded">🖌️ Mask</span></div>
+                                                    <div onClick={() => setHero(room.id, file.id)} className={`absolute -top-2 -left-2 text-2xl z-20 cursor-pointer ${isHero ? '' : 'grayscale'}`}>⭐️</div>
                                                 </div>
                                             );
                                         })}
@@ -690,18 +562,14 @@ export default function Home() {
                             ))}
                         </div>
                     </div>
-                    <div className="mt-8 flex justify-end">
-                        <button onClick={startStagingRender} className="px-10 py-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl hover:bg-[#00b09f] shadow-[0_0_15px_rgba(0,145,131,0.3)] transition-all">Start Spatial Staging</button>
-                    </div>
+                    <div className="mt-8 flex justify-end"><button onClick={startStagingRender} className="px-10 py-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl">Start Staging</button></div>
                   </div>
                 )}
 
-                {isRendering && (
-                  <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8 sticky top-10 z-[40]">
+                {isRendering && activeModal === 'none' && (
+                  <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8">
                       <p className="font-black montserrat uppercase tracking-[0.3em] text-sm text-[#009183] animate-pulse">{progressStatus}</p>
-                      <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10">
-                          <div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-700" style={{ width: `${progressPct}%` }}></div>
-                      </div>
+                      <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10"><div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-700" style={{ width: `${progressPct}%` }}></div></div>
                   </div>
                 )}
 
@@ -712,56 +580,36 @@ export default function Home() {
                             <button onClick={() => window.location.href = `${API}/download-zip/${jobName}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-xl font-black uppercase text-[10px] hover:bg-[#009183] hover:text-white transition-colors">Export ZIP</button>
                         </div>
                         <div className="grid grid-cols-2 gap-10 pb-20">
-{galleryImages.map((item) => (
-    <div key={item.name} className="group space-y-3">
-        <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] transition-all duration-300">
-            
-            <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(item.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 transition-all shadow-lg border border-red-900/50">🗑️</button>
-
-            {item.type === 'video' ? (
-                <>
-                    <video src={item.url} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-10" />
-                    <div className="absolute top-4 left-4 bg-purple-600 text-white text-[9px] font-black px-3 py-1.5 rounded shadow-lg z-30 uppercase tracking-widest border border-purple-400/50">🎬 Cinematic Video</div>
-                </>
-            ) : (
-                <div onClick={() => { setCompareData({raw: item.raw || item.url, edited: item.url}); setActiveModal('compare'); }}>
-                    <img src={item.url} className="w-full h-full object-cover" alt="Rendered result" />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center pointer-events-none z-20">
-                        <span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full transition-opacity backdrop-blur-sm">Click to Compare</span>
-                    </div>
-                </div>
-            )}
-        </div>
-        
-        <div className="flex gap-2">
-            {item.type === 'image' && (
-                <>
-                    {item.approved ? (
-                        <div className="flex-1 py-3 bg-[#009183]/20 text-[#00b09f] font-black uppercase text-[10px] text-center rounded-xl border border-[#009183]/30">Approved</div>
-                    ) : (
-                        <>
-                            <button onClick={() => approveImage(item.name)} className="flex-1 py-3 bg-[#009183] text-white font-black uppercase text-[10px] rounded-xl hover:bg-[#00b09f] transition-all">Approve 4K</button>
-                            <button onClick={() => openCanvasStudio(item.name, 'retouch', item.url)} className="flex-1 py-3 bg-[#0f172a] border border-slate-700 text-slate-300 font-black uppercase text-[10px] rounded-xl hover:bg-slate-800 transition-colors">Retouch</button>
-                        </>
-                    )}
-                </>
-            )}
-        </div>
-        
-        <div className="flex gap-2">
-            <button onClick={() => handleDownloadSingle(item.url, item.name)} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Download {item.type}</button>
-            {item.type === 'image' && (
-                <button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('rerender'); }} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Re-Render</button>
-            )}
-        </div>
-        
-        {item.type === 'image' && (
-            <div className="flex mt-1">
-                <button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('video'); }} className="flex-1 py-3 bg-purple-900/30 border border-purple-700/50 text-purple-400 font-black uppercase text-[10px] rounded-xl hover:bg-purple-800 hover:text-white shadow-[0_0_15px_rgba(147,51,234,0.15)] transition-all">🎬 Animate with Veo AI</button>
-            </div>
-        )}
-    </div>
-))}
+                            {galleryImages.map((item) => (
+                                <div key={item.name} className="group space-y-3">
+                                    <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] transition-all duration-300">
+                                        <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(item.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 transition-all shadow-lg border border-red-900/50">🗑️</button>
+                                        {item.type === 'video' ? (
+                                            <>
+                                                <video src={item.url} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-10" />
+                                                <div className="absolute top-4 left-4 bg-purple-600 text-white text-[9px] font-black px-3 py-1.5 rounded shadow-lg z-30 uppercase tracking-widest border border-purple-400/50">🎬 Cinematic Video</div>
+                                            </>
+                                        ) : (
+                                            <div onClick={() => { setCompareData({raw: item.raw || item.url, edited: item.url}); setActiveModal('compare'); }}>
+                                                <img src={item.url} className="w-full h-full object-cover" alt={`Render ${item.name}`} />
+                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center pointer-events-none z-20"><span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full transition-opacity backdrop-blur-sm">Click to Compare</span></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {item.type === 'image' && (
+                                            <>
+                                                {item.approved ? <div className="flex-1 py-3 bg-[#009183]/20 text-[#00b09f] font-black uppercase text-[10px] text-center rounded-xl border border-[#009183]/30">Approved</div> : <><button onClick={() => approveImage(item.name)} className="flex-1 py-3 bg-[#009183] text-white font-black uppercase text-[10px] rounded-xl hover:bg-[#00b09f] transition-all">Approve 4K</button><button onClick={() => openCanvasStudio(item.name, 'retouch', item.url)} className="flex-1 py-3 bg-[#0f172a] border border-slate-700 text-slate-300 font-black uppercase text-[10px] rounded-xl hover:bg-slate-800 transition-colors">Retouch</button></>}
+                                            </>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleDownloadSingle(item.url, item.name)} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Download {item.type}</button>
+                                        {item.type === 'image' && <button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('rerender'); }} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Re-Render</button>}
+                                    </div>
+                                    {item.type === 'image' && (
+                                        <div className="flex mt-1"><button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('video'); }} className="flex-1 py-3 bg-purple-900/30 border border-purple-700/50 text-purple-400 font-black uppercase text-[10px] rounded-xl hover:bg-purple-800 hover:text-white shadow-[0_0_15px_rgba(147,51,234,0.15)] transition-all">🎬 Animate with Veo AI</button></div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -774,33 +622,23 @@ export default function Home() {
       {/* --- ALL MODALS --- */}
       {(activeModal === 'mask' || activeModal === 'retouch') && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
-            <div className="flex justify-between items-center w-[85vw] max-w-[1100px]">
-                <h2 className="text-2xl font-black text-white uppercase montserrat tracking-widest text-[#009183]">{activeModal === 'mask' ? 'Paint Floor Area' : 'Retouch Studio'}</h2>
-                <button onClick={() => setActiveModal('none')} className="text-slate-400 font-bold uppercase text-xs hover:text-white transition-colors">Close</button>
-            </div>
-            <div className="relative w-[85vw] max-w-[1100px] aspect-[3/2] bg-black border border-white/10 rounded-3xl overflow-hidden shadow-2xl" onMouseMove={handleCanvasMouseMove} onMouseDown={handleCanvasMouseDown} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp}>
-                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full z-10 cursor-none"></canvas>
-            </div>
+            <div className="flex justify-between items-center w-[85vw] max-w-[1100px]"><h2 className="text-2xl font-black text-white uppercase montserrat tracking-widest text-[#009183]">{activeModal === 'mask' ? 'Paint Floor Area' : 'Retouch Studio'}</h2><button onClick={() => setActiveModal('none')} className="text-slate-400 font-bold uppercase text-xs hover:text-white transition-colors">Close</button></div>
+            <div className="relative w-[85vw] max-w-[1100px] aspect-[3/2] bg-black border border-white/10 rounded-3xl overflow-hidden shadow-2xl" onMouseMove={handleCanvasMouseMove} onMouseDown={handleCanvasMouseDown} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp}><canvas ref={canvasRef} className="absolute inset-0 w-full h-full z-10 cursor-none"></canvas></div>
             <div className="w-[85vw] max-w-[1100px] flex gap-5 bg-[#0f172a] p-4 rounded-2xl items-center shadow-2xl border border-white/10">
-                <div className="flex flex-col gap-1 w-40 pl-2">
-                    <label className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Brush: <span className="text-white">{brushSize}</span>px</label>
-                    <input type="range" min="5" max="200" value={brushSize} onChange={(e) => setBrushSize(parseInt(e.target.value))} className="accent-[#009183] cursor-pointer" />
-                </div>
+                <div className="flex flex-col gap-1 w-40 pl-2"><label className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Brush: <span className="text-white">{brushSize}</span>px</label><input type="range" min="5" max="200" value={brushSize} onChange={(e) => setBrushSize(parseInt(e.target.value))} className="accent-[#009183] cursor-pointer" /></div>
                 <div className="w-px h-8 bg-slate-700 mx-2"></div>
-                <button onClick={undoCanvas} className="px-5 py-3 bg-[#0B1120] border border-slate-700 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors">Undo</button>
-                <button onClick={clearCanvas} className="px-5 py-3 bg-red-900/20 text-red-400 font-bold text-xs rounded-xl border border-red-900/50 hover:bg-red-900/40 transition-colors">Reset</button>
+                <button onClick={undoCanvas} className="px-5 py-3 bg-[#0B1120] border border-slate-700 text-white font-bold text-xs rounded-xl">Undo</button>
+                <button onClick={clearCanvas} className="px-5 py-3 bg-red-900/20 text-red-400 font-bold text-xs rounded-xl border border-red-900/50">Reset</button>
                 {activeModal === 'mask' ? (
                   <>
                     <div className="flex-1 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest">Only green areas will receive furniture</div>
-                    <button onClick={saveFloorMask} className="px-8 py-3 bg-[#009183] text-white font-black uppercase text-xs rounded-xl hover:bg-[#00b09f] shadow-[0_0_15px_rgba(0,145,131,0.3)] transition-all duration-300">Save Mask</button>
+                    <button onClick={saveFloorMask} className="px-8 py-3 bg-[#009183] text-white font-black uppercase text-xs rounded-xl">Save Mask</button>
                   </>
                 ) : (
                   <>
-                    <label className="flex items-center gap-2 text-slate-300 text-xs font-bold cursor-pointer ml-auto mr-4 hover:text-white transition-colors">
-                        <input type="checkbox" checked={saveAsNew} onChange={(e) => setSaveAsNew(e.target.checked)} className="w-4 h-4 accent-[#009183] bg-slate-800 border-slate-700 rounded" /> Save as new
-                    </label>
-                    <input type="text" value={retouchPrompt} onChange={(e) => setRetouchPrompt(e.target.value)} placeholder="Instruction (e.g., 'Remove the garbage bin')..." className="flex-1 max-w-sm bg-[#0B1120] rounded-xl p-3 text-sm text-white outline-none border border-slate-700 focus:border-[#009183]" />
-                    <button id="retouchBtn" onClick={submitRetouch} className="px-8 py-3 bg-[#009183] text-white font-black uppercase text-xs rounded-xl hover:bg-[#00b09f] shadow-[0_0_15px_rgba(0,145,131,0.3)] transition-all duration-300">Execute</button>
+                    <label className="flex items-center gap-2 text-slate-300 text-xs font-bold cursor-pointer ml-auto mr-4"><input type="checkbox" checked={saveAsNew} onChange={(e) => setSaveAsNew(e.target.checked)} className="w-4 h-4 accent-[#009183]" /> Save as new</label>
+                    <input type="text" value={retouchPrompt} onChange={(e) => setRetouchPrompt(e.target.value)} placeholder="Instruction..." className="flex-1 max-w-sm bg-[#0B1120] rounded-xl p-3 text-sm text-white outline-none border border-slate-700 focus:border-[#009183]" />
+                    <button onClick={submitRetouch} className="px-8 py-3 bg-[#009183] text-white font-black uppercase text-xs rounded-xl">Execute</button>
                   </>
                 )}
             </div>
@@ -810,17 +648,11 @@ export default function Home() {
       {activeModal === 'video' && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
             <div className="bg-[#0f172a] rounded-3xl p-8 shadow-2xl border border-purple-500/30 w-[500px]">
-                <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-xl font-black text-white uppercase montserrat tracking-wider text-purple-400">🎬 Video Magic</h2>
-                    <button onClick={() => setActiveModal('none')} className="text-slate-500 hover:text-white font-bold uppercase text-xs transition-colors">Cancel</button>
-                </div>
+                <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black text-white uppercase montserrat tracking-wider text-purple-400">🎬 Video Magic</h2><button onClick={() => setActiveModal('none')} className="text-slate-500 hover:text-white font-bold uppercase text-xs">Cancel</button></div>
                 <div className="space-y-6">
-                    <div>
-                        <label className="text-[10px] font-bold text-purple-300 uppercase tracking-widest mb-3 block">Director's Prompt</label>
-                        <textarea rows={3} value={videoPrompt} onChange={(e) => setVideoPrompt(e.target.value)} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-purple-500 transition-colors resize-none" />
-                    </div>
-                    <div className="text-xs text-slate-400 italic">The Veo AI will analyze your 4K render and generate a highly realistic 8-second cinematic camera movement.</div>
-                    <button onClick={submitVideo} className="w-full py-4 mt-4 bg-purple-600 text-white font-black uppercase text-xs rounded-xl hover:bg-purple-500 shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all">Action! 🎬</button>
+                    <div><label className="text-[10px] font-bold text-purple-300 uppercase tracking-widest mb-3 block">Director's Prompt</label><textarea rows={3} value={videoPrompt} onChange={(e) => setVideoPrompt(e.target.value)} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-purple-500 transition-colors resize-none" /></div>
+                    <div className="text-xs text-slate-400 italic">Highly realistic 8-second cinematic camera movement.</div>
+                    <button onClick={submitVideo} className="w-full py-4 mt-4 bg-purple-600 text-white font-black uppercase text-xs rounded-xl shadow-[0_0_20px_rgba(147,51,234,0.4)]">Action! 🎬</button>
                 </div>
             </div>
         </div>
@@ -829,43 +661,12 @@ export default function Home() {
       {activeModal === 'rerender' && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
             <div className="bg-[#0f172a] rounded-3xl p-8 shadow-2xl border border-white/10 w-[500px]">
-                <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-xl font-black text-white uppercase montserrat tracking-wider">Setup Re-Render</h2>
-                    <button onClick={() => setActiveModal('none')} className="text-slate-500 hover:text-white font-bold uppercase text-xs transition-colors">Cancel</button>
-                </div>
+                <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black text-white uppercase montserrat tracking-wider">Re-Render</h2><button onClick={() => setActiveModal('none')} className="text-slate-500 hover:text-white font-bold uppercase text-xs">Cancel</button></div>
                 <div className="space-y-6">
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Image Type</label>
-                        <select value={rerenderData.type} onChange={(e) => setRerenderData({...rerenderData, type: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183] transition-colors"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone / Aerial</option></select>
-                    </div>
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">New Style Category</label>
-                        <select value={rerenderData.style} onChange={(e) => setRerenderData({...rerenderData, style: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183] transition-colors">
-                            <optgroup label="Lighting & Weather">
-                                <option value="weather_rain_to_sun">Rain to Sun</option>
-                                <option value="sunny_midday">Sunny midday</option>
-                                <option value="dusk_blue_hour">Blue Hour</option>
-                                <option value="dusk_purple_orange">Purple Dusk</option>
-                                <option value="early_morning">Early Morning</option>
-                            </optgroup>
-                            <optgroup label="Season">
-                                <option value="winter">Winter Wonderland</option>
-                                <option value="autumn">Peak Autumn</option>
-                                <option value="spring">Early Spring</option>
-                                <option value="summer">Mid-Summer</option>
-                            </optgroup>
-                            <optgroup label="Staging">
-                                <option value="staging_scandi">Scandi</option>
-                                <option value="staging_luxury">Luxury</option>
-                                <option value="staging_outdoor">Outdoor Lounge</option>
-                            </optgroup>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Custom Prompt Override</label>
-                        <input type="text" value={rerenderData.prompt} onChange={(e) => setRerenderData({...rerenderData, prompt: e.target.value})} placeholder="Leave blank to use defaults..." className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-[#009183] transition-colors" />
-                    </div>
-                    <button id="submitRerenderBtn" onClick={submitRerender} className="w-full py-4 mt-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl hover:bg-[#00b09f] shadow-[0_0_20px_rgba(0,145,131,0.2)]">Start Re-Render</button>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Image Type</label><select value={rerenderData.type} onChange={(e) => setRerenderData({...rerenderData, type: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">New Style</label><select value={rerenderData.style} onChange={(e) => setRerenderData({...rerenderData, style: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><optgroup label="Lighting"><option value="weather_rain_to_sun">Rain to Sun</option><option value="dusk_blue_hour">Blue Hour</option></optgroup><optgroup label="Staging"><option value="staging_scandi">Scandi</option></optgroup></select></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Custom Prompt</label><input type="text" value={rerenderData.prompt} onChange={(e) => setRerenderData({...rerenderData, prompt: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-[#009183]" /></div>
+                    <button onClick={submitRerender} className="w-full py-4 mt-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl shadow-[0_0_20px_rgba(0,145,131,0.2)]">Start Re-Render</button>
                 </div>
             </div>
         </div>
@@ -874,13 +675,9 @@ export default function Home() {
       {activeModal === 'compare' && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center" onClick={() => setActiveModal('none')}>
             <div className="relative w-[90vw] max-w-[1100px] aspect-[3/2] rounded-[1.5rem] bg-black overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-white/10 cursor-col-resize" onMouseMove={handleSlider} onClick={(e) => e.stopPropagation()}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img id="modalAfter" src={compareData.edited} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10" alt="After" />
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img id="modalBefore" src={compareData.raw} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-20" alt="Before" style={{ clipPath: 'inset(0 50% 0 0)' }} />
-                <div id="modalHandle" className="absolute top-0 bottom-0 w-[2px] bg-white/50 z-30 -translate-x-1/2 pointer-events-none" style={{ left: '50%' }}>
-                    <div className="absolute top-1/2 left-1/2 w-10 h-10 bg-[#009183] border-[3px] border-[#0B1120] rounded-full -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-white font-bold shadow-xl">↔</div>
-                </div>
+                <div id="modalHandle" className="absolute top-0 bottom-0 w-[2px] bg-white/50 z-30 -translate-x-1/2 pointer-events-none" style={{ left: '50%' }}><div className="absolute top-1/2 left-1/2 w-10 h-10 bg-[#009183] border-[3px] border-[#0B1120] rounded-full -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-white font-bold shadow-xl">↔</div></div>
             </div>
         </div>
       )}
