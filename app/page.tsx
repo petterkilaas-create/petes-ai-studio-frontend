@@ -283,6 +283,9 @@ export default function Home() {
           status: 'processing' 
         }]);
 
+        // Legg den umiddelbart til i den lokale visningen så den dukker opp med en gang
+        setArchiveOrders(prev => [{ name: jobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
+
         pollProgress(); 
     } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
@@ -312,6 +315,9 @@ export default function Home() {
             status: 'processing' 
           }]);
 
+          // Legg den umiddelbart til i den lokale visningen så den dukker opp med en gang
+          setArchiveOrders(prev => [{ name: jobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
+
           pollProgress(); 
       } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
@@ -330,14 +336,18 @@ const pollProgress = async () => {
             if (s.status === 'finished') { 
                 setIsRendering(false); 
                 
-                // --- HER ER MAGIEN (STEG 2) ---
                 // Vi forteller databasen at denne jobben er ferdig:
                 await supabase
                   .from('projects')
                   .update({ status: 'completed' })
                   .eq('name', jobName)
                   .eq('user_id', user?.id);
-                // ------------------------------
+                
+                // --- HER ER MAGIEN SOM FIKSER CACHE-PROBLEMET DITT ---
+                // Vi forteller React om å oppdatere den lokale listen umiddelbart
+                setArchiveOrders(prev => prev.map(order => 
+                  order.name === jobName ? { ...order, status: 'completed' } : order
+                ));
                   
                 loadGallery(jobName); 
                 return; 
@@ -513,6 +523,8 @@ const pollProgress = async () => {
                                         <select value={room.style} onChange={(e) => updateRoomStyle(room.id, e.target.value)} className="bg-[#0f172a] text-slate-300 rounded px-2 py-1 text-[9px] font-bold uppercase outline-none border border-slate-700">
                                             <option value="staging_scandi">Scandi Minimalism</option>
                                             <option value="staging_luxury">Classic Luxury</option>
+                                            {/* NY KATEGORI LAGT TIL HER */}
+                                            <option value="staging_outdoor">Outdoor Lounge</option>
                                         </select>
                                     </div>
                                     <div className="drop-zone-room flex flex-wrap gap-4 p-4 min-h-[150px] w-full">
@@ -657,6 +669,8 @@ const pollProgress = async () => {
                             <optgroup label="Staging">
                                 <option value="staging_scandi">Scandi</option>
                                 <option value="staging_luxury">Luxury</option>
+                                {/* NY KATEGORI LAGT TIL HER OGSÅ */}
+                                <option value="staging_outdoor">Outdoor Lounge</option>
                             </optgroup>
                         </select>
                     </div>
