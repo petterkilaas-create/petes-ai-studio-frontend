@@ -21,8 +21,6 @@ export default function Home() {
   const [roomCounter, setRoomCounter] = useState(0);
   const [totalRenders, setTotalRenders] = useState(0);
   const [archiveOrders, setArchiveOrders] = useState<OrderArchive[]>([]);
-
-  // --- NY STATE FOR SØK I ARKIV ---
   const [searchTerm, setSearchTerm] = useState("");
 
   const [globalType, setGlobalType] = useState("exterior");
@@ -122,51 +120,43 @@ export default function Home() {
   const setHero = (roomId: string, imgId: string) => { setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, hero_img_id: imgId } : r)); };
   const updateRoomStyle = (roomId: string, newStyle: string) => { setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, style: newStyle } : r)); };
 
-  // --- NYE FUNKSJONER FOR FASE 2: SLETTE OG ENDRE NAVN PÅ ORDRE ---
   const deleteOrder = async (e: React.MouseEvent, orderName: string) => {
-    e.stopPropagation(); // Hindrer at vi åpner ordren når vi klikker på søppelbøtten
+    e.stopPropagation();
     if (!window.confirm(`Are you sure you want to permanently delete the project "${orderName}"?`)) return;
-
-    // 1. Slett fra Supabase
-    if (user) {
-        await supabase.from('projects').delete().eq('name', orderName).eq('user_id', user.id);
-    }
-    // 2. Slett fra Google Cloud (Sender tomt filnavn for å slette hele mappen)
-    const fd = new FormData();
-    fd.append('job_name', orderName);
-    fd.append('image_name', ''); 
+    if (user) { await supabase.from('projects').delete().eq('name', orderName).eq('user_id', user.id); }
+    const fd = new FormData(); fd.append('job_name', orderName); fd.append('image_name', ''); 
     fetch(`${API}/delete-image/`, { method: 'POST', body: fd }).catch(console.error);
-
-    // 3. Oppdater visningen
     setArchiveOrders(prev => prev.filter(o => o.name !== orderName));
-    if (jobName === orderName) createNewJob(); // Tømmer skjermen hvis du står inne i prosjektet som ble slettet
+    if (jobName === orderName) createNewJob();
   };
 
   const renameOrder = async (e: React.MouseEvent, oldName: string) => {
     e.stopPropagation();
     const newNameRaw = window.prompt("Enter new project name:", oldName);
     if (!newNameRaw || newNameRaw === oldName) return;
-    
-    const newName = newNameRaw.replace(/ /g, "_"); // Vasker bort mellomrom
-
-    // 1. Oppdater Supabase
-    if (user) {
-        await supabase.from('projects').update({ name: newName }).eq('name', oldName).eq('user_id', user.id);
-    }
-    // 2. Oppdater Google Cloud
-    const fd = new FormData();
-    fd.append('old_name', oldName);
-    fd.append('new_name', newName);
+    const newName = newNameRaw.replace(/ /g, "_");
+    if (user) { await supabase.from('projects').update({ name: newName }).eq('name', oldName).eq('user_id', user.id); }
+    const fd = new FormData(); fd.append('old_name', oldName); fd.append('new_name', newName);
     fetch(`${API}/rename-order/`, { method: 'POST', body: fd }).catch(console.error);
-
-    // 3. Oppdater visningen
     setArchiveOrders(prev => prev.map(o => o.name === oldName ? { ...o, name: newName } : o));
-    if (jobName === oldName) {
-        setJobName(newName);
-        loadGallery(newName);
-    }
+    if (jobName === oldName) { setJobName(newName); loadGallery(newName); }
   };
-  // -------------------------------------------------------------
+
+  // --- NY FUNKSJON: SLETT ENKELTBILDE I GALLERI ---
+  const deleteSingleImage = async (imgName: string) => {
+      if (!window.confirm("Are you sure you want to permanently delete this image?")) return;
+      const fd = new FormData();
+      fd.append('job_name', jobName);
+      fd.append('image_name', imgName);
+      try {
+          await fetch(`${API}/delete-image/`, { method: 'POST', body: fd });
+          // Oppdaterer state umiddelbart slik at bildet forsvinner
+          setGalleryImages(prev => prev.filter(img => img.name !== imgName));
+      } catch (e) {
+          console.error("Failed to delete image:", e);
+      }
+  };
+  // ------------------------------------------------
 
   const openCanvasStudio = (imgIdOrName: string, mode: 'mask' | 'retouch', customUrl: string | null = null) => {
     setCurrentCanvasImgId(imgIdOrName); setActiveModal(mode); setBrushSize(50);
@@ -396,8 +386,6 @@ const pollProgress = async () => {
 
   const assignedImageIds = stagingRooms.flatMap(r => r.images);
   const unassignedFiles = uploadedFiles.filter(f => !assignedImageIds.includes(f.id));
-
-  // --- NYTT FOR FASE 2: Filtrert arkivliste basert på søk ---
   const filteredOrders = archiveOrders.filter(order => order.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
@@ -423,7 +411,6 @@ const pollProgress = async () => {
           
           <div className="mb-4">
             <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Archive</h2>
-            {/* NYTT SØKEFELT HER */}
             <input 
                 type="text" 
                 placeholder="Search..." 
@@ -434,7 +421,6 @@ const pollProgress = async () => {
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-            {/* BRUKER NÅ DEN FILTRERTE LISTEN */}
             {filteredOrders.map(order => (
                 <div key={order.name} onClick={() => viewOrder(order.name)} className="cursor-pointer p-4 rounded-xl bg-[#0f172a]/50 hover:bg-[#1e293b] border border-white/5 hover:border-white/20 transition-all flex flex-col gap-3 group">
                     <div className="flex justify-between items-center">
@@ -455,7 +441,6 @@ const pollProgress = async () => {
                         </div>
                     </div>
                     
-                    {/* NYE KNAPPER FOR REDIGER OG SLETT */}
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity h-0 group-hover:h-auto overflow-hidden">
                         <button onClick={(e) => renameOrder(e, order.name)} className="flex-1 py-1.5 bg-[#0B1120] text-slate-400 hover:text-white rounded border border-slate-700 hover:border-[#009183] text-[9px] font-bold uppercase transition-colors">✏️ Edit</button>
                         <button onClick={(e) => deleteOrder(e, order.name)} className="flex-1 py-1.5 bg-red-950/30 text-red-400 hover:text-white rounded border border-red-900/50 hover:border-red-500 text-[9px] font-bold uppercase transition-colors">🗑️ Delete</button>
@@ -624,6 +609,7 @@ const pollProgress = async () => {
                   </div>
                 )}
 
+                {/* --- OPPDATERT GALLERI MED SLETTE-KNAPP --- */}
                 {galleryImages.length > 0 && !isRendering && (
                     <div className="animate-in fade-in slide-in-from-bottom-10 duration-500">
                         <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
@@ -633,10 +619,20 @@ const pollProgress = async () => {
                         <div className="grid grid-cols-2 gap-10 pb-20">
                             {galleryImages.map((img) => (
                                 <div key={img.name} className="group space-y-3">
-                                    <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-col-resize hover:scale-[1.02] hover:shadow-[0_20px_40px_-15px_rgba(0,145,131,0.2)] hover:border-white/20 transition-all duration-300" onClick={() => { setCompareData({raw: img.raw, edited: img.edited}); setActiveModal('compare'); }}>
+                                    <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] hover:shadow-[0_20px_40px_-15px_rgba(0,145,131,0.2)] hover:border-white/20 transition-all duration-300" onClick={() => { setCompareData({raw: img.raw, edited: img.edited}); setActiveModal('compare'); }}>
+                                        
+                                        {/* NY SLETTE-KNAPP PÅ BILDET */}
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); deleteSingleImage(img.name); }} 
+                                            className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all shadow-lg border border-red-900/50 hover:border-red-500"
+                                            title="Delete Image"
+                                        >
+                                            🗑️
+                                        </button>
+
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={img.edited} className="w-full h-full object-cover" alt="Rendered result" />
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center"><span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full transition-opacity backdrop-blur-sm">Click to Compare</span></div>
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center pointer-events-none"><span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full transition-opacity backdrop-blur-sm">Click to Compare</span></div>
                                     </div>
                                     <div className="flex gap-2">
                                         {img.approved ? <div className="flex-1 py-3 bg-[#009183]/20 text-[#00b09f] font-black uppercase text-[10px] text-center rounded-xl border border-[#009183]/30">Approved</div> : <><button onClick={() => approveImage(img.name)} className="flex-1 py-3 bg-[#009183] text-white font-black uppercase text-[10px] rounded-xl hover:bg-[#00b09f] transition-all">Approve 4K</button><button onClick={() => openCanvasStudio(img.name, 'retouch', img.edited)} className="flex-1 py-3 bg-[#0f172a] border border-slate-700 text-slate-300 font-black uppercase text-[10px] rounded-xl hover:bg-slate-800 transition-colors">Retouch</button></>}
