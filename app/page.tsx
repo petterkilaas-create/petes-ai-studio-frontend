@@ -50,7 +50,6 @@ export default function Home() {
   const undoStack = useRef<ImageData[]>([]);
 
   useEffect(() => {
-    // Lagt til cache: 'no-store' for å unngå gamle data
     fetch(`${API}/batch-progress/`, { cache: 'no-store' }).then(res => res.json()).then(data => { 
       if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); 
     }).catch(e => console.error(e));
@@ -272,9 +271,14 @@ export default function Home() {
     apiCanvas.toBlob((b) => { setUploadedFiles(prev => prev.map(f => f.id === currentCanvasImgId ? { ...f, maskBlob: b } : f)); setActiveModal('none'); }, 'image/png');
   };
 
-  const submitRetouch = () => {
+  // OPPDATERT: Retouch lukker modal momentant og kjører progress bar
+  const submitRetouch = async () => {
       if(!retouchPrompt) return;
-      const btn = document.getElementById('retouchBtn') as HTMLButtonElement; if(btn) { btn.innerText = 'Processing...'; btn.disabled = true; }
+      setActiveModal('none');
+      setIsRendering(true);
+      setProgressPct(0);
+      setProgressStatus("Initializing Retouch...");
+
       const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
       if (!canvas || !hiddenCanvas) return;
       const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height;
@@ -284,10 +288,17 @@ export default function Home() {
       const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
       for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } }
       aCtx.putImageData(maskData, 0, 0);
+      
       apiCanvas.toBlob(async (b) => {
           if(!b) return;
           const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
-          try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); setActiveModal('none'); setGalleryImages([]); loadGallery(jobName); } catch(e) { console.error(e); }
+          try { 
+              await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); 
+              pollProgress(jobName); // Setter i gang polling etter vi har sendt ordren
+          } catch(e) { 
+              console.error(e); 
+              setProgressStatus("Error connecting to server!");
+          }
       }, 'image/png');
   };
 
@@ -303,7 +314,6 @@ export default function Home() {
     if (!jobName || uploadedFiles.length === 0) return;
     if (pollTimer.current) clearTimeout(pollTimer.current);
     
-    // Sikkerhetsnett: Tvinger bort mellomrom i frontend også!
     const safeJobName = jobName.replace(/ /g, "_");
     setJobName(safeJobName);
 
@@ -321,8 +331,6 @@ export default function Home() {
         await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
         await supabase.from('projects').insert([{ name: safeJobName, user_id: user?.id, status: 'processing' }]);
         setArchiveOrders(prev => [{ name: safeJobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
-        
-        // Videresender trygt prosjektnavn til pollingen
         pollProgress(safeJobName); 
     } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
@@ -355,10 +363,8 @@ export default function Home() {
       } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
 
-  // Sender med navnet direkte inn i funksjonen for sikkerhets skyld
   const pollProgress = async (pollingJobName: string) => {
     try {
-        // OPPDATERT: cache: 'no-store' hindrer Vercel i å fryse resultatet!
         const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
         const s = await r.json();
         
@@ -386,7 +392,6 @@ export default function Home() {
       if (pollTimer.current) clearTimeout(pollTimer.current);
       setIsRendering(false); setJobName(name); setUploadedFiles([]); setStagingRooms([]); setGalleryImages([]); 
       
-      // Sjekker om ordren "henger igjen" som Work etter refresh, og reparerer det automatisk!
       const targetOrder = archiveOrders.find(o => o.name === name);
       
       try {
@@ -415,14 +420,26 @@ export default function Home() {
 
   const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(jobName); };
 
+  // OPPDATERT: Re-render lukker modal momentant og starter progress bar
   const submitRerender = async () => {
-      const btn = document.getElementById('submitRerenderBtn') as HTMLButtonElement; if(btn) { btn.innerText = "Processing..."; btn.disabled = true; }
-      const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
+      setActiveModal('none');
+      setIsRendering(true);
+      setProgressPct(0);
+      setProgressStatus("Initializing Re-Render...");
+
+      const fd = new FormData(); 
+      fd.append('job_name', jobName); 
+      fd.append('image_name', currentCanvasImgId); 
+      fd.append('image_type', rerenderData.type); 
+      fd.append('style', rerenderData.style); 
+      fd.append('prompt', rerenderData.prompt);
       try { 
           await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); 
-          setActiveModal('none'); 
           pollProgress(jobName); 
-      } catch(e) { console.error(e); }
+      } catch(e) { 
+          console.error(e); 
+          setProgressStatus("Error connecting to server!");
+      }
   };
 
   const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => {
