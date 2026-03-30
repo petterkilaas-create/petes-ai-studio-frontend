@@ -44,14 +44,14 @@ export default function Home() {
   const hiddenMaskCanvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
   
-  // OPPDATERT: Sikker timer-håndtering
   const pollTimer = useRef<NodeJS.Timeout | null>(null);
   const isDrawing = useRef(false);
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
   useEffect(() => {
-    fetch(`${API}/batch-progress/`).then(res => res.json()).then(data => { 
+    // Lagt til cache: 'no-store' for å unngå gamle data
+    fetch(`${API}/batch-progress/`, { cache: 'no-store' }).then(res => res.json()).then(data => { 
       if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); 
     }).catch(e => console.error(e));
 
@@ -74,7 +74,6 @@ export default function Home() {
     };
     fetchMyProjects();
 
-    // Cleanup timer on unmount
     return () => {
         if (pollTimer.current) clearTimeout(pollTimer.current);
     };
@@ -154,9 +153,7 @@ export default function Home() {
 
   const deleteSingleImage = async (imgName: string) => {
       if (!window.confirm("Are you sure you want to permanently delete this image?")) return;
-      const fd = new FormData();
-      fd.append('job_name', jobName);
-      fd.append('image_name', imgName);
+      const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName);
       try {
           await fetch(`${API}/delete-image/`, { method: 'POST', body: fd });
           setGalleryImages(prev => prev.filter(img => img.name !== imgName));
@@ -304,10 +301,14 @@ export default function Home() {
 
   const startExpressRender = async () => {
     if (!jobName || uploadedFiles.length === 0) return;
-    if (pollTimer.current) clearTimeout(pollTimer.current); // Tøm evt gml timer
+    if (pollTimer.current) clearTimeout(pollTimer.current);
     
+    // Sikkerhetsnett: Tvinger bort mellomrom i frontend også!
+    const safeJobName = jobName.replace(/ /g, "_");
+    setJobName(safeJobName);
+
     setIsRendering(true); setProgressPct(0); setProgressStatus("Uploading to cloud...");
-    const fd = new FormData(); fd.append('job_name', jobName);
+    const fd = new FormData(); fd.append('job_name', safeJobName);
     
     const cfg: any = {}; 
     uploadedFiles.forEach(f => { 
@@ -318,9 +319,11 @@ export default function Home() {
     fd.append('config', JSON.stringify(cfg));
     try { 
         await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
-        await supabase.from('projects').insert([{ name: jobName, user_id: user?.id, status: 'processing' }]);
-        setArchiveOrders(prev => [{ name: jobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
-        pollProgress(); 
+        await supabase.from('projects').insert([{ name: safeJobName, user_id: user?.id, status: 'processing' }]);
+        setArchiveOrders(prev => [{ name: safeJobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
+        
+        // Videresender trygt prosjektnavn til pollingen
+        pollProgress(safeJobName); 
     } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
 
@@ -331,8 +334,11 @@ export default function Home() {
       if (unassigned.length > 0) { alert("Please drag all images into a room before starting."); return; }
       if (pollTimer.current) clearTimeout(pollTimer.current);
       
+      const safeJobName = jobName.replace(/ /g, "_");
+      setJobName(safeJobName);
+
       setIsRendering(true); setProgressPct(0); setProgressStatus("Analyzing Spatial Data...");
-      const fd = new FormData(); fd.append('job_name', jobName);
+      const fd = new FormData(); fd.append('job_name', safeJobName);
       const cfg: any = {};
       stagingRooms.forEach(room => {
           room.images.forEach(imgId => {
@@ -343,44 +349,70 @@ export default function Home() {
       fd.append('config', JSON.stringify(cfg));
       try { 
           await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); 
-          await supabase.from('projects').insert([{ name: jobName, user_id: user?.id, status: 'processing' }]);
-          setArchiveOrders(prev => [{ name: jobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
-          pollProgress(); 
+          await supabase.from('projects').insert([{ name: safeJobName, user_id: user?.id, status: 'processing' }]);
+          setArchiveOrders(prev => [{ name: safeJobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
+          pollProgress(safeJobName); 
       } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
 
-  // OPPDATERT: Robust polling som dreper seg selv når den er ferdig!
-  const pollProgress = async () => {
+  // Sender med navnet direkte inn i funksjonen for sikkerhets skyld
+  const pollProgress = async (pollingJobName: string) => {
     try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${jobName}`); 
+        // OPPDATERT: cache: 'no-store' hindrer Vercel i å fryse resultatet!
+        const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
         const s = await r.json();
+        
         if (s.lifetime_completed) setTotalRenders(s.lifetime_completed);
+        
         if (s.total > 0) {
             setProgressPct((s.completed / s.total) * 100); 
             setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
+            
             if (s.status === 'finished') { 
                 setIsRendering(false); 
-                await supabase.from('projects').update({ status: 'completed' }).eq('name', jobName).eq('user_id', user?.id);
-                setArchiveOrders(prev => prev.map(order => order.name === jobName ? { ...order, status: 'completed' } : order));
-                loadGallery(jobName); 
-                
-                // SKRU AV MASKINEN!
+                await supabase.from('projects').update({ status: 'completed' }).eq('name', pollingJobName).eq('user_id', user?.id);
+                setArchiveOrders(prev => prev.map(order => order.name === pollingJobName ? { ...order, status: 'completed' } : order));
+                loadGallery(pollingJobName); 
                 if (pollTimer.current) clearTimeout(pollTimer.current);
                 return; 
             }
         }
     } catch (e) { console.error("Feil ved sjekking av fremdrift:", e); }
     
-    // Fortsett å rope til vi når 'finished'
-    pollTimer.current = setTimeout(pollProgress, 2000);
+    pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
   };
 
-  const viewOrder = (name: string) => { 
-      if (pollTimer.current) clearTimeout(pollTimer.current); // Stopp polling hvis vi bytter view
-      setIsRendering(false); setJobName(name); setUploadedFiles([]); setStagingRooms([]); setGalleryImages([]); loadGallery(name); 
+  const viewOrder = async (name: string) => { 
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+      setIsRendering(false); setJobName(name); setUploadedFiles([]); setStagingRooms([]); setGalleryImages([]); 
+      
+      // Sjekker om ordren "henger igjen" som Work etter refresh, og reparerer det automatisk!
+      const targetOrder = archiveOrders.find(o => o.name === name);
+      
+      try {
+          const res = await fetch(`${API}/list-finished/?job_name=${name}`, { cache: 'no-store' });
+          const data = await res.json();
+          setGalleryImages(data.images);
+          
+          if (data.images.length > 0 && targetOrder?.status !== 'completed' && user) {
+              await supabase.from('projects').update({ status: 'completed' }).eq('name', name).eq('user_id', user.id);
+              setArchiveOrders(prev => prev.map(o => o.name === name ? { ...o, status: 'completed' } : o));
+          }
+      } catch (e) {
+          console.error(e);
+      }
   };
-  
-  const loadGallery = async (name: string) => { try { const res = await fetch(`${API}/list-finished/?job_name=${name}`); const data = await res.json(); setGalleryImages(data.images); } catch (e) {} };
+
+  const loadGallery = async (name: string) => { 
+      try { 
+          const res = await fetch(`${API}/list-finished/?job_name=${name}`, { cache: 'no-store' }); 
+          const data = await res.json(); 
+          setGalleryImages(data.images); 
+      } catch (e) {
+          console.error(e);
+      } 
+  };
+
   const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(jobName); };
 
   const submitRerender = async () => {
@@ -389,7 +421,7 @@ export default function Home() {
       try { 
           await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); 
           setActiveModal('none'); 
-          pollProgress(); 
+          pollProgress(jobName); 
       } catch(e) { console.error(e); }
   };
 
@@ -519,7 +551,6 @@ export default function Home() {
                                                 <option value="spring">Spring</option>
                                                 <option value="summer">Summer</option>
                                             </optgroup>
-                                            {/* NY STAGING GROUP HER */}
                                             <optgroup label="Staging (Single Image)">
                                                 <option value="staging_scandi">Scandi Minimalism</option>
                                                 <option value="staging_luxury">Classic Luxury</option>
@@ -556,7 +587,6 @@ export default function Home() {
                                         <option value="spring">Early Spring</option>
                                         <option value="summer">Mid-Summer</option>
                                       </optgroup>
-                                      {/* NY STAGING GROUP FOR GLOBAL */}
                                       <optgroup label="Staging (Single Image)">
                                           <option value="staging_scandi">Scandi Minimalism</option>
                                           <option value="staging_luxury">Classic Luxury</option>
