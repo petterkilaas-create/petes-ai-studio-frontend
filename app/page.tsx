@@ -44,6 +44,8 @@ export default function Home() {
   const hiddenMaskCanvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
   
+  // OPPDATERT: Sikker timer-håndtering
+  const pollTimer = useRef<NodeJS.Timeout | null>(null);
   const isDrawing = useRef(false);
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
@@ -71,6 +73,11 @@ export default function Home() {
       }
     };
     fetchMyProjects();
+
+    // Cleanup timer on unmount
+    return () => {
+        if (pollTimer.current) clearTimeout(pollTimer.current);
+    };
   }, [user]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,7 +97,10 @@ export default function Home() {
   const updateFileField = (id: string, field: keyof UploadedFile, value: any) => { setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f)); };
   const applyExpressAll = () => { setUploadedFiles(prev => prev.map(f => ({ ...f, type: globalType, style: globalStyle, prompt: "" }))); };
   
-  const createNewJob = () => { setJobName(""); setUploadedFiles([]); setStagingRooms([]); setRoomCounter(0); setGalleryImages([]); setIsRendering(false); setProgressPct(0); setActiveModal('none'); };
+  const createNewJob = () => { 
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+      setJobName(""); setUploadedFiles([]); setStagingRooms([]); setRoomCounter(0); setGalleryImages([]); setIsRendering(false); setProgressPct(0); setActiveModal('none'); 
+  };
   const addRoom = () => { const newId = roomCounter + 1; setRoomCounter(newId); setStagingRooms(prev => [...prev, { id: `room_${newId}`, style: "staging_scandi", hero_img_id: null, images: [] }]); };
   const handleDragStart = (e: React.DragEvent<HTMLElement>, imgId: string) => { e.dataTransfer.setData("text/plain", imgId); e.dataTransfer.effectAllowed = "move"; (e.target as HTMLElement).style.opacity = "0.5"; };
   const handleDragEnd = (e: React.DragEvent<HTMLElement>) => { (e.target as HTMLElement).style.opacity = "1"; };
@@ -142,7 +152,6 @@ export default function Home() {
     if (jobName === oldName) { setJobName(newName); loadGallery(newName); }
   };
 
-  // --- NY FUNKSJON: SLETT ENKELTBILDE I GALLERI ---
   const deleteSingleImage = async (imgName: string) => {
       if (!window.confirm("Are you sure you want to permanently delete this image?")) return;
       const fd = new FormData();
@@ -150,13 +159,9 @@ export default function Home() {
       fd.append('image_name', imgName);
       try {
           await fetch(`${API}/delete-image/`, { method: 'POST', body: fd });
-          // Oppdaterer state umiddelbart slik at bildet forsvinner
           setGalleryImages(prev => prev.filter(img => img.name !== imgName));
-      } catch (e) {
-          console.error("Failed to delete image:", e);
-      }
+      } catch (e) { console.error("Failed to delete image:", e); }
   };
-  // ------------------------------------------------
 
   const openCanvasStudio = (imgIdOrName: string, mode: 'mask' | 'retouch', customUrl: string | null = null) => {
     setCurrentCanvasImgId(imgIdOrName); setActiveModal(mode); setBrushSize(50);
@@ -299,6 +304,8 @@ export default function Home() {
 
   const startExpressRender = async () => {
     if (!jobName || uploadedFiles.length === 0) return;
+    if (pollTimer.current) clearTimeout(pollTimer.current); // Tøm evt gml timer
+    
     setIsRendering(true); setProgressPct(0); setProgressStatus("Uploading to cloud...");
     const fd = new FormData(); fd.append('job_name', jobName);
     
@@ -322,6 +329,8 @@ export default function Home() {
       const assignedImageIds = stagingRooms.flatMap(r => r.images);
       const unassigned = uploadedFiles.filter(f => !assignedImageIds.includes(f.id));
       if (unassigned.length > 0) { alert("Please drag all images into a room before starting."); return; }
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+      
       setIsRendering(true); setProgressPct(0); setProgressStatus("Analyzing Spatial Data...");
       const fd = new FormData(); fd.append('job_name', jobName);
       const cfg: any = {};
@@ -340,7 +349,8 @@ export default function Home() {
       } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
 
-const pollProgress = async () => {
+  // OPPDATERT: Robust polling som dreper seg selv når den er ferdig!
+  const pollProgress = async () => {
     try {
         const r = await fetch(`${API}/batch-progress/?job_name=${jobName}`); 
         const s = await r.json();
@@ -353,21 +363,34 @@ const pollProgress = async () => {
                 await supabase.from('projects').update({ status: 'completed' }).eq('name', jobName).eq('user_id', user?.id);
                 setArchiveOrders(prev => prev.map(order => order.name === jobName ? { ...order, status: 'completed' } : order));
                 loadGallery(jobName); 
+                
+                // SKRU AV MASKINEN!
+                if (pollTimer.current) clearTimeout(pollTimer.current);
                 return; 
             }
         }
     } catch (e) { console.error("Feil ved sjekking av fremdrift:", e); }
-    setTimeout(pollProgress, 2000);
+    
+    // Fortsett å rope til vi når 'finished'
+    pollTimer.current = setTimeout(pollProgress, 2000);
   };
 
-  const viewOrder = (name: string) => { setIsRendering(false); setJobName(name); setUploadedFiles([]); setStagingRooms([]); setGalleryImages([]); loadGallery(name); };
+  const viewOrder = (name: string) => { 
+      if (pollTimer.current) clearTimeout(pollTimer.current); // Stopp polling hvis vi bytter view
+      setIsRendering(false); setJobName(name); setUploadedFiles([]); setStagingRooms([]); setGalleryImages([]); loadGallery(name); 
+  };
+  
   const loadGallery = async (name: string) => { try { const res = await fetch(`${API}/list-finished/?job_name=${name}`); const data = await res.json(); setGalleryImages(data.images); } catch (e) {} };
   const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(jobName); };
 
   const submitRerender = async () => {
       const btn = document.getElementById('submitRerenderBtn') as HTMLButtonElement; if(btn) { btn.innerText = "Processing..."; btn.disabled = true; }
       const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
-      try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); setActiveModal('none'); pollProgress(); } catch(e) { console.error(e); }
+      try { 
+          await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); 
+          setActiveModal('none'); 
+          pollProgress(); 
+      } catch(e) { console.error(e); }
   };
 
   const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -496,6 +519,12 @@ const pollProgress = async () => {
                                                 <option value="spring">Spring</option>
                                                 <option value="summer">Summer</option>
                                             </optgroup>
+                                            {/* NY STAGING GROUP HER */}
+                                            <optgroup label="Staging (Single Image)">
+                                                <option value="staging_scandi">Scandi Minimalism</option>
+                                                <option value="staging_luxury">Classic Luxury</option>
+                                                <option value="staging_outdoor">Outdoor Lounge</option>
+                                            </optgroup>
                                         </select>
                                     </div>
                                     <input 
@@ -526,6 +555,12 @@ const pollProgress = async () => {
                                         <option value="autumn">Peak Autumn</option>
                                         <option value="spring">Early Spring</option>
                                         <option value="summer">Mid-Summer</option>
+                                      </optgroup>
+                                      {/* NY STAGING GROUP FOR GLOBAL */}
+                                      <optgroup label="Staging (Single Image)">
+                                          <option value="staging_scandi">Scandi Minimalism</option>
+                                          <option value="staging_luxury">Classic Luxury</option>
+                                          <option value="staging_outdoor">Outdoor Lounge</option>
                                       </optgroup>
                                   </select>
                                   <button onClick={applyExpressAll} className="bg-slate-800 text-white px-6 rounded-xl text-[10px] font-black uppercase hover:bg-slate-700 transition-colors">Assign All</button>
@@ -609,7 +644,6 @@ const pollProgress = async () => {
                   </div>
                 )}
 
-                {/* --- OPPDATERT GALLERI MED SLETTE-KNAPP --- */}
                 {galleryImages.length > 0 && !isRendering && (
                     <div className="animate-in fade-in slide-in-from-bottom-10 duration-500">
                         <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
@@ -621,7 +655,6 @@ const pollProgress = async () => {
                                 <div key={img.name} className="group space-y-3">
                                     <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] hover:shadow-[0_20px_40px_-15px_rgba(0,145,131,0.2)] hover:border-white/20 transition-all duration-300" onClick={() => { setCompareData({raw: img.raw, edited: img.edited}); setActiveModal('compare'); }}>
                                         
-                                        {/* NY SLETTE-KNAPP PÅ BILDET */}
                                         <button 
                                             onClick={(e) => { e.stopPropagation(); deleteSingleImage(img.name); }} 
                                             className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all shadow-lg border border-red-900/50 hover:border-red-500"
