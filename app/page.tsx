@@ -49,6 +49,7 @@ export default function Home() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
+  // 1. INITIAL FETCH & SUPABASE REALTIME SUBSCRIPTION
   useEffect(() => {
     fetch(`${API}/batch-progress/`, { cache: 'no-store' }).then(res => res.json()).then(data => { 
       if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); 
@@ -71,12 +72,57 @@ export default function Home() {
         setArchiveOrders(formattedOrders);
       }
     };
+
     fetchMyProjects();
 
+    if (!user) return;
+
+    // --- MAGIEN STARTER HER: SUPABASE REALTIME WEBSOCKETS ---
+    const channel = supabase
+      .channel('realtime-projects')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'projects', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as any;
+            setArchiveOrders(prev => prev.map(o => o.name === updated.name ? { ...o, status: updated.status } : o));
+          } else if (payload.eventType === 'INSERT') {
+            const inserted = payload.new as any;
+            setArchiveOrders(prev => {
+              if (!prev.find(o => o.name === inserted.name)) {
+                return [{ name: inserted.name, date: new Date(inserted.created_at).toLocaleDateString('no-NO'), status: inserted.status }, ...prev];
+              }
+              return prev;
+            });
+          } else if (payload.eventType === 'DELETE') {
+            const deleted = payload.old as any;
+            setArchiveOrders(prev => prev.filter(o => o.name !== deleted.name));
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
+        supabase.removeChannel(channel);
         if (pollTimer.current) clearTimeout(pollTimer.current);
     };
   }, [user]);
+
+  // 2. LYTTER PÅ SANNTIDS-ENDRINGER FOR Å LASTE INN GALLERIET AUTOMATISK
+  useEffect(() => {
+      const activeOrder = archiveOrders.find(o => o.name === jobName);
+      if (activeOrder?.status === 'completed' && isRendering) {
+          // Databasen sier jobben er ferdig! Vi dreper laste-animasjonen og henter bildene!
+          setIsRendering(false);
+          if (pollTimer.current) clearTimeout(pollTimer.current);
+          
+          fetch(`${API}/list-finished/?job_name=${jobName}`, { cache: 'no-store' })
+            .then(res => res.json())
+            .then(data => setGalleryImages(data.images))
+            .catch(console.error);
+      }
+  }, [archiveOrders, jobName, isRendering]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
@@ -134,7 +180,7 @@ export default function Home() {
     if (user) { await supabase.from('projects').delete().eq('name', orderName).eq('user_id', user.id); }
     const fd = new FormData(); fd.append('job_name', orderName); fd.append('image_name', ''); 
     fetch(`${API}/delete-image/`, { method: 'POST', body: fd }).catch(console.error);
-    setArchiveOrders(prev => prev.filter(o => o.name !== orderName));
+    // Realtime vil egentlig slette den fra listen for oss, men for sikkerhets skyld tømmer vi skjermen hvis vi var inne i den:
     if (jobName === orderName) createNewJob();
   };
 
@@ -146,7 +192,6 @@ export default function Home() {
     if (user) { await supabase.from('projects').update({ name: newName }).eq('name', oldName).eq('user_id', user.id); }
     const fd = new FormData(); fd.append('old_name', oldName); fd.append('new_name', newName);
     fetch(`${API}/rename-order/`, { method: 'POST', body: fd }).catch(console.error);
-    setArchiveOrders(prev => prev.map(o => o.name === oldName ? { ...o, name: newName } : o));
     if (jobName === oldName) { setJobName(newName); loadGallery(newName); }
   };
 
@@ -328,8 +373,11 @@ export default function Home() {
     fd.append('config', JSON.stringify(cfg));
     try { 
         await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
-        await supabase.from('projects').insert([{ name: safeJobName, user_id: user?.id, status: 'processing' }]);
-        setArchiveOrders(prev => [{ name: safeJobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
+        
+        // Optimistisk UI-oppdatering mens vi venter på Supabase Realtime
+        if (user) {
+            await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
+        }
         pollProgress(safeJobName); 
     } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
@@ -356,12 +404,15 @@ export default function Home() {
       fd.append('config', JSON.stringify(cfg));
       try { 
           await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); 
-          await supabase.from('projects').insert([{ name: safeJobName, user_id: user?.id, status: 'processing' }]);
-          setArchiveOrders(prev => [{ name: safeJobName, date: new Date().toLocaleDateString('no-NO'), status: 'processing' }, ...prev]);
+          
+          if (user) {
+              await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
+          }
           pollProgress(safeJobName); 
       } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
 
+  // Lettvekts-polling kun for å drive prosent-baren. Hovedstatus styres nå av Supabase Realtime.
   const pollProgress = async (pollingJobName: string) => {
     try {
         const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
@@ -369,19 +420,14 @@ export default function Home() {
         
         if (s.lifetime_completed) setTotalRenders(s.lifetime_completed);
         
-        if (s.total > 0) {
+        if (s.total > 0 && s.status !== 'finished') {
             setProgressPct((s.completed / s.total) * 100); 
             setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
-            
-            if (s.status === 'finished') { 
-                setIsRendering(false); 
-                await supabase.from('projects').update({ status: 'completed' }).eq('name', pollingJobName).eq('user_id', user?.id);
-                setArchiveOrders(prev => prev.map(order => order.name === pollingJobName ? { ...order, status: 'completed' } : order));
-                loadGallery(pollingJobName); 
-                if (pollTimer.current) clearTimeout(pollTimer.current);
-                return; 
-            }
         }
+        
+        // Vi lar useEffect-en (Realtime) ta seg av avslutningen når databasen sier det er ferdig.
+        if (s.status === 'finished') return; 
+        
     } catch (e) { console.error("Feil ved sjekking av fremdrift:", e); }
     
     pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
@@ -391,17 +437,10 @@ export default function Home() {
       if (pollTimer.current) clearTimeout(pollTimer.current);
       setIsRendering(false); setJobName(name); setUploadedFiles([]); setStagingRooms([]); setGalleryImages([]); 
       
-      const targetOrder = archiveOrders.find(o => o.name === name);
-      
       try {
           const res = await fetch(`${API}/list-finished/?job_name=${name}`, { cache: 'no-store' });
           const data = await res.json();
           setGalleryImages(data.images);
-          
-          if (data.images.length > 0 && targetOrder?.status !== 'completed' && user) {
-              await supabase.from('projects').update({ status: 'completed' }).eq('name', name).eq('user_id', user.id);
-              setArchiveOrders(prev => prev.map(o => o.name === name ? { ...o, status: 'completed' } : o));
-          }
       } catch (e) {
           console.error(e);
       }
@@ -680,7 +719,6 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* OPPDATERT: Progress bar vises over galleriet når isRendering er true */}
                 {isRendering && activeModal === 'none' && (
                   <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8">
                       <p className="font-black montserrat uppercase tracking-[0.3em] text-sm text-[#009183] animate-pulse">{progressStatus}</p>
@@ -690,7 +728,6 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* OPPDATERT: Galleriet forblir synlig selv om progress-baren lader */}
                 {galleryImages.length > 0 && (
                     <div className="animate-in fade-in slide-in-from-bottom-10 duration-500">
                         <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
