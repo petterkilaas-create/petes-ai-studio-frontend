@@ -6,7 +6,6 @@ import { supabase } from "../supabaseClient";
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
-// --- NYTT: Lagt til "prompt" i typen ---
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; };
 type GalleryImage = { name: string; raw: string; edited: string; approved?: boolean; };
@@ -22,6 +21,9 @@ export default function Home() {
   const [roomCounter, setRoomCounter] = useState(0);
   const [totalRenders, setTotalRenders] = useState(0);
   const [archiveOrders, setArchiveOrders] = useState<OrderArchive[]>([]);
+
+  // --- NY STATE FOR SØK I ARKIV ---
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [globalType, setGlobalType] = useState("exterior");
   const [globalStyle, setGlobalStyle] = useState("dusk_blue_hour");
@@ -79,7 +81,6 @@ export default function Home() {
     const newFiles: UploadedFile[] = [];
     for (let i = 0; i < e.target.files.length; i++) {
       if (e.target.files[i].type.startsWith("image/")) {
-        // --- NYTT: default prompt er tom ---
         newFiles.push({ id: "img_" + Math.random().toString(36).substr(2, 9), file: e.target.files[i], url: URL.createObjectURL(e.target.files[i]), type: globalType, style: globalStyle, prompt: "", maskBlob: null });
       }
     }
@@ -87,21 +88,10 @@ export default function Home() {
     if (currentMode === 'staging' && stagingRooms.length === 0) addRoom();
   };
 
-  // --- NYE FUNKSJONER FOR FASE 1 ---
-  const removeFile = (id: string) => {
-    setUploadedFiles(prev => prev.filter(f => f.id !== id));
-  };
-
-  const updateFileField = (id: string, field: keyof UploadedFile, value: any) => {
-    setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f));
-  };
-
-  const applyExpressAll = () => {
-    // Sletter også eventuelle custom prompts når du trykker Assign All
-    setUploadedFiles(prev => prev.map(f => ({ ...f, type: globalType, style: globalStyle, prompt: "" }))); 
-  };
-  // ----------------------------------
-
+  const removeFile = (id: string) => { setUploadedFiles(prev => prev.filter(f => f.id !== id)); };
+  const updateFileField = (id: string, field: keyof UploadedFile, value: any) => { setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f)); };
+  const applyExpressAll = () => { setUploadedFiles(prev => prev.map(f => ({ ...f, type: globalType, style: globalStyle, prompt: "" }))); };
+  
   const createNewJob = () => { setJobName(""); setUploadedFiles([]); setStagingRooms([]); setRoomCounter(0); setGalleryImages([]); setIsRendering(false); setProgressPct(0); setActiveModal('none'); };
   const addRoom = () => { const newId = roomCounter + 1; setRoomCounter(newId); setStagingRooms(prev => [...prev, { id: `room_${newId}`, style: "staging_scandi", hero_img_id: null, images: [] }]); };
   const handleDragStart = (e: React.DragEvent<HTMLElement>, imgId: string) => { e.dataTransfer.setData("text/plain", imgId); e.dataTransfer.effectAllowed = "move"; (e.target as HTMLElement).style.opacity = "0.5"; };
@@ -131,6 +121,52 @@ export default function Home() {
 
   const setHero = (roomId: string, imgId: string) => { setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, hero_img_id: imgId } : r)); };
   const updateRoomStyle = (roomId: string, newStyle: string) => { setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, style: newStyle } : r)); };
+
+  // --- NYE FUNKSJONER FOR FASE 2: SLETTE OG ENDRE NAVN PÅ ORDRE ---
+  const deleteOrder = async (e: React.MouseEvent, orderName: string) => {
+    e.stopPropagation(); // Hindrer at vi åpner ordren når vi klikker på søppelbøtten
+    if (!window.confirm(`Are you sure you want to permanently delete the project "${orderName}"?`)) return;
+
+    // 1. Slett fra Supabase
+    if (user) {
+        await supabase.from('projects').delete().eq('name', orderName).eq('user_id', user.id);
+    }
+    // 2. Slett fra Google Cloud (Sender tomt filnavn for å slette hele mappen)
+    const fd = new FormData();
+    fd.append('job_name', orderName);
+    fd.append('image_name', ''); 
+    fetch(`${API}/delete-image/`, { method: 'POST', body: fd }).catch(console.error);
+
+    // 3. Oppdater visningen
+    setArchiveOrders(prev => prev.filter(o => o.name !== orderName));
+    if (jobName === orderName) createNewJob(); // Tømmer skjermen hvis du står inne i prosjektet som ble slettet
+  };
+
+  const renameOrder = async (e: React.MouseEvent, oldName: string) => {
+    e.stopPropagation();
+    const newNameRaw = window.prompt("Enter new project name:", oldName);
+    if (!newNameRaw || newNameRaw === oldName) return;
+    
+    const newName = newNameRaw.replace(/ /g, "_"); // Vasker bort mellomrom
+
+    // 1. Oppdater Supabase
+    if (user) {
+        await supabase.from('projects').update({ name: newName }).eq('name', oldName).eq('user_id', user.id);
+    }
+    // 2. Oppdater Google Cloud
+    const fd = new FormData();
+    fd.append('old_name', oldName);
+    fd.append('new_name', newName);
+    fetch(`${API}/rename-order/`, { method: 'POST', body: fd }).catch(console.error);
+
+    // 3. Oppdater visningen
+    setArchiveOrders(prev => prev.map(o => o.name === oldName ? { ...o, name: newName } : o));
+    if (jobName === oldName) {
+        setJobName(newName);
+        loadGallery(newName);
+    }
+  };
+  // -------------------------------------------------------------
 
   const openCanvasStudio = (imgIdOrName: string, mode: 'mask' | 'retouch', customUrl: string | null = null) => {
     setCurrentCanvasImgId(imgIdOrName); setActiveModal(mode); setBrushSize(50);
@@ -276,13 +312,11 @@ export default function Home() {
     setIsRendering(true); setProgressPct(0); setProgressStatus("Uploading to cloud...");
     const fd = new FormData(); fd.append('job_name', jobName);
     
-    // --- NYTT: Tar nå med 'prompt' til backend ---
     const cfg: any = {}; 
     uploadedFiles.forEach(f => { 
         fd.append('files', f.file); 
         cfg[f.file.name] = { type: f.type, style: f.style, prompt: f.prompt }; 
     });
-    // ----------------------------------------------
     
     fd.append('config', JSON.stringify(cfg));
     try { 
@@ -363,6 +397,9 @@ const pollProgress = async () => {
   const assignedImageIds = stagingRooms.flatMap(r => r.images);
   const unassignedFiles = uploadedFiles.filter(f => !assignedImageIds.includes(f.id));
 
+  // --- NYTT FOR FASE 2: Filtrert arkivliste basert på søk ---
+  const filteredOrders = archiveOrders.filter(order => order.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
   return (
     <>
       <div ref={cursorRef} id="brushCursor" style={{ display: activeModal === 'mask' || activeModal === 'retouch' ? 'block' : 'none', width: brushSize, height: brushSize }} className="fixed border-2 border-[#00ff83]/80 rounded-full pointer-events-none z-[9999] -translate-x-1/2 -translate-y-1/2 bg-[#00ff83]/20 mix-blend-difference"></div>
@@ -383,24 +420,45 @@ const pollProgress = async () => {
       <main className="flex flex-1 overflow-hidden">
         <aside className="w-80 bg-[#0f172a]/50 border-r border-white/5 flex flex-col p-6 z-10">
           <button onClick={createNewJob} className="w-full py-4 bg-[#009183] text-white font-black uppercase text-sm tracking-widest rounded-xl hover:bg-[#00b09f] mb-8 transition-colors">+ New Project</button>
-          <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Archive</h2>
+          
+          <div className="mb-4">
+            <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Archive</h2>
+            {/* NYTT SØKEFELT HER */}
+            <input 
+                type="text" 
+                placeholder="Search..." 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                className="w-full bg-[#0B1120] rounded-xl px-4 py-3 text-[10px] text-white outline-none border border-slate-700 focus:border-[#009183] placeholder-slate-600 uppercase tracking-widest font-bold"
+            />
+          </div>
+
           <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-            {archiveOrders.map(order => (
-                <div key={order.name} onClick={() => viewOrder(order.name)} className="cursor-pointer p-4 rounded-xl bg-[#0f172a]/50 hover:bg-[#1e293b] border border-white/5 hover:border-white/20 transition-all flex justify-between items-center group">
-                    <div>
-                        <p className="text-[11px] font-black text-slate-200 uppercase group-hover:text-[#009183] transition-colors">{order.name}</p>
-                        <p className="text-[9px] text-slate-500 font-bold">{order.date}</p>
+            {/* BRUKER NÅ DEN FILTRERTE LISTEN */}
+            {filteredOrders.map(order => (
+                <div key={order.name} onClick={() => viewOrder(order.name)} className="cursor-pointer p-4 rounded-xl bg-[#0f172a]/50 hover:bg-[#1e293b] border border-white/5 hover:border-white/20 transition-all flex flex-col gap-3 group">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <p className="text-[11px] font-black text-slate-200 uppercase group-hover:text-[#009183] transition-colors">{order.name}</p>
+                            <p className="text-[9px] text-slate-500 font-bold">{order.date}</p>
+                        </div>
+                        <div>
+                            {order.status === 'completed' || order.status === 'finished' ? (
+                                <span className="flex items-center gap-1.5 text-[8px] font-black text-[#00ff83] uppercase bg-[#00ff83]/10 px-2 py-1.5 rounded border border-[#00ff83]/20 shadow-[0_0_10px_rgba(0,255,131,0.1)]">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[#00ff83]"></div> Ready
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-1.5 text-[8px] font-black text-yellow-400 uppercase bg-yellow-400/10 px-2 py-1.5 rounded border border-yellow-400/20">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></div> Work
+                                </span>
+                            )}
+                        </div>
                     </div>
-                    <div>
-                        {order.status === 'completed' || order.status === 'finished' ? (
-                            <span className="flex items-center gap-1.5 text-[8px] font-black text-[#00ff83] uppercase bg-[#00ff83]/10 px-2 py-1.5 rounded border border-[#00ff83]/20 shadow-[0_0_10px_rgba(0,255,131,0.1)]">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#00ff83]"></div> Ready
-                            </span>
-                        ) : (
-                            <span className="flex items-center gap-1.5 text-[8px] font-black text-yellow-400 uppercase bg-yellow-400/10 px-2 py-1.5 rounded border border-yellow-400/20">
-                                <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></div> Work
-                            </span>
-                        )}
+                    
+                    {/* NYE KNAPPER FOR REDIGER OG SLETT */}
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity h-0 group-hover:h-auto overflow-hidden">
+                        <button onClick={(e) => renameOrder(e, order.name)} className="flex-1 py-1.5 bg-[#0B1120] text-slate-400 hover:text-white rounded border border-slate-700 hover:border-[#009183] text-[9px] font-bold uppercase transition-colors">✏️ Edit</button>
+                        <button onClick={(e) => deleteOrder(e, order.name)} className="flex-1 py-1.5 bg-red-950/30 text-red-400 hover:text-white rounded border border-red-900/50 hover:border-red-500 text-[9px] font-bold uppercase transition-colors">🗑️ Delete</button>
                     </div>
                 </div>
             ))}
@@ -422,12 +480,9 @@ const pollProgress = async () => {
                   <div className="space-y-8 animate-in fade-in duration-300">
                       <div className="glass p-8">
                           <h2 className="font-bold uppercase text-xs tracking-widest text-slate-400 mb-6">Express Settings</h2>
-                          
-                          {/* --- NY UI FOR INDIVIDUELLE BILDER --- */}
                           <div className="grid grid-cols-3 gap-6">
                             {uploadedFiles.map((file) => (
                               <div key={file.id} className="bg-[#0f172a] rounded-xl overflow-hidden border border-slate-700 relative flex flex-col">
-                                {/* SLETTE-KNAPP */}
                                 <button onClick={() => removeFile(file.id)} className="absolute top-2 right-2 bg-red-500/80 text-white rounded-full w-6 h-6 flex items-center justify-center text-[10px] font-black z-10 hover:bg-red-600 transition-colors shadow">X</button>
                                 
                                 <div className="aspect-[3/2] relative border-b border-slate-700">
@@ -435,7 +490,6 @@ const pollProgress = async () => {
                                   <img src={file.url} alt="upload" className="w-full h-full object-cover" />
                                 </div>
                                 
-                                {/* INDIVIDUELLE VALG */}
                                 <div className="p-3 flex flex-col gap-2">
                                     <div className="flex gap-2">
                                         <select value={file.type} onChange={(e) => updateFileField(file.id, 'type', e.target.value)} className="w-1/2 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none focus:border-[#009183]">
@@ -470,7 +524,6 @@ const pollProgress = async () => {
                               </div>
                             ))}
                           </div>
-                          {/* -------------------------------------- */}
 
                           <div className="mt-8 flex justify-between items-center bg-[#0f172a] p-6 rounded-2xl border border-white/5">
                               <div className="flex gap-4">
@@ -511,7 +564,6 @@ const pollProgress = async () => {
                             <div className="drop-zone-room flex flex-wrap gap-2 p-2 min-h-[150px] w-full" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, 'unassigned')}>
                                 {unassignedFiles.map(file => (
                                     <div key={file.id} className="relative group">
-                                        {/* NYTT SLETTE-IKON FOR STAGING */}
                                         <button onClick={() => removeFile(file.id)} className="absolute -top-2 -right-2 bg-red-500/80 text-white rounded-full w-5 h-5 flex items-center justify-center text-[8px] font-black z-10 opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all shadow">X</button>
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={file.url} alt="Unassigned" draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className="draggable-img w-20 h-20 object-cover rounded-lg border border-slate-700 hover:border-[#009183]" />
