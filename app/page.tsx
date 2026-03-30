@@ -6,9 +6,10 @@ import { supabase } from "../supabaseClient";
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
+// OPPDATERT: Typen har nå 'video' inkludert
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; };
-type GalleryImage = { name: string; raw: string; edited: string; approved?: boolean; };
+type GalleryImage = { name: string; raw: string; edited: string; approved?: boolean; video?: string; };
 type OrderArchive = { name: string; date: string; status: string; };
 
 export default function Home() {
@@ -31,13 +32,17 @@ export default function Home() {
   const [progressStatus, setProgressStatus] = useState("Processing...");
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
-  const [activeModal, setActiveModal] = useState<'none' | 'mask' | 'retouch' | 'compare' | 'rerender'>('none');
+  // OPPDATERT: 'video' lagt til som modal-valg
+  const [activeModal, setActiveModal] = useState<'none' | 'mask' | 'retouch' | 'compare' | 'rerender' | 'video'>('none');
   const [currentCanvasImgId, setCurrentCanvasImgId] = useState("");
   const [brushSize, setBrushSize] = useState(50);
   const [retouchPrompt, setRetouchPrompt] = useState("");
   const [saveAsNew, setSaveAsNew] = useState(true);
   const [rerenderData, setRerenderData] = useState({ type: "exterior", style: "dusk_blue_hour", prompt: "" });
   const [compareData, setCompareData] = useState({ raw: "", edited: "" });
+  
+  // NY STATE: For Video Studio prompt
+  const [videoPrompt, setVideoPrompt] = useState("Cinematic 5 second slow pan, highly detailed architectural video, 8k resolution");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -49,7 +54,7 @@ export default function Home() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
-  // 1. INITIAL FETCH & SUPABASE REALTIME SUBSCRIPTION
+  // 1. INITIAL FETCH & SUPABASE REALTIME
   useEffect(() => {
     fetch(`${API}/batch-progress/`, { cache: 'no-store' }).then(res => res.json()).then(data => { 
       if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); 
@@ -77,7 +82,6 @@ export default function Home() {
 
     if (!user) return;
 
-    // --- MAGIEN STARTER HER: SUPABASE REALTIME WEBSOCKETS ---
     const channel = supabase
       .channel('realtime-projects')
       .on(
@@ -109,11 +113,10 @@ export default function Home() {
     };
   }, [user]);
 
-  // 2. LYTTER PÅ SANNTIDS-ENDRINGER FOR Å LASTE INN GALLERIET AUTOMATISK
+  // 2. LYTTER PÅ SANNTIDS-ENDRINGER
   useEffect(() => {
       const activeOrder = archiveOrders.find(o => o.name === jobName);
       if (activeOrder?.status === 'completed' && isRendering) {
-          // Databasen sier jobben er ferdig! Vi dreper laste-animasjonen og henter bildene!
           setIsRendering(false);
           if (pollTimer.current) clearTimeout(pollTimer.current);
           
@@ -180,7 +183,6 @@ export default function Home() {
     if (user) { await supabase.from('projects').delete().eq('name', orderName).eq('user_id', user.id); }
     const fd = new FormData(); fd.append('job_name', orderName); fd.append('image_name', ''); 
     fetch(`${API}/delete-image/`, { method: 'POST', body: fd }).catch(console.error);
-    // Realtime vil egentlig slette den fra listen for oss, men for sikkerhets skyld tømmer vi skjermen hvis vi var inne i den:
     if (jobName === orderName) createNewJob();
   };
 
@@ -373,8 +375,6 @@ export default function Home() {
     fd.append('config', JSON.stringify(cfg));
     try { 
         await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
-        
-        // Optimistisk UI-oppdatering mens vi venter på Supabase Realtime
         if (user) {
             await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
         }
@@ -404,7 +404,6 @@ export default function Home() {
       fd.append('config', JSON.stringify(cfg));
       try { 
           await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); 
-          
           if (user) {
               await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
           }
@@ -412,7 +411,6 @@ export default function Home() {
       } catch (error) { console.error(error); setProgressStatus("Error connecting to server!"); }
   };
 
-  // Lettvekts-polling kun for å drive prosent-baren. Hovedstatus styres nå av Supabase Realtime.
   const pollProgress = async (pollingJobName: string) => {
     try {
         const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
@@ -425,7 +423,6 @@ export default function Home() {
             setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
         }
         
-        // Vi lar useEffect-en (Realtime) ta seg av avslutningen når databasen sier det er ferdig.
         if (s.status === 'finished') return; 
         
     } catch (e) { console.error("Feil ved sjekking av fremdrift:", e); }
@@ -472,6 +469,26 @@ export default function Home() {
       fd.append('prompt', rerenderData.prompt);
       try { 
           await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); 
+          pollProgress(jobName); 
+      } catch(e) { 
+          console.error(e); 
+          setProgressStatus("Error connecting to server!");
+      }
+  };
+
+  // NY FUNKSJON: Start Googles VEO Video-generator!
+  const submitVideo = async () => {
+      setActiveModal('none');
+      setIsRendering(true);
+      setProgressPct(0);
+      setProgressStatus("Generating Cinematic Video Magic... (This takes 1-2 mins)");
+
+      const fd = new FormData(); 
+      fd.append('job_name', jobName); 
+      fd.append('image_name', currentCanvasImgId); 
+      fd.append('prompt', videoPrompt);
+      try { 
+          await fetch(`${API}/generate-video/`, { method: 'POST', body: fd }); 
           pollProgress(jobName); 
       } catch(e) { 
           console.error(e); 
@@ -747,17 +764,35 @@ export default function Home() {
                                             🗑️
                                         </button>
 
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={img.edited} className="w-full h-full object-cover" alt="Rendered result" />
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center pointer-events-none"><span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full transition-opacity backdrop-blur-sm">Click to Compare</span></div>
+                                        {/* OPPDATERT: Hvis vi har en VEO Video, spilles den av i loop! */}
+                                        {img.video ? (
+                                            <>
+                                                <video src={img.video} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none" />
+                                                <div className="absolute top-4 left-4 bg-purple-600 text-white text-[9px] font-black px-3 py-1.5 rounded shadow-lg z-30 uppercase tracking-widest border border-purple-400/50">🎬 Cinematic Video</div>
+                                            </>
+                                        ) : (
+                                            /* eslint-disable-next-line @next/next/no-img-element */
+                                            <img src={img.edited} className="w-full h-full object-cover" alt="Rendered result" />
+                                        )}
+                                        
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center pointer-events-none z-20"><span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full transition-opacity backdrop-blur-sm">Click to Compare</span></div>
                                     </div>
+                                    
                                     <div className="flex gap-2">
                                         {img.approved ? <div className="flex-1 py-3 bg-[#009183]/20 text-[#00b09f] font-black uppercase text-[10px] text-center rounded-xl border border-[#009183]/30">Approved</div> : <><button onClick={() => approveImage(img.name)} className="flex-1 py-3 bg-[#009183] text-white font-black uppercase text-[10px] rounded-xl hover:bg-[#00b09f] transition-all">Approve 4K</button><button onClick={() => openCanvasStudio(img.name, 'retouch', img.edited)} className="flex-1 py-3 bg-[#0f172a] border border-slate-700 text-slate-300 font-black uppercase text-[10px] rounded-xl hover:bg-slate-800 transition-colors">Retouch</button></>}
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => handleDownloadSingle(img.edited, img.name)} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Download</button>
+                                        {/* OPPDATERT: Laster ned MP4 hvis videoen finnes */}
+                                        <button onClick={() => handleDownloadSingle(img.video || img.edited, img.video ? img.name.replace('.jpg', '.mp4') : img.name)} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Download {img.video ? 'Video' : ''}</button>
                                         <button onClick={() => { setCurrentCanvasImgId(img.name); setActiveModal('rerender'); }} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Re-Render</button>
                                     </div>
+                                    
+                                    {/* NY RAD: VIDEO MAGIC KNAPPEN! */}
+                                    {!img.video && (
+                                        <div className="flex mt-1">
+                                            <button onClick={() => { setCurrentCanvasImgId(img.name); setActiveModal('video'); }} className="flex-1 py-3 bg-purple-900/30 border border-purple-700/50 text-purple-400 font-black uppercase text-[10px] rounded-xl hover:bg-purple-800 hover:text-white hover:border-purple-500 transition-all shadow-[0_0_15px_rgba(147,51,234,0.15)] hover:shadow-[0_0_20px_rgba(147,51,234,0.4)]">🎬 Animate with Veo AI</button>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -803,6 +838,33 @@ export default function Home() {
                     <button id="retouchBtn" onClick={submitRetouch} className="px-8 py-3 bg-[#009183] text-white font-black uppercase text-xs rounded-xl hover:bg-[#00b09f] shadow-[0_0_15px_rgba(0,145,131,0.3)] transition-all duration-300">Execute</button>
                   </>
                 )}
+            </div>
+        </div>
+      )}
+
+      {/* NY MODAL: VIDEO MAGIC STUDIO */}
+      {activeModal === 'video' && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
+            <div className="bg-[#0f172a] rounded-3xl p-8 shadow-2xl border border-purple-500/30 w-[500px]">
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-xl font-black text-white uppercase montserrat tracking-wider text-purple-400">🎬 Video Magic</h2>
+                    <button onClick={() => setActiveModal('none')} className="text-slate-500 hover:text-white font-bold uppercase text-xs transition-colors">Cancel</button>
+                </div>
+                <div className="space-y-6">
+                    <div>
+                        <label className="text-[10px] font-bold text-purple-300 uppercase tracking-widest mb-3 block">Director's Prompt</label>
+                        <textarea 
+                            rows={3}
+                            value={videoPrompt} 
+                            onChange={(e) => setVideoPrompt(e.target.value)} 
+                            className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-purple-500 transition-colors resize-none"
+                        />
+                    </div>
+                    <div className="text-xs text-slate-400 italic">
+                        The Veo AI will analyze your 4K render and generate a highly realistic 5-second cinematic camera movement.
+                    </div>
+                    <button onClick={submitVideo} className="w-full py-4 mt-4 bg-purple-600 text-white font-black uppercase text-xs rounded-xl hover:bg-purple-500 shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all">Action! 🎬</button>
+                </div>
             </div>
         </div>
       )}
