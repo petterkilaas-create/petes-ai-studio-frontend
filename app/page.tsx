@@ -6,7 +6,6 @@ import { supabase } from "../supabaseClient";
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
-// OPPDATERT: Typen har nå 'video' inkludert
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; };
 type GalleryImage = { name: string; raw: string; edited: string; approved?: boolean; video?: string; };
@@ -32,7 +31,6 @@ export default function Home() {
   const [progressStatus, setProgressStatus] = useState("Processing...");
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
-  // OPPDATERT: 'video' lagt til som modal-valg
   const [activeModal, setActiveModal] = useState<'none' | 'mask' | 'retouch' | 'compare' | 'rerender' | 'video'>('none');
   const [currentCanvasImgId, setCurrentCanvasImgId] = useState("");
   const [brushSize, setBrushSize] = useState(50);
@@ -41,7 +39,6 @@ export default function Home() {
   const [rerenderData, setRerenderData] = useState({ type: "exterior", style: "dusk_blue_hour", prompt: "" });
   const [compareData, setCompareData] = useState({ raw: "", edited: "" });
   
-  // NY STATE: For Video Studio prompt
   const [videoPrompt, setVideoPrompt] = useState("Cinematic 5 second slow pan, highly detailed architectural video, 8k resolution");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,7 +51,6 @@ export default function Home() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
-  // 1. INITIAL FETCH & SUPABASE REALTIME
   useEffect(() => {
     fetch(`${API}/batch-progress/`, { cache: 'no-store' }).then(res => res.json()).then(data => { 
       if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); 
@@ -113,7 +109,6 @@ export default function Home() {
     };
   }, [user]);
 
-  // 2. LYTTER PÅ SANNTIDS-ENDRINGER
   useEffect(() => {
       const activeOrder = archiveOrders.find(o => o.name === jobName);
       if (activeOrder?.status === 'completed' && isRendering) {
@@ -321,6 +316,10 @@ export default function Home() {
   const submitRetouch = async () => {
       if(!retouchPrompt) return;
       setActiveModal('none');
+      
+      setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
+
       setIsRendering(true);
       setProgressPct(0);
       setProgressStatus("Initializing Retouch...");
@@ -418,6 +417,11 @@ export default function Home() {
         
         if (s.lifetime_completed) setTotalRenders(s.lifetime_completed);
         
+        if (s.status === 'error') {
+            setProgressStatus(`Error: ${s.message}`);
+            return;
+        }
+        
         if (s.total > 0 && s.status !== 'finished') {
             setProgressPct((s.completed / s.total) * 100); 
             setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
@@ -457,6 +461,10 @@ export default function Home() {
 
   const submitRerender = async () => {
       setActiveModal('none');
+
+      setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
+
       setIsRendering(true);
       setProgressPct(0);
       setProgressStatus("Initializing Re-Render...");
@@ -476,9 +484,12 @@ export default function Home() {
       }
   };
 
-  // NY FUNKSJON: Start Googles VEO Video-generator!
   const submitVideo = async () => {
       setActiveModal('none');
+      
+      setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
+      
       setIsRendering(true);
       setProgressPct(0);
       setProgressStatus("Generating Cinematic Video Magic... (This takes 1-2 mins)");
@@ -736,6 +747,7 @@ export default function Home() {
                   </div>
                 )}
 
+                {/* Progress bar ligger over galleriet når isRendering er true */}
                 {isRendering && activeModal === 'none' && (
                   <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8">
                       <p className="font-black montserrat uppercase tracking-[0.3em] text-sm text-[#009183] animate-pulse">{progressStatus}</p>
@@ -745,6 +757,7 @@ export default function Home() {
                   </div>
                 )}
 
+                {/* Galleriet forblir synlig */}
                 {galleryImages.length > 0 && (
                     <div className="animate-in fade-in slide-in-from-bottom-10 duration-500">
                         <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
@@ -764,7 +777,6 @@ export default function Home() {
                                             🗑️
                                         </button>
 
-                                        {/* OPPDATERT: Hvis vi har en VEO Video, spilles den av i loop! */}
                                         {img.video ? (
                                             <>
                                                 <video src={img.video} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none" />
@@ -782,12 +794,10 @@ export default function Home() {
                                         {img.approved ? <div className="flex-1 py-3 bg-[#009183]/20 text-[#00b09f] font-black uppercase text-[10px] text-center rounded-xl border border-[#009183]/30">Approved</div> : <><button onClick={() => approveImage(img.name)} className="flex-1 py-3 bg-[#009183] text-white font-black uppercase text-[10px] rounded-xl hover:bg-[#00b09f] transition-all">Approve 4K</button><button onClick={() => openCanvasStudio(img.name, 'retouch', img.edited)} className="flex-1 py-3 bg-[#0f172a] border border-slate-700 text-slate-300 font-black uppercase text-[10px] rounded-xl hover:bg-slate-800 transition-colors">Retouch</button></>}
                                     </div>
                                     <div className="flex gap-2">
-                                        {/* OPPDATERT: Laster ned MP4 hvis videoen finnes */}
                                         <button onClick={() => handleDownloadSingle(img.video || img.edited, img.video ? img.name.replace('.jpg', '.mp4') : img.name)} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Download {img.video ? 'Video' : ''}</button>
                                         <button onClick={() => { setCurrentCanvasImgId(img.name); setActiveModal('rerender'); }} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Re-Render</button>
                                     </div>
                                     
-                                    {/* NY RAD: VIDEO MAGIC KNAPPEN! */}
                                     {!img.video && (
                                         <div className="flex mt-1">
                                             <button onClick={() => { setCurrentCanvasImgId(img.name); setActiveModal('video'); }} className="flex-1 py-3 bg-purple-900/30 border border-purple-700/50 text-purple-400 font-black uppercase text-[10px] rounded-xl hover:bg-purple-800 hover:text-white hover:border-purple-500 transition-all shadow-[0_0_15px_rgba(147,51,234,0.15)] hover:shadow-[0_0_20px_rgba(147,51,234,0.4)]">🎬 Animate with Veo AI</button>
@@ -842,7 +852,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* NY MODAL: VIDEO MAGIC STUDIO */}
       {activeModal === 'video' && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
             <div className="bg-[#0f172a] rounded-3xl p-8 shadow-2xl border border-purple-500/30 w-[500px]">
