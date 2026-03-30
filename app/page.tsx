@@ -39,7 +39,7 @@ export default function Home() {
   const [rerenderData, setRerenderData] = useState({ type: "exterior", style: "dusk_blue_hour", prompt: "" });
   const [compareData, setCompareData] = useState({ raw: "", edited: "" });
   
-  const [videoPrompt, setVideoPrompt] = useState("Cinematic 5 second slow pan, highly detailed architectural video, 8k resolution");
+  const [videoPrompt, setVideoPrompt] = useState("Cinematic slow pan, highly detailed architectural video, 8k resolution");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -111,14 +111,10 @@ export default function Home() {
 
   useEffect(() => {
       const activeOrder = archiveOrders.find(o => o.name === jobName);
-      if (activeOrder?.status === 'completed' && isRendering) {
+      if ((activeOrder?.status === 'completed' || activeOrder?.status === 'finished') && isRendering) {
           setIsRendering(false);
           if (pollTimer.current) clearTimeout(pollTimer.current);
-          
-          fetch(`${API}/list-finished/?job_name=${jobName}`, { cache: 'no-store' })
-            .then(res => res.json())
-            .then(data => setGalleryImages(data.images))
-            .catch(console.error);
+          loadGallery(jobName);
       }
   }, [archiveOrders, jobName, isRendering]);
 
@@ -427,7 +423,11 @@ export default function Home() {
             setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
         }
         
-        if (s.status === 'finished') return; 
+        if (s.status === 'finished') {
+            // Vi henter galleriet manuelt med en gang vi får finished i polleren
+            loadGallery(pollingJobName);
+            return; 
+        }
         
     } catch (e) { console.error("Feil ved sjekking av fremdrift:", e); }
     
@@ -437,14 +437,7 @@ export default function Home() {
   const viewOrder = async (name: string) => { 
       if (pollTimer.current) clearTimeout(pollTimer.current);
       setIsRendering(false); setJobName(name); setUploadedFiles([]); setStagingRooms([]); setGalleryImages([]); 
-      
-      try {
-          const res = await fetch(`${API}/list-finished/?job_name=${name}`, { cache: 'no-store' });
-          const data = await res.json();
-          setGalleryImages(data.images);
-      } catch (e) {
-          console.error(e);
-      }
+      loadGallery(name);
   };
 
   const loadGallery = async (name: string) => { 
@@ -461,50 +454,20 @@ export default function Home() {
 
   const submitRerender = async () => {
       setActiveModal('none');
-
       setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
       if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
-
-      setIsRendering(true);
-      setProgressPct(0);
-      setProgressStatus("Initializing Re-Render...");
-
-      const fd = new FormData(); 
-      fd.append('job_name', jobName); 
-      fd.append('image_name', currentCanvasImgId); 
-      fd.append('image_type', rerenderData.type); 
-      fd.append('style', rerenderData.style); 
-      fd.append('prompt', rerenderData.prompt);
-      try { 
-          await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); 
-          pollProgress(jobName); 
-      } catch(e) { 
-          console.error(e); 
-          setProgressStatus("Error connecting to server!");
-      }
+      setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render...");
+      const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
+      try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(jobName); } catch(e) { console.error(e); setProgressStatus("Error connecting to server!"); }
   };
 
   const submitVideo = async () => {
       setActiveModal('none');
-      
       setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
       if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
-      
-      setIsRendering(true);
-      setProgressPct(0);
-      setProgressStatus("Generating Cinematic Video Magic... (This takes 1-2 mins)");
-
-      const fd = new FormData(); 
-      fd.append('job_name', jobName); 
-      fd.append('image_name', currentCanvasImgId); 
-      fd.append('prompt', videoPrompt);
-      try { 
-          await fetch(`${API}/generate-video/`, { method: 'POST', body: fd }); 
-          pollProgress(jobName); 
-      } catch(e) { 
-          console.error(e); 
-          setProgressStatus("Error connecting to server!");
-      }
+      setIsRendering(true); setProgressPct(0); setProgressStatus("Generating Cinematic Video Magic... (This takes 1-2 mins)");
+      const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', videoPrompt);
+      try { await fetch(`${API}/generate-video/`, { method: 'POST', body: fd }); pollProgress(jobName); } catch(e) { console.error(e); setProgressStatus("Error connecting to server!"); }
   };
 
   const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -606,12 +569,10 @@ export default function Home() {
                             {uploadedFiles.map((file) => (
                               <div key={file.id} className="bg-[#0f172a] rounded-xl overflow-hidden border border-slate-700 relative flex flex-col">
                                 <button onClick={() => removeFile(file.id)} className="absolute top-2 right-2 bg-red-500/80 text-white rounded-full w-6 h-6 flex items-center justify-center text-[10px] font-black z-10 hover:bg-red-600 transition-colors shadow">X</button>
-                                
                                 <div className="aspect-[3/2] relative border-b border-slate-700">
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
                                   <img src={file.url} alt="upload" className="w-full h-full object-cover" />
                                 </div>
-                                
                                 <div className="p-3 flex flex-col gap-2">
                                     <div className="flex gap-2">
                                         <select value={file.type} onChange={(e) => updateFileField(file.id, 'type', e.target.value)} className="w-1/2 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none focus:border-[#009183]">
@@ -640,18 +601,11 @@ export default function Home() {
                                             </optgroup>
                                         </select>
                                     </div>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Custom prompt (overrides dropdowns)..." 
-                                        value={file.prompt} 
-                                        onChange={(e) => updateFileField(file.id, 'prompt', e.target.value)} 
-                                        className="w-full bg-[#0B1120] rounded-lg px-3 py-2 text-[10px] text-white outline-none border border-slate-700 focus:border-[#009183] placeholder-slate-600"
-                                    />
+                                    <input type="text" placeholder="Custom prompt (overrides dropdowns)..." value={file.prompt} onChange={(e) => updateFileField(file.id, 'prompt', e.target.value)} className="w-full bg-[#0B1120] rounded-lg px-3 py-2 text-[10px] text-white outline-none border border-slate-700 focus:border-[#009183] placeholder-slate-600" />
                                 </div>
                               </div>
                             ))}
                           </div>
-
                           <div className="mt-8 flex justify-between items-center bg-[#0f172a] p-6 rounded-2xl border border-white/5">
                               <div className="flex gap-4">
                                   <select value={globalType} onChange={(e) => setGlobalType(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
@@ -689,7 +643,6 @@ export default function Home() {
                         <h2 className="font-bold uppercase text-xs tracking-widest text-[#009183]">Spatial Staging Workspace</h2>
                         <button onClick={addRoom} className="px-4 py-2 border border-[#009183] text-[#009183] text-[10px] font-black uppercase rounded-lg hover:bg-[#009183] hover:text-white transition-colors">+ Add Room</button>
                     </div>
-                    
                     <div className="flex gap-8">
                         <div className="w-1/3 bg-[#0B1120] p-4 rounded-xl border border-slate-800">
                             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Unassigned Assets</h3>
@@ -703,7 +656,6 @@ export default function Home() {
                                 ))}
                             </div>
                         </div>
-                        
                         <div className="w-2/3 space-y-6">
                             {stagingRooms.map((room, index) => (
                                 <div key={room.id} className="bg-[#0B1120] p-5 rounded-xl border border-slate-800" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, room.id)}>
@@ -724,13 +676,11 @@ export default function Home() {
                                                 <div key={file.id} className="relative w-24 h-24 group">
                                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                                     <img src={file.url} alt="Room img" draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className={`draggable-img w-full h-full object-cover rounded-lg border-2 ${isHero ? 'border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.4)]' : 'border-slate-700'}`} />
-                                                    
                                                     <div onClick={() => openCanvasStudio(file.id, 'mask')} className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center rounded-lg transition-opacity backdrop-blur-sm z-10 cursor-pointer">
                                                         <span className="text-white text-[8px] font-bold uppercase text-center mb-1">Canvas Tool</span>
                                                         <span className="text-white text-[8px] font-black uppercase text-center border border-white px-2 py-1 rounded hover:bg-white hover:text-black transition-colors">🖌️ Mask</span>
                                                     </div>
                                                     {file.maskBlob && <div className="absolute bottom-1 right-1 bg-green-500 text-white text-[8px] font-black uppercase px-1 rounded z-20 shadow">Masked</div>}
-
                                                     <div onClick={() => setHero(room.id, file.id)} className={`hero-star absolute -top-2 -left-2 text-2xl z-20 ${isHero ? 'is-hero' : ''}`}>⭐️</div>
                                                 </div>
                                             );
@@ -740,16 +690,14 @@ export default function Home() {
                             ))}
                         </div>
                     </div>
-                    
                     <div className="mt-8 flex justify-end">
                         <button onClick={startStagingRender} className="px-10 py-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl hover:bg-[#00b09f] shadow-[0_0_15px_rgba(0,145,131,0.3)] transition-all">Start Spatial Staging</button>
                     </div>
                   </div>
                 )}
 
-                {/* Progress bar ligger over galleriet når isRendering er true */}
-                {isRendering && activeModal === 'none' && (
-                  <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8">
+                {isRendering && (
+                  <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8 sticky top-10 z-[40]">
                       <p className="font-black montserrat uppercase tracking-[0.3em] text-sm text-[#009183] animate-pulse">{progressStatus}</p>
                       <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10">
                           <div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-700" style={{ width: `${progressPct}%` }}></div>
@@ -757,7 +705,6 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Galleriet forblir synlig */}
                 {galleryImages.length > 0 && (
                     <div className="animate-in fade-in slide-in-from-bottom-10 duration-500">
                         <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
@@ -767,16 +714,8 @@ export default function Home() {
                         <div className="grid grid-cols-2 gap-10 pb-20">
                             {galleryImages.map((img) => (
                                 <div key={img.name} className="group space-y-3">
-                                    <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] hover:shadow-[0_20px_40px_-15px_rgba(0,145,131,0.2)] hover:border-white/20 transition-all duration-300" onClick={() => { setCompareData({raw: img.raw, edited: img.edited}); setActiveModal('compare'); }}>
-                                        
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); deleteSingleImage(img.name); }} 
-                                            className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all shadow-lg border border-red-900/50 hover:border-red-500"
-                                            title="Delete Image"
-                                        >
-                                            🗑️
-                                        </button>
-
+                                    <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] hover:shadow-[0_20px_40px_-15px_rgba(0,145,131,0.2)] hover:border-white/20 transition-all duration-300" onClick={() => { if(!img.video) { setCompareData({raw: img.raw, edited: img.edited}); setActiveModal('compare'); } }}>
+                                        <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(img.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 hover:bg-red-600 transition-all shadow-lg border border-red-900/50 hover:border-red-500" title="Delete Image">🗑️</button>
                                         {img.video ? (
                                             <>
                                                 <video src={img.video} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none" />
@@ -786,10 +725,8 @@ export default function Home() {
                                             /* eslint-disable-next-line @next/next/no-img-element */
                                             <img src={img.edited} className="w-full h-full object-cover" alt="Rendered result" />
                                         )}
-                                        
-                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center pointer-events-none z-20"><span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full transition-opacity backdrop-blur-sm">Click to Compare</span></div>
+                                        {!img.video && <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 flex items-center justify-center pointer-events-none z-20"><span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full transition-opacity backdrop-blur-sm">Click to Compare</span></div>}
                                     </div>
-                                    
                                     <div className="flex gap-2">
                                         {img.approved ? <div className="flex-1 py-3 bg-[#009183]/20 text-[#00b09f] font-black uppercase text-[10px] text-center rounded-xl border border-[#009183]/30">Approved</div> : <><button onClick={() => approveImage(img.name)} className="flex-1 py-3 bg-[#009183] text-white font-black uppercase text-[10px] rounded-xl hover:bg-[#00b09f] transition-all">Approve 4K</button><button onClick={() => openCanvasStudio(img.name, 'retouch', img.edited)} className="flex-1 py-3 bg-[#0f172a] border border-slate-700 text-slate-300 font-black uppercase text-[10px] rounded-xl hover:bg-slate-800 transition-colors">Retouch</button></>}
                                     </div>
@@ -797,7 +734,6 @@ export default function Home() {
                                         <button onClick={() => handleDownloadSingle(img.video || img.edited, img.video ? img.name.replace('.jpg', '.mp4') : img.name)} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Download {img.video ? 'Video' : ''}</button>
                                         <button onClick={() => { setCurrentCanvasImgId(img.name); setActiveModal('rerender'); }} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Re-Render</button>
                                     </div>
-                                    
                                     {!img.video && (
                                         <div className="flex mt-1">
                                             <button onClick={() => { setCurrentCanvasImgId(img.name); setActiveModal('video'); }} className="flex-1 py-3 bg-purple-900/30 border border-purple-700/50 text-purple-400 font-black uppercase text-[10px] rounded-xl hover:bg-purple-800 hover:text-white hover:border-purple-500 transition-all shadow-[0_0_15px_rgba(147,51,234,0.15)] hover:shadow-[0_0_20px_rgba(147,51,234,0.4)]">🎬 Animate with Veo AI</button>
@@ -808,7 +744,6 @@ export default function Home() {
                         </div>
                     </div>
                 )}
-
             </div>
         </section>
       </main>
@@ -820,11 +755,9 @@ export default function Home() {
                 <h2 className="text-2xl font-black text-white uppercase montserrat tracking-widest text-[#009183]">{activeModal === 'mask' ? 'Paint Floor Area' : 'Retouch Studio'}</h2>
                 <button onClick={() => setActiveModal('none')} className="text-slate-400 font-bold uppercase text-xs hover:text-white transition-colors">Close</button>
             </div>
-            
             <div className="relative w-[85vw] max-w-[1100px] aspect-[3/2] bg-black border border-white/10 rounded-3xl overflow-hidden shadow-2xl" onMouseMove={handleCanvasMouseMove} onMouseDown={handleCanvasMouseDown} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp}>
                 <canvas ref={canvasRef} className="absolute inset-0 w-full h-full z-10 cursor-none"></canvas>
             </div>
-            
             <div className="w-[85vw] max-w-[1100px] flex gap-5 bg-[#0f172a] p-4 rounded-2xl items-center shadow-2xl border border-white/10">
                 <div className="flex flex-col gap-1 w-40 pl-2">
                     <label className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Brush: <span className="text-white">{brushSize}</span>px</label>
@@ -833,7 +766,6 @@ export default function Home() {
                 <div className="w-px h-8 bg-slate-700 mx-2"></div>
                 <button onClick={undoCanvas} className="px-5 py-3 bg-[#0B1120] border border-slate-700 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors">Undo</button>
                 <button onClick={clearCanvas} className="px-5 py-3 bg-red-900/20 text-red-400 font-bold text-xs rounded-xl border border-red-900/50 hover:bg-red-900/40 transition-colors">Reset</button>
-                
                 {activeModal === 'mask' ? (
                   <>
                     <div className="flex-1 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest">Only green areas will receive furniture</div>
@@ -862,16 +794,9 @@ export default function Home() {
                 <div className="space-y-6">
                     <div>
                         <label className="text-[10px] font-bold text-purple-300 uppercase tracking-widest mb-3 block">Director's Prompt</label>
-                        <textarea 
-                            rows={3}
-                            value={videoPrompt} 
-                            onChange={(e) => setVideoPrompt(e.target.value)} 
-                            className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-purple-500 transition-colors resize-none"
-                        />
+                        <textarea rows={3} value={videoPrompt} onChange={(e) => setVideoPrompt(e.target.value)} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-purple-500 transition-colors resize-none" />
                     </div>
-                    <div className="text-xs text-slate-400 italic">
-                        The Veo AI will analyze your 4K render and generate a highly realistic 5-second cinematic camera movement.
-                    </div>
+                    <div className="text-xs text-slate-400 italic">The Veo AI will analyze your 4K render and generate a highly realistic 8-second cinematic camera movement.</div>
                     <button onClick={submitVideo} className="w-full py-4 mt-4 bg-purple-600 text-white font-black uppercase text-xs rounded-xl hover:bg-purple-500 shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all">Action! 🎬</button>
                 </div>
             </div>
@@ -894,10 +819,10 @@ export default function Home() {
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">New Style Category</label>
                         <select value={rerenderData.style} onChange={(e) => setRerenderData({...rerenderData, style: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183] transition-colors">
                             <optgroup label="Lighting & Weather">
-                                <option value="weather_rain_to_sun">Rain to Sun (Vått til tørt)</option>
-                                <option value="sunny_midday">Sunny midday (Strålende sol)</option>
-                                <option value="dusk_blue_hour">Blue Hour (Kveldsfoto)</option>
-                                <option value="dusk_purple_orange">Purple Dusk (Solfall)</option>
+                                <option value="weather_rain_to_sun">Rain to Sun</option>
+                                <option value="sunny_midday">Sunny midday</option>
+                                <option value="dusk_blue_hour">Blue Hour</option>
+                                <option value="dusk_purple_orange">Purple Dusk</option>
                                 <option value="early_morning">Early Morning</option>
                             </optgroup>
                             <optgroup label="Season">
@@ -930,7 +855,6 @@ export default function Home() {
                 <img id="modalAfter" src={compareData.edited} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10" alt="After" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img id="modalBefore" src={compareData.raw} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-20" alt="Before" style={{ clipPath: 'inset(0 50% 0 0)' }} />
-                
                 <div id="modalHandle" className="absolute top-0 bottom-0 w-[2px] bg-white/50 z-30 -translate-x-1/2 pointer-events-none" style={{ left: '50%' }}>
                     <div className="absolute top-1/2 left-1/2 w-10 h-10 bg-[#009183] border-[3px] border-[#0B1120] rounded-full -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-white font-bold shadow-xl">↔</div>
                 </div>
