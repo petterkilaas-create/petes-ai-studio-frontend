@@ -60,6 +60,7 @@ export default function Home() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
+  // 1. SUPABASE REALTIME LISTENER
   useEffect(() => {
     const fetchMyProjects = async () => {
       if (!user) return;
@@ -111,14 +112,24 @@ export default function Home() {
     };
   }, [user]);
 
+  // 2. DEN MAGISKE TRIGGEREN: Lytter på status-endring fra Supabase
   useEffect(() => {
       const activeOrder = archiveOrders.find(o => o.name === jobName);
-      if ((activeOrder?.status === 'completed' || activeOrder?.status === 'finished') && isRendering) {
-          setIsRendering(false);
-          if (pollTimer.current) clearTimeout(pollTimer.current);
-          loadGallery(jobName);
+      if (isRendering && activeOrder && (activeOrder.status === 'completed' || activeOrder.status === 'finished')) {
+          handleJobComplete(jobName);
       }
   }, [archiveOrders, jobName, isRendering]);
+
+  const handleJobComplete = (targetJobName: string) => {
+      setIsRendering(false);
+      setProgressPct(100);
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+      
+      // Venter 1.5 sekund for å la Google Cloud Storage "puste ut" før vi henter bildene
+      setTimeout(() => {
+          loadGallery(targetJobName);
+      }, 1500);
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
@@ -362,11 +373,18 @@ export default function Home() {
       } catch (error) { console.error(error); }
   };
 
+  // 3. OPPDATERT POLLING: Fortsatt her for UI (Progress Bar), men avsluttes elegant når jobben er gjort
   const pollProgress = async (pollingJobName: string) => {
     try {
         const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
         const s = await r.json();
-        if (s.total > 0 && s.status !== 'finished') {
+        
+        if (s.status === 'finished') {
+            handleJobComplete(pollingJobName);
+            return;
+        }
+
+        if (s.total > 0) {
             setProgressPct((s.completed / s.total) * 100); 
             setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
         }
@@ -380,9 +398,11 @@ export default function Home() {
       loadGallery(name);
   };
 
+  // 4. CACHE BUSTER FOR GALLERIET: Unikt tidsstempel fikser "Hard Refresh"-problemet!
   const loadGallery = async (name: string) => { 
       try { 
-          const res = await fetch(`${API}/list-finished/?job_name=${name}`, { cache: 'no-store' }); 
+          const timestamp = Date.now();
+          const res = await fetch(`${API}/list-finished/?job_name=${name}&t=${timestamp}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
       } catch (e) { console.error(e); } 
