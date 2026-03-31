@@ -24,11 +24,19 @@ type OrderArchive = { name: string; date: string; status: string; };
 export default function Home() {
   const { user } = useUser();
 
-  const [currentMode, setCurrentMode] = useState<'express' | 'staging'>('express');
+  // --- UI STATES ---
+  const [currentMode, setCurrentMode] = useState<'express' | 'staging' | 'video'>('express');
   const [jobName, setJobName] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  
+  // --- STAGING STATES ---
   const [stagingRooms, setStagingRooms] = useState<StagingRoom[]>([]);
   const [roomCounter, setRoomCounter] = useState(0);
+  
+  // --- VIDEO BUILDER STATES (NEW) ---
+  const [videoTimeline, setVideoTimeline] = useState<string[]>([]);
+  const [videoMeta, setVideoMeta] = useState({ address: "", price: "", realtorName: "", phone: "" });
+
   const [archiveOrders, setArchiveOrders] = useState<OrderArchive[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -60,7 +68,7 @@ export default function Home() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
-  // 1. SUPABASE REALTIME LISTENER
+  // --- SUPABASE REALTIME LISTENER ---
   useEffect(() => {
     const fetchMyProjects = async () => {
       if (!user) return;
@@ -112,7 +120,7 @@ export default function Home() {
     };
   }, [user]);
 
-  // 2. DEN MAGISKE TRIGGEREN: Lytter på status-endring fra Supabase
+  // --- AUTO RELOAD TRIGGER ---
   useEffect(() => {
       const activeOrder = archiveOrders.find(o => o.name === jobName);
       if (isRendering && activeOrder && (activeOrder.status === 'completed' || activeOrder.status === 'finished')) {
@@ -124,11 +132,7 @@ export default function Home() {
       setIsRendering(false);
       setProgressPct(100);
       if (pollTimer.current) clearTimeout(pollTimer.current);
-      
-      // Venter 1.5 sekund for å la Google Cloud Storage "puste ut" før vi henter bildene
-      setTimeout(() => {
-          loadGallery(targetJobName);
-      }, 1500);
+      setTimeout(() => { loadGallery(targetJobName); }, 1500);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -144,21 +148,30 @@ export default function Home() {
     if (currentMode === 'staging' && stagingRooms.length === 0) addRoom();
   };
 
-  const removeFile = (id: string) => { setUploadedFiles(prev => prev.filter(f => f.id !== id)); };
+  const removeFile = (id: string) => { 
+      setUploadedFiles(prev => prev.filter(f => f.id !== id)); 
+      setVideoTimeline(prev => prev.filter(vid => vid !== id));
+  };
+  
   const updateFileField = (id: string, field: keyof UploadedFile, value: any) => { setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f)); };
   const applyExpressAll = () => { setUploadedFiles(prev => prev.map(f => ({ ...f, type: globalType, style: globalStyle, prompt: "" }))); };
   
   const createNewJob = () => { 
       if (pollTimer.current) clearTimeout(pollTimer.current);
-      setJobName(""); setUploadedFiles([]); setStagingRooms([]); setRoomCounter(0); setGalleryImages([]); setIsRendering(false); setProgressPct(0); setActiveModal('none'); 
+      setJobName(""); setUploadedFiles([]); setStagingRooms([]); setRoomCounter(0); 
+      setVideoTimeline([]); setVideoMeta({ address: "", price: "", realtorName: "", phone: "" });
+      setGalleryImages([]); setIsRendering(false); setProgressPct(0); setActiveModal('none'); 
   };
 
-  const addRoom = () => { const newId = roomCounter + 1; setRoomCounter(newId); setStagingRooms(prev => [...prev, { id: `room_${newId}`, style: "staging_scandi", hero_img_id: null, images: [] }]); };
+  // --- DRAG & DROP COMMON ---
   const handleDragStart = (e: React.DragEvent<HTMLElement>, imgId: string) => { e.dataTransfer.setData("text/plain", imgId); e.dataTransfer.effectAllowed = "move"; (e.target as HTMLElement).style.opacity = "0.5"; };
   const handleDragEnd = (e: React.DragEvent<HTMLElement>) => { (e.target as HTMLElement).style.opacity = "1"; };
   const handleDragOver = (e: React.DragEvent<HTMLElement>) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; e.currentTarget.classList.add("dragover"); };
   const handleDragLeave = (e: React.DragEvent<HTMLElement>) => { e.currentTarget.classList.remove("dragover"); };
-  const handleDrop = (e: React.DragEvent<HTMLElement>, targetRoomId: string) => {
+
+  // --- STAGING DRAG & DROP ---
+  const addRoom = () => { const newId = roomCounter + 1; setRoomCounter(newId); setStagingRooms(prev => [...prev, { id: `room_${newId}`, style: "staging_scandi", hero_img_id: null, images: [] }]); };
+  const handleStagingDrop = (e: React.DragEvent<HTMLElement>, targetRoomId: string) => {
     e.preventDefault(); e.currentTarget.classList.remove("dragover");
     const imgId = e.dataTransfer.getData("text/plain"); if (!imgId) return;
     setStagingRooms(prev => {
@@ -178,10 +191,18 @@ export default function Home() {
         return updated;
     });
   };
-
   const setHero = (roomId: string, imgId: string) => { setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, hero_img_id: imgId } : r)); };
   const updateRoomStyle = (roomId: string, newStyle: string) => { setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, style: newStyle } : r)); };
 
+  // --- VIDEO BUILDER DRAG & DROP ---
+  const handleVideoDrop = (e: React.DragEvent<HTMLElement>) => {
+      e.preventDefault(); e.currentTarget.classList.remove("dragover");
+      const imgId = e.dataTransfer.getData("text/plain"); if (!imgId) return;
+      if (!videoTimeline.includes(imgId)) { setVideoTimeline(prev => [...prev, imgId]); }
+  };
+  const removeFromVideoTimeline = (imgId: string) => { setVideoTimeline(prev => prev.filter(id => id !== imgId)); };
+
+  // --- CRUD ORDERS ---
   const deleteOrder = async (e: React.MouseEvent, orderName: string) => {
     e.stopPropagation();
     if (!window.confirm(`Are you sure you want to permanently delete the project "${orderName}"?`)) return;
@@ -190,7 +211,6 @@ export default function Home() {
     fetch(`${API}/delete-image/`, { method: 'POST', body: fd }).catch(console.error);
     if (jobName === orderName) createNewJob();
   };
-
   const renameOrder = async (e: React.MouseEvent, oldName: string) => {
     e.stopPropagation();
     const newNameRaw = window.prompt("Enter new project name:", oldName);
@@ -201,7 +221,6 @@ export default function Home() {
     fetch(`${API}/rename-order/`, { method: 'POST', body: fd }).catch(console.error);
     if (jobName === oldName) { setJobName(newName); loadGallery(newName); }
   };
-
   const deleteSingleImage = async (imgName: string) => {
       if (!window.confirm("Are you sure you want to permanently delete this image?")) return;
       const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName);
@@ -211,6 +230,7 @@ export default function Home() {
       } catch (e) { console.error("Failed to delete image:", e); }
   };
 
+  // --- CANVAS STUDIO ---
   const openCanvasStudio = (imgIdOrName: string, mode: 'mask' | 'retouch', customUrl: string | null = null) => {
     setCurrentCanvasImgId(imgIdOrName); setActiveModal(mode); setBrushSize(50);
     let targetUrl = customUrl;
@@ -221,7 +241,6 @@ export default function Home() {
       image.src = targetUrl;
     }
   };
-
   const initCanvas = () => {
     const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
     if (!canvas || !hiddenCanvas || !bgImg.current) return;
@@ -229,26 +248,22 @@ export default function Home() {
     const hiddenCtx = hiddenCanvas.getContext('2d'); if (hiddenCtx) hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
     undoStack.current = []; saveCanvasState(); renderCanvas();
   };
-
   const saveCanvasState = () => {
     const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return;
     const ctx = hiddenCanvas.getContext('2d'); if (!ctx) return;
     if (undoStack.current.length > 50) undoStack.current.shift();
     undoStack.current.push(ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height));
   };
-
   const undoCanvas = () => {
     const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas || undoStack.current.length <= 1) return;
     undoStack.current.pop(); const ctx = hiddenCanvas.getContext('2d');
     if (ctx) { ctx.putImageData(undoStack.current[undoStack.current.length - 1], 0, 0); renderCanvas(); }
   };
-
   const clearCanvas = () => {
     const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return;
     const ctx = hiddenCanvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
     undoStack.current = []; saveCanvasState(); renderCanvas();
   };
-
   const renderCanvas = () => {
     const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
     if (!canvas || !hiddenCanvas || !bgImg.current) return;
@@ -266,7 +281,6 @@ export default function Home() {
     }
     tCtx.putImageData(overlayData, 0, 0); ctx.drawImage(tempCanvas, 0, 0);
   };
-
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { 
     isDrawing.current = true; 
     const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
@@ -276,14 +290,11 @@ export default function Home() {
     const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height);
     ctx.beginPath(); ctx.moveTo(x, y); hiddenCtx.beginPath(); hiddenCtx.moveTo(x, y);
   };
-
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (cursorRef.current) { cursorRef.current.style.left = `${e.clientX}px`; cursorRef.current.style.top = `${e.clientY}px`; }
     if (isDrawing.current) drawOnCanvas(e);
   };
-  
   const handleCanvasMouseUp = () => { if (isDrawing.current) { saveCanvasState(); isDrawing.current = false; renderCanvas(); } };
-
   const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => {
     const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
     if (!canvas || !hiddenCanvas || !isDrawing.current) return;
@@ -293,7 +304,6 @@ export default function Home() {
     hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); 
     ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = activeModal === 'mask' ? 'rgba(0, 255, 131, 0.4)' : 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); 
   };
-
   const saveFloorMask = () => {
     const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
     if (!canvas || !hiddenCanvas) return;
@@ -307,28 +317,7 @@ export default function Home() {
     apiCanvas.toBlob((b) => { setUploadedFiles(prev => prev.map(f => f.id === currentCanvasImgId ? { ...f, maskBlob: b } : f)); setActiveModal('none'); }, 'image/png');
   };
 
-  const submitRetouch = async () => {
-      if(!retouchPrompt) return;
-      setActiveModal('none');
-      setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
-      setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch...");
-      const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-      if (!canvas || !hiddenCanvas) return;
-      const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height;
-      const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return;
-      aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height);
-      const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return;
-      const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
-      for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } }
-      aCtx.putImageData(maskData, 0, 0);
-      apiCanvas.toBlob(async (b) => {
-          if(!b) return;
-          const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
-          try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); pollProgress(jobName); } catch(e) { console.error(e); }
-      }, 'image/png');
-  };
-
+  // --- API CALLS ---
   const handleDownloadSingle = async (url: string, filename: string) => {
       try {
           const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob);
@@ -373,21 +362,20 @@ export default function Home() {
       } catch (error) { console.error(error); }
   };
 
-  // 3. OPPDATERT POLLING: Fortsatt her for UI (Progress Bar), men avsluttes elegant når jobben er gjort
+  const startFullPropertyFilm = () => {
+      if (videoTimeline.length < 2) {
+          alert("You need to add at least 2 scenes to the timeline to generate a film.");
+          return;
+      }
+      alert("🚀 COMING IN PHASE 2: This will send your timeline and agent details directly to the Creatomate + Veo AI pipeline to generate a full cinematic property film!");
+  };
+
   const pollProgress = async (pollingJobName: string) => {
     try {
         const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
         const s = await r.json();
-        
-        if (s.status === 'finished') {
-            handleJobComplete(pollingJobName);
-            return;
-        }
-
-        if (s.total > 0) {
-            setProgressPct((s.completed / s.total) * 100); 
-            setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
-        }
+        if (s.status === 'finished') { handleJobComplete(pollingJobName); return; }
+        if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Processing... ${s.completed} / ${s.total}`); }
     } catch (e) { console.error(e); }
     pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
   };
@@ -398,7 +386,6 @@ export default function Home() {
       loadGallery(name);
   };
 
-  // 4. CACHE BUSTER FOR GALLERIET: Unikt tidsstempel fikser "Hard Refresh"-problemet!
   const loadGallery = async (name: string) => { 
       try { 
           const timestamp = Date.now();
@@ -410,9 +397,29 @@ export default function Home() {
 
   const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(jobName); };
 
+  const submitRetouch = async () => {
+      if(!retouchPrompt) return;
+      setActiveModal('none'); setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
+      setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch...");
+      const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
+      if (!canvas || !hiddenCanvas) return;
+      const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height;
+      const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return;
+      aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height);
+      const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return;
+      const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } }
+      aCtx.putImageData(maskData, 0, 0);
+      apiCanvas.toBlob(async (b) => {
+          if(!b) return;
+          const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
+          try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); pollProgress(jobName); } catch(e) { console.error(e); }
+      }, 'image/png');
+  };
+
   const submitRerender = async () => {
-      setActiveModal('none');
-      setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
+      setActiveModal('none'); setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
       if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
       setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render...");
       const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
@@ -420,8 +427,7 @@ export default function Home() {
   };
 
   const submitVideo = async () => {
-      setActiveModal('none');
-      setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
+      setActiveModal('none'); setArchiveOrders(prev => prev.map(o => o.name === jobName ? { ...o, status: 'processing' } : o));
       if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
       setIsRendering(true); setProgressPct(0); setProgressStatus("Generating Cinematic Video Magic...");
       const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', videoPrompt);
@@ -442,8 +448,12 @@ export default function Home() {
     window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const assignedImageIds = stagingRooms.flatMap(r => r.images);
-  const unassignedFiles = uploadedFiles.filter(f => !assignedImageIds.includes(f.id));
+  const assignedStagingIds = stagingRooms.flatMap(r => r.images);
+  const unassignedStagingFiles = uploadedFiles.filter(f => !assignedStagingIds.includes(f.id));
+  
+  const unassignedVideoFiles = uploadedFiles.filter(f => !videoTimeline.includes(f.id));
+  const timelineFiles = videoTimeline.map(id => uploadedFiles.find(f => f.id === id)).filter(Boolean) as UploadedFile[];
+
   const filteredOrders = archiveOrders.filter(order => order.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
@@ -457,8 +467,9 @@ export default function Home() {
           <h1 className="text-lg font-black text-white montserrat tracking-widest uppercase">Pete&apos;s <span className="text-[#009183]">AI</span> Studio</h1>
         </div>
         <div className="flex bg-[#0B1120] p-1 rounded-xl border border-slate-700">
-          <button onClick={() => setCurrentMode('express')} className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${currentMode === 'express' ? 'bg-[#009183] text-white' : 'text-slate-500 hover:text-white'}`}>⚡ Express</button>
-          <button onClick={() => setCurrentMode('staging')} className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${currentMode === 'staging' ? 'bg-[#009183] text-white' : 'text-slate-500 hover:text-white'}`}>🛋️ Staging</button>
+          <button onClick={() => setCurrentMode('express')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${currentMode === 'express' ? 'bg-[#009183] text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>⚡ Express</button>
+          <button onClick={() => setCurrentMode('staging')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${currentMode === 'staging' ? 'bg-[#009183] text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>🛋️ Staging</button>
+          <button onClick={() => setCurrentMode('video')} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${currentMode === 'video' ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.3)]' : 'text-slate-500 hover:text-purple-400'}`}>🎬 Video Builder</button>
         </div>
         <div className="flex items-center gap-6">
             <UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-[#009183]/50 hover:border-[#009183] transition-all" } }} />
@@ -497,6 +508,7 @@ export default function Home() {
                   </div>
                 )}
 
+                {/* --- 1. EXPRESS MODE --- */}
                 {uploadedFiles.length > 0 && currentMode === 'express' && !isRendering && galleryImages.length === 0 && (
                   <div className="space-y-8">
                       <div className="grid grid-cols-3 gap-6">
@@ -529,6 +541,7 @@ export default function Home() {
                   </div>
                 )}
 
+                {/* --- 2. STAGING MODE --- */}
                 {uploadedFiles.length > 0 && currentMode === 'staging' && !isRendering && galleryImages.length === 0 && (
                   <div className="glass p-8 bg-[#0f172a]/50 border border-[#009183]/30">
                     <div className="flex justify-between items-center mb-6">
@@ -538,15 +551,15 @@ export default function Home() {
                     <div className="flex gap-8">
                         <div className="w-1/3 bg-[#0B1120] p-4 rounded-xl border border-slate-800">
                             <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Unassigned</h3>
-                            <div className="flex flex-wrap gap-2 p-2 min-h-[150px]" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, 'unassigned')}>
-                                {unassignedFiles.map(file => (
+                            <div className="flex flex-wrap gap-2 p-2 min-h-[150px]" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => handleStagingDrop(e, 'unassigned')}>
+                                {unassignedStagingFiles.map(file => (
                                     <img key={file.id} src={file.url} alt={`Unassigned ${file.id}`} draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className="w-20 h-20 object-cover rounded-lg border border-slate-700" />
                                 ))}
                             </div>
                         </div>
                         <div className="w-2/3 space-y-6">
                             {stagingRooms.map((room, index) => (
-                                <div key={room.id} className="bg-[#0B1120] p-5 rounded-xl border border-slate-800" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => handleDrop(e, room.id)}>
+                                <div key={room.id} className="bg-[#0B1120] p-5 rounded-xl border border-slate-800" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => handleStagingDrop(e, room.id)}>
                                     <div className="flex justify-between items-center mb-4"><h3 className="text-[10px] font-black text-white uppercase tracking-widest">Room {index + 1}</h3><select value={room.style} onChange={(e) => updateRoomStyle(room.id, e.target.value)} className="bg-[#0f172a] text-slate-300 rounded px-2 py-1 text-[9px] font-bold uppercase border border-slate-700 outline-none"><option value="staging_scandi">Scandi</option><option value="staging_luxury">Luxury</option></select></div>
                                     <div className="flex flex-wrap gap-4 p-4 min-h-[150px]">
                                         {room.images.map(imgId => {
@@ -570,6 +583,75 @@ export default function Home() {
                   </div>
                 )}
 
+                {/* --- 3. NEW: VIDEO BUILDER MODE --- */}
+                {uploadedFiles.length > 0 && currentMode === 'video' && !isRendering && galleryImages.length === 0 && (
+                  <div className="glass p-8 bg-[#0f172a]/50 border border-purple-500/30">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 className="font-black uppercase text-xl tracking-widest text-purple-400 montserrat">Cinematic Property Film</h2>
+                            <p className="text-xs text-slate-400 font-bold mt-2">Build a full 20-second real estate video using Veo 3.1 Fast & Creatomate.</p>
+                        </div>
+                    </div>
+                    
+                    {/* Intro / Outro Form */}
+                    <div className="grid grid-cols-2 gap-8 mb-10">
+                        <div className="bg-[#0B1120] p-6 rounded-2xl border border-slate-800 space-y-4">
+                            <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">🎬 Intro Scene</h3>
+                            <input type="text" placeholder="Address (e.g. Storgata 1)" value={videoMeta.address} onChange={(e) => setVideoMeta({...videoMeta, address: e.target.value})} className="w-full bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-purple-500" />
+                            <input type="text" placeholder="Price (e.g. Prisantydning 5.990.000,-)" value={videoMeta.price} onChange={(e) => setVideoMeta({...videoMeta, price: e.target.value})} className="w-full bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-purple-500" />
+                        </div>
+                        <div className="bg-[#0B1120] p-6 rounded-2xl border border-slate-800 space-y-4">
+                            <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2">📱 Outro Scene</h3>
+                            <input type="text" placeholder="Realtor Name" value={videoMeta.realtorName} onChange={(e) => setVideoMeta({...videoMeta, realtorName: e.target.value})} className="w-full bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-purple-500" />
+                            <input type="text" placeholder="Phone / Agency" value={videoMeta.phone} onChange={(e) => setVideoMeta({...videoMeta, phone: e.target.value})} className="w-full bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-purple-500" />
+                        </div>
+                    </div>
+
+                    {/* Timeline & Unassigned Pool */}
+                    <div className="flex flex-col gap-6">
+                        
+                        {/* Timeline */}
+                        <div className="bg-[#0B1120] p-6 rounded-2xl border border-purple-500/40" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleVideoDrop}>
+                            <h3 className="text-[10px] font-black text-purple-400 uppercase tracking-widest mb-4">Timeline (Drag here to set order)</h3>
+                            <div className="flex gap-4 p-4 min-h-[160px] overflow-x-auto bg-[#0f172a] rounded-xl border border-slate-800 items-center">
+                                {timelineFiles.length === 0 ? (
+                                    <div className="w-full text-center text-slate-500 text-xs font-bold uppercase tracking-widest">Drag images here to build your film</div>
+                                ) : (
+                                    timelineFiles.map((file, index) => (
+                                        <div key={file.id} className="relative min-w-[120px] h-[120px] group flex-shrink-0">
+                                            <div className="absolute -top-3 -left-3 w-6 h-6 bg-purple-600 rounded-full text-white flex items-center justify-center text-[10px] font-black border-2 border-[#0f172a] z-20">{index + 1}</div>
+                                            <button onClick={() => removeFromVideoTimeline(file.id)} className="absolute top-2 right-2 bg-red-500/80 text-white rounded-full w-5 h-5 flex items-center justify-center text-[8px] font-black z-30 hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity">X</button>
+                                            <img src={file.url} draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className="w-full h-full object-cover rounded-lg border-2 border-purple-500/50" />
+                                            <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-1 rounded text-[8px] text-white font-bold uppercase">4s Pan</div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Unused Images */}
+                        <div className="bg-[#0B1120] p-6 rounded-2xl border border-slate-800" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={(e) => {
+                            e.preventDefault(); e.currentTarget.classList.remove("dragover");
+                            const imgId = e.dataTransfer.getData("text/plain"); if (imgId) removeFromVideoTimeline(imgId);
+                        }}>
+                            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Unused Images</h3>
+                            <div className="flex flex-wrap gap-3">
+                                {unassignedVideoFiles.map(file => (
+                                    <img key={file.id} src={file.url} draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className="w-16 h-16 object-cover rounded-lg border border-slate-700 opacity-70 hover:opacity-100 transition-opacity cursor-grab" />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-10 flex justify-end">
+                        <button onClick={startFullPropertyFilm} className="px-10 py-4 bg-purple-600 text-white font-bold uppercase tracking-widest text-xs rounded-full shadow-[0_0_20px_rgba(147,51,234,0.4)] hover:bg-purple-500 transition-colors">
+                            Generate Property Film
+                        </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* --- RENDERING SPINNER --- */}
                 {isRendering && activeModal === 'none' && (
                   <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8">
                       <p className="font-black montserrat uppercase tracking-[0.3em] text-sm text-[#009183] animate-pulse">{progressStatus}</p>
@@ -577,10 +659,9 @@ export default function Home() {
                   </div>
                 )}
 
+                {/* --- GALLERY --- */}
                 {galleryImages.length > 0 && (
                     <div className="animate-in fade-in slide-in-from-bottom-10 duration-500">
-                        
-                        {/* --- NEW SLEEK HEADER FOR PROJECT --- */}
                         <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                             <div className="flex items-center gap-4">
                                 <h3 className="text-4xl font-black text-white montserrat uppercase">{jobName}</h3>
@@ -591,15 +672,11 @@ export default function Home() {
                                 <button onClick={() => window.location.href = `${API}/download-zip/${jobName}`} className="px-5 py-2 bg-white text-[#0B1120] rounded-full font-bold uppercase tracking-widest text-[9px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Export ZIP</button>
                             </div>
                         </div>
-
-                        {/* --- NEW SLEEK GALLERY CARDS --- */}
                         <div className="grid grid-cols-2 gap-10 pb-20">
                             {galleryImages.map((item) => (
                                 <div key={item.name} className="group flex flex-col">
-                                    
                                     <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] transition-all duration-300 mb-4">
                                         <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(item.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 transition-all shadow-lg border border-red-900/50">🗑️</button>
-                                        
                                         {item.type === 'video' ? (
                                             <>
                                                 <video src={item.url} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-10" />
@@ -612,8 +689,6 @@ export default function Home() {
                                             </div>
                                         )}
                                     </div>
-                                    
-                                    {/* Action Pills Row */}
                                     <div className="flex flex-wrap items-center gap-2 mb-3">
                                         {item.type === 'image' && (
                                             <>
@@ -622,7 +697,6 @@ export default function Home() {
                                                 ) : (
                                                     <button onClick={() => approveImage(item.name)} className="px-4 py-1.5 bg-[#009183] text-white text-[9px] font-bold uppercase tracking-widest rounded-full hover:bg-[#00b09f] shadow-[0_0_10px_rgba(0,145,131,0.2)] transition-all">Approve</button>
                                                 )}
-                                                
                                                 {!item.approved && (
                                                     <button onClick={() => openCanvasStudio(item.name, 'retouch', item.url)} className="px-4 py-1.5 bg-transparent border border-slate-700 text-slate-300 text-[9px] font-bold uppercase tracking-widest rounded-full hover:bg-slate-800 hover:text-white transition-colors">✏️ Retouch</button>
                                                 )}
@@ -631,8 +705,6 @@ export default function Home() {
                                         )}
                                         <button onClick={() => handleDownloadSingle(item.url, item.name)} className="px-4 py-1.5 bg-transparent border border-slate-700 text-slate-300 text-[9px] font-bold uppercase tracking-widest rounded-full hover:bg-slate-800 hover:text-white transition-colors">⬇️ Download</button>
                                     </div>
-
-                                    {/* Veo Subtle Button */}
                                     {item.type === 'image' && (
                                         <div className="mt-auto">
                                             <button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('video'); }} className="w-full py-2 bg-gradient-to-r from-purple-900/10 to-transparent border border-purple-500/20 text-purple-400 text-[9px] font-bold uppercase tracking-widest rounded-xl hover:bg-purple-900/20 hover:border-purple-500/40 transition-all flex items-center justify-center gap-2">
@@ -649,7 +721,7 @@ export default function Home() {
         </section>
       </main>
 
-      {/* --- ALL MODALS --- */}
+      {/* --- MODALS --- */}
       {(activeModal === 'mask' || activeModal === 'retouch') && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
             <div className="flex justify-between items-center w-[85vw] max-w-[1100px]"><h2 className="text-2xl font-black text-white uppercase montserrat tracking-widest text-[#009183]">{activeModal === 'mask' ? 'Paint Floor Area' : 'Retouch Studio'}</h2><button onClick={() => setActiveModal('none')} className="text-slate-400 font-bold uppercase text-xs hover:text-white transition-colors">Close</button></div>
