@@ -377,7 +377,6 @@ export default function Home() {
       const fd = new FormData();
       fd.append('job_name', safeJobName);
 
-      // Knytter opp alle bildene på tidslinjen
       timelineFiles.forEach(f => { fd.append('files', f.file); });
 
       const cfg = {
@@ -702,8 +701,8 @@ export default function Home() {
                                         <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(item.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 transition-all shadow-lg border border-red-900/50">🗑️</button>
                                         {item.type === 'video' ? (
                                             <>
-                                                <video src={item.url} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-10" />
-                                                <div className="absolute top-4 left-4 bg-purple-600 text-white text-[9px] font-black px-3 py-1.5 rounded-full shadow-lg z-30 uppercase tracking-widest border border-purple-400/50">🎬 Cinematic Video</div>
+                                                <video src={item.url} autoPlay loop muted playsInline controls className="absolute inset-0 w-full h-full object-cover z-10" />
+                                                <div className="absolute top-4 left-4 bg-purple-600 text-white text-[9px] font-black px-3 py-1.5 rounded-full shadow-lg z-30 uppercase tracking-widest border border-purple-400/50 pointer-events-none">🎬 Cinematic Video</div>
                                             </>
                                         ) : (
                                             <div onClick={() => { setCompareData({raw: item.raw || item.url, edited: item.url}); setActiveModal('compare'); }}>
