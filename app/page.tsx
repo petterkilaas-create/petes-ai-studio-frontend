@@ -502,9 +502,9 @@ export default function Home() {
                           <div className="flex gap-4">
                               <select value={globalType} onChange={(e) => setGlobalType(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
                               <select value={globalStyle} onChange={(e) => setGlobalStyle(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="weather_rain_to_sun">Rain to Sun</option><option value="sunny_midday">Sunny Midday</option><option value="dusk_blue_hour">Blue Hour</option><option value="staging_scandi">Scandi Staging</option></select>
-                              <button onClick={applyExpressAll} className="bg-slate-800 text-white px-6 rounded-xl text-[10px] font-black uppercase">Assign All</button>
+                              <button onClick={applyExpressAll} className="bg-slate-800 text-white px-6 rounded-xl text-[10px] font-bold tracking-widest uppercase">Assign All</button>
                           </div>
-                          <button onClick={startExpressRender} className="px-10 py-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl hover:bg-[#00b09f] shadow-[0_0_15px_rgba(0,145,131,0.3)]">Start Render</button>
+                          <button onClick={startExpressRender} className="px-10 py-3 bg-[#009183] text-white font-bold uppercase tracking-widest text-xs rounded-full hover:bg-[#00b09f] shadow-[0_0_15px_rgba(0,145,131,0.3)]">Start Render</button>
                       </div>
                   </div>
                 )}
@@ -546,7 +546,7 @@ export default function Home() {
                             ))}
                         </div>
                     </div>
-                    <div className="mt-8 flex justify-end"><button onClick={startStagingRender} className="px-10 py-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl">Start Staging</button></div>
+                    <div className="mt-8 flex justify-end"><button onClick={startStagingRender} className="px-10 py-3 bg-[#009183] text-white font-bold uppercase tracking-widest text-xs rounded-full shadow-[0_0_15px_rgba(0,145,131,0.3)]">Start Staging</button></div>
                   </div>
                 )}
 
@@ -559,25 +559,31 @@ export default function Home() {
 
                 {galleryImages.length > 0 && (
                     <div className="animate-in fade-in slide-in-from-bottom-10 duration-500">
+                        
+                        {/* --- NEW SLEEK HEADER FOR PROJECT --- */}
                         <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                             <div className="flex items-center gap-4">
                                 <h3 className="text-4xl font-black text-white montserrat uppercase">{jobName}</h3>
                                 <button onClick={(e) => renameOrder(e, jobName)} className="text-slate-500 hover:text-white text-xl transition-colors pb-1" title="Rename Project">✏️</button>
                             </div>
                             <div className="flex gap-3">
-                                <button onClick={(e) => deleteOrder(e, jobName)} className="px-6 py-3 bg-red-950/30 text-red-400 border border-red-900/50 rounded-xl font-black uppercase text-[10px] hover:bg-red-600 hover:text-white transition-colors">Delete Project</button>
-                                <button onClick={() => window.location.href = `${API}/download-zip/${jobName}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-xl font-black uppercase text-[10px] hover:bg-[#009183] hover:text-white transition-colors">Export ZIP</button>
+                                <button onClick={(e) => deleteOrder(e, jobName)} className="px-5 py-2 bg-transparent text-red-400 border border-red-900/30 rounded-full font-bold uppercase tracking-widest text-[9px] hover:bg-red-950/50 hover:border-red-500/50 transition-all">Delete Project</button>
+                                <button onClick={() => window.location.href = `${API}/download-zip/${jobName}`} className="px-5 py-2 bg-white text-[#0B1120] rounded-full font-bold uppercase tracking-widest text-[9px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Export ZIP</button>
                             </div>
                         </div>
+
+                        {/* --- NEW SLEEK GALLERY CARDS --- */}
                         <div className="grid grid-cols-2 gap-10 pb-20">
                             {galleryImages.map((item) => (
-                                <div key={item.name} className="group space-y-3">
-                                    <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] transition-all duration-300">
+                                <div key={item.name} className="group flex flex-col">
+                                    
+                                    <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-[#0f172a] shadow-2xl border border-white/5 cursor-pointer hover:scale-[1.02] transition-all duration-300 mb-4">
                                         <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(item.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 transition-all shadow-lg border border-red-900/50">🗑️</button>
+                                        
                                         {item.type === 'video' ? (
                                             <>
                                                 <video src={item.url} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover z-10" />
-                                                <div className="absolute top-4 left-4 bg-purple-600 text-white text-[9px] font-black px-3 py-1.5 rounded shadow-lg z-30 uppercase tracking-widest border border-purple-400/50">🎬 Cinematic Video</div>
+                                                <div className="absolute top-4 left-4 bg-purple-600 text-white text-[9px] font-black px-3 py-1.5 rounded-full shadow-lg z-30 uppercase tracking-widest border border-purple-400/50">🎬 Cinematic Video</div>
                                             </>
                                         ) : (
                                             <div onClick={() => { setCompareData({raw: item.raw || item.url, edited: item.url}); setActiveModal('compare'); }}>
@@ -586,19 +592,33 @@ export default function Home() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="flex gap-2">
+                                    
+                                    {/* Action Pills Row */}
+                                    <div className="flex flex-wrap items-center gap-2 mb-3">
                                         {item.type === 'image' && (
                                             <>
-                                                {item.approved ? <div className="flex-1 py-3 bg-[#009183]/20 text-[#00b09f] font-black uppercase text-[10px] text-center rounded-xl border border-[#009183]/30">Approved</div> : <><button onClick={() => approveImage(item.name)} className="flex-1 py-3 bg-[#009183] text-white font-black uppercase text-[10px] rounded-xl hover:bg-[#00b09f] transition-all">Approve 4K</button><button onClick={() => openCanvasStudio(item.name, 'retouch', item.url)} className="flex-1 py-3 bg-[#0f172a] border border-slate-700 text-slate-300 font-black uppercase text-[10px] rounded-xl hover:bg-slate-800 transition-colors">Retouch</button></>}
+                                                {item.approved ? (
+                                                    <span className="px-4 py-1.5 bg-[#009183]/10 text-[#00ff83] border border-[#009183]/30 text-[9px] font-bold uppercase tracking-widest rounded-full">✅ Approved</span>
+                                                ) : (
+                                                    <button onClick={() => approveImage(item.name)} className="px-4 py-1.5 bg-[#009183] text-white text-[9px] font-bold uppercase tracking-widest rounded-full hover:bg-[#00b09f] shadow-[0_0_10px_rgba(0,145,131,0.2)] transition-all">Approve</button>
+                                                )}
+                                                
+                                                {!item.approved && (
+                                                    <button onClick={() => openCanvasStudio(item.name, 'retouch', item.url)} className="px-4 py-1.5 bg-transparent border border-slate-700 text-slate-300 text-[9px] font-bold uppercase tracking-widest rounded-full hover:bg-slate-800 hover:text-white transition-colors">✏️ Retouch</button>
+                                                )}
+                                                <button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('rerender'); }} className="px-4 py-1.5 bg-transparent border border-slate-700 text-slate-300 text-[9px] font-bold uppercase tracking-widest rounded-full hover:bg-slate-800 hover:text-white transition-colors">🔄 Re-Render</button>
                                             </>
                                         )}
+                                        <button onClick={() => handleDownloadSingle(item.url, item.name)} className="px-4 py-1.5 bg-transparent border border-slate-700 text-slate-300 text-[9px] font-bold uppercase tracking-widest rounded-full hover:bg-slate-800 hover:text-white transition-colors">⬇️ Download</button>
                                     </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleDownloadSingle(item.url, item.name)} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Download {item.type}</button>
-                                        {item.type === 'image' && <button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('rerender'); }} className="flex-1 py-2.5 bg-[#0B1120] border border-slate-800 text-slate-400 font-bold uppercase text-[9px] rounded-xl hover:bg-slate-800 hover:text-white transition-colors">Re-Render</button>}
-                                    </div>
+
+                                    {/* Veo Subtle Button */}
                                     {item.type === 'image' && (
-                                        <div className="flex mt-1"><button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('video'); }} className="flex-1 py-3 bg-purple-900/30 border border-purple-700/50 text-purple-400 font-black uppercase text-[10px] rounded-xl hover:bg-purple-800 hover:text-white shadow-[0_0_15px_rgba(147,51,234,0.15)] transition-all">🎬 Animate with Veo AI</button></div>
+                                        <div className="mt-auto">
+                                            <button onClick={() => { setCurrentCanvasImgId(item.name); setActiveModal('video'); }} className="w-full py-2 bg-gradient-to-r from-purple-900/10 to-transparent border border-purple-500/20 text-purple-400 text-[9px] font-bold uppercase tracking-widest rounded-xl hover:bg-purple-900/20 hover:border-purple-500/40 transition-all flex items-center justify-center gap-2">
+                                                🎬 Animate with Veo AI
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             ))}
