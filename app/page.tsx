@@ -362,12 +362,35 @@ export default function Home() {
       } catch (error) { console.error(error); }
   };
 
-  const startFullPropertyFilm = () => {
+  const startFullPropertyFilm = async () => {
       if (videoTimeline.length < 2) {
           alert("You need to add at least 2 scenes to the timeline to generate a film.");
           return;
       }
-      alert("🚀 COMING IN PHASE 2: This will send your timeline and agent details directly to the Creatomate + Veo AI pipeline to generate a full cinematic property film!");
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+      
+      const safeJobName = jobName ? jobName.replace(/ /g, "_") : `FILM-${new Date().getTime().toString().slice(-4)}`;
+      setJobName(safeJobName);
+      setIsRendering(true); setProgressPct(0); 
+      setProgressStatus("Directing the AI Cameras...");
+
+      const fd = new FormData();
+      fd.append('job_name', safeJobName);
+
+      // Knytter opp alle bildene på tidslinjen
+      timelineFiles.forEach(f => { fd.append('files', f.file); });
+
+      const cfg = {
+          timeline: timelineFiles.map(f => f.file.name),
+          meta: videoMeta
+      };
+      fd.append('config', JSON.stringify(cfg));
+
+      try {
+          await fetch(`${API}/start-property-film/`, { method: 'POST', body: fd });
+          if (user) await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
+          pollProgress(safeJobName);
+      } catch (error) { console.error(error); }
   };
 
   const pollProgress = async (pollingJobName: string) => {
