@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, UserButton } from "@clerk/nextjs";
 import { supabase } from "../supabaseClient"; 
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
@@ -9,7 +9,6 @@ const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.ap
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; };
 
-// OPPDATERT TYPE FOR Å STØTTE VIDEO SOM EGET OBJEKT
 type GalleryImage = { 
   name: string; 
   url: string; 
@@ -30,7 +29,6 @@ export default function Home() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [stagingRooms, setStagingRooms] = useState<StagingRoom[]>([]);
   const [roomCounter, setRoomCounter] = useState(0);
-  const [totalRenders, setTotalRenders] = useState(0);
   const [archiveOrders, setArchiveOrders] = useState<OrderArchive[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -63,10 +61,6 @@ export default function Home() {
   const undoStack = useRef<ImageData[]>([]);
 
   useEffect(() => {
-    fetch(`${API}/batch-progress/`, { cache: 'no-store' }).then(res => res.json()).then(data => { 
-      if (data.lifetime_completed) setTotalRenders(data.lifetime_completed); 
-    }).catch(e => console.error(e));
-
     const fetchMyProjects = async () => {
       if (!user) return;
       const { data, error } = await supabase
@@ -373,7 +367,6 @@ export default function Home() {
     try {
         const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
         const s = await r.json();
-        if (s.lifetime_completed) setTotalRenders(s.lifetime_completed);
         if (s.total > 0 && s.status !== 'finished') {
             setProgressPct((s.completed / s.total) * 100); 
             setProgressStatus(`Processing... ${s.completed} / ${s.total}`);
@@ -448,7 +441,9 @@ export default function Home() {
           <button onClick={() => setCurrentMode('express')} className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${currentMode === 'express' ? 'bg-[#009183] text-white' : 'text-slate-500 hover:text-white'}`}>⚡ Express</button>
           <button onClick={() => setCurrentMode('staging')} className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${currentMode === 'staging' ? 'bg-[#009183] text-white' : 'text-slate-500 hover:text-white'}`}>🛋️ Staging</button>
         </div>
-        <div className="flex items-center gap-6"><div className="text-right"><p className="text-2xl font-black text-[#009183] montserrat leading-none">{totalRenders}</p><p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-1">Total Renders</p></div></div>
+        <div className="flex items-center gap-6">
+            <UserButton afterSignOutUrl="/" appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-[#009183]/50 hover:border-[#009183] transition-all" } }} />
+        </div>
       </header>
 
       <main className="flex flex-1 overflow-hidden">
