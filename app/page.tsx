@@ -111,7 +111,6 @@ export default function Home() {
     };
   }, [user]);
 
-  // POLL-LOGIKK FOR Å STOPPE PROGRESS BAR
   useEffect(() => {
       const activeOrder = archiveOrders.find(o => o.name === jobName);
       if ((activeOrder?.status === 'completed' || activeOrder?.status === 'finished') && isRendering) {
@@ -442,7 +441,8 @@ export default function Home() {
           <button onClick={() => setCurrentMode('staging')} className={`px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${currentMode === 'staging' ? 'bg-[#009183] text-white' : 'text-slate-500 hover:text-white'}`}>🛋️ Staging</button>
         </div>
         <div className="flex items-center gap-6">
-<UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-[#009183]/50 hover:border-[#009183] transition-all" } }} />        </div>
+            <UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-[#009183]/50 hover:border-[#009183] transition-all" } }} />
+        </div>
       </header>
 
       <main className="flex flex-1 overflow-hidden">
@@ -455,22 +455,12 @@ export default function Home() {
           <div className="flex-1 overflow-y-auto space-y-2 pr-2">
             {filteredOrders.map(order => (
                 <div key={order.name} onClick={() => viewOrder(order.name)} className="cursor-pointer p-4 rounded-xl bg-[#0f172a]/50 hover:bg-[#1e293b] border border-white/5 hover:border-white/20 transition-all flex flex-col gap-3 group">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-start">
                         <div>
                             <p className="text-[11px] font-black text-slate-200 uppercase group-hover:text-[#009183] transition-colors">{order.name}</p>
                             <p className="text-[9px] text-slate-500 font-bold">{order.date}</p>
                         </div>
-                        <div>
-                            {order.status === 'completed' || order.status === 'finished' ? (
-                                <span className="flex items-center gap-1.5 text-[8px] font-black text-[#00ff83] uppercase bg-[#00ff83]/10 px-2 py-1.5 rounded border border-[#00ff83]/20 shadow-[0_0_10px_rgba(0,255,131,0.1)]"><div className="w-1.5 h-1.5 rounded-full bg-[#00ff83]"></div> Ready</span>
-                            ) : (
-                                <span className="flex items-center gap-1.5 text-[8px] font-black text-yellow-400 uppercase bg-yellow-400/10 px-2 py-1.5 rounded border border-yellow-400/20"><div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse"></div> Work</span>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity h-0 group-hover:h-auto overflow-hidden">
-                        <button onClick={(e) => renameOrder(e, order.name)} className="flex-1 py-1.5 bg-[#0B1120] text-slate-400 hover:text-white rounded border border-slate-700 hover:border-[#009183] text-[9px] font-bold uppercase transition-colors">✏️ Edit</button>
-                        <button onClick={(e) => deleteOrder(e, order.name)} className="flex-1 py-1.5 bg-red-950/30 text-red-400 hover:text-white rounded border border-red-900/50 hover:border-red-500 text-[9px] font-bold uppercase transition-colors">🗑️ Delete</button>
+                        <button onClick={(e) => deleteOrder(e, order.name)} className="text-slate-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all" title="Delete Project">🗑️</button>
                     </div>
                 </div>
             ))}
@@ -570,8 +560,14 @@ export default function Home() {
                 {galleryImages.length > 0 && (
                     <div className="animate-in fade-in slide-in-from-bottom-10 duration-500">
                         <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
-                            <h3 className="text-4xl font-black text-white montserrat uppercase">{jobName}</h3>
-                            <button onClick={() => window.location.href = `${API}/download-zip/${jobName}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-xl font-black uppercase text-[10px] hover:bg-[#009183] hover:text-white transition-colors">Export ZIP</button>
+                            <div className="flex items-center gap-4">
+                                <h3 className="text-4xl font-black text-white montserrat uppercase">{jobName}</h3>
+                                <button onClick={(e) => renameOrder(e, jobName)} className="text-slate-500 hover:text-white text-xl transition-colors pb-1" title="Rename Project">✏️</button>
+                            </div>
+                            <div className="flex gap-3">
+                                <button onClick={(e) => deleteOrder(e, jobName)} className="px-6 py-3 bg-red-950/30 text-red-400 border border-red-900/50 rounded-xl font-black uppercase text-[10px] hover:bg-red-600 hover:text-white transition-colors">Delete Project</button>
+                                <button onClick={() => window.location.href = `${API}/download-zip/${jobName}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-xl font-black uppercase text-[10px] hover:bg-[#009183] hover:text-white transition-colors">Export ZIP</button>
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-10 pb-20">
                             {galleryImages.map((item) => (
