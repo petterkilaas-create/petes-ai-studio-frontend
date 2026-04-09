@@ -208,26 +208,12 @@ export default function ExpressPage() {
                   <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest">Step 2: Upload Photos</h2>
                   <button onClick={() => setWizardStep(1)} className="text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Change Style</button>
               </div>
+              
               <div 
                   onDragOver={(e) => e.preventDefault()} 
                   onDrop={handleDropZone}
                   className="glass p-16 border-2 border-dashed border-[#009183]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(0,145,131,0.05)]"
               >
-                  <div className="text-center">
-                      <div className="text-5xl mb-4">{STYLE_CARDS.find(s => s.id === globalStyle)?.icon}</div>
-                      <p className="text-white font-bold text-lg">Applying: <span className="text-[#009183] uppercase tracking-widest">{STYLE_CARDS.find(s => s.id === globalStyle)?.title}</span></p>
-                  </div>
-                  
-                  <input type="text" value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="PROJECT NAME (E.G. MAIN STREET 1)" className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-[#009183] uppercase pb-3 transition-colors" />
-                  
-                  <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
-                  <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-[#009183] text-white rounded-full font-black uppercase tracking-widest text-xs cursor-pointer hover:bg-[#00b09f] transition-all shadow-[0_0_20px_rgba(0,145,131,0.4)]">
-                      Select Images
-                  </button>
-              </div>
-          </div>
-        )}
-              <div className="glass p-16 border-2 border-dashed border-[#009183]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(0,145,131,0.05)]">
                   <div className="text-center">
                       <div className="text-5xl mb-4">{STYLE_CARDS.find(s => s.id === globalStyle)?.icon}</div>
                       <p className="text-white font-bold text-lg">Applying: <span className="text-[#009183] uppercase tracking-widest">{STYLE_CARDS.find(s => s.id === globalStyle)?.title}</span></p>
