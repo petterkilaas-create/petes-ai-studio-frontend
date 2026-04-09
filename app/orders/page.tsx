@@ -282,12 +282,6 @@ export default function OrdersPage() {
     <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans">
       <div ref={cursorRef} style={{ display: activeModal === 'retouch' ? 'block' : 'none', width: brushSize, height: brushSize }} className="fixed border-2 border-[#ef4444]/80 rounded-full pointer-events-none z-[9999] -translate-x-1/2 -translate-y-1/2 bg-[#ef4444]/20 mix-blend-difference"></div>
       <canvas ref={hiddenMaskCanvasRef} style={{ display: 'none' }}></canvas>
-      
-      {/* HEADER */}
-      <header className="bg-[#0f172a] border-b border-white/5 px-8 py-4 flex justify-between items-center z-50 sticky top-0">
-        <Link href="/" className="text-slate-400 hover:text-white transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest"><span>←</span> Back to Studio</Link>
-        <div className="flex items-center gap-6"><UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-[#009183]/50" } }} /></div>
-      </header>
 
       <main className="flex-1 max-w-6xl mx-auto w-full p-8">
         {!selectedOrder ? (
