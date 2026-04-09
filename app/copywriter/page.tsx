@@ -17,7 +17,7 @@ export default function CopywriterPage() {
   const [copySuccess, setCopySuccess] = useState(false);
 
   // --- NEW: COMPRESSION HELPER ---
-  const compressImage = (file: File): Promise<Blob> => {
+ const compressImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -26,7 +26,8 @@ export default function CopywriterPage() {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          const MAX_WIDTH = 1200; // More than enough for AI analysis
+          // Vi går ned til 1000px for å være helt trygge på 32MB-grensen
+          const MAX_WIDTH = 1000; 
           let width = img.width;
           let height = img.height;
 
@@ -38,9 +39,11 @@ export default function CopywriterPage() {
           canvas.height = height;
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, width, height);
+          
+          // Vi senker kvaliteten til 0.5 (50%) for å spare masse plass
           canvas.toBlob((blob) => {
             resolve(blob as Blob);
-          }, "image/jpeg", 0.7); // 70% quality is perfect for AI
+          }, "image/jpeg", 0.5); 
         };
       };
     });
