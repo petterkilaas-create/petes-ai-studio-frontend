@@ -12,6 +12,10 @@ type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: 
 
 export default function OrdersPage() {
   const { user } = useUser();
+  
+  // ADMIN & VIEW MODE STATES
+  const isAdmin = user?.primaryEmailAddress?.emailAddress === "petter.kilaas@diakrit.com"; 
+  const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
 
   const [archiveOrders, setArchiveOrders] = useState<OrderArchive[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -50,31 +54,51 @@ export default function OrdersPage() {
   useEffect(() => {
     const fetchMyProjects = async () => {
       if (!user) return;
-      const { data, error } = await supabase.from('projects').select('name, created_at, status').eq('user_id', user.id).order('created_at', { ascending: false });
+      
+      let query = supabase
+        .from('projects')
+        .select('name, created_at, status')
+        .order('created_at', { ascending: false });
+
+      // Hvis ikke admin, eller hvis viewMode er 'mine', filtrer på brukerID
+      if (viewMode === 'mine') {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
+      
       if (!error && data) {
-        setArchiveOrders(data.map(p => ({ name: p.name, date: new Date(p.created_at).toLocaleDateString('no-NO'), status: p.status || 'processing' })));
+        setArchiveOrders(data.map(p => ({ 
+          name: p.name, 
+          date: new Date(p.created_at).toLocaleDateString('no-NO'), 
+          status: p.status || 'processing' 
+        })));
       }
     };
+    
     fetchMyProjects();
 
     if (!user) return;
-    const channel = supabase.channel('realtime-projects-archive').on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `user_id=eq.${user.id}` }, (payload) => {
+    const channel = supabase.channel('realtime-projects-archive').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
           if (payload.eventType === 'UPDATE') {
             const updated = payload.new as any;
             setArchiveOrders(prev => prev.map(o => o.name === updated.name ? { ...o, status: updated.status } : o));
           } else if (payload.eventType === 'INSERT') {
             const inserted = payload.new as any;
-            setArchiveOrders(prev => {
-              if (!prev.find(o => o.name === inserted.name)) {
-                return [{ name: inserted.name, date: new Date(inserted.created_at).toLocaleDateString('no-NO'), status: inserted.status }, ...prev];
-              }
-              return prev;
-            });
+            // Legg til i listen hvis vi ser på alle, eller hvis det er vår egen
+            if (viewMode === 'all' || inserted.user_id === user.id) {
+                setArchiveOrders(prev => {
+                    if (!prev.find(o => o.name === inserted.name)) {
+                        return [{ name: inserted.name, date: new Date(inserted.created_at).toLocaleDateString('no-NO'), status: inserted.status }, ...prev];
+                    }
+                    return prev;
+                });
+            }
           }
         }).subscribe();
 
     return () => { supabase.removeChannel(channel); if (pollTimer.current) clearTimeout(pollTimer.current); };
-  }, [user]);
+  }, [user, viewMode]);
 
   // --- ACTIONS ---
   const viewOrder = async (name: string) => { 
@@ -113,7 +137,7 @@ export default function OrdersPage() {
     if (!window.confirm(`Are you sure you want to permanently delete "${orderName}"?`)) return;
     setArchiveOrders(prev => prev.filter(o => o.name !== orderName));
     if (selectedOrder === orderName) setSelectedOrder(null);
-    if (user) await supabase.from('projects').delete().eq('name', orderName).eq('user_id', user.id);
+    if (user) await supabase.from('projects').delete().eq('name', orderName);
     const fd = new FormData(); fd.append('job_name', orderName); fd.append('image_name', ''); 
     fetch(`${API}/delete-image/`, { method: 'POST', body: fd }).catch(console.error);
   };
@@ -125,7 +149,7 @@ export default function OrdersPage() {
     const newName = newNameRaw.replace(/ /g, "_");
     setArchiveOrders(prev => prev.map(o => o.name === oldName ? { ...o, name: newName } : o));
     if (selectedOrder === oldName) setSelectedOrder(newName);
-    if (user) await supabase.from('projects').update({ name: newName }).eq('name', oldName).eq('user_id', user.id);
+    if (user) await supabase.from('projects').update({ name: newName }).eq('name', oldName);
     const fd = new FormData(); fd.append('old_name', oldName); fd.append('new_name', newName);
     fetch(`${API}/rename-order/`, { method: 'POST', body: fd }).catch(console.error);
   };
@@ -218,7 +242,7 @@ export default function OrdersPage() {
   const submitRetouch = async () => {
       if(!retouchPrompt || !selectedOrder) return;
       setActiveModal('none'); 
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder).eq('user_id', user.id);
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder);
       setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch...");
       const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
       if (!canvas || !hiddenCanvas) return;
@@ -239,7 +263,7 @@ export default function OrdersPage() {
   const submitRerender = async () => {
       if(!selectedOrder) return;
       setActiveModal('none');
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder).eq('user_id', user.id);
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder);
       setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render...");
       const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
       try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(selectedOrder); } catch(e) { console.error(e); }
@@ -248,7 +272,7 @@ export default function OrdersPage() {
   const submitVideo = async () => {
       if(!selectedOrder) return;
       setActiveModal('none');
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder).eq('user_id', user.id);
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder);
       setIsRendering(true); setProgressPct(0); setProgressStatus("Generating Veo Magic...");
       const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('prompt', videoPrompt);
       try { await fetch(`${API}/generate-video/`, { method: 'POST', body: fd }); pollProgress(selectedOrder); } catch(e) { console.error(e); }
@@ -292,7 +316,16 @@ export default function OrdersPage() {
                         <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-2">My Orders</h1>
                         <p className="text-slate-400 text-sm">View, manage, and retouch your processed projects.</p>
                     </div>
-                    <input type="text" placeholder="Search projects..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-[#009183]" />
+                    <div className="flex items-center">
+                        {/* GOD MODE TOGGLE */}
+                        {isAdmin && (
+                            <div className="flex bg-[#0f172a] rounded-xl p-1 border border-slate-700 mr-4 shadow-lg">
+                                <button onClick={() => setViewMode('mine')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'mine' ? 'bg-[#009183] text-white shadow-md' : 'text-slate-500 hover:text-white'}`}>My Orders</button>
+                                <button onClick={() => setViewMode('all')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'all' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}>All Users (Admin)</button>
+                            </div>
+                        )}
+                        <input type="text" placeholder="Search projects..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-[#009183]" />
+                    </div>
                 </div>
                 <div className="bg-[#0f172a] border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
                     <table className="w-full text-left border-collapse">
@@ -427,7 +460,7 @@ export default function OrdersPage() {
                 <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black text-white uppercase tracking-wider">Re-Render</h2><button onClick={() => setActiveModal('none')} className="text-slate-500 hover:text-white font-bold uppercase text-xs">Cancel</button></div>
                 <div className="space-y-6">
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Image Type</label><select value={rerenderData.type} onChange={(e) => setRerenderData({...rerenderData, type: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select></div>
-                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">New Style</label><select value={rerenderData.style} onChange={(e) => setRerenderData({...rerenderData, style: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><optgroup label="Lighting"><option value="weather_rain_to_sun">Rain to Sun</option><option value="dusk_blue_hour">Blue Hour</option></optgroup><optgroup label="Staging"><option value="staging_scandi">Scandi</option></optgroup></select></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">New Style</label><select value={rerenderData.style} onChange={(e) => setRerenderData({...rerenderData, style: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><optgroup label="Lighting"><option value="weather_rain_to_sun">Rain to Sun</option><option value="dusk_blue_hour">Blue Hour</option><option value="sunny_midday">Sunny Midday</option></optgroup></select></div>
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Custom Prompt</label><input type="text" value={rerenderData.prompt} onChange={(e) => setRerenderData({...rerenderData, prompt: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-[#009183]" /></div>
                     <button onClick={submitRerender} className="w-full py-4 mt-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl shadow-[0_0_20px_rgba(0,145,131,0.2)]">Start Re-Render</button>
                 </div>
