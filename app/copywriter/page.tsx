@@ -16,8 +16,11 @@ export default function CopywriterPage() {
   const [generatedText, setGeneratedText] = useState("");
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // --- NEW: COMPRESSION HELPER ---
- const compressImage = (file: File): Promise<Blob> => {
+  // --- NEW: TONE & LENGTH STATES ---
+  const [tone, setTone] = useState("Eksklusiv og luksuriøs");
+  const [length, setLength] = useState("Fyldig og detaljert");
+
+  const compressImage = (file: File): Promise<Blob> => {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
@@ -26,7 +29,6 @@ export default function CopywriterPage() {
         img.src = event.target?.result as string;
         img.onload = () => {
           const canvas = document.createElement("canvas");
-          // Vi går ned til 1000px for å være helt trygge på 32MB-grensen
           const MAX_WIDTH = 1000; 
           let width = img.width;
           let height = img.height;
@@ -40,7 +42,6 @@ export default function CopywriterPage() {
           const ctx = canvas.getContext("2d");
           ctx?.drawImage(img, 0, 0, width, height);
           
-          // Vi senker kvaliteten til 0.5 (50%) for å spare masse plass
           canvas.toBlob((blob) => {
             resolve(blob as Blob);
           }, "image/jpeg", 0.5); 
@@ -75,9 +76,11 @@ export default function CopywriterPage() {
 
     const formData = new FormData();
     formData.append("address", address);
+    // Sender med de nye variablene til backenden!
+    formData.append("tone", tone);
+    formData.append("length", length);
 
     try {
-      // Compress all images in parallel before sending
       const compressedBlobs = await Promise.all(
         images.map((img) => compressImage(img.file))
       );
@@ -107,7 +110,6 @@ export default function CopywriterPage() {
     }
   };
 
-  // ... (rest of the functions: handleDrop, removeImage, handleCopyText stay the same)
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     handleFileUpload(e.dataTransfer.files);
@@ -138,27 +140,62 @@ export default function CopywriterPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           <div className="space-y-6 animate-in fade-in slide-in-from-left-8 duration-700">
             <div className="bg-[#0f172a] rounded-[2rem] p-8 border border-white/5 shadow-xl">
-              <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest mb-6">Step 1: Property Address</h2>
-              <Autocomplete
-                apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-                onPlaceSelected={(place) => {
-                  if (place && place.formatted_address) {
-                    setAddress(place.formatted_address);
-                  }
-                }}
-                options={{
-                  types: ["address"],
-                  componentRestrictions: { country: "no" },
-                }}
-                placeholder="SEARCH FOR ADDRESS HERE..."
-                className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-sm outline-none focus:border-[#009183] transition-colors"
-              />
-              {address && (
-                <div className="mt-4 p-4 bg-[#009183]/10 border border-[#009183]/30 rounded-xl">
-                  <p className="text-[10px] text-[#00ff83] uppercase font-bold tracking-wider">📍 Selected Location:</p>
-                  <p className="text-white font-black">{address}</p>
+              <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest mb-6">Step 1: Property Details</h2>
+              
+              <div className="space-y-6">
+                {/* Address Input */}
+                <div>
+                  <Autocomplete
+                    apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                    onPlaceSelected={(place) => {
+                      if (place && place.formatted_address) {
+                        setAddress(place.formatted_address);
+                      }
+                    }}
+                    options={{
+                      types: ["address"],
+                      componentRestrictions: { country: "no" },
+                    }}
+                    placeholder="SEARCH FOR ADDRESS HERE..."
+                    className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-sm outline-none focus:border-[#009183] transition-colors"
+                  />
+                  {address && (
+                    <div className="mt-4 p-4 bg-[#009183]/10 border border-[#009183]/30 rounded-xl">
+                      <p className="text-[10px] text-[#00ff83] uppercase font-bold tracking-wider">📍 Selected Location:</p>
+                      <p className="text-white font-black">{address}</p>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* AI Tuning Options */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-800">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Tone of Voice</label>
+                    <select 
+                      value={tone} 
+                      onChange={(e) => setTone(e.target.value)}
+                      className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white font-bold text-xs outline-none focus:border-[#009183] transition-colors appearance-none cursor-pointer"
+                    >
+                      <option value="Eksklusiv og luksuriøs">💎 Eksklusiv & Luksuriøs</option>
+                      <option value="Kortfattet og moderne">⚡ Kortfattet & Moderne</option>
+                      <option value="Familievennlig og varm">👨‍👩‍👧‍👦 Familievennlig & Varm</option>
+                      <option value="Kreativ og selgende">🔥 Kreativ & Selgende</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Text Length</label>
+                    <select 
+                      value={length} 
+                      onChange={(e) => setLength(e.target.value)}
+                      className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-white font-bold text-xs outline-none focus:border-[#009183] transition-colors appearance-none cursor-pointer"
+                    >
+                      <option value="Fyldig og detaljert">📝 Fyldig (Standard)</option>
+                      <option value="Kort og presis">📱 Kort & Presis (SoMe)</option>
+                      <option value="Ekstra lang og historisk">🏛️ Ekstra Lang (Historisk)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="bg-[#0f172a] rounded-[2rem] p-8 border border-white/5 shadow-xl">
