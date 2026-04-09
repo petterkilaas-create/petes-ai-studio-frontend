@@ -42,8 +42,8 @@ export default function CopywriterPage() {
     setImages((prev) => prev.filter((img) => img.id !== id));
   };
 
-  // Dummy function for now (will be replaced with real backend call)
-  const generateCopy = () => {
+  // Den EKTE funksjonen som snakker med backenden din
+  const generateCopy = async () => {
     if (!address || images.length === 0) {
         alert("Du må legge inn både en adresse og minst ett bilde!");
         return;
@@ -52,11 +52,29 @@ export default function CopywriterPage() {
     setIsGenerating(true);
     setGeneratedText("");
     
-    // Simulerer tenketid fra AI-en før vi kobler på backend
-    setTimeout(() => {
+    // Bygg en FormData for å sende adresse og filer til backenden
+    const formData = new FormData();
+    formData.append("address", address);
+    images.forEach((img) => {
+      formData.append("files", img.file);
+    });
+
+    try {
+      const API_URL = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
+      const response = await fetch(`${API_URL}/generate-copy/`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Feil i backend");
+      
+      const data = await response.json();
+      setGeneratedText(data.copy); // Dytter den ekte teksten fra Gemini inn i editoren
+    } catch (error) {
+      setGeneratedText("Beklager, noe gikk galt under analysen av bildene. Sjekk at backenden kjører.");
+    } finally {
       setIsGenerating(false);
-      setGeneratedText(`🏡 Velkommen til ${address}!\n\nEn sjelden mulighet presenterer seg i dette fantastiske nabolaget. Her får du en bolig som kombinerer moderne estetikk med smarte løsninger, perfekt for deg som ønsker det lille ekstra.\n\n✨ HØYDEPUNKTER:\n• Nydelig lysinnfall fra store vindusflater.\n• Gjennomgående høy standard og eksklusive materialvalg.\n• Kort gangavstand til offentlig transport og grønne lunger.\n\nENTRÉ / GANG\nVelkommen inn! Det første som møter deg er en romslig og innbydende entré med god plass til avhenging av yttertøy.\n\nSTUE & KJØKKEN\nHjertet i hjemmet er den åpne stue- og kjøkkenløsningen. Her er det rikelig med plass til både sofagruppe og et stort spisebord. Kjøkkenet er moderne innredet med integrerte hvitevarer av høy kvalitet.\n\n[Dette er en simulert tekst. Klar for å koble på Gemini 1.5 Flash!]`);
-    }, 4000);
+    }
   };
 
   const handleCopyText = () => {
