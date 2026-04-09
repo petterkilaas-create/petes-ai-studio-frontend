@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { supabase } from "../../supabaseClient"; 
+import Autocomplete from "react-google-autocomplete";
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
@@ -207,7 +208,36 @@ export default function ExpressPage() {
                       <p className="text-white font-bold text-lg">Applying: <span className="text-[#009183] uppercase tracking-widest">{STYLE_CARDS.find(s => s.id === globalStyle)?.title}</span></p>
                   </div>
                   
-                  <input type="text" value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="PROJECT NAME (E.G. MAIN STREET 1)" className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-[#009183] uppercase pb-3 transition-colors" />
+                  {/* --- GOOGLE AUTOCOMPLETE REPLACES OLD INPUT --- */}
+                  <div className="w-full max-w-2xl mx-auto space-y-4">
+                      <label className="text-[10px] font-bold text-[#009183] uppercase tracking-[0.2em] block text-center mb-6">
+                          📍 Søk etter eiendommens adresse
+                      </label>
+                      
+                      <Autocomplete
+                          apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                          onPlaceSelected={(place) => {
+                              if (place && place.formatted_address) {
+                                  const addr = place.formatted_address;
+                                  const shortId = Math.floor(1000 + Math.random() * 9000); 
+                                  setJobName(`${addr} (#${shortId})`);
+                              }
+                          }}
+                          options={{
+                              types: ["address"],
+                              componentRestrictions: { country: "no" }, 
+                          }}
+                          placeholder="START Å SKRIVE ADRESSE..."
+                          className="w-full bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-[#009183] uppercase pb-4 transition-colors text-center placeholder:text-slate-600"
+                      />
+
+                      {jobName && (
+                          <div className="mt-8 p-6 bg-[#0f172a] rounded-2xl border border-[#009183]/30 text-center animate-in fade-in duration-300">
+                              <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Prosjekt opprettet:</p>
+                              <p className="text-xl text-[#00ff83] font-black uppercase tracking-wider">{jobName}</p>
+                          </div>
+                      )}
+                  </div>
                   
                   <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
                   <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-[#009183] text-white rounded-full font-black uppercase tracking-widest text-xs cursor-pointer hover:bg-[#00b09f] transition-all shadow-[0_0_20px_rgba(0,145,131,0.4)]">
