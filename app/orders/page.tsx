@@ -52,7 +52,7 @@ export default function OrdersPage() {
 
   // --- FETCH ORDERS & REALTIME LISTENER ---
   useEffect(() => {
-    const fetchProjects = async () => {
+    const fetchMyProjects = async () => {
       if (!user) return;
       
       let query = supabase
@@ -74,10 +74,10 @@ export default function OrdersPage() {
       }
     };
     
-    fetchProjects();
+    fetchMyProjects();
 
     const channel = supabase.channel('realtime-projects-archive').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
-        fetchProjects(); 
+        fetchMyProjects(); 
     }).subscribe();
 
     return () => { supabase.removeChannel(channel); if (pollTimer.current) clearTimeout(pollTimer.current); };
@@ -153,6 +153,14 @@ export default function OrdersPage() {
       const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', imgName); 
       await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); 
       loadGallery(selectedOrder); 
+  };
+
+  const handleDownloadSingle = async (url: string, filename: string) => {
+      try {
+          const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'file';
+          document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      } catch (error) { window.open(url, '_blank'); }
   };
 
   // --- CANVAS STUDIO (RETOUCH) ---
@@ -279,11 +287,11 @@ export default function OrdersPage() {
   const filteredOrders = archiveOrders.filter(order => order.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans">
+    <div className="flex flex-col bg-[#0B1120] text-white min-h-screen">
       <div ref={cursorRef} style={{ display: activeModal === 'retouch' ? 'block' : 'none', width: brushSize, height: brushSize }} className="fixed border-2 border-[#ef4444]/80 rounded-full pointer-events-none z-[9999] -translate-x-1/2 -translate-y-1/2 bg-[#ef4444]/20 mix-blend-difference"></div>
       <canvas ref={hiddenMaskCanvasRef} style={{ display: 'none' }}></canvas>
 
-      <main className="max-w-6xl mx-auto w-full p-8 overflow-y-visible">
+      <main className="max-w-6xl mx-auto w-full p-8 flex-1">
         {!selectedOrder ? (
             /* --- ORDER LIST VIEW --- */
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -295,11 +303,11 @@ export default function OrdersPage() {
                     <div className="flex items-center gap-3 w-full md:w-auto">
                         {isAdmin && (
                             <div className="flex bg-[#0f172a] rounded-xl p-1 border border-slate-700 shadow-lg">
-                                <button onClick={() => setViewMode('mine')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'mine' ? 'bg-[#009183] text-white shadow-md' : 'text-slate-500 hover:text-white'}`}>My Orders</button>
-                                <button onClick={() => setViewMode('all')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'all' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}>All Users</button>
+                                <button onClick={() => setViewMode('mine')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'mine' ? 'bg-[#009183] text-white' : 'text-slate-500 hover:text-white'}`}>My Orders</button>
+                                <button onClick={() => setViewMode('all')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'all' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-white'}`}>All Users</button>
                             </div>
                         )}
-                        <input type="text" placeholder="Search projects..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-[#009183]" />
+                        <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-[#009183]" />
                     </div>
                 </div>
                 <div className="bg-[#0f172a] border border-slate-800 rounded-3xl shadow-xl mb-20 overflow-hidden">
@@ -327,7 +335,7 @@ export default function OrdersPage() {
             </div>
         ) : (
             /* --- SINGLE ORDER GALLERY VIEW --- */
-            <div className="animate-in fade-in duration-500 mb-20">
+            <div className="animate-in fade-in duration-500 pb-20">
                 <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                     <div>
                         <button onClick={() => setSelectedOrder(null)} className="text-[#009183] hover:text-white text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 transition-colors"><span>←</span> Back to List</button>
@@ -351,7 +359,7 @@ export default function OrdersPage() {
                 ) : galleryImages.length === 0 ? (
                     <div className="text-center py-20 text-slate-500">No images found.</div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-20">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         {galleryImages.map((item) => (
                             <div key={item.name} className="group flex flex-col bg-[#0f172a] rounded-[2rem] p-4 border border-white/5 shadow-xl">
                                 <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-black mb-4 cursor-pointer" onClick={() => { if(item.type !== 'video') { setCompareData({raw: item.raw || item.url, edited: item.url}); setActiveModal('compare'); }}}>
