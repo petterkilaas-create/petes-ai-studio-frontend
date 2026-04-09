@@ -126,18 +126,6 @@ export default function VideoPage() {
 
   return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans">
-      
-      {/* HEADER */}
-      <header className="bg-[#0f172a] border-b border-white/5 px-8 py-4 flex justify-between items-center z-50">
-        <div className="flex items-center gap-6">
-            <Link href="/" className="text-slate-400 hover:text-white transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
-                <span>←</span> Back to Studio
-            </Link>
-        </div>
-        <div className="flex items-center gap-6">
-            <UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-purple-500/50" } }} />
-        </div>
-      </header>
 
       <main className="flex-1 flex flex-col max-w-6xl mx-auto w-full p-8">
           
