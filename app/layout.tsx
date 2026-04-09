@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/orders" className="hover:text-white transition-colors">📁 Orders</Link>
               </nav>
             </div>
-            <UserButton afterSignOutUrl="/" />
+            <UserButton />
           </header>
           {children}
         </body>
