@@ -8,24 +8,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans">
-      
-      {/* HEADER */}
-      <header className="bg-[#0f172a] border-b border-white/5 px-8 py-4 flex justify-between items-center z-50">
-        <Link href="/" className="flex items-center gap-4 group cursor-pointer">
-          <div className="w-10 h-10 bg-[#0B1120] border border-[#009183]/30 rounded-xl flex items-center justify-center font-black text-[#009183] text-xl">P</div>
-          <h1 className="text-lg font-black text-white uppercase tracking-widest" style={{ fontFamily: 'Montserrat, sans-serif' }}>
-            Pete&apos;s <span className="text-[#009183]">AI</span> Studio
-          </h1>
-        </Link>
-        
-        <nav className="hidden md:flex gap-8 text-xs font-bold uppercase tracking-widest text-slate-400">
-          <Link href="/orders" className="hover:text-[#009183] transition-colors">My Orders</Link>
-        </nav>
-
-        <div className="flex items-center gap-6">
-            <UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-[#009183]/50 hover:border-[#009183] transition-all" } }} />
-        </div>
-      </header>
 
       {/* HERO SECTION */}
       <main className="flex-1 flex flex-col items-center pt-20 px-6">
