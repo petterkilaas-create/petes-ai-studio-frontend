@@ -10,14 +10,42 @@ export default function CopywriterPage() {
   const { user } = useUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // States
   const [address, setAddress] = useState("");
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedText, setGeneratedText] = useState("");
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // Handle Drag & Drop / File Selection
+  // --- NEW: COMPRESSION HELPER ---
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 1200; // More than enough for AI analysis
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            resolve(blob as Blob);
+          }, "image/jpeg", 0.7); // 70% quality is perfect for AI
+        };
+      };
+    });
+  };
+
   const handleFileUpload = (files: FileList | null) => {
     if (!files) return;
     const newImages: UploadedImage[] = [];
@@ -33,32 +61,28 @@ export default function CopywriterPage() {
     setImages((prev) => [...prev, ...newImages]);
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    handleFileUpload(e.dataTransfer.files);
-  };
-
-  const removeImage = (id: string) => {
-    setImages((prev) => prev.filter((img) => img.id !== id));
-  };
-
-  // Logic to communicate with the Backend
   const generateCopy = async () => {
     if (!address || images.length === 0) {
-        alert("Please provide both an address and at least one image!");
-        return;
+      alert("Please provide both an address and at least one image!");
+      return;
     }
-    
+
     setIsGenerating(true);
     setGeneratedText("");
-    
+
     const formData = new FormData();
     formData.append("address", address);
-    images.forEach((img) => {
-      formData.append("files", img.file);
-    });
 
     try {
+      // Compress all images in parallel before sending
+      const compressedBlobs = await Promise.all(
+        images.map((img) => compressImage(img.file))
+      );
+
+      compressedBlobs.forEach((blob, index) => {
+        formData.append("files", blob, `image_${index}.jpg`);
+      });
+
       const API_URL = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
       const response = await fetch(`${API_URL}/generate-copy/`, {
         method: "POST",
@@ -66,19 +90,28 @@ export default function CopywriterPage() {
       });
 
       const data = await response.json();
-      
-      // Handle custom error response from Python Backend
+
       if (data.status === "error") {
-          setGeneratedText(`🚨 BACKEND ERROR:\n\n${data.message}\n\nTechnical Trace:\n${data.trace}`);
-          return;
+        setGeneratedText(`🚨 BACKEND ERROR:\n\n${data.message}\n\nTechnical Trace:\n${data.trace}`);
+        return;
       }
 
-      setGeneratedText(data.copy); 
+      setGeneratedText(data.copy);
     } catch (error) {
-      setGeneratedText(`Connection Error! Could not reach the backend server. Error: ${error}`);
+      setGeneratedText(`Connection Error! Request was likely too large or timed out. Try uploading slightly fewer images. Error: ${error}`);
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // ... (rest of the functions: handleDrop, removeImage, handleCopyText stay the same)
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    handleFileUpload(e.dataTransfer.files);
+  };
+
+  const removeImage = (id: string) => {
+    setImages((prev) => prev.filter((img) => img.id !== id));
   };
 
   const handleCopyText = () => {
@@ -90,8 +123,6 @@ export default function CopywriterPage() {
   return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans p-8">
       <div className="max-w-7xl mx-auto w-full">
-        
-        {/* HEADER */}
         <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
           <h1 className="text-4xl font-black text-white uppercase tracking-widest flex items-center gap-4 mb-2">
             <span className="text-5xl">✍️</span> AI Copywriter
@@ -101,13 +132,8 @@ export default function CopywriterPage() {
           </p>
         </div>
 
-        {/* MAIN TWO-COLUMN LAYOUT */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          
-          {/* LEFT COLUMN: INPUT */}
           <div className="space-y-6 animate-in fade-in slide-in-from-left-8 duration-700">
-            
-            {/* Step 1: Address */}
             <div className="bg-[#0f172a] rounded-[2rem] p-8 border border-white/5 shadow-xl">
               <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest mb-6">Step 1: Property Address</h2>
               <Autocomplete
@@ -132,7 +158,6 @@ export default function CopywriterPage() {
               )}
             </div>
 
-            {/* Step 2: Images */}
             <div className="bg-[#0f172a] rounded-[2rem] p-8 border border-white/5 shadow-xl">
               <div className="flex justify-between items-end mb-6">
                 <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest">Step 2: Visual Context</h2>
@@ -151,7 +176,6 @@ export default function CopywriterPage() {
                 <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={(e) => handleFileUpload(e.target.files)} />
               </div>
 
-              {/* Image Grid Preview */}
               {images.length > 0 && (
                 <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                   {images.map((img) => (
@@ -164,17 +188,15 @@ export default function CopywriterPage() {
               )}
             </div>
 
-            {/* Action Button */}
             <button 
               onClick={generateCopy}
               disabled={isGenerating || !address || images.length === 0}
               className="w-full py-5 bg-gradient-to-r from-[#009183] to-[#00b09f] hover:from-[#00b09f] hover:to-[#009183] text-white rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-[0_0_30px_rgba(0,145,131,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1"
             >
-              ✨ Generate Listing Copy
+              {isGenerating ? "Compressing & Analyzing..." : "✨ Generate Listing Copy"}
             </button>
           </div>
 
-          {/* RIGHT COLUMN: OUTPUT / EDITOR */}
           <div className="bg-[#0f172a] rounded-[2rem] border border-white/5 shadow-xl flex flex-col h-[800px] animate-in fade-in slide-in-from-right-8 duration-700">
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-[#1e293b]/50 rounded-t-[2rem]">
               <h2 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
@@ -196,7 +218,7 @@ export default function CopywriterPage() {
                   <div className="w-12 h-12 border-4 border-[#009183] border-t-transparent rounded-full animate-spin"></div>
                   <div className="text-center">
                     <p className="text-[#009183] font-black uppercase tracking-widest text-xs animate-pulse mb-2">Analyzing Architecture...</p>
-                    <p className="text-slate-500 text-[10px] uppercase tracking-widest">Gathering local data & property insights</p>
+                    <p className="text-slate-500 text-[10px] uppercase tracking-widest">Resizing images for analysis & gathering insights</p>
                   </div>
                 </div>
               ) : generatedText ? (
@@ -214,7 +236,6 @@ export default function CopywriterPage() {
               )}
             </div>
           </div>
-
         </div>
       </div>
     </div>
