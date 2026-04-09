@@ -6,7 +6,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <ClerkProvider>
       <html lang="no">
-        // Endre body-linjen i app/layout.tsx til dette:
         <body className="bg-[#0B1120] text-white min-h-screen overflow-y-auto">
           <header className="sticky top-0 z-[100] bg-[#0f172a]/80 backdrop-blur-md border-b border-white/5 px-8 py-4 flex justify-between items-center shadow-lg">
             <div className="flex items-center gap-8">
