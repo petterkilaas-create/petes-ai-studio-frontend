@@ -195,11 +195,6 @@ export default function StagingPage() {
       <div ref={cursorRef} style={{ display: activeModal === 'mask' ? 'block' : 'none', width: brushSize, height: brushSize }} className="fixed border-2 border-[#00ff83] rounded-full pointer-events-none z-[9999] -translate-x-1/2 -translate-y-1/2 bg-[#00ff83]/20"></div>
       <canvas ref={hiddenMaskCanvasRef} style={{ display: 'none' }}></canvas>
 
-      <header className="bg-[#0f172a] border-b border-white/5 px-8 py-4 flex justify-between items-center z-50">
-        <Link href="/" className="text-slate-400 hover:text-white transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest"><span>←</span> Studio</Link>
-        <UserButton />
-      </header>
-
       <main className="flex-1 max-w-6xl mx-auto w-full p-8">
         <div className="mb-12 bg-[#0f172a] border border-slate-800 rounded-3xl p-8 shadow-xl">
             <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-4">🛋️ Virtual Staging</h1>
