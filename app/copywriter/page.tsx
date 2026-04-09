@@ -42,17 +42,16 @@ export default function CopywriterPage() {
     setImages((prev) => prev.filter((img) => img.id !== id));
   };
 
-  // Den EKTE funksjonen som snakker med backenden din
+  // Logic to communicate with the Backend
   const generateCopy = async () => {
     if (!address || images.length === 0) {
-        alert("Du må legge inn både en adresse og minst ett bilde!");
+        alert("Please provide both an address and at least one image!");
         return;
     }
     
     setIsGenerating(true);
     setGeneratedText("");
     
-    // Bygg en FormData for å sende adresse og filer til backenden
     const formData = new FormData();
     formData.append("address", address);
     images.forEach((img) => {
@@ -66,12 +65,17 @@ export default function CopywriterPage() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Feil i backend");
-      
       const data = await response.json();
-      setGeneratedText(data.copy); // Dytter den ekte teksten fra Gemini inn i editoren
+      
+      // Handle custom error response from Python Backend
+      if (data.status === "error") {
+          setGeneratedText(`🚨 BACKEND ERROR:\n\n${data.message}\n\nTechnical Trace:\n${data.trace}`);
+          return;
+      }
+
+      setGeneratedText(data.copy); 
     } catch (error) {
-      setGeneratedText("Beklager, noe gikk galt under analysen av bildene. Sjekk at backenden kjører.");
+      setGeneratedText(`Connection Error! Could not reach the backend server. Error: ${error}`);
     } finally {
       setIsGenerating(false);
     }
@@ -93,7 +97,7 @@ export default function CopywriterPage() {
             <span className="text-5xl">✍️</span> AI Copywriter
           </h1>
           <p className="text-slate-400 max-w-2xl text-sm leading-relaxed">
-            Slipp skrivesperren. Last opp alle bildene fra boligen, bekreft adressen, og la AI-en vår analysere materialer og nabolag for å skrive et selgende Finn.no-prospekt på få sekunder.
+            Eliminate writer's block. Upload property photos, confirm the address, and let our AI analyze materials and location to write a compelling real estate listing in seconds.
           </p>
         </div>
 
@@ -105,7 +109,7 @@ export default function CopywriterPage() {
             
             {/* Step 1: Address */}
             <div className="bg-[#0f172a] rounded-[2rem] p-8 border border-white/5 shadow-xl">
-              <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest mb-6">Trinn 1: Eiendommens Adresse</h2>
+              <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest mb-6">Step 1: Property Address</h2>
               <Autocomplete
                 apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
                 onPlaceSelected={(place) => {
@@ -117,12 +121,12 @@ export default function CopywriterPage() {
                   types: ["address"],
                   componentRestrictions: { country: "no" },
                 }}
-                placeholder="SØK ETTER ADRESSE HER..."
+                placeholder="SEARCH FOR ADDRESS HERE..."
                 className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-sm outline-none focus:border-[#009183] transition-colors"
               />
               {address && (
                 <div className="mt-4 p-4 bg-[#009183]/10 border border-[#009183]/30 rounded-xl">
-                  <p className="text-[10px] text-[#00ff83] uppercase font-bold tracking-wider">📍 Valgt lokasjon:</p>
+                  <p className="text-[10px] text-[#00ff83] uppercase font-bold tracking-wider">📍 Selected Location:</p>
                   <p className="text-white font-black">{address}</p>
                 </div>
               )}
@@ -131,8 +135,8 @@ export default function CopywriterPage() {
             {/* Step 2: Images */}
             <div className="bg-[#0f172a] rounded-[2rem] p-8 border border-white/5 shadow-xl">
               <div className="flex justify-between items-end mb-6">
-                <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest">Trinn 2: Bildegrunnlag</h2>
-                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{images.length} BILDER VALGT</span>
+                <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest">Step 2: Visual Context</h2>
+                <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{images.length} IMAGES SELECTED</span>
               </div>
 
               <div 
@@ -142,8 +146,8 @@ export default function CopywriterPage() {
                 className="w-full min-h-[150px] border-2 border-dashed border-slate-700 hover:border-[#009183] rounded-2xl flex flex-col items-center justify-center p-8 cursor-pointer bg-[#0B1120]/50 transition-colors group mb-6"
               >
                 <span className="text-3xl mb-3 group-hover:scale-110 transition-transform">📸</span>
-                <p className="text-slate-300 font-bold text-sm uppercase tracking-wider text-center">Klikk eller dra bilder hit</p>
-                <p className="text-slate-500 text-[10px] uppercase tracking-widest mt-2 text-center">Last opp hele mappen for best resultat</p>
+                <p className="text-slate-300 font-bold text-sm uppercase tracking-wider text-center">Click or drag images here</p>
+                <p className="text-slate-500 text-[10px] uppercase tracking-widest mt-2 text-center">Upload the full gallery for best results</p>
                 <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={(e) => handleFileUpload(e.target.files)} />
               </div>
 
@@ -166,7 +170,7 @@ export default function CopywriterPage() {
               disabled={isGenerating || !address || images.length === 0}
               className="w-full py-5 bg-gradient-to-r from-[#009183] to-[#00b09f] hover:from-[#00b09f] hover:to-[#009183] text-white rounded-[2rem] font-black uppercase tracking-widest text-sm shadow-[0_0_30px_rgba(0,145,131,0.3)] transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-1"
             >
-              ✨ Generer Boligprospekt
+              ✨ Generate Listing Copy
             </button>
           </div>
 
@@ -181,7 +185,7 @@ export default function CopywriterPage() {
                   onClick={handleCopyText}
                   className="px-6 py-2 bg-[#009183] text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-[#00b09f] transition-colors"
                 >
-                  {copySuccess ? "✓ Kopiert!" : "📋 Kopier Tekst"}
+                  {copySuccess ? "✓ Copied!" : "📋 Copy Text"}
                 </button>
               )}
             </div>
@@ -191,8 +195,8 @@ export default function CopywriterPage() {
                 <div className="h-full flex flex-col items-center justify-center space-y-6">
                   <div className="w-12 h-12 border-4 border-[#009183] border-t-transparent rounded-full animate-spin"></div>
                   <div className="text-center">
-                    <p className="text-[#009183] font-black uppercase tracking-widest text-xs animate-pulse mb-2">Analyserer arkitektur...</p>
-                    <p className="text-slate-500 text-[10px] uppercase tracking-widest">Henter lokaldata fra Entur & Google Maps</p>
+                    <p className="text-[#009183] font-black uppercase tracking-widest text-xs animate-pulse mb-2">Analyzing Architecture...</p>
+                    <p className="text-slate-500 text-[10px] uppercase tracking-widest">Gathering local data & property insights</p>
                   </div>
                 </div>
               ) : generatedText ? (
@@ -204,8 +208,8 @@ export default function CopywriterPage() {
               ) : (
                 <div className="h-full flex flex-col items-center justify-center opacity-30 text-center px-10">
                   <span className="text-6xl mb-6">📄</span>
-                  <p className="text-white font-bold uppercase tracking-widest text-sm mb-2">Editor Venter</p>
-                  <p className="text-slate-400 text-xs leading-relaxed">Fyll inn adresse og last opp bilder til venstre for å generere et unikt og skreddersydd boligprospekt.</p>
+                  <p className="text-white font-bold uppercase tracking-widest text-sm mb-2">Editor Ready</p>
+                  <p className="text-slate-400 text-xs leading-relaxed">Enter an address and upload photos to generate a unique, tailored property description.</p>
                 </div>
               )}
             </div>
