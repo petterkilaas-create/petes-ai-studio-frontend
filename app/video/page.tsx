@@ -1,0 +1,275 @@
+"use client";
+
+import { useState, useRef } from "react";
+import { useUser, UserButton } from "@clerk/nextjs";
+import Link from "next/link";
+import { supabase } from "../../supabaseClient"; 
+
+const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
+
+type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; };
+type GalleryImage = { name: string; url: string; type: 'image' | 'video'; };
+
+export default function VideoPage() {
+  const { user } = useUser();
+
+  const [jobName, setJobName] = useState("");
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  
+  // Video Specific States
+  const [videoTimeline, setVideoTimeline] = useState<string[]>([]);
+  const [videoMeta, setVideoMeta] = useState({ address: "", price: "", realtorName: "", phone: "" });
+
+  const [isRendering, setIsRendering] = useState(false);
+  const [progressPct, setProgressPct] = useState(0);
+  const [progressStatus, setProgressStatus] = useState("Processing...");
+  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pollTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // --- UPLOAD LOGIC ---
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    if (!jobName) setJobName(`FILM-${new Date().getTime().toString().slice(-4)}`);
+    const newFiles: UploadedFile[] = [];
+    for (let i = 0; i < e.target.files.length; i++) {
+      if (e.target.files[i].type.startsWith("image/")) {
+        newFiles.push({ id: "img_" + Math.random().toString(36).substr(2, 9), file: e.target.files[i], url: URL.createObjectURL(e.target.files[i]), type: "exterior", style: "", prompt: "" });
+      }
+    }
+    setUploadedFiles(prev => [...prev, ...newFiles]);
+  };
+
+  // --- DRAG AND DROP LOGIC ---
+  const handleDragStart = (e: React.DragEvent, id: string) => { e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; };
+  const handleDragEnd = (e: React.DragEvent) => { /* Optional styling reset */ };
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); };
+
+  const handleVideoDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      const imgId = e.dataTransfer.getData("text/plain"); 
+      if (!imgId) return;
+      if (!videoTimeline.includes(imgId)) { 
+          setVideoTimeline(prev => [...prev, imgId]); 
+      }
+  };
+
+  const removeFromVideoTimeline = (imgId: string) => { setVideoTimeline(prev => prev.filter(id => id !== imgId)); };
+
+  // --- API / RENDER LOGIC ---
+  const startFullPropertyFilm = async () => {
+      if (videoTimeline.length < 2) {
+          alert("You need to add at least 2 scenes to the timeline to generate a film.");
+          return;
+      }
+      if (pollTimer.current) clearTimeout(pollTimer.current);
+      
+      const safeJobName = jobName.replace(/ /g, "_"); setJobName(safeJobName);
+      setIsRendering(true); setProgressPct(0); setProgressStatus("Directing the AI Cameras...");
+
+      const fd = new FormData();
+      fd.append('job_name', safeJobName);
+
+      // Add only the files that are actually in the timeline to the FormData
+      const timelineFiles = videoTimeline.map(id => uploadedFiles.find(f => f.id === id)).filter(Boolean) as UploadedFile[];
+      timelineFiles.forEach(f => { fd.append('files', f.file); });
+
+      const cfg = {
+          timeline: timelineFiles.map(f => f.file.name),
+          meta: videoMeta
+      };
+      fd.append('config', JSON.stringify(cfg));
+
+      try {
+          await fetch(`${API}/start-property-film/`, { method: 'POST', body: fd });
+          if (user) await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
+          pollProgress(safeJobName);
+      } catch (error) { console.error(error); }
+  };
+
+  const pollProgress = async (pollingJobName: string) => {
+    try {
+        const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
+        const s = await r.json();
+        if (s.status === 'finished') { 
+            setIsRendering(false); setProgressPct(100);
+            if (pollTimer.current) clearTimeout(pollTimer.current);
+            setTimeout(() => { loadGallery(pollingJobName); }, 1500);
+            return; 
+        }
+        if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Rendering Video Frames...`); }
+    } catch (e) { console.error(e); }
+    pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 4000); // Polling slower for video
+  };
+
+  const loadGallery = async (name: string) => { 
+      try { 
+          const res = await fetch(`${API}/list-finished/?job_name=${name}&t=${Date.now()}`, { cache: 'no-store' }); 
+          const data = await res.json(); 
+          setGalleryImages(data.images); 
+      } catch (e) { console.error(e); } 
+  };
+
+  const handleDownloadSingle = async (url: string, filename: string) => {
+      try {
+          const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'video.mp4';
+          document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      } catch (error) { window.open(url, '_blank'); }
+  };
+
+  // Derived state for UI
+  const unassignedVideoFiles = uploadedFiles.filter(f => !videoTimeline.includes(f.id));
+  const timelineFilesList = videoTimeline.map(id => uploadedFiles.find(f => f.id === id)).filter(Boolean) as UploadedFile[];
+
+  return (
+    <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans">
+      
+      {/* HEADER */}
+      <header className="bg-[#0f172a] border-b border-white/5 px-8 py-4 flex justify-between items-center z-50">
+        <div className="flex items-center gap-6">
+            <Link href="/" className="text-slate-400 hover:text-white transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                <span>←</span> Back to Studio
+            </Link>
+        </div>
+        <div className="flex items-center gap-6">
+            <UserButton appearance={{ elements: { userButtonAvatarBox: "w-10 h-10 border-2 border-purple-500/50" } }} />
+        </div>
+      </header>
+
+      <main className="flex-1 flex flex-col max-w-6xl mx-auto w-full p-8">
+          
+        {/* EXPLAINER */}
+        <div className="mb-12 bg-[#0f172a] border border-slate-800 rounded-3xl p-8 shadow-xl">
+            <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-4 flex items-center gap-4">
+                <span className="text-4xl">🎬</span> Cinematic Video
+            </h1>
+            <p className="text-slate-400 mb-6 max-w-3xl">
+                Turn your static property photos into a premium social media reel. Simply fill out the property details, drag your photos into the timeline in the exact order you want them, and let our AI generate a beautifully paced, branded video.
+            </p>
+            <div className="flex gap-8 text-sm">
+                <div className="flex-1 bg-purple-900/10 border border-purple-500/20 p-5 rounded-2xl">
+                    <h4 className="text-purple-400 font-bold uppercase tracking-widest text-xs mb-2">✅ Expectations</h4>
+                    <ul className="text-slate-400 space-y-2 list-disc list-inside">
+                        <li>Smooth "Ken Burns" camera pans and zooms</li>
+                        <li>Automated graphics for Address & Price</li>
+                        <li>Branded outro with Realtor details</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        {/* UPLOADER */}
+        {uploadedFiles.length === 0 && galleryImages.length === 0 && !isRendering && (
+          <div className="glass p-16 border-2 border-dashed border-slate-700 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50">
+              <input type="text" value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="PROJECT NAME (E.G. STORGATA 1)" className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-3xl font-black text-white outline-none focus:border-purple-500 uppercase pb-3" />
+              <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
+              <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-purple-600 text-white rounded-full font-black uppercase text-xs cursor-pointer hover:bg-purple-500 transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)]">Upload Photos</button>
+          </div>
+        )}
+
+        {/* BUILDER UI */}
+        {uploadedFiles.length > 0 && !isRendering && galleryImages.length === 0 && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+              
+              {/* Form Data */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="bg-[#0f172a] p-6 rounded-2xl border border-slate-800 space-y-4">
+                      <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest">🎬 Intro Scene Text</h3>
+                      <input type="text" placeholder="Address (e.g. Storgata 1)" value={videoMeta.address} onChange={(e) => setVideoMeta({...videoMeta, address: e.target.value})} className="w-full bg-[#0B1120] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-purple-500" />
+                      <input type="text" placeholder="Price (e.g. Prisantydning 5.990.000,-)" value={videoMeta.price} onChange={(e) => setVideoMeta({...videoMeta, price: e.target.value})} className="w-full bg-[#0B1120] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-purple-500" />
+                  </div>
+                  <div className="bg-[#0f172a] p-6 rounded-2xl border border-slate-800 space-y-4">
+                      <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest">📱 Outro Scene Text</h3>
+                      <input type="text" placeholder="Realtor Name" value={videoMeta.realtorName} onChange={(e) => setVideoMeta({...videoMeta, realtorName: e.target.value})} className="w-full bg-[#0B1120] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-purple-500" />
+                      <input type="text" placeholder="Phone / Agency" value={videoMeta.phone} onChange={(e) => setVideoMeta({...videoMeta, phone: e.target.value})} className="w-full bg-[#0B1120] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-purple-500" />
+                  </div>
+              </div>
+
+              {/* Timeline */}
+              <div className="bg-[#0f172a] p-8 rounded-2xl border border-purple-500/40 shadow-lg" onDragOver={handleDragOver} onDrop={handleVideoDrop}>
+                  <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Timeline (Drag here to set order)</h3>
+                      <span className="text-xs text-slate-400 font-bold">{timelineFilesList.length} / 12 Images Selected</span>
+                  </div>
+                  <div className="flex gap-4 p-6 min-h-[180px] overflow-x-auto bg-[#0B1120] rounded-xl border border-slate-800 items-center">
+                      {timelineFilesList.length === 0 ? (
+                          <div className="w-full text-center text-slate-600 text-xs font-bold uppercase tracking-widest">Drag images here from the pool below</div>
+                      ) : (
+                          timelineFilesList.map((file, index) => (
+                              <div key={file.id + index} className="relative min-w-[120px] h-[120px] group flex-shrink-0">
+                                  <div className="absolute -top-3 -left-3 w-6 h-6 bg-purple-600 rounded-full text-white flex items-center justify-center text-[10px] font-black border-2 border-[#0B1120] z-20">{index + 1}</div>
+                                  <button onClick={() => removeFromVideoTimeline(file.id)} className="absolute top-2 right-2 bg-red-500/80 text-white rounded-full w-5 h-5 flex items-center justify-center text-[8px] font-black z-30 hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity">X</button>
+                                  <img src={file.url} draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className="w-full h-full object-cover rounded-lg border-2 border-purple-500/50" alt="timeline frame" />
+                              </div>
+                          ))
+                      )}
+                  </div>
+              </div>
+
+              {/* Unused Images */}
+              <div className="bg-[#0f172a] p-6 rounded-2xl border border-slate-800" onDragOver={handleDragOver} onDrop={(e) => {
+                  e.preventDefault(); 
+                  const imgId = e.dataTransfer.getData("text/plain"); 
+                  if (imgId) removeFromVideoTimeline(imgId);
+              }}>
+                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Image Pool</h3>
+                  <div className="flex flex-wrap gap-4">
+                      {unassignedVideoFiles.map(file => (
+                          <img key={file.id} src={file.url} draggable onDragStart={(e) => handleDragStart(e, file.id)} onDragEnd={handleDragEnd} className="w-20 h-20 object-cover rounded-xl border border-slate-700 opacity-80 hover:opacity-100 hover:scale-105 transition-all cursor-grab" alt="pool frame" />
+                      ))}
+                      {unassignedVideoFiles.length === 0 && <p className="text-xs text-slate-600 font-bold uppercase">All uploaded images are in the timeline.</p>}
+                  </div>
+              </div>
+
+              <div className="flex justify-end pt-4">
+                  <button onClick={startFullPropertyFilm} className="px-12 py-5 bg-purple-600 text-white font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_20px_rgba(147,51,234,0.4)] hover:bg-purple-500 transition-colors">
+                      Generate Property Film
+                  </button>
+              </div>
+          </div>
+        )}
+
+        {/* RENDERING SPINNER */}
+        {isRendering && (
+          <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 rounded-3xl bg-[#0f172a]/50 border border-purple-500/30">
+              <p className="font-black uppercase tracking-widest text-sm text-purple-400 animate-pulse">{progressStatus}</p>
+              <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10">
+                  <div className="bg-purple-500 h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(147,51,234,0.5)]" style={{ width: `${progressPct}%` }}></div>
+              </div>
+          </div>
+        )}
+
+        {/* RESULTS GALLERY */}
+        {galleryImages.length > 0 && !isRendering && (
+            <div className="animate-in fade-in slide-in-from-bottom-10 duration-500 max-w-3xl mx-auto">
+                <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
+                    <h3 className="text-3xl font-black text-white uppercase">{jobName}</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-10 pb-20">
+                    {galleryImages.map((item) => (
+                        <div key={item.name} className="flex flex-col bg-[#0f172a] rounded-[2rem] p-4 border border-white/5 shadow-2xl">
+                            <div className="relative aspect-video rounded-[1.5rem] overflow-hidden bg-black mb-4">
+                                {item.type === 'video' ? (
+                                    <video src={item.url} autoPlay loop muted playsInline controls className="absolute inset-0 w-full h-full object-cover z-10" />
+                                ) : (
+                                    <img src={item.url} className="w-full h-full object-cover" alt="Fallback" />
+                                )}
+                            </div>
+                            <div className="flex justify-between items-center px-4 py-2">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-green-500"></span> Ready
+                                </span>
+                                <button onClick={() => handleDownloadSingle(item.url, item.name)} className="px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg">Download MP4</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+      </main>
+    </div>
+  );
+}
