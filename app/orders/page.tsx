@@ -13,24 +13,19 @@ type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: 
 export default function OrdersPage() {
   const { user } = useUser();
   
-  // ADMIN & VIEW MODE STATES
   const isAdmin = user?.primaryEmailAddress?.emailAddress === "petter.kilaas@diakrit.com"; 
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
 
   const [archiveOrders, setArchiveOrders] = useState<OrderArchive[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  
-  // States for viewing a specific order
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [isLoadingGallery, setIsLoadingGallery] = useState(false);
 
-  // Processing States
   const [isRendering, setIsRendering] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
   const [progressStatus, setProgressStatus] = useState("Processing...");
 
-  // Modals & Tool States
   const [activeModal, setActiveModal] = useState<'none' | 'compare' | 'retouch' | 'rerender' | 'video'>('none');
   const [currentCanvasImgId, setCurrentCanvasImgId] = useState("");
   const [compareData, setCompareData] = useState({ raw: "", edited: "" });
@@ -41,7 +36,6 @@ export default function OrdersPage() {
   const [rerenderData, setRerenderData] = useState({ type: "exterior", style: "dusk_blue_hour", prompt: "" });
   const [videoPrompt, setVideoPrompt] = useState("Cinematic slow pan, highly detailed architectural video, 8k resolution");
 
-  // Refs for Canvas & Polling
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hiddenMaskCanvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -50,9 +44,8 @@ export default function OrdersPage() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
-  // --- FETCH ORDERS & REALTIME LISTENER ---
   useEffect(() => {
-    const fetchMyProjects = async () => {
+    const fetchProjects = async () => {
       if (!user) return;
       
       let query = supabase
@@ -60,13 +53,11 @@ export default function OrdersPage() {
         .select('name, created_at, status')
         .order('created_at', { ascending: false });
 
-      // Hvis ikke admin, eller hvis viewMode er 'mine', filtrer på brukerID
       if (viewMode === 'mine') {
         query = query.eq('user_id', user.id);
       }
 
       const { data, error } = await query;
-      
       if (!error && data) {
         setArchiveOrders(data.map(p => ({ 
           name: p.name, 
@@ -76,36 +67,21 @@ export default function OrdersPage() {
       }
     };
     
-    fetchMyProjects();
+    fetchProjects();
 
-    if (!user) return;
     const channel = supabase.channel('realtime-projects-archive').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
-          if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as any;
-            setArchiveOrders(prev => prev.map(o => o.name === updated.name ? { ...o, status: updated.status } : o));
-          } else if (payload.eventType === 'INSERT') {
-            const inserted = payload.new as any;
-            // Legg til i listen hvis vi ser på alle, eller hvis det er vår egen
-            if (viewMode === 'all' || inserted.user_id === user.id) {
-                setArchiveOrders(prev => {
-                    if (!prev.find(o => o.name === inserted.name)) {
-                        return [{ name: inserted.name, date: new Date(inserted.created_at).toLocaleDateString('no-NO'), status: inserted.status }, ...prev];
-                    }
-                    return prev;
-                });
-            }
-          }
-        }).subscribe();
+        fetchProjects(); // Enkleste måte å holde lista oppdatert på
+    }).subscribe();
 
     return () => { supabase.removeChannel(channel); if (pollTimer.current) clearTimeout(pollTimer.current); };
   }, [user, viewMode]);
 
-  // --- ACTIONS ---
   const viewOrder = async (name: string) => { 
       if (pollTimer.current) clearTimeout(pollTimer.current);
       setSelectedOrder(name); setIsLoadingGallery(true); setGalleryImages([]);
       await loadGallery(name);
       setIsLoadingGallery(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const loadGallery = async (name: string) => { 
@@ -131,7 +107,6 @@ export default function OrdersPage() {
     pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
   };
 
-  // --- CRUD ---
   const deleteOrder = async (e: React.MouseEvent, orderName: string) => {
     e.stopPropagation();
     if (!window.confirm(`Are you sure you want to permanently delete "${orderName}"?`)) return;
@@ -171,7 +146,6 @@ export default function OrdersPage() {
       loadGallery(selectedOrder); 
   };
 
-  // --- CANVAS STUDIO (RETOUCH) ---
   const openCanvasStudio = (imgName: string, customUrl: string) => {
     setCurrentCanvasImgId(imgName); setActiveModal('retouch'); setBrushSize(50);
     const image = new Image(); image.crossOrigin = "Anonymous";
@@ -238,7 +212,6 @@ export default function OrdersPage() {
     ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); 
   };
 
-  // --- API SUBMISSIONS ---
   const submitRetouch = async () => {
       if(!retouchPrompt || !selectedOrder) return;
       setActiveModal('none'); 
@@ -303,28 +276,27 @@ export default function OrdersPage() {
   const filteredOrders = archiveOrders.filter(order => order.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans">
+    <div className="flex flex-col bg-[#0B1120] text-white">
       <div ref={cursorRef} style={{ display: activeModal === 'retouch' ? 'block' : 'none', width: brushSize, height: brushSize }} className="fixed border-2 border-[#ef4444]/80 rounded-full pointer-events-none z-[9999] -translate-x-1/2 -translate-y-1/2 bg-[#ef4444]/20 mix-blend-difference"></div>
       <canvas ref={hiddenMaskCanvasRef} style={{ display: 'none' }}></canvas>
 
-      <main className="flex-1 max-w-6xl mx-auto w-full p-8">
+      <main className="max-w-6xl mx-auto w-full p-8 min-h-screen">
         {!selectedOrder ? (
             /* --- ORDER LIST VIEW --- */
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex justify-between items-end mb-8">
+                <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
                     <div>
                         <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-2">My Orders</h1>
                         <p className="text-slate-400 text-sm">View, manage, and retouch your processed projects.</p>
                     </div>
-                    <div className="flex items-center">
-                        {/* GOD MODE TOGGLE */}
+                    <div className="flex items-center gap-3 w-full md:w-auto">
                         {isAdmin && (
-                            <div className="flex bg-[#0f172a] rounded-xl p-1 border border-slate-700 mr-4 shadow-lg">
-                                <button onClick={() => setViewMode('mine')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'mine' ? 'bg-[#009183] text-white shadow-md' : 'text-slate-500 hover:text-white'}`}>My Orders</button>
-                                <button onClick={() => setViewMode('all')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'all' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 hover:text-white'}`}>All Users (Admin)</button>
+                            <div className="flex bg-[#0f172a] rounded-xl p-1 border border-slate-700 shadow-lg">
+                                <button onClick={() => setViewMode('mine')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'mine' ? 'bg-[#009183] text-white' : 'text-slate-500 hover:text-white'}`}>My Orders</button>
+                                <button onClick={() => setViewMode('all')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'all' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-white'}`}>All Users</button>
                             </div>
                         )}
-                        <input type="text" placeholder="Search projects..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-64 bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-[#009183]" />
+                        <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-[#009183]" />
                     </div>
                 </div>
                 <div className="bg-[#0f172a] border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
@@ -338,7 +310,7 @@ export default function OrdersPage() {
                                     <tr key={order.name} onClick={() => viewOrder(order.name)} className="border-b border-slate-800/50 hover:bg-[#1e293b]/50 cursor-pointer transition-colors group">
                                         <td className="p-5 font-bold text-white flex items-center gap-3"><span className="text-xl group-hover:scale-110 transition-transform">{order.name.includes('FILM') || order.name.includes('video') ? '🎬' : order.name.includes('STAGING') ? '🛋️' : '⚡'}</span>{order.name}</td>
                                         <td className="p-5 text-slate-400 text-sm">{order.date}</td>
-                                        <td className="p-5">{order.status === 'completed' ? (<span className="bg-green-900/30 text-green-400 border border-green-500/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Completed</span>) : (<span className="bg-yellow-900/30 text-yellow-400 border border-yellow-500/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider animate-pulse">Processing</span>)}</td>
+                                        <td className="p-5">{order.status === 'completed' || order.status === 'finished' ? (<span className="bg-green-900/30 text-green-400 border border-green-500/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Completed</span>) : (<span className="bg-yellow-900/30 text-yellow-400 border border-yellow-500/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider animate-pulse">Processing</span>)}</td>
                                         <td className="p-5 text-right flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button onClick={(e) => renameOrder(e, order.name)} className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center hover:bg-slate-700 text-slate-300 transition-colors" title="Rename">✏️</button>
                                             <button onClick={(e) => deleteOrder(e, order.name)} className="w-8 h-8 rounded-full bg-red-900/20 border border-red-900/50 flex items-center justify-center hover:bg-red-900/40 text-red-400 transition-colors" title="Delete">🗑️</button>
@@ -361,7 +333,6 @@ export default function OrdersPage() {
                     <button onClick={() => window.location.href = `${API}/download-zip/${selectedOrder}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
                 </div>
 
-                {/* RENDERING SPINNER */}
                 {isRendering && activeModal === 'none' && (
                   <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8 rounded-3xl bg-[#0f172a]/50 border border-[#009183]/30">
                       <p className="font-black uppercase tracking-[0.3em] text-sm text-[#009183] animate-pulse">{progressStatus}</p>
@@ -375,14 +346,13 @@ export default function OrdersPage() {
                         <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Loading Media...</p>
                     </div>
                 ) : galleryImages.length === 0 ? (
-                    <div className="text-center py-20 text-slate-500">No images or videos found for this project.</div>
+                    <div className="text-center py-20 text-slate-500">No images found.</div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-20">
                         {galleryImages.map((item) => (
                             <div key={item.name} className="group flex flex-col bg-[#0f172a] rounded-[2rem] p-4 border border-white/5 shadow-xl">
                                 <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-black mb-4 cursor-pointer" onClick={() => { if(item.type !== 'video') { setCompareData({raw: item.raw || item.url, edited: item.url}); setActiveModal('compare'); }}}>
                                     <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(item.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 transition-all shadow-lg border border-red-900/50">🗑️</button>
-                                    
                                     {item.type === 'video' ? (
                                         <>
                                             <video src={item.url} autoPlay loop muted playsInline controls className="absolute inset-0 w-full h-full object-cover z-10" />
