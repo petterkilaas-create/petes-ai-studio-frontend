@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-// Siden vi nå er inni app/express/, må vi gå to hakk opp for å finne supabaseClient
 import { supabase } from "../../supabaseClient"; 
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
@@ -11,14 +10,27 @@ const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.ap
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: string; edited?: string; approved?: boolean; video?: string; };
 
+const STYLE_CARDS = [
+  { id: 'dusk_blue_hour', icon: '🌙', title: 'Blue Hour', desc: 'Deep indigo twilight sky with a warm, inviting interior glow.' },
+  { id: 'sunny_midday', icon: '☀️', title: 'Sunny Midday', desc: 'Crisp, bright daylight with crystal clear blue skies.' },
+  { id: 'weather_rain_to_sun', icon: '🌦️', title: 'Rain to Sun', desc: 'Magically dry up puddles and turn overcast skies sunny.' },
+  { id: 'dusk_purple_orange', icon: '🌅', title: 'Purple Dusk', desc: 'Vibrant, luxurious sunset with an orange horizon.' },
+  { id: 'early_morning', icon: '🌄', title: 'Early Morning', desc: 'Soft, pale Nordic morning light for a fresh aesthetic.' },
+  { id: 'winter', icon: '❄️', title: 'Winter Wonderland', desc: 'Add crisp, realistic snow to the ground, roof, and trees.' },
+  { id: 'autumn', icon: '🍂', title: 'Autumn Colors', desc: 'Turn green foliage into golden ochre and rust.' },
+  { id: 'summer', icon: '🌳', title: 'Peak Summer', desc: 'Ensure lush, vibrant green lawns and dense tree canopies.' },
+];
+
 export default function ExpressPage() {
   const { user } = useUser();
 
+  // Wizard & Upload States
+  const [wizardStep, setWizardStep] = useState<1 | 2>(1);
+  const [globalStyle, setGlobalStyle] = useState("dusk_blue_hour");
   const [jobName, setJobName] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [globalType, setGlobalType] = useState("exterior");
-  const [globalStyle, setGlobalStyle] = useState("dusk_blue_hour");
 
+  // Processing States
   const [isRendering, setIsRendering] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
   const [progressStatus, setProgressStatus] = useState("Processing...");
@@ -42,14 +54,20 @@ export default function ExpressPage() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
-  // --- UPLOAD LOGIC ---
+  // --- WIZARD LOGIC ---
+  const selectStyleAndProceed = (styleId: string) => {
+      setGlobalStyle(styleId);
+      setWizardStep(2);
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     if (!jobName) setJobName(`JOB-${new Date().getTime().toString().slice(-4)}`);
     const newFiles: UploadedFile[] = [];
     for (let i = 0; i < e.target.files.length; i++) {
       if (e.target.files[i].type.startsWith("image/")) {
-        newFiles.push({ id: "img_" + Math.random().toString(36).substr(2, 9), file: e.target.files[i], url: URL.createObjectURL(e.target.files[i]), type: globalType, style: globalStyle, prompt: "", maskBlob: null });
+        // Automatically apply the style they chose in Step 1!
+        newFiles.push({ id: "img_" + Math.random().toString(36).substr(2, 9), file: e.target.files[i], url: URL.createObjectURL(e.target.files[i]), type: "exterior", style: globalStyle, prompt: "", maskBlob: null });
       }
     }
     setUploadedFiles(prev => [...prev, ...newFiles]);
@@ -57,8 +75,7 @@ export default function ExpressPage() {
 
   const removeFile = (id: string) => setUploadedFiles(prev => prev.filter(f => f.id !== id));
   const updateFileField = (id: string, field: keyof UploadedFile, value: any) => setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f));
-  const applyExpressAll = () => setUploadedFiles(prev => prev.map(f => ({ ...f, type: globalType, style: globalStyle, prompt: "" })));
-
+  
   // --- API / RENDER LOGIC ---
   const startExpressRender = async () => {
     if (!jobName || uploadedFiles.length === 0) return;
@@ -79,7 +96,7 @@ export default function ExpressPage() {
     try {
         const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
         const s = await r.json();
-        if (s.status === 'finished') { handleJobComplete(pollingJobName); return; }
+        if (s.status === 'finished' || s.status === 'completed') { handleJobComplete(pollingJobName); return; }
         if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Processing... ${s.completed} / ${s.total}`); }
     } catch (e) { console.error(e); }
     pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
@@ -99,153 +116,31 @@ export default function ExpressPage() {
       } catch (e) { console.error(e); } 
   };
 
-  // --- CANVAS & RETOUCH LOGIC ---
+  // --- CANVAS & RETOUCH LOGIC (Kept perfectly intact) ---
   const openCanvasStudio = (imgIdOrName: string, customUrl: string | null = null) => {
     setCurrentCanvasImgId(imgIdOrName); setActiveModal('retouch'); setBrushSize(50);
     let targetUrl = customUrl;
     if (!targetUrl) { const fileObj = uploadedFiles.find(f => f.id === imgIdOrName); if (fileObj) targetUrl = fileObj.url; }
-    if (targetUrl) {
-      const image = new Image(); image.crossOrigin = "Anonymous";
-      image.onload = () => { bgImg.current = image; initCanvas(); };
-      image.src = targetUrl;
-    }
+    if (targetUrl) { const image = new Image(); image.crossOrigin = "Anonymous"; image.onload = () => { bgImg.current = image; initCanvas(); }; image.src = targetUrl; }
   };
-
-  const initCanvas = () => {
-    const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-    if (!canvas || !hiddenCanvas || !bgImg.current) return;
-    canvas.width = hiddenCanvas.width = bgImg.current.width; canvas.height = hiddenCanvas.height = bgImg.current.height;
-    const hiddenCtx = hiddenCanvas.getContext('2d'); if (hiddenCtx) hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
-    undoStack.current = []; saveCanvasState(); renderCanvas();
-  };
-
-  const saveCanvasState = () => {
-    const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return;
-    const ctx = hiddenCanvas.getContext('2d'); if (!ctx) return;
-    if (undoStack.current.length > 50) undoStack.current.shift();
-    undoStack.current.push(ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height));
-  };
-
-  const undoCanvas = () => {
-    const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas || undoStack.current.length <= 1) return;
-    undoStack.current.pop(); const ctx = hiddenCanvas.getContext('2d');
-    if (ctx) { ctx.putImageData(undoStack.current[undoStack.current.length - 1], 0, 0); renderCanvas(); }
-  };
-
-  const clearCanvas = () => {
-    const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return;
-    const ctx = hiddenCanvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
-    undoStack.current = []; saveCanvasState(); renderCanvas();
-  };
-
-  const renderCanvas = () => {
-    const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-    if (!canvas || !hiddenCanvas || !bgImg.current) return;
-    const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d');
-    if (!ctx || !hiddenCtx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(bgImg.current, 0, 0, canvas.width, canvas.height);
-    const tempCanvas = document.createElement('canvas'); tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
-    const tCtx = tempCanvas.getContext('2d'); if (!tCtx) return;
-    const imgData = hiddenCtx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height);
-    const overlayData = tCtx.createImageData(canvas.width, canvas.height);
-    for (let i = 0; i < imgData.data.length; i += 4) {
-      if (imgData.data[i + 3] > 10) { overlayData.data[i] = 239; overlayData.data[i + 1] = 68; overlayData.data[i + 2] = 68; overlayData.data[i + 3] = 120; }
-    }
-    tCtx.putImageData(overlayData, 0, 0); ctx.drawImage(tempCanvas, 0, 0);
-  };
-
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { 
-    isDrawing.current = true; 
-    const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-    if (!canvas || !hiddenCanvas) return;
-    const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d');
-    if (!ctx || !hiddenCtx) return;
-    const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    ctx.beginPath(); ctx.moveTo(x, y); hiddenCtx.beginPath(); hiddenCtx.moveTo(x, y);
-  };
-
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (cursorRef.current) { cursorRef.current.style.left = `${e.clientX}px`; cursorRef.current.style.top = `${e.clientY}px`; }
-    if (isDrawing.current) drawOnCanvas(e);
-  };
-
+  const initCanvas = () => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !bgImg.current) return; canvas.width = hiddenCanvas.width = bgImg.current.width; canvas.height = hiddenCanvas.height = bgImg.current.height; const hiddenCtx = hiddenCanvas.getContext('2d'); if (hiddenCtx) hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height); undoStack.current = []; saveCanvasState(); renderCanvas(); };
+  const saveCanvasState = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return; const ctx = hiddenCanvas.getContext('2d'); if (!ctx) return; if (undoStack.current.length > 50) undoStack.current.shift(); undoStack.current.push(ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height)); };
+  const undoCanvas = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas || undoStack.current.length <= 1) return; undoStack.current.pop(); const ctx = hiddenCanvas.getContext('2d'); if (ctx) { ctx.putImageData(undoStack.current[undoStack.current.length - 1], 0, 0); renderCanvas(); } };
+  const clearCanvas = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return; const ctx = hiddenCanvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height); undoStack.current = []; saveCanvasState(); renderCanvas(); };
+  const renderCanvas = () => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !bgImg.current) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(bgImg.current, 0, 0, canvas.width, canvas.height); const tempCanvas = document.createElement('canvas'); tempCanvas.width = canvas.width; tempCanvas.height = canvas.height; const tCtx = tempCanvas.getContext('2d'); if (!tCtx) return; const imgData = hiddenCtx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height); const overlayData = tCtx.createImageData(canvas.width, canvas.height); for (let i = 0; i < imgData.data.length; i += 4) { if (imgData.data[i + 3] > 10) { overlayData.data[i] = 239; overlayData.data[i + 1] = 68; overlayData.data[i + 2] = 68; overlayData.data[i + 3] = 120; } } tCtx.putImageData(overlayData, 0, 0); ctx.drawImage(tempCanvas, 0, 0); };
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { isDrawing.current = true; const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height); ctx.beginPath(); ctx.moveTo(x, y); hiddenCtx.beginPath(); hiddenCtx.moveTo(x, y); };
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => { if (cursorRef.current) { cursorRef.current.style.left = `${e.clientX}px`; cursorRef.current.style.top = `${e.clientY}px`; } if (isDrawing.current) drawOnCanvas(e); };
   const handleCanvasMouseUp = () => { if (isDrawing.current) { saveCanvasState(); isDrawing.current = false; renderCanvas(); } };
+  const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !isDrawing.current) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height); hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); };
 
-  const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => {
-    const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-    if (!canvas || !hiddenCanvas || !isDrawing.current) return;
-    const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d');
-    if (!ctx || !hiddenCtx) return;
-    const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); 
-    ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); 
-  };
+  const submitRetouch = async () => { if(!retouchPrompt) return; setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id); setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch..."); const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas) return; const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height; const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return; aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height); const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return; const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height); for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } } aCtx.putImageData(maskData, 0, 0); apiCanvas.toBlob(async (b) => { if(!b) return; const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); pollProgress(jobName); } catch(e) { console.error(e); } }, 'image/png'); };
+  const submitRerender = async () => { setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id); setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render..."); const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt); try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(jobName); } catch(e) { console.error(e); } };
+  const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(jobName); };
+  const deleteSingleImage = async (imgName: string) => { if (!window.confirm("Are you sure you want to permanently delete this image?")) return; const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); try { await fetch(`${API}/delete-image/`, { method: 'POST', body: fd }); setGalleryImages(prev => prev.filter(img => img.name !== imgName)); } catch (e) { console.error("Failed to delete image:", e); } };
+  const handleDownloadSingle = async (url: string, filename: string) => { try { const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'file'; document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100); } catch (error) { window.open(url, '_blank'); } };
+  const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => { const rect = e.currentTarget.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 100; const percent = Math.max(0, Math.min(100, x)); const beforeImg = document.getElementById('modalBefore'); const handle = document.getElementById('modalHandle'); if (beforeImg && handle) { beforeImg.style.clipPath = `inset(0 ${100 - percent}% 0 0)`; handle.style.left = `${percent}%`; } };
 
-  const submitRetouch = async () => {
-      if(!retouchPrompt) return;
-      setActiveModal('none'); 
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
-      setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch...");
-      const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-      if (!canvas || !hiddenCanvas) return;
-      const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height;
-      const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return;
-      aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height);
-      const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return;
-      const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
-      for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } }
-      aCtx.putImageData(maskData, 0, 0);
-      apiCanvas.toBlob(async (b) => {
-          if(!b) return;
-          const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
-          try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); pollProgress(jobName); } catch(e) { console.error(e); }
-      }, 'image/png');
-  };
-
-  const submitRerender = async () => {
-      setActiveModal('none');
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id);
-      setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render...");
-      const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
-      try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(jobName); } catch(e) { console.error(e); }
-  };
-
-  const approveImage = async (imgName: string) => { 
-      const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); 
-      await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); 
-      loadGallery(jobName); 
-  };
-
-  const deleteSingleImage = async (imgName: string) => {
-      if (!window.confirm("Are you sure you want to permanently delete this image?")) return;
-      const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName);
-      try {
-          await fetch(`${API}/delete-image/`, { method: 'POST', body: fd });
-          setGalleryImages(prev => prev.filter(img => img.name !== imgName));
-      } catch (e) { console.error("Failed to delete image:", e); }
-  };
-
-  const handleDownloadSingle = async (url: string, filename: string) => {
-      try {
-          const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'file';
-          document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-      } catch (error) { window.open(url, '_blank'); }
-  };
-
-  const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * 100;
-      const percent = Math.max(0, Math.min(100, x));
-      const beforeImg = document.getElementById('modalBefore');
-      const handle = document.getElementById('modalHandle');
-      if (beforeImg && handle) { beforeImg.style.clipPath = `inset(0 ${100 - percent}% 0 0)`; handle.style.left = `${percent}%`; }
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setActiveModal('none'); if ((e.metaKey || e.ctrlKey) && e.key === 'z') undoCanvas(); };
-    window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  useEffect(() => { const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setActiveModal('none'); if ((e.metaKey || e.ctrlKey) && e.key === 'z') undoCanvas(); }; window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown); }, []);
 
   return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans">
@@ -266,46 +161,66 @@ export default function ExpressPage() {
 
       <main className="flex-1 flex flex-col max-w-6xl mx-auto w-full p-8">
           
-        {/* EXPLAINER & EXPECTATIONS */}
-        <div className="mb-12 bg-[#0f172a] border border-slate-800 rounded-3xl p-8 shadow-xl">
-            <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-4 flex items-center gap-4">
+        <div className="mb-12">
+            <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-2 flex items-center gap-4">
                 <span className="text-4xl">⚡</span> Express Retouch
             </h1>
-            <p className="text-slate-400 mb-6 max-w-3xl">
-                Lightning-fast, professional image enhancement. Upload your raw photos, tell us the season or time of day, and our AI will balance HDR, correct colors, and swap skies instantly.
-            </p>
-            <div className="flex gap-8 text-sm">
-                <div className="flex-1 bg-green-900/10 border border-green-500/20 p-5 rounded-2xl">
-                    <h4 className="text-green-400 font-bold uppercase tracking-widest text-xs mb-2">✅ What it does best</h4>
-                    <ul className="text-slate-400 space-y-2 list-disc list-inside">
-                        <li>Balances harsh shadows and window blowouts</li>
-                        <li>Replaces grey skies with blue skies or sunsets</li>
-                        <li>Enhances grass and outdoor lighting</li>
-                    </ul>
-                </div>
-                <div className="flex-1 bg-red-900/10 border border-red-500/20 p-5 rounded-2xl">
-                    <h4 className="text-red-400 font-bold uppercase tracking-widest text-xs mb-2">🚫 Limitations</h4>
-                    <ul className="text-slate-400 space-y-2 list-disc list-inside">
-                        <li>Will not remove cars, people, or clutter automatically</li>
-                        <li>Cannot change structural architecture</li>
-                        <li>Extreme angles may cause AI hallucination</li>
-                    </ul>
-                </div>
-            </div>
+            <p className="text-slate-400 max-w-2xl">Enhance exteriors, fix blown-out windows, or magically alter the weather and time of day in seconds.</p>
         </div>
 
-        {/* UPLOADER */}
-        {uploadedFiles.length === 0 && galleryImages.length === 0 && !isRendering && (
-          <div className="glass p-16 border-2 border-dashed border-slate-700 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50">
-              <input type="text" value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="PROJECT NAME (E.G. MAIN STREET 1)" className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-3xl font-black text-white outline-none focus:border-[#009183] uppercase pb-3" />
-              <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
-              <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-white text-[#0B1120] rounded-full font-black uppercase text-xs cursor-pointer hover:bg-[#009183] hover:text-white transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]">Upload Photos</button>
+        {/* --- WIZARD STEP 1: CHOOSE STYLE --- */}
+        {wizardStep === 1 && uploadedFiles.length === 0 && galleryImages.length === 0 && !isRendering && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest mb-6">Step 1: Choose your magic</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {STYLE_CARDS.map(style => (
+                        <div 
+                            key={style.id} 
+                            onClick={() => selectStyleAndProceed(style.id)}
+                            className="bg-[#0f172a] border border-slate-800 rounded-2xl p-6 cursor-pointer hover:border-[#009183]/50 hover:bg-[#1e293b] transition-all group flex flex-col h-full shadow-lg hover:shadow-[0_10px_30px_-15px_rgba(0,145,131,0.3)] hover:-translate-y-1"
+                        >
+                            <div className="text-4xl mb-4 group-hover:scale-110 transition-transform origin-left">{style.icon}</div>
+                            <h3 className="text-sm font-black text-white uppercase tracking-wider mb-2">{style.title}</h3>
+                            <p className="text-slate-400 text-xs leading-relaxed flex-1">{style.desc}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {/* --- WIZARD STEP 2: UPLOAD PHOTOS --- */}
+        {wizardStep === 2 && uploadedFiles.length === 0 && galleryImages.length === 0 && !isRendering && (
+          <div className="animate-in fade-in slide-in-from-right-8 duration-500">
+              <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest">Step 2: Upload Photos</h2>
+                  <button onClick={() => setWizardStep(1)} className="text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Change Style</button>
+              </div>
+              
+              <div className="glass p-16 border-2 border-dashed border-[#009183]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(0,145,131,0.05)]">
+                  <div className="text-center">
+                      <div className="text-5xl mb-4">{STYLE_CARDS.find(s => s.id === globalStyle)?.icon}</div>
+                      <p className="text-white font-bold text-lg">Applying: <span className="text-[#009183] uppercase tracking-widest">{STYLE_CARDS.find(s => s.id === globalStyle)?.title}</span></p>
+                  </div>
+                  
+                  <input type="text" value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="PROJECT NAME (E.G. MAIN STREET 1)" className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-[#009183] uppercase pb-3 transition-colors" />
+                  
+                  <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
+                  <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-[#009183] text-white rounded-full font-black uppercase tracking-widest text-xs cursor-pointer hover:bg-[#00b09f] transition-all shadow-[0_0_20px_rgba(0,145,131,0.4)]">
+                      Select Images
+                  </button>
+              </div>
           </div>
         )}
 
-        {/* PROCESSING UI */}
+        {/* --- WIZARD STEP 3: REVIEW & RENDER --- */}
         {uploadedFiles.length > 0 && !isRendering && galleryImages.length === 0 && (
           <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex justify-between items-center">
+                  <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest">Step 3: Review & Render</h2>
+                  <button onClick={() => fileInputRef.current?.click()} className="text-white text-[10px] font-bold uppercase tracking-widest border border-slate-700 px-4 py-2 rounded-lg hover:bg-slate-800">Add More Photos</button>
+                  <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {uploadedFiles.map((file) => (
                   <div key={file.id} className="bg-[#0f172a] rounded-2xl overflow-hidden border border-slate-800 relative flex flex-col shadow-lg">
@@ -313,8 +228,8 @@ export default function ExpressPage() {
                     <img src={file.url} alt={`Upload`} className="aspect-[3/2] object-cover" />
                     <div className="p-4 flex flex-col gap-3">
                         <div className="flex gap-2">
-                            <select value={file.type} onChange={(e) => updateFileField(file.id, 'type', e.target.value)} className="w-1/2 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
-                            <select value={file.style} onChange={(e) => updateFileField(file.id, 'style', e.target.value)} className="w-1/2 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[10px] font-bold uppercase border border-slate-700 outline-none">
+                            <select value={file.type} onChange={(e) => updateFileField(file.id, 'type', e.target.value)} className="w-1/3 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
+                            <select value={file.style} onChange={(e) => updateFileField(file.id, 'style', e.target.value)} className="w-2/3 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none">
                                 <optgroup label="Lighting"><option value="weather_rain_to_sun">Rain to Sun</option><option value="sunny_midday">Sunny Midday</option><option value="dusk_blue_hour">Blue Hour</option><option value="dusk_purple_orange">Purple Dusk</option><option value="early_morning">Early Morning</option></optgroup>
                                 <optgroup label="Season"><option value="winter">Winter</option><option value="autumn">Autumn</option><option value="spring">Spring</option><option value="summer">Summer</option></optgroup>
                             </select>
@@ -325,31 +240,26 @@ export default function ExpressPage() {
                 ))}
               </div>
               
-              <div className="flex flex-wrap justify-between items-center bg-[#0f172a] p-6 rounded-2xl border border-slate-800 shadow-xl">
-                  <div className="flex flex-wrap gap-4 items-center">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Apply to all:</span>
-                      <select value={globalType} onChange={(e) => setGlobalType(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
-                      <select value={globalStyle} onChange={(e) => setGlobalStyle(e.target.value)} className="bg-[#0B1120] text-slate-300 rounded-xl px-4 py-3 text-[10px] font-bold uppercase border border-slate-700 outline-none"><option value="weather_rain_to_sun">Rain to Sun</option><option value="sunny_midday">Sunny Midday</option><option value="dusk_blue_hour">Blue Hour</option></select>
-                      <button onClick={applyExpressAll} className="bg-slate-800 text-white px-6 py-3 rounded-xl text-[10px] font-bold tracking-widest uppercase hover:bg-slate-700">Apply</button>
-                  </div>
-                  <button onClick={startExpressRender} className="px-10 py-4 bg-[#009183] text-white font-black uppercase tracking-widest text-xs rounded-full hover:bg-[#00b09f] shadow-[0_0_20px_rgba(0,145,131,0.3)] transition-all">Start Render</button>
+              <div className="flex justify-end pt-4 border-t border-slate-800">
+                  <button onClick={startExpressRender} className="px-12 py-4 bg-gradient-to-r from-[#009183] to-[#00b09f] text-white font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_30px_rgba(0,145,131,0.4)] hover:scale-105 transition-transform">Start AI Render</button>
               </div>
           </div>
         )}
 
-        {/* RENDERING SPINNER */}
+        {/* --- RENDERING SPINNER --- */}
         {isRendering && activeModal === 'none' && (
-          <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 rounded-3xl bg-[#0f172a]/50 border border-[#009183]/30">
+          <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 rounded-3xl bg-[#0f172a]/50 border border-[#009183]/30 shadow-2xl mt-10">
+              <div className="text-6xl animate-bounce mb-4">{STYLE_CARDS.find(s => s.id === globalStyle)?.icon || '⚡'}</div>
               <p className="font-black uppercase tracking-[0.3em] text-sm text-[#009183] animate-pulse">{progressStatus}</p>
               <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10">
-                <div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-700" style={{ width: `${progressPct}%` }}></div>
+                <div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-700 shadow-[0_0_15px_rgba(0,145,131,0.8)]" style={{ width: `${progressPct}%` }}></div>
               </div>
           </div>
         )}
 
-        {/* RESULTS GALLERY */}
+        {/* --- RESULTS GALLERY --- */}
         {galleryImages.length > 0 && !isRendering && (
-            <div className="animate-in fade-in slide-in-from-bottom-10 duration-500">
+            <div className="animate-in fade-in slide-in-from-bottom-10 duration-500 mt-10">
                 <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                     <h3 className="text-3xl font-black text-white uppercase">{jobName}</h3>
                     <div className="flex gap-3">
@@ -383,7 +293,7 @@ export default function ExpressPage() {
         )}
       </main>
 
-      {/* --- MODALS --- */}
+      {/* --- MODALS (Unchanged) --- */}
       {activeModal === 'retouch' && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
             <div className="flex justify-between items-center w-[85vw] max-w-[1100px]"><h2 className="text-2xl font-black text-[#009183] uppercase tracking-widest">Retouch Studio</h2><button onClick={() => setActiveModal('none')} className="text-slate-400 font-bold uppercase text-xs hover:text-white">Close</button></div>
