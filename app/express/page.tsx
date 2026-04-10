@@ -67,7 +67,6 @@ export default function ExpressPage() {
     const newFiles: UploadedFile[] = [];
     for (let i = 0; i < e.target.files.length; i++) {
       if (e.target.files[i].type.startsWith("image/")) {
-        // Automatically apply the style they chose in Step 1!
         newFiles.push({ id: "img_" + Math.random().toString(36).substr(2, 9), file: e.target.files[i], url: URL.createObjectURL(e.target.files[i]), type: "exterior", style: globalStyle, prompt: "", maskBlob: null });
       }
     }
@@ -97,18 +96,20 @@ export default function ExpressPage() {
     const safeJobName = jobName.replace(/ /g, "_"); setJobName(safeJobName);
     setIsRendering(true); setProgressPct(0); setProgressStatus("Uploading to cloud...");
     const fd = new FormData(); fd.append('job_name', safeJobName);
+    if (user) fd.append('user_id', user.id); // Sørger for at user_id sendes med!
     const cfg: any = {}; uploadedFiles.forEach(f => { fd.append('files', f.file); cfg[f.file.name] = { type: f.type, style: f.style, prompt: f.prompt }; });
     fd.append('config', JSON.stringify(cfg));
     try { 
         await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
-        if (user) await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
+        // Fjernet den manuelle supabase-posten her fordi backenden fikser det!
         pollProgress(safeJobName); 
     } catch (error) { console.error(error); }
   };
 
   const pollProgress = async (pollingJobName: string) => {
     try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
+        // ENCODE COMPONENT FIKS FOR POLLING!
+        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}`, { cache: 'no-store' }); 
         const s = await r.json();
         if (s.status === 'finished' || s.status === 'completed') { handleJobComplete(pollingJobName); return; }
         if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Processing... ${s.completed} / ${s.total}`); }
@@ -124,7 +125,8 @@ export default function ExpressPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          const res = await fetch(`${API}/list-finished/?job_name=${name}&t=${Date.now()}`, { cache: 'no-store' }); 
+          // ENCODE COMPONENT FIKS FOR GALLERI!
+          const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
       } catch (e) { console.error(e); } 
@@ -220,7 +222,8 @@ export default function ExpressPage() {
                               if (place && place.formatted_address) {
                                   const addr = place.formatted_address;
                                   const shortId = Math.floor(1000 + Math.random() * 9000); 
-                                  setJobName(`${addr} (#${shortId})`);
+                                  // HASHTAG-FIKS: Vi bruker bindestrek istedenfor hashtag (#)
+                                  setJobName(`${addr} - ${shortId}`);
                               }
                           }}
                           options={{
@@ -298,7 +301,8 @@ export default function ExpressPage() {
                 <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                     <h3 className="text-3xl font-black text-white uppercase">{jobName}</h3>
                     <div className="flex gap-3">
-                        <button onClick={() => window.location.href = `${API}/download-zip/${jobName}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
+                        {/* ENCODE COMPONENT FIKS FOR NEDLASTING! */}
+                        <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(jobName)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-20">
