@@ -7,30 +7,27 @@ import { supabase } from "../../supabaseClient";
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
-type OrderArchive = { name: string; date: string; status: string; };
+// Oppdatert for å inkludere address!
+type OrderArchive = { name: string; address?: string; date: string; status: string; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: string; edited?: string; approved?: boolean; };
 
 export default function OrdersPage() {
   const { user } = useUser();
   
-  // ADMIN & VIEW MODE STATES
   const isAdmin = user?.primaryEmailAddress?.emailAddress === "petter.kilaas@diakrit.com"; 
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
 
   const [archiveOrders, setArchiveOrders] = useState<OrderArchive[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   
-  // States for viewing a specific order
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [isLoadingGallery, setIsLoadingGallery] = useState(false);
 
-  // Processing States
   const [isRendering, setIsRendering] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
   const [progressStatus, setProgressStatus] = useState("Processing...");
 
-  // Modals & Tool States
   const [activeModal, setActiveModal] = useState<'none' | 'compare' | 'retouch' | 'rerender' | 'video'>('none');
   const [currentCanvasImgId, setCurrentCanvasImgId] = useState("");
   const [compareData, setCompareData] = useState({ raw: "", edited: "" });
@@ -41,7 +38,6 @@ export default function OrdersPage() {
   const [rerenderData, setRerenderData] = useState({ type: "exterior", style: "dusk_blue_hour", prompt: "" });
   const [videoPrompt, setVideoPrompt] = useState("Cinematic slow pan, highly detailed architectural video, 8k resolution");
 
-  // Refs for Canvas & Polling
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hiddenMaskCanvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -50,14 +46,13 @@ export default function OrdersPage() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
-  // --- FETCH ORDERS & REALTIME LISTENER ---
   useEffect(() => {
     const fetchMyProjects = async () => {
       if (!user) return;
       
       let query = supabase
         .from('projects')
-        .select('name, created_at, status')
+        .select('name, address, created_at, status') // NYTT: select address
         .order('created_at', { ascending: false });
 
       if (viewMode === 'mine') {
@@ -68,6 +63,7 @@ export default function OrdersPage() {
       if (!error && data) {
         setArchiveOrders(data.map(p => ({ 
           name: p.name, 
+          address: p.address, // Lagrer addressen fra databasen
           date: new Date(p.created_at).toLocaleDateString('no-NO'), 
           status: p.status || 'processing' 
         })));
@@ -83,7 +79,6 @@ export default function OrdersPage() {
     return () => { supabase.removeChannel(channel); if (pollTimer.current) clearTimeout(pollTimer.current); };
   }, [user, viewMode]);
 
-  // --- ACTIONS ---
   const viewOrder = async (name: string) => { 
       if (pollTimer.current) clearTimeout(pollTimer.current);
       setSelectedOrder(name); setIsLoadingGallery(true); setGalleryImages([]);
@@ -94,7 +89,8 @@ export default function OrdersPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          const res = await fetch(`${API}/list-finished/?job_name=${name}&t=${Date.now()}`, { cache: 'no-store' }); 
+          // ENCODE COMPONENT FIKS
+          const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
       } catch (e) { console.error(e); } 
@@ -102,7 +98,8 @@ export default function OrdersPage() {
 
   const pollProgress = async (pollingJobName: string) => {
     try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${pollingJobName}`, { cache: 'no-store' }); 
+        // ENCODE COMPONENT FIKS
+        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}`, { cache: 'no-store' }); 
         const s = await r.json();
         if (s.status === 'finished' || s.status === 'completed') { 
             setIsRendering(false); setProgressPct(100);
@@ -115,10 +112,9 @@ export default function OrdersPage() {
     pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
   };
 
-  // --- CRUD ---
   const deleteOrder = async (e: React.MouseEvent, orderName: string) => {
     e.stopPropagation();
-    if (!window.confirm(`Are you sure you want to permanently delete "${orderName}"?`)) return;
+    if (!window.confirm(`Are you sure you want to permanently delete this project?`)) return;
     setArchiveOrders(prev => prev.filter(o => o.name !== orderName));
     if (selectedOrder === orderName) setSelectedOrder(null);
     if (user) await supabase.from('projects').delete().eq('name', orderName);
@@ -128,7 +124,7 @@ export default function OrdersPage() {
 
   const renameOrder = async (e: React.MouseEvent, oldName: string) => {
     e.stopPropagation();
-    const newNameRaw = window.prompt("Enter new project name:", oldName);
+    const newNameRaw = window.prompt("Enter new project ID:", oldName);
     if (!newNameRaw || newNameRaw === oldName) return;
     const newName = newNameRaw.replace(/ /g, "_");
     setArchiveOrders(prev => prev.map(o => o.name === oldName ? { ...o, name: newName } : o));
@@ -163,74 +159,18 @@ export default function OrdersPage() {
       } catch (error) { window.open(url, '_blank'); }
   };
 
-  // --- CANVAS STUDIO (RETOUCH) ---
-  const openCanvasStudio = (imgName: string, customUrl: string) => {
-    setCurrentCanvasImgId(imgName); setActiveModal('retouch'); setBrushSize(50);
-    const image = new Image(); image.crossOrigin = "Anonymous";
-    image.onload = () => { bgImg.current = image; initCanvas(); };
-    image.src = customUrl;
-  };
-  const initCanvas = () => {
-    const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-    if (!canvas || !hiddenCanvas || !bgImg.current) return;
-    canvas.width = hiddenCanvas.width = bgImg.current.width; canvas.height = hiddenCanvas.height = bgImg.current.height;
-    const hiddenCtx = hiddenCanvas.getContext('2d'); if (hiddenCtx) hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
-    undoStack.current = []; saveCanvasState(); renderCanvas();
-  };
-  const saveCanvasState = () => {
-    const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return;
-    const ctx = hiddenCanvas.getContext('2d'); if (!ctx) return;
-    if (undoStack.current.length > 50) undoStack.current.shift();
-    undoStack.current.push(ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height));
-  };
-  const undoCanvas = () => {
-    const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas || undoStack.current.length <= 1) return;
-    undoStack.current.pop(); const ctx = hiddenCanvas.getContext('2d');
-    if (ctx) { ctx.putImageData(undoStack.current[undoStack.current.length - 1], 0, 0); renderCanvas(); }
-  };
-  const clearCanvas = () => {
-    const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return;
-    const ctx = hiddenCanvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
-    undoStack.current = []; saveCanvasState(); renderCanvas();
-  };
-  const renderCanvas = () => {
-    const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-    if (!canvas || !hiddenCanvas || !bgImg.current) return;
-    const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d');
-    if (!ctx || !hiddenCtx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(bgImg.current, 0, 0, canvas.width, canvas.height);
-    const tempCanvas = document.createElement('canvas'); tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
-    const tCtx = tempCanvas.getContext('2d'); if (!tCtx) return;
-    const imgData = hiddenCtx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height);
-    const overlayData = tCtx.createImageData(canvas.width, canvas.height);
-    for (let i = 0; i < imgData.data.length; i += 4) { if (imgData.data[i + 3] > 10) { overlayData.data[i] = 239; overlayData.data[i + 1] = 68; overlayData.data[i + 2] = 68; overlayData.data[i + 3] = 120; } }
-    tCtx.putImageData(overlayData, 0, 0); ctx.drawImage(tempCanvas, 0, 0);
-  };
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { 
-    isDrawing.current = true; 
-    const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-    if (!canvas || !hiddenCanvas) return;
-    const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d');
-    if (!ctx || !hiddenCtx) return;
-    const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    ctx.beginPath(); ctx.moveTo(x, y); hiddenCtx.beginPath(); hiddenCtx.moveTo(x, y);
-  };
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (cursorRef.current) { cursorRef.current.style.left = `${e.clientX}px`; cursorRef.current.style.top = `${e.clientY}px`; }
-    if (isDrawing.current) drawOnCanvas(e);
-  };
+  // Canvas
+  const openCanvasStudio = (imgName: string, customUrl: string) => { setCurrentCanvasImgId(imgName); setActiveModal('retouch'); setBrushSize(50); const image = new Image(); image.crossOrigin = "Anonymous"; image.onload = () => { bgImg.current = image; initCanvas(); }; image.src = customUrl; };
+  const initCanvas = () => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !bgImg.current) return; canvas.width = hiddenCanvas.width = bgImg.current.width; canvas.height = hiddenCanvas.height = bgImg.current.height; const hiddenCtx = hiddenCanvas.getContext('2d'); if (hiddenCtx) hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height); undoStack.current = []; saveCanvasState(); renderCanvas(); };
+  const saveCanvasState = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return; const ctx = hiddenCanvas.getContext('2d'); if (!ctx) return; if (undoStack.current.length > 50) undoStack.current.shift(); undoStack.current.push(ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height)); };
+  const undoCanvas = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas || undoStack.current.length <= 1) return; undoStack.current.pop(); const ctx = hiddenCanvas.getContext('2d'); if (ctx) { ctx.putImageData(undoStack.current[undoStack.current.length - 1], 0, 0); renderCanvas(); } };
+  const clearCanvas = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return; const ctx = hiddenCanvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height); undoStack.current = []; saveCanvasState(); renderCanvas(); };
+  const renderCanvas = () => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !bgImg.current) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(bgImg.current, 0, 0, canvas.width, canvas.height); const tempCanvas = document.createElement('canvas'); tempCanvas.width = canvas.width; tempCanvas.height = canvas.height; const tCtx = tempCanvas.getContext('2d'); if (!tCtx) return; const imgData = hiddenCtx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height); const overlayData = tCtx.createImageData(canvas.width, canvas.height); for (let i = 0; i < imgData.data.length; i += 4) { if (imgData.data[i + 3] > 10) { overlayData.data[i] = 239; overlayData.data[i + 1] = 68; overlayData.data[i + 2] = 68; overlayData.data[i + 3] = 120; } } tCtx.putImageData(overlayData, 0, 0); ctx.drawImage(tempCanvas, 0, 0); };
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { isDrawing.current = true; const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height); ctx.beginPath(); ctx.moveTo(x, y); hiddenCtx.beginPath(); hiddenCtx.moveTo(x, y); };
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => { if (cursorRef.current) { cursorRef.current.style.left = `${e.clientX}px`; cursorRef.current.style.top = `${e.clientY}px`; } if (isDrawing.current) drawOnCanvas(e); };
   const handleCanvasMouseUp = () => { if (isDrawing.current) { saveCanvasState(); isDrawing.current = false; renderCanvas(); } };
-  const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => {
-    const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-    if (!canvas || !hiddenCanvas || !isDrawing.current) return;
-    const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d');
-    if (!ctx || !hiddenCtx) return;
-    const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); 
-    ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); 
-  };
+  const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !isDrawing.current) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height); hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); };
 
-  // --- API SUBMISSIONS ---
   const submitRetouch = async () => {
       if(!retouchPrompt || !selectedOrder) return;
       setActiveModal('none'); 
@@ -284,7 +224,10 @@ export default function OrdersPage() {
     window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const filteredOrders = archiveOrders.filter(order => order.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredOrders = archiveOrders.filter(order => 
+      order.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (order.address && order.address.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   return (
     <div className="flex flex-col bg-[#0B1120] text-white min-h-screen">
@@ -293,7 +236,6 @@ export default function OrdersPage() {
 
       <main className="max-w-6xl mx-auto w-full p-8 flex-1">
         {!selectedOrder ? (
-            /* --- ORDER LIST VIEW --- */
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
                     <div>
@@ -307,19 +249,26 @@ export default function OrdersPage() {
                                 <button onClick={() => setViewMode('all')} className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${viewMode === 'all' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-white'}`}>All Users</button>
                             </div>
                         )}
-                        <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-[#009183]" />
+                        <input type="text" placeholder="Search ID or Address..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full md:w-64 bg-[#0f172a] rounded-xl px-4 py-3 text-xs text-white outline-none border border-slate-700 focus:border-[#009183]" />
                     </div>
                 </div>
                 <div className="bg-[#0f172a] border border-slate-800 rounded-3xl shadow-xl mb-20 overflow-hidden">
                     <table className="w-full text-left border-collapse">
-                        <thead><tr className="bg-[#1e293b] border-b border-slate-800 text-[10px] uppercase tracking-widest text-slate-400 font-bold"><th className="p-5">Project Name</th><th className="p-5">Date</th><th className="p-5">Status</th><th className="p-5 text-right">Actions</th></tr></thead>
+                        <thead><tr className="bg-[#1e293b] border-b border-slate-800 text-[10px] uppercase tracking-widest text-slate-400 font-bold"><th className="p-5">Project</th><th className="p-5">Date</th><th className="p-5">Status</th><th className="p-5 text-right">Actions</th></tr></thead>
                         <tbody>
                             {filteredOrders.length === 0 ? (
                                 <tr><td colSpan={4} className="p-8 text-center text-slate-500 text-sm">No projects found.</td></tr>
                             ) : (
                                 filteredOrders.map(order => (
                                     <tr key={order.name} onClick={() => viewOrder(order.name)} className="border-b border-slate-800/50 hover:bg-[#1e293b]/50 cursor-pointer transition-colors group">
-                                        <td className="p-5 font-bold text-white flex items-center gap-3"><span className="text-xl group-hover:scale-110 transition-transform">{order.name.includes('FILM') || order.name.includes('video') ? '🎬' : order.name.includes('STAGING') ? '🛋️' : '⚡'}</span>{order.name}</td>
+                                        <td className="p-5 font-bold text-white flex flex-col justify-center">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xl group-hover:scale-110 transition-transform">{order.name.includes('FILM') || order.name.includes('video') ? '🎬' : order.name.includes('STAGING') ? '🛋️' : '⚡'}</span>
+                                                <span>{order.name}</span>
+                                            </div>
+                                            {/* NYTT: Viser addressen pent under navnet hvis den finnes */}
+                                            {order.address && <span className="text-[10px] text-slate-400 mt-1 ml-9 uppercase tracking-widest font-normal">{order.address}</span>}
+                                        </td>
                                         <td className="p-5 text-slate-400 text-sm">{order.date}</td>
                                         <td className="p-5">{order.status === 'completed' || order.status === 'finished' ? (<span className="bg-green-900/30 text-green-400 border border-green-500/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">Completed</span>) : (<span className="bg-yellow-900/30 text-yellow-400 border border-yellow-500/20 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider animate-pulse">Processing</span>)}</td>
                                         <td className="p-5 text-right flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -334,14 +283,14 @@ export default function OrdersPage() {
                 </div>
             </div>
         ) : (
-            /* --- SINGLE ORDER GALLERY VIEW --- */
             <div className="animate-in fade-in duration-500 pb-20">
                 <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                     <div>
                         <button onClick={() => setSelectedOrder(null)} className="text-[#009183] hover:text-white text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 transition-colors"><span>←</span> Back to List</button>
                         <h3 className="text-3xl font-black text-white uppercase">{selectedOrder}</h3>
                     </div>
-                    <button onClick={() => window.location.href = `${API}/download-zip/${selectedOrder}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
+                    {/* ENCODE COMPONENT FIKS */}
+                    <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(selectedOrder)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
                 </div>
 
                 {isRendering && activeModal === 'none' && (

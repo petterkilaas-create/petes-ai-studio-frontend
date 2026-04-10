@@ -25,19 +25,24 @@ const STYLE_CARDS = [
 export default function ExpressPage() {
   const { user } = useUser();
 
-  // Wizard & Upload States
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
   const [globalStyle, setGlobalStyle] = useState("dusk_blue_hour");
-  const [jobName, setJobName] = useState("");
+  
+  // NYTT: Order ID og Adresse separert
+  const [orderId, setOrderId] = useState("");
+  const [orderAddress, setOrderAddress] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
-  // Processing States
+  // Generer Order ID ved innlasting
+  useEffect(() => {
+    setOrderId(`ORD-${Math.random().toString(16).slice(2, 8).toUpperCase()}`);
+  }, []);
+
   const [isRendering, setIsRendering] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
   const [progressStatus, setProgressStatus] = useState("Processing...");
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
-  // Canvas & Modals for Retouching
   const [activeModal, setActiveModal] = useState<'none' | 'retouch' | 'compare' | 'rerender'>('none');
   const [currentCanvasImgId, setCurrentCanvasImgId] = useState("");
   const [brushSize, setBrushSize] = useState(50);
@@ -55,15 +60,10 @@ export default function ExpressPage() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
-  // --- WIZARD LOGIC ---
-  const selectStyleAndProceed = (styleId: string) => {
-      setGlobalStyle(styleId);
-      setWizardStep(2);
-  };
+  const selectStyleAndProceed = (styleId: string) => { setGlobalStyle(styleId); setWizardStep(2); };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
-    if (!jobName) setJobName(`JOB-${new Date().getTime().toString().slice(-4)}`);
     const newFiles: UploadedFile[] = [];
     for (let i = 0; i < e.target.files.length; i++) {
       if (e.target.files[i].type.startsWith("image/")) {
@@ -76,7 +76,6 @@ export default function ExpressPage() {
   const handleDropZone = (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       if (!e.dataTransfer.files?.length) return;
-      if (!jobName) setJobName(`JOB-${new Date().getTime().toString().slice(-4)}`);
       const newFiles: UploadedFile[] = [];
       for (let i = 0; i < e.dataTransfer.files.length; i++) {
           if (e.dataTransfer.files[i].type.startsWith("image/")) {
@@ -89,26 +88,28 @@ export default function ExpressPage() {
   const removeFile = (id: string) => setUploadedFiles(prev => prev.filter(f => f.id !== id));
   const updateFileField = (id: string, field: keyof UploadedFile, value: any) => setUploadedFiles(prev => prev.map(f => f.id === id ? { ...f, [field]: value } : f));
   
-  // --- API / RENDER LOGIC ---
   const startExpressRender = async () => {
-    if (!jobName || uploadedFiles.length === 0) return;
+    if (!orderId || uploadedFiles.length === 0) return;
     if (pollTimer.current) clearTimeout(pollTimer.current);
-    const safeJobName = jobName.replace(/ /g, "_"); setJobName(safeJobName);
+    
     setIsRendering(true); setProgressPct(0); setProgressStatus("Uploading to cloud...");
-    const fd = new FormData(); fd.append('job_name', safeJobName);
-    if (user) fd.append('user_id', user.id); // Sørger for at user_id sendes med!
-    const cfg: any = {}; uploadedFiles.forEach(f => { fd.append('files', f.file); cfg[f.file.name] = { type: f.type, style: f.style, prompt: f.prompt }; });
+    const fd = new FormData(); 
+    fd.append('job_name', orderId);
+    fd.append('address', orderAddress);
+    if (user) fd.append('user_id', user.id); 
+    
+    const cfg: any = {}; 
+    uploadedFiles.forEach(f => { fd.append('files', f.file); cfg[f.file.name] = { type: f.type, style: f.style, prompt: f.prompt }; });
     fd.append('config', JSON.stringify(cfg));
+    
     try { 
         await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
-        // Fjernet den manuelle supabase-posten her fordi backenden fikser det!
-        pollProgress(safeJobName); 
+        pollProgress(orderId); 
     } catch (error) { console.error(error); }
   };
 
   const pollProgress = async (pollingJobName: string) => {
     try {
-        // ENCODE COMPONENT FIKS FOR POLLING!
         const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}`, { cache: 'no-store' }); 
         const s = await r.json();
         if (s.status === 'finished' || s.status === 'completed') { handleJobComplete(pollingJobName); return; }
@@ -125,20 +126,14 @@ export default function ExpressPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          // ENCODE COMPONENT FIKS FOR GALLERI!
           const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
       } catch (e) { console.error(e); } 
   };
 
-  // --- CANVAS & RETOUCH LOGIC (Kept perfectly intact) ---
-  const openCanvasStudio = (imgIdOrName: string, customUrl: string | null = null) => {
-    setCurrentCanvasImgId(imgIdOrName); setActiveModal('retouch'); setBrushSize(50);
-    let targetUrl = customUrl;
-    if (!targetUrl) { const fileObj = uploadedFiles.find(f => f.id === imgIdOrName); if (fileObj) targetUrl = fileObj.url; }
-    if (targetUrl) { const image = new Image(); image.crossOrigin = "Anonymous"; image.onload = () => { bgImg.current = image; initCanvas(); }; image.src = targetUrl; }
-  };
+  // Canvas
+  const openCanvasStudio = (imgIdOrName: string, customUrl: string | null = null) => { setCurrentCanvasImgId(imgIdOrName); setActiveModal('retouch'); setBrushSize(50); let targetUrl = customUrl; if (!targetUrl) { const fileObj = uploadedFiles.find(f => f.id === imgIdOrName); if (fileObj) targetUrl = fileObj.url; } if (targetUrl) { const image = new Image(); image.crossOrigin = "Anonymous"; image.onload = () => { bgImg.current = image; initCanvas(); }; image.src = targetUrl; } };
   const initCanvas = () => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !bgImg.current) return; canvas.width = hiddenCanvas.width = bgImg.current.width; canvas.height = hiddenCanvas.height = bgImg.current.height; const hiddenCtx = hiddenCanvas.getContext('2d'); if (hiddenCtx) hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height); undoStack.current = []; saveCanvasState(); renderCanvas(); };
   const saveCanvasState = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return; const ctx = hiddenCanvas.getContext('2d'); if (!ctx) return; if (undoStack.current.length > 50) undoStack.current.shift(); undoStack.current.push(ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height)); };
   const undoCanvas = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas || undoStack.current.length <= 1) return; undoStack.current.pop(); const ctx = hiddenCanvas.getContext('2d'); if (ctx) { ctx.putImageData(undoStack.current[undoStack.current.length - 1], 0, 0); renderCanvas(); } };
@@ -149,10 +144,10 @@ export default function ExpressPage() {
   const handleCanvasMouseUp = () => { if (isDrawing.current) { saveCanvasState(); isDrawing.current = false; renderCanvas(); } };
   const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !isDrawing.current) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height); hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); };
 
-  const submitRetouch = async () => { if(!retouchPrompt) return; setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id); setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch..."); const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas) return; const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height; const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return; aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height); const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return; const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height); for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } } aCtx.putImageData(maskData, 0, 0); apiCanvas.toBlob(async (b) => { if(!b) return; const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); pollProgress(jobName); } catch(e) { console.error(e); } }, 'image/png'); };
-  const submitRerender = async () => { setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', jobName).eq('user_id', user.id); setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render..."); const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt); try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(jobName); } catch(e) { console.error(e); } };
-  const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(jobName); };
-  const deleteSingleImage = async (imgName: string) => { if (!window.confirm("Are you sure you want to permanently delete this image?")) return; const fd = new FormData(); fd.append('job_name', jobName); fd.append('image_name', imgName); try { await fetch(`${API}/delete-image/`, { method: 'POST', body: fd }); setGalleryImages(prev => prev.filter(img => img.name !== imgName)); } catch (e) { console.error("Failed to delete image:", e); } };
+  const submitRetouch = async () => { if(!retouchPrompt) return; setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch..."); const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas) return; const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height; const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return; aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height); const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return; const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height); for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } } aCtx.putImageData(maskData, 0, 0); apiCanvas.toBlob(async (b) => { if(!b) return; const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); pollProgress(orderId); } catch(e) { console.error(e); } }, 'image/png'); };
+  const submitRerender = async () => { setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render..."); const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt); try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(orderId); } catch(e) { console.error(e); } };
+  const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(orderId); };
+  const deleteSingleImage = async (imgName: string) => { if (!window.confirm("Are you sure you want to permanently delete this image?")) return; const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); try { await fetch(`${API}/delete-image/`, { method: 'POST', body: fd }); setGalleryImages(prev => prev.filter(img => img.name !== imgName)); } catch (e) { console.error("Failed to delete image:", e); } };
   const handleDownloadSingle = async (url: string, filename: string) => { try { const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'file'; document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100); } catch (error) { window.open(url, '_blank'); } };
   const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => { const rect = e.currentTarget.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 100; const percent = Math.max(0, Math.min(100, x)); const beforeImg = document.getElementById('modalBefore'); const handle = document.getElementById('modalHandle'); if (beforeImg && handle) { beforeImg.style.clipPath = `inset(0 ${100 - percent}% 0 0)`; handle.style.left = `${percent}%`; } };
 
@@ -165,11 +160,17 @@ export default function ExpressPage() {
 
       <main className="flex-1 flex flex-col max-w-6xl mx-auto w-full p-8">
           
-        <div className="mb-12">
-            <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-2 flex items-center gap-4">
-                <span className="text-4xl">⚡</span> Express Retouch
-            </h1>
-            <p className="text-slate-400 max-w-2xl">Enhance exteriors, fix blown-out windows, or magically alter the weather and time of day in seconds.</p>
+        <div className="mb-12 flex justify-between items-start">
+            <div>
+                <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-2 flex items-center gap-4">
+                    <span className="text-4xl">⚡</span> Express Retouch
+                </h1>
+                <p className="text-slate-400 max-w-2xl">Enhance exteriors, fix blown-out windows, or magically alter the weather.</p>
+            </div>
+            <div className="text-right border border-white/10 px-4 py-2 rounded-xl bg-white/5">
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Order ID</p>
+                <p className="text-lg text-white font-black">{orderId}</p>
+            </div>
         </div>
 
         {/* --- WIZARD STEP 1: CHOOSE STYLE --- */}
@@ -210,36 +211,21 @@ export default function ExpressPage() {
                       <p className="text-white font-bold text-lg">Applying: <span className="text-[#009183] uppercase tracking-widest">{STYLE_CARDS.find(s => s.id === globalStyle)?.title}</span></p>
                   </div>
                   
-                  {/* --- GOOGLE AUTOCOMPLETE REPLACES OLD INPUT --- */}
                   <div className="w-full max-w-2xl mx-auto space-y-4">
                       <label className="text-[10px] font-bold text-[#009183] uppercase tracking-[0.2em] block text-center mb-6">
-                          📍 Søk etter eiendommens adresse
+                          📍 Legg til adresse (Valgfritt)
                       </label>
-                      
                       <Autocomplete
                           apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
                           onPlaceSelected={(place) => {
                               if (place && place.formatted_address) {
-                                  const addr = place.formatted_address;
-                                  const shortId = Math.floor(1000 + Math.random() * 9000); 
-                                  // HASHTAG-FIKS: Vi bruker bindestrek istedenfor hashtag (#)
-                                  setJobName(`${addr} - ${shortId}`);
+                                  setOrderAddress(place.formatted_address);
                               }
                           }}
-                          options={{
-                              types: ["address"],
-                              componentRestrictions: { country: "no" }, 
-                          }}
-                          placeholder="START Å SKRIVE ADRESSE..."
+                          options={{ types: ["address"], componentRestrictions: { country: "no" } }}
+                          placeholder="SØK ETTER ADRESSE..."
                           className="w-full bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-[#009183] uppercase pb-4 transition-colors text-center placeholder:text-slate-600"
                       />
-
-                      {jobName && (
-                          <div className="mt-8 p-6 bg-[#0f172a] rounded-2xl border border-[#009183]/30 text-center animate-in fade-in duration-300">
-                              <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Prosjekt opprettet:</p>
-                              <p className="text-xl text-[#00ff83] font-black uppercase tracking-wider">{jobName}</p>
-                          </div>
-                      )}
                   </div>
                   
                   <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
@@ -299,10 +285,12 @@ export default function ExpressPage() {
         {galleryImages.length > 0 && !isRendering && (
             <div className="animate-in fade-in slide-in-from-bottom-10 duration-500 mt-10">
                 <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
-                    <h3 className="text-3xl font-black text-white uppercase">{jobName}</h3>
+                    <div>
+                        <p className="text-[#009183] font-bold text-sm tracking-widest">{orderId}</p>
+                        <h3 className="text-3xl font-black text-white uppercase">{orderAddress || "Unnamed Project"}</h3>
+                    </div>
                     <div className="flex gap-3">
-                        {/* ENCODE COMPONENT FIKS FOR NEDLASTING! */}
-                        <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(jobName)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
+                        <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(orderId)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-20">
@@ -332,7 +320,7 @@ export default function ExpressPage() {
         )}
       </main>
 
-      {/* --- MODALS (Unchanged) --- */}
+      {/* --- MODALS --- */}
       {activeModal === 'retouch' && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
             <div className="flex justify-between items-center w-[85vw] max-w-[1100px]"><h2 className="text-2xl font-black text-[#009183] uppercase tracking-widest">Retouch Studio</h2><button onClick={() => setActiveModal('none')} className="text-slate-400 font-bold uppercase text-xs hover:text-white">Close</button></div>

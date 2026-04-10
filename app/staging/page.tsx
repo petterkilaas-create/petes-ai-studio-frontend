@@ -14,10 +14,15 @@ type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: 
 export default function StagingPage() {
   const { user } = useUser();
 
-  const [jobName, setJobName] = useState("");
+  const [orderId, setOrderId] = useState("");
+  const [orderAddress, setOrderAddress] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [stagingRooms, setStagingRooms] = useState<StagingRoom[]>([]);
   const [roomCounter, setRoomCounter] = useState(0);
+
+  useEffect(() => {
+    setOrderId(`ORD-${Math.random().toString(16).slice(2, 8).toUpperCase()}`);
+  }, []);
 
   const [isRendering, setIsRendering] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
@@ -87,7 +92,6 @@ export default function StagingPage() {
   // --- UPLOAD & RENDER ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
-    if (!jobName) setJobName(`STAGING-${new Date().getTime().toString().slice(-4)}`);
     const newFiles: UploadedFile[] = [];
     for (let i = 0; i < e.target.files.length; i++) {
         newFiles.push({ id: "img_" + Math.random().toString(36).substr(2, 9), file: e.target.files[i], url: URL.createObjectURL(e.target.files[i]), type: "interior", style: "staging_scandi", prompt: "", maskBlob: null });
@@ -97,10 +101,13 @@ export default function StagingPage() {
   };
 
   const startStagingRender = async () => {
-    if (!jobName) return;
-    const safeJobName = jobName.replace(/ /g, "_");
+    if (!orderId) return;
     setIsRendering(true); setProgressPct(0); setProgressStatus("Analyzing Spatial Data...");
-    const fd = new FormData(); fd.append('job_name', safeJobName);
+    const fd = new FormData(); 
+    fd.append('job_name', orderId);
+    fd.append('address', orderAddress);
+    if (user) fd.append('user_id', user.id);
+
     const cfg: any = {};
     stagingRooms.forEach(room => {
         room.images.forEach(imgId => {
@@ -113,16 +120,16 @@ export default function StagingPage() {
         });
     });
     fd.append('config', JSON.stringify(cfg));
+    
     try { 
         await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); 
-        if (user) await supabase.from('projects').insert([{ name: safeJobName, user_id: user.id, status: 'processing' }]);
-        pollProgress(safeJobName); 
+        pollProgress(orderId); 
     } catch (error) { console.error(error); }
   };
 
   const pollProgress = async (name: string) => {
     try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${name}`, { cache: 'no-store' }); 
+        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(name)}`, { cache: 'no-store' }); 
         const s = await r.json();
         if (s.status === 'finished') { setIsRendering(false); loadGallery(name); return; }
         if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Staging Rooms... ${s.completed} / ${s.total}`); }
@@ -132,7 +139,7 @@ export default function StagingPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          const res = await fetch(`${API}/list-finished/?job_name=${name}&t=${Date.now()}`, { cache: 'no-store' }); 
+          const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
       } catch (e) { console.error(e); } 
@@ -196,24 +203,20 @@ export default function StagingPage() {
       <canvas ref={hiddenMaskCanvasRef} style={{ display: 'none' }}></canvas>
 
       <main className="flex-1 max-w-6xl mx-auto w-full p-8">
-        <div className="mb-12 bg-[#0f172a] border border-slate-800 rounded-3xl p-8 shadow-xl">
-            <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-4">🛋️ Virtual Staging</h1>
-            <p className="text-slate-400 mb-6">Transform empty spaces into furnished, inviting homes. Group photos by room and set a &quot;Hero&quot; angle to ensure consistent furniture style across the whole room.</p>
-            <div className="flex gap-8 text-sm">
-                <div className="flex-1 bg-green-900/10 border border-green-500/20 p-5 rounded-2xl">
-                    <h4 className="text-green-400 font-bold uppercase tracking-widest text-xs mb-2">✅ Best for</h4>
-                    <ul className="text-slate-400 space-y-1"><li>• Completely empty rooms</li><li>• Clean floors and walls</li></ul>
-                </div>
-                <div className="flex-1 bg-red-900/10 border border-red-500/20 p-5 rounded-2xl">
-                    <h4 className="text-red-400 font-bold uppercase tracking-widest text-xs mb-2">🚫 Not for</h4>
-                    <ul className="text-slate-400 space-y-1"><li>• Removing existing furniture</li><li>• Very cluttered or messy spaces</li></ul>
-                </div>
+        <div className="mb-12 bg-[#0f172a] border border-slate-800 rounded-3xl p-8 shadow-xl flex justify-between items-start">
+            <div>
+                <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-4">🛋️ Virtual Staging</h1>
+                <p className="text-slate-400 max-w-2xl">Transform empty spaces into furnished, inviting homes. Group photos by room and set a &quot;Hero&quot; angle.</p>
+            </div>
+            <div className="text-right border border-white/10 px-4 py-2 rounded-xl bg-white/5">
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Order ID</p>
+                <p className="text-lg text-white font-black">{orderId}</p>
             </div>
         </div>
 
         {uploadedFiles.length === 0 && galleryImages.length === 0 && (
             <div className="glass p-16 border-2 border-dashed border-slate-700 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50">
-                <input type="text" value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="PROJECT NAME" className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-3xl font-black text-white outline-none focus:border-[#009183] uppercase" />
+                <input type="text" value={orderAddress} onChange={(e) => setOrderAddress(e.target.value)} placeholder="PROJECT ADDRESS (OPTIONAL)" className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-3xl font-black text-white outline-none focus:border-[#009183] uppercase pb-3" />
                 <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
                 <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-white text-black rounded-full font-black uppercase text-xs">Upload Images</button>
             </div>
@@ -269,16 +272,25 @@ export default function StagingPage() {
         )}
 
         {galleryImages.length > 0 && !isRendering && (
-            <div className="grid grid-cols-2 gap-10">
-                {galleryImages.map(item => (
-                    <div key={item.name} className="bg-[#0f172a] p-4 rounded-[2rem] border border-white/5">
-                        <img src={item.url} className="w-full aspect-[3/2] object-cover rounded-[1.5rem] mb-4" />
-                        <div className="flex justify-between items-center px-2">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{item.name}</span>
-                            <button onClick={() => window.open(item.url)} className="px-4 py-2 bg-slate-800 text-white rounded-full text-[9px] font-black uppercase">Download</button>
-                        </div>
+            <div className="animate-in fade-in slide-in-from-bottom-10 duration-500 mt-10">
+                <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
+                    <div>
+                        <p className="text-[#009183] font-bold text-sm tracking-widest">{orderId}</p>
+                        <h3 className="text-3xl font-black text-white uppercase">{orderAddress || "Unnamed Project"}</h3>
                     </div>
-                ))}
+                    <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(orderId)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
+                </div>
+                <div className="grid grid-cols-2 gap-10">
+                    {galleryImages.map(item => (
+                        <div key={item.name} className="bg-[#0f172a] p-4 rounded-[2rem] border border-white/5">
+                            <img src={item.url} className="w-full aspect-[3/2] object-cover rounded-[1.5rem] mb-4" />
+                            <div className="flex justify-between items-center px-2">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{item.name}</span>
+                                <button onClick={() => window.open(item.url)} className="px-4 py-2 bg-slate-800 text-white rounded-full text-[9px] font-black uppercase">Download</button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         )}
       </main>
