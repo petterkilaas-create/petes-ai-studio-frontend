@@ -109,14 +109,20 @@ export default function ExpressPage() {
   };
 
   const pollProgress = async (pollingJobName: string) => {
-    try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}`, { cache: 'no-store' }); 
-        const s = await r.json();
-        if (s.status === 'finished' || s.status === 'completed') { handleJobComplete(pollingJobName); return; }
-        if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Processing... ${s.completed} / ${s.total}`); }
-    } catch (e) { console.error(e); }
-    pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
-  };
+  try {
+      // MAGIEN: &t=${Date.now()} tvinger Next.js til å drepe cachen
+      const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}&t=${Date.now()}`, { cache: 'no-store' }); 
+      const s = await r.json();
+      if (s.status === 'finished' || s.status === 'completed') { 
+          setIsRendering(false); setProgressPct(100);
+          if (pollTimer.current) clearTimeout(pollTimer.current);
+          setTimeout(() => { loadGallery(pollingJobName); }, 1000);
+          return; 
+      }
+      if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Processing... ${s.completed} / ${s.total}`); }
+  } catch (e) { console.error(e); }
+  pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
+};
 
   const handleJobComplete = (targetJobName: string) => {
       setIsRendering(false); setProgressPct(100);
