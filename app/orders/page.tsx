@@ -1,13 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useUser, UserButton } from "@clerk/nextjs";
-import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { supabase } from "../../supabaseClient"; 
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
-// Oppdatert for å inkludere address!
 type OrderArchive = { name: string; address?: string; date: string; status: string; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: string; edited?: string; approved?: boolean; };
 
@@ -52,7 +50,7 @@ export default function OrdersPage() {
       
       let query = supabase
         .from('projects')
-        .select('name, address, created_at, status') // NYTT: select address
+        .select('name, address, created_at, status')
         .order('created_at', { ascending: false });
 
       if (viewMode === 'mine') {
@@ -63,7 +61,7 @@ export default function OrdersPage() {
       if (!error && data) {
         setArchiveOrders(data.map(p => ({ 
           name: p.name, 
-          address: p.address, // Lagrer addressen fra databasen
+          address: p.address,
           date: new Date(p.created_at).toLocaleDateString('no-NO'), 
           status: p.status || 'processing' 
         })));
@@ -89,7 +87,7 @@ export default function OrdersPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          // ENCODE COMPONENT FIKS
+          // Cache buster included!
           const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
@@ -98,8 +96,8 @@ export default function OrdersPage() {
 
   const pollProgress = async (pollingJobName: string) => {
     try {
-        // ENCODE COMPONENT FIKS
-        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}`, { cache: 'no-store' }); 
+        // Cache buster included!
+        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}&t=${Date.now()}`, { cache: 'no-store' }); 
         const s = await r.json();
         if (s.status === 'finished' || s.status === 'completed') { 
             setIsRendering(false); setProgressPct(100);
@@ -159,7 +157,6 @@ export default function OrdersPage() {
       } catch (error) { window.open(url, '_blank'); }
   };
 
-  // Canvas
   const openCanvasStudio = (imgName: string, customUrl: string) => { setCurrentCanvasImgId(imgName); setActiveModal('retouch'); setBrushSize(50); const image = new Image(); image.crossOrigin = "Anonymous"; image.onload = () => { bgImg.current = image; initCanvas(); }; image.src = customUrl; };
   const initCanvas = () => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !bgImg.current) return; canvas.width = hiddenCanvas.width = bgImg.current.width; canvas.height = hiddenCanvas.height = bgImg.current.height; const hiddenCtx = hiddenCanvas.getContext('2d'); if (hiddenCtx) hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height); undoStack.current = []; saveCanvasState(); renderCanvas(); };
   const saveCanvasState = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return; const ctx = hiddenCanvas.getContext('2d'); if (!ctx) return; if (undoStack.current.length > 50) undoStack.current.shift(); undoStack.current.push(ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height)); };
@@ -230,7 +227,7 @@ export default function OrdersPage() {
   );
 
   return (
-    <div className="flex flex-col bg-[#0B1120] text-white min-h-screen">
+    <div className="flex flex-col bg-[#0B1120] text-white min-h-screen font-sans">
       <div ref={cursorRef} style={{ display: activeModal === 'retouch' ? 'block' : 'none', width: brushSize, height: brushSize }} className="fixed border-2 border-[#ef4444]/80 rounded-full pointer-events-none z-[9999] -translate-x-1/2 -translate-y-1/2 bg-[#ef4444]/20 mix-blend-difference"></div>
       <canvas ref={hiddenMaskCanvasRef} style={{ display: 'none' }}></canvas>
 
@@ -263,10 +260,9 @@ export default function OrdersPage() {
                                     <tr key={order.name} onClick={() => viewOrder(order.name)} className="border-b border-slate-800/50 hover:bg-[#1e293b]/50 cursor-pointer transition-colors group">
                                         <td className="p-5 font-bold text-white flex flex-col justify-center">
                                             <div className="flex items-center gap-3">
-                                                <span className="text-xl group-hover:scale-110 transition-transform">{order.name.includes('FILM') || order.name.includes('video') ? '🎬' : order.name.includes('STAGING') ? '🛋️' : '⚡'}</span>
+                                                <span className="text-xl group-hover:scale-110 transition-transform">{order.name.includes('FILM') || order.name.includes('video') ? '🎬' : order.name.includes('STAGING') ? '🛋️' : order.name.includes('CPY') ? '✍️' : '⚡'}</span>
                                                 <span>{order.name}</span>
                                             </div>
-                                            {/* NYTT: Viser addressen pent under navnet hvis den finnes */}
                                             {order.address && <span className="text-[10px] text-slate-400 mt-1 ml-9 uppercase tracking-widest font-normal">{order.address}</span>}
                                         </td>
                                         <td className="p-5 text-slate-400 text-sm">{order.date}</td>
@@ -287,7 +283,8 @@ export default function OrdersPage() {
                 <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                     <div>
                         <button onClick={() => setSelectedOrder(null)} className="text-[#009183] hover:text-white text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 transition-colors"><span>←</span> Back to List</button>
-                        <h3 className="text-3xl font-black text-white uppercase">{selectedOrder}</h3>
+                        <p className="text-[#009183] font-bold text-sm tracking-widest mb-1">{selectedOrder}</p>
+                        <h3 className="text-3xl font-black text-white uppercase">{archiveOrders.find(o => o.name === selectedOrder)?.address || "Unnamed Project"}</h3>
                     </div>
                     {/* ENCODE COMPONENT FIKS */}
                     <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(selectedOrder)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useUser, UserButton } from "@clerk/nextjs";
-import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { supabase } from "../../supabaseClient"; 
+import Autocomplete from "react-google-autocomplete";
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
@@ -29,7 +29,6 @@ export default function StagingPage() {
   const [progressStatus, setProgressStatus] = useState("Processing...");
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
-  // Modal States
   const [activeModal, setActiveModal] = useState<'none' | 'mask' | 'compare'>('none');
   const [currentCanvasImgId, setCurrentCanvasImgId] = useState("");
   const [brushSize, setBrushSize] = useState(50);
@@ -43,7 +42,6 @@ export default function StagingPage() {
   const isDrawing = useRef(false);
   const bgImg = useRef<HTMLImageElement | null>(null);
 
-  // --- ROOM LOGIC ---
   const addRoom = () => {
     const newId = roomCounter + 1;
     setRoomCounter(newId);
@@ -58,11 +56,7 @@ export default function StagingPage() {
     setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, hero_img_id: imgId } : r));
   };
 
-  // --- DRAG & DROP ---
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData("text/plain", id);
-  };
-
+  const handleDragStart = (e: React.DragEvent, id: string) => { e.dataTransfer.setData("text/plain", id); };
   const handleDragOver = (e: React.DragEvent) => e.preventDefault();
 
   const handleStagingDrop = (e: React.DragEvent, targetRoomId: string) => {
@@ -89,7 +83,6 @@ export default function StagingPage() {
     });
   };
 
-  // --- UPLOAD & RENDER ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     const newFiles: UploadedFile[] = [];
@@ -129,9 +122,10 @@ export default function StagingPage() {
 
   const pollProgress = async (name: string) => {
     try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(name)}`, { cache: 'no-store' }); 
+        // Cache buster included!
+        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
         const s = await r.json();
-        if (s.status === 'finished') { setIsRendering(false); loadGallery(name); return; }
+        if (s.status === 'finished' || s.status === 'completed') { setIsRendering(false); loadGallery(name); return; }
         if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Staging Rooms... ${s.completed} / ${s.total}`); }
     } catch (e) { console.error(e); }
     pollTimer.current = setTimeout(() => pollProgress(name), 2000);
@@ -139,13 +133,13 @@ export default function StagingPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
+          // Cache buster included!
           const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
       } catch (e) { console.error(e); } 
   };
 
-  // --- CANVAS STUDIO ---
   const openCanvasStudio = (imgId: string) => {
     setCurrentCanvasImgId(imgId); setActiveModal('mask');
     const f = uploadedFiles.find(x => x.id === imgId);
@@ -216,7 +210,13 @@ export default function StagingPage() {
 
         {uploadedFiles.length === 0 && galleryImages.length === 0 && (
             <div className="glass p-16 border-2 border-dashed border-slate-700 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50">
-                <input type="text" value={orderAddress} onChange={(e) => setOrderAddress(e.target.value)} placeholder="PROJECT ADDRESS (OPTIONAL)" className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-3xl font-black text-white outline-none focus:border-[#009183] uppercase pb-3" />
+                <Autocomplete
+                    apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                    onPlaceSelected={(place) => { if (place && place.formatted_address) { setOrderAddress(place.formatted_address); } }}
+                    options={{ types: ["address"], componentRestrictions: { country: "no" } }}
+                    placeholder="PROJECT ADDRESS (OPTIONAL)..."
+                    className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-3xl font-black text-white outline-none focus:border-[#009183] uppercase pb-3"
+                />
                 <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
                 <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-white text-black rounded-full font-black uppercase text-xs">Upload Images</button>
             </div>
@@ -229,7 +229,7 @@ export default function StagingPage() {
                     <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Unassigned Photos</h3>
                     <div className="flex flex-wrap gap-3 p-4 bg-[#0f172a] rounded-2xl min-h-[400px]" onDragOver={handleDragOver} onDrop={(e) => handleStagingDrop(e, 'unassigned')}>
                         {unassigned.map(f => (
-                            <img key={f.id} src={f.url} draggable onDragStart={(e) => handleDragStart(e, f.id)} className="w-24 h-24 object-cover rounded-xl border border-white/5 cursor-grab" />
+                            <img key={f.id} src={f.url} draggable onDragStart={(e) => handleDragStart(e, f.id)} className="w-24 h-24 object-cover rounded-xl border border-white/5 cursor-grab" alt="Upload"/>
                         ))}
                     </div>
                 </div>
@@ -250,8 +250,8 @@ export default function StagingPage() {
                                     const isHero = room.hero_img_id === imgId;
                                     return (
                                         <div key={f.id} className="relative w-28 h-28 group">
-                                            <img src={f.url} className={`w-full h-full object-cover rounded-xl border-2 ${isHero ? 'border-[#00ff83]' : 'border-transparent'}`} />
-                                            <div onClick={() => openCanvasStudio(f.id)} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl cursor-pointer text-[10px] text-white font-black uppercase">🖌️ Mask Floor</div>
+                                            <img src={f.url} className={`w-full h-full object-cover rounded-xl border-2 ${isHero ? 'border-[#00ff83]' : 'border-transparent'}`} alt="Room img" />
+                                            <div onClick={() => openCanvasStudio(f.id)} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl cursor-pointer text-[10px] text-white font-black uppercase text-center leading-tight px-2">🖌️ Mask Floor</div>
                                             <div onClick={() => setHero(room.id, f.id)} className={`absolute -top-2 -left-2 text-xl cursor-pointer ${isHero ? '' : 'grayscale'}`}>⭐</div>
                                         </div>
                                     )
@@ -280,10 +280,10 @@ export default function StagingPage() {
                     </div>
                     <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(orderId)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
                 </div>
-                <div className="grid grid-cols-2 gap-10">
+                <div className="grid grid-cols-2 gap-10 pb-20">
                     {galleryImages.map(item => (
                         <div key={item.name} className="bg-[#0f172a] p-4 rounded-[2rem] border border-white/5">
-                            <img src={item.url} className="w-full aspect-[3/2] object-cover rounded-[1.5rem] mb-4" />
+                            <img src={item.url} className="w-full aspect-[3/2] object-cover rounded-[1.5rem] mb-4" alt="Result"/>
                             <div className="flex justify-between items-center px-2">
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{item.name}</span>
                                 <button onClick={() => window.open(item.url)} className="px-4 py-2 bg-slate-800 text-white rounded-full text-[9px] font-black uppercase">Download</button>

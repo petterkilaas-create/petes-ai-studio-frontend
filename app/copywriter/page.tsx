@@ -24,7 +24,6 @@ export default function CopywriterPage() {
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
   const [isLoadingGallery, setIsLoadingGallery] = useState(false);
 
-  // Nytt for Copywriter: Order ID og Address
   const [orderId, setOrderId] = useState("");
   const [orderAddress, setOrderAddress] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -32,7 +31,6 @@ export default function CopywriterPage() {
   const [length, setLength] = useState("Fyldig");
   const [generatedCopy, setGeneratedCopy] = useState("");
 
-  // Generer unik ID ved innlasting
   useEffect(() => {
     setOrderId(`CPY-${Math.random().toString(16).slice(2, 8).toUpperCase()}`);
   }, []);
@@ -51,9 +49,7 @@ export default function CopywriterPage() {
   const [rerenderData, setRerenderData] = useState({ type: "exterior", style: "dusk_blue_hour", prompt: "" });
   const [videoPrompt, setVideoPrompt] = useState("Cinematic slow pan, highly detailed architectural video, 8k resolution");
 
-  // HER MANGLER DEN I STAD:
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hiddenMaskCanvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -62,7 +58,6 @@ export default function CopywriterPage() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
-  // --- FETCH ORDERS & REALTIME LISTENER ---
   useEffect(() => {
     const fetchMyProjects = async () => {
       if (!user) return;
@@ -96,7 +91,6 @@ export default function CopywriterPage() {
     return () => { supabase.removeChannel(channel); if (pollTimer.current) clearTimeout(pollTimer.current); };
   }, [user, viewMode]);
 
-  // --- UPLOAD LOGIC ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     const newFiles: UploadedFile[] = [];
@@ -110,7 +104,6 @@ export default function CopywriterPage() {
 
   const removeFile = (id: string) => setUploadedFiles(prev => prev.filter(f => f.id !== id));
 
-  // --- GENERATE COPY LOGIC ---
   const startCopyGeneration = async () => {
     if (!orderId || uploadedFiles.length === 0) return;
     setIsRendering(true); setProgressPct(50); setProgressStatus("Analyzing Photos & Maps...");
@@ -138,7 +131,6 @@ export default function CopywriterPage() {
     } catch (error) { console.error(error); setIsRendering(false); }
   };
 
-  // --- ACTIONS ---
   const viewOrder = async (name: string) => { 
       if (pollTimer.current) clearTimeout(pollTimer.current);
       setSelectedOrder(name); setIsLoadingGallery(true); setGalleryImages([]);
@@ -155,6 +147,7 @@ export default function CopywriterPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
+          // Cache buster included!
           const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
@@ -163,7 +156,8 @@ export default function CopywriterPage() {
 
   const pollProgress = async (pollingJobName: string) => {
     try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}`, { cache: 'no-store' }); 
+        // Cache buster included!
+        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}&t=${Date.now()}`, { cache: 'no-store' }); 
         const s = await r.json();
         if (s.status === 'finished' || s.status === 'completed') { 
             setIsRendering(false); setProgressPct(100);
@@ -223,6 +217,71 @@ export default function CopywriterPage() {
       } catch (error) { window.open(url, '_blank'); }
   };
 
+  // Canvas Studio Logic
+  const openCanvasStudio = (imgName: string, customUrl: string) => { setCurrentCanvasImgId(imgName); setActiveModal('retouch'); setBrushSize(50); const image = new Image(); image.crossOrigin = "Anonymous"; image.onload = () => { bgImg.current = image; initCanvas(); }; image.src = customUrl; };
+  const initCanvas = () => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !bgImg.current) return; canvas.width = hiddenCanvas.width = bgImg.current.width; canvas.height = hiddenCanvas.height = bgImg.current.height; const hiddenCtx = hiddenCanvas.getContext('2d'); if (hiddenCtx) hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height); undoStack.current = []; saveCanvasState(); renderCanvas(); };
+  const saveCanvasState = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return; const ctx = hiddenCanvas.getContext('2d'); if (!ctx) return; if (undoStack.current.length > 50) undoStack.current.shift(); undoStack.current.push(ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height)); };
+  const undoCanvas = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas || undoStack.current.length <= 1) return; undoStack.current.pop(); const ctx = hiddenCanvas.getContext('2d'); if (ctx) { ctx.putImageData(undoStack.current[undoStack.current.length - 1], 0, 0); renderCanvas(); } };
+  const clearCanvas = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return; const ctx = hiddenCanvas.getContext('2d'); if (ctx) ctx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height); undoStack.current = []; saveCanvasState(); renderCanvas(); };
+  const renderCanvas = () => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !bgImg.current) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(bgImg.current, 0, 0, canvas.width, canvas.height); const tempCanvas = document.createElement('canvas'); tempCanvas.width = canvas.width; tempCanvas.height = canvas.height; const tCtx = tempCanvas.getContext('2d'); if (!tCtx) return; const imgData = hiddenCtx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height); const overlayData = tCtx.createImageData(canvas.width, canvas.height); for (let i = 0; i < imgData.data.length; i += 4) { if (imgData.data[i + 3] > 10) { overlayData.data[i] = 239; overlayData.data[i + 1] = 68; overlayData.data[i + 2] = 68; overlayData.data[i + 3] = 120; } } tCtx.putImageData(overlayData, 0, 0); ctx.drawImage(tempCanvas, 0, 0); };
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => { isDrawing.current = true; const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height); ctx.beginPath(); ctx.moveTo(x, y); hiddenCtx.beginPath(); hiddenCtx.moveTo(x, y); };
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => { if (cursorRef.current) { cursorRef.current.style.left = `${e.clientX}px`; cursorRef.current.style.top = `${e.clientY}px`; } if (isDrawing.current) drawOnCanvas(e); };
+  const handleCanvasMouseUp = () => { if (isDrawing.current) { saveCanvasState(); isDrawing.current = false; renderCanvas(); } };
+  const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !isDrawing.current) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height); hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); };
+
+  const submitRetouch = async () => {
+      if(!retouchPrompt || !selectedOrder) return;
+      setActiveModal('none'); 
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder);
+      setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch...");
+      const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
+      if (!canvas || !hiddenCanvas) return;
+      const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height;
+      const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return;
+      aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height);
+      const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return;
+      const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } }
+      aCtx.putImageData(maskData, 0, 0);
+      apiCanvas.toBlob(async (b) => {
+          if(!b) return;
+          const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
+          try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); pollProgress(selectedOrder); } catch(e) { console.error(e); }
+      }, 'image/png');
+  };
+
+  const submitRerender = async () => {
+      if(!selectedOrder) return;
+      setActiveModal('none');
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder);
+      setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render...");
+      const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
+      try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(selectedOrder); } catch(e) { console.error(e); }
+  };
+
+  const submitVideo = async () => {
+      if(!selectedOrder) return;
+      setActiveModal('none');
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder);
+      setIsRendering(true); setProgressPct(0); setProgressStatus("Generating Veo Magic...");
+      const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('prompt', videoPrompt);
+      try { await fetch(`${API}/generate-video/`, { method: 'POST', body: fd }); pollProgress(selectedOrder); } catch(e) { console.error(e); }
+  };
+
+  const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const percent = Math.max(0, Math.min(100, x));
+      const beforeImg = document.getElementById('modalBefore');
+      const handle = document.getElementById('modalHandle');
+      if (beforeImg && handle) { beforeImg.style.clipPath = `inset(0 ${100 - percent}% 0 0)`; handle.style.left = `${percent}%`; }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setActiveModal('none'); if ((e.metaKey || e.ctrlKey) && e.key === 'z') undoCanvas(); };
+    window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const filteredOrders = archiveOrders.filter(order => 
       order.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       (order.address && order.address.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -235,7 +294,7 @@ export default function CopywriterPage() {
 
       <main className="max-w-6xl mx-auto w-full p-8 flex-1">
         
-        {/* --- CREATION VIEW (Hvis ingen ordre er valgt) --- */}
+        {/* --- CREATION VIEW --- */}
         {!selectedOrder ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="mb-12 bg-[#0f172a] border border-slate-800 rounded-3xl p-8 shadow-xl flex justify-between items-start">
@@ -310,7 +369,7 @@ export default function CopywriterPage() {
                           {filteredOrders.length === 0 ? (
                               <tr><td colSpan={4} className="p-8 text-center text-slate-500 text-sm">No projects found.</td></tr>
                           ) : (
-                              filteredOrders.filter(o => o.name.startsWith('CPY')).map(order => ( // Viser kun CPY-ordrer her
+                              filteredOrders.filter(o => o.name.startsWith('CPY')).map(order => ( 
                                   <tr key={order.name} onClick={() => viewOrder(order.name)} className="border-b border-slate-800/50 hover:bg-[#1e293b]/50 cursor-pointer transition-colors group">
                                       <td className="p-5 font-bold text-white flex flex-col justify-center">
                                           <div className="flex items-center gap-3">
@@ -360,10 +419,63 @@ export default function CopywriterPage() {
                         </div>
                     </div>
                 )}
-
             </div>
         )}
       </main>
+
+      {/* --- MODALS --- */}
+      {activeModal === 'retouch' && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
+            <div className="flex justify-between items-center w-[85vw] max-w-[1100px]"><h2 className="text-2xl font-black text-[#009183] uppercase tracking-widest">Retouch Studio</h2><button onClick={() => setActiveModal('none')} className="text-slate-400 font-bold uppercase text-xs hover:text-white transition-colors">Close</button></div>
+            <div className="relative w-[85vw] max-w-[1100px] aspect-[3/2] bg-black border border-white/10 rounded-3xl overflow-hidden shadow-2xl" onMouseMove={handleCanvasMouseMove} onMouseDown={handleCanvasMouseDown} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp}><canvas ref={canvasRef} className="absolute inset-0 w-full h-full z-10 cursor-none"></canvas></div>
+            <div className="w-[85vw] max-w-[1100px] flex gap-5 bg-[#0f172a] p-4 rounded-2xl items-center shadow-2xl border border-white/10">
+                <div className="flex flex-col gap-1 w-40 pl-2"><label className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Brush: <span className="text-white">{brushSize}</span>px</label><input type="range" min="5" max="200" value={brushSize} onChange={(e) => setBrushSize(parseInt(e.target.value))} className="accent-[#009183] cursor-pointer" /></div>
+                <div className="w-px h-8 bg-slate-700 mx-2"></div>
+                <button onClick={undoCanvas} className="px-5 py-3 bg-[#0B1120] border border-slate-700 text-white font-bold text-xs rounded-xl">Undo</button>
+                <button onClick={clearCanvas} className="px-5 py-3 bg-red-900/20 text-red-400 font-bold text-xs rounded-xl border border-red-900/50">Reset</button>
+                <label className="flex items-center gap-2 text-slate-300 text-xs font-bold cursor-pointer ml-auto mr-4"><input type="checkbox" checked={saveAsNew} onChange={(e) => setSaveAsNew(e.target.checked)} className="w-4 h-4 accent-[#009183]" /> Save as new</label>
+                <input type="text" value={retouchPrompt} onChange={(e) => setRetouchPrompt(e.target.value)} placeholder="Instruction..." className="flex-1 max-w-sm bg-[#0B1120] rounded-xl p-3 text-sm text-white outline-none border border-slate-700 focus:border-[#009183]" />
+                <button onClick={submitRetouch} className="px-8 py-3 bg-[#009183] text-white font-black uppercase text-xs rounded-xl">Execute</button>
+            </div>
+        </div>
+      )}
+
+      {activeModal === 'video' && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
+            <div className="bg-[#0f172a] rounded-3xl p-8 shadow-2xl border border-purple-500/30 w-[500px]">
+                <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black text-white uppercase tracking-wider text-purple-400">🎬 Video Magic</h2><button onClick={() => setActiveModal('none')} className="text-slate-500 hover:text-white font-bold uppercase text-xs">Cancel</button></div>
+                <div className="space-y-6">
+                    <div><label className="text-[10px] font-bold text-purple-300 uppercase tracking-widest mb-3 block">Director's Prompt</label><textarea rows={3} value={videoPrompt} onChange={(e) => setVideoPrompt(e.target.value)} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-purple-500 transition-colors resize-none" /></div>
+                    <div className="text-xs text-slate-400 italic">Highly realistic 4-second cinematic camera movement.</div>
+                    <button onClick={submitVideo} className="w-full py-4 mt-4 bg-purple-600 text-white font-black uppercase text-xs rounded-xl shadow-[0_0_20px_rgba(147,51,234,0.4)]">Action! 🎬</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {activeModal === 'rerender' && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
+            <div className="bg-[#0f172a] rounded-3xl p-8 shadow-2xl border border-white/10 w-[500px]">
+                <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black text-white uppercase tracking-wider">Re-Render</h2><button onClick={() => setActiveModal('none')} className="text-slate-500 hover:text-white font-bold uppercase text-xs">Cancel</button></div>
+                <div className="space-y-6">
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Image Type</label><select value={rerenderData.type} onChange={(e) => setRerenderData({...rerenderData, type: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">New Style</label><select value={rerenderData.style} onChange={(e) => setRerenderData({...rerenderData, style: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><optgroup label="Lighting"><option value="weather_rain_to_sun">Rain to Sun</option><option value="dusk_blue_hour">Blue Hour</option><option value="sunny_midday">Sunny Midday</option></optgroup></select></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Custom Prompt</label><input type="text" value={rerenderData.prompt} onChange={(e) => setRerenderData({...rerenderData, prompt: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-[#009183]" /></div>
+                    <button onClick={submitRerender} className="w-full py-4 mt-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl shadow-[0_0_20px_rgba(0,145,131,0.2)]">Start Re-Render</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {activeModal === 'compare' && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center" onClick={() => setActiveModal('none')}>
+            <div className="relative w-[90vw] max-w-[1100px] aspect-[3/2] rounded-[1.5rem] bg-black overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-white/10 cursor-col-resize" onMouseMove={handleSlider} onClick={(e) => e.stopPropagation()}>
+                <img id="modalAfter" src={compareData.edited} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10" alt="After" />
+                <img id="modalBefore" src={compareData.raw} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-20" alt="Before" style={{ clipPath: 'inset(0 50% 0 0)' }} />
+                <div id="modalHandle" className="absolute top-0 bottom-0 w-[2px] bg-white/50 z-30 -translate-x-1/2 pointer-events-none" style={{ left: '50%' }}><div className="absolute top-1/2 left-1/2 w-10 h-10 bg-[#009183] border-[3px] border-[#0B1120] rounded-full -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-white font-bold shadow-xl">↔</div></div>
+            </div>
+        </div>
+      )}
     </div>
   );
 }

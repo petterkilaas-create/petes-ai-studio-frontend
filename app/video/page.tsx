@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useUser, UserButton } from "@clerk/nextjs";
-import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
+import Autocomplete from "react-google-autocomplete";
 import { supabase } from "../../supabaseClient"; 
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
@@ -33,7 +33,6 @@ export default function VideoPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // --- UPLOAD LOGIC ---
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
     const newFiles: UploadedFile[] = [];
@@ -45,11 +44,9 @@ export default function VideoPage() {
     setUploadedFiles(prev => [...prev, ...newFiles]);
   };
 
-  // --- DRAG AND DROP LOGIC ---
   const handleDragStart = (e: React.DragEvent, id: string) => { e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; };
   const handleDragEnd = (e: React.DragEvent) => { /* Optional styling reset */ };
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
-  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); };
 
   const handleVideoDrop = (e: React.DragEvent) => {
       e.preventDefault();
@@ -62,7 +59,6 @@ export default function VideoPage() {
 
   const removeFromVideoTimeline = (imgId: string) => { setVideoTimeline(prev => prev.filter(id => id !== imgId)); };
 
-  // --- API / RENDER LOGIC ---
   const startFullPropertyFilm = async () => {
       if (videoTimeline.length < 2) {
           alert("You need to add at least 2 scenes to the timeline to generate a film.");
@@ -94,7 +90,8 @@ export default function VideoPage() {
 
   const pollProgress = async (pollingJobName: string) => {
     try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}`, { cache: 'no-store' }); 
+        // Cache buster included!
+        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}&t=${Date.now()}`, { cache: 'no-store' }); 
         const s = await r.json();
         if (s.status === 'finished' || s.status === 'completed') { 
             setIsRendering(false); setProgressPct(100);
@@ -109,6 +106,7 @@ export default function VideoPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
+          // Cache buster included!
           const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
@@ -130,7 +128,6 @@ export default function VideoPage() {
     <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans">
       <main className="flex-1 flex flex-col max-w-6xl mx-auto w-full p-8">
           
-        {/* EXPLAINER */}
         <div className="mb-12 bg-[#0f172a] border border-slate-800 rounded-3xl p-8 shadow-xl flex justify-between items-start">
             <div>
                 <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-4 flex items-center gap-4">
@@ -144,16 +141,20 @@ export default function VideoPage() {
             </div>
         </div>
 
-        {/* UPLOADER */}
         {uploadedFiles.length === 0 && galleryImages.length === 0 && !isRendering && (
           <div className="glass p-16 border-2 border-dashed border-slate-700 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50">
-              <input type="text" value={orderAddress} onChange={(e) => setOrderAddress(e.target.value)} placeholder="PROJECT ADDRESS (OPTIONAL)" className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-3xl font-black text-white outline-none focus:border-purple-500 uppercase pb-3" />
+              <Autocomplete
+                  apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                  onPlaceSelected={(place) => { if (place && place.formatted_address) { setOrderAddress(place.formatted_address); } }}
+                  options={{ types: ["address"], componentRestrictions: { country: "no" } }}
+                  placeholder="PROJECT ADDRESS (OPTIONAL)..."
+                  className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-3xl font-black text-white outline-none focus:border-purple-500 uppercase pb-3"
+              />
               <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
               <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-purple-600 text-white rounded-full font-black uppercase text-xs cursor-pointer hover:bg-purple-500 transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)]">Upload Photos</button>
           </div>
         )}
 
-        {/* BUILDER UI */}
         {uploadedFiles.length > 0 && !isRendering && galleryImages.length === 0 && (
           <div className="space-y-8 animate-in fade-in duration-500">
               
