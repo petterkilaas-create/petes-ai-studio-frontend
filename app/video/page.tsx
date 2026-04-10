@@ -21,7 +21,6 @@ export default function VideoPage() {
     setOrderId(`ORD-${Math.random().toString(16).slice(2, 8).toUpperCase()}`);
   }, []);
 
-  // Video Specific States
   const [videoTimeline, setVideoTimeline] = useState<string[]>([]);
   const [videoMeta, setVideoMeta] = useState({ address: "", price: "", realtorName: "", phone: "" });
 
@@ -45,7 +44,7 @@ export default function VideoPage() {
   };
 
   const handleDragStart = (e: React.DragEvent, id: string) => { e.dataTransfer.setData("text/plain", id); e.dataTransfer.effectAllowed = "move"; };
-  const handleDragEnd = (e: React.DragEvent) => { /* Optional styling reset */ };
+  const handleDragEnd = (e: React.DragEvent) => {  };
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; };
 
   const handleVideoDrop = (e: React.DragEvent) => {
@@ -90,7 +89,6 @@ export default function VideoPage() {
 
   const pollProgress = async (pollingJobName: string) => {
     try {
-        // Cache buster included!
         const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}&t=${Date.now()}`, { cache: 'no-store' }); 
         const s = await r.json();
         if (s.status === 'finished' || s.status === 'completed') { 
@@ -106,7 +104,6 @@ export default function VideoPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          // Cache buster included!
           const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
@@ -142,16 +139,32 @@ export default function VideoPage() {
         </div>
 
         {uploadedFiles.length === 0 && galleryImages.length === 0 && !isRendering && (
-          <div className="glass p-16 border-2 border-dashed border-slate-700 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50">
-              <Autocomplete
-                  apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-                  onPlaceSelected={(place) => { if (place && place.formatted_address) { setOrderAddress(place.formatted_address); } }}
-                  options={{ types: ["address"], componentRestrictions: { country: "no" } }}
-                  placeholder="PROJECT ADDRESS (OPTIONAL)..."
-                  className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-3xl font-black text-white outline-none focus:border-purple-500 uppercase pb-3"
-              />
+          <div className="glass p-16 border-2 border-dashed border-[#9333ea]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(147,51,234,0.05)]">
+              <div className="w-full max-w-2xl mx-auto space-y-4">
+                  <label className="text-[10px] font-bold text-purple-400 uppercase tracking-[0.2em] block text-center mb-6">
+                      📍 Søk etter eiendommens adresse
+                  </label>
+                  <Autocomplete
+                      apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                      onPlaceSelected={(place) => { 
+                          if (place && place.formatted_address) { 
+                              setOrderAddress(place.formatted_address); 
+                              setVideoMeta(prev => ({...prev, address: place.formatted_address || ""})); // Auto-fill video meta too
+                          } 
+                      }}
+                      options={{ types: ["address"], componentRestrictions: { country: "no" } }}
+                      placeholder="START Å SKRIVE ADRESSE..."
+                      className="w-full bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-purple-500 uppercase pb-4 transition-colors text-center placeholder:text-slate-600"
+                  />
+                  {orderAddress && (
+                      <div className="mt-8 p-6 bg-[#0B1120] rounded-2xl border border-purple-500/30 text-center animate-in fade-in duration-300">
+                          <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Prosjekt opprettet:</p>
+                          <p className="text-xl text-purple-400 font-black uppercase tracking-wider">{orderAddress}</p>
+                      </div>
+                  )}
+              </div>
               <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
-              <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-purple-600 text-white rounded-full font-black uppercase text-xs cursor-pointer hover:bg-purple-500 transition-all shadow-[0_0_20px_rgba(147,51,234,0.3)]">Upload Photos</button>
+              <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-purple-600 text-white rounded-full font-black uppercase text-xs cursor-pointer hover:bg-purple-500 transition-all shadow-[0_0_20px_rgba(147,51,234,0.4)]">Upload Photos</button>
           </div>
         )}
 
@@ -206,7 +219,7 @@ export default function VideoPage() {
               </div>
 
               <div className="flex justify-end pt-4">
-                  <button onClick={startFullPropertyFilm} className="px-12 py-5 bg-purple-600 text-white font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_20px_rgba(147,51,234,0.4)] hover:bg-purple-500 transition-colors">
+                  <button onClick={startFullPropertyFilm} className="px-12 py-5 bg-gradient-to-r from-purple-600 to-purple-500 text-white font-black uppercase tracking-widest text-xs rounded-full shadow-[0_0_30px_rgba(147,51,234,0.4)] hover:scale-105 transition-transform">
                       Generate Property Film
                   </button>
               </div>

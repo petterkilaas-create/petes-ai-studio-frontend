@@ -17,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/express" className="hover:text-[#009183] transition-colors">⚡ Express</Link>
                 <Link href="/staging" className="hover:text-[#00ff83] transition-colors">🛋️ Staging</Link>
                 <Link href="/video" className="hover:text-purple-400 transition-colors">🎬 Video</Link>
+                <Link href="/copywriter" className="...">✍️ Copywriter</Link>
                 <div className="w-px h-4 bg-slate-700"></div>
                 <Link href="/orders" className="hover:text-white transition-colors">📁 Orders</Link>
               </nav>

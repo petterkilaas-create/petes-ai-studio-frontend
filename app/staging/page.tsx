@@ -122,7 +122,6 @@ export default function StagingPage() {
 
   const pollProgress = async (name: string) => {
     try {
-        // Cache buster included!
         const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
         const s = await r.json();
         if (s.status === 'finished' || s.status === 'completed') { setIsRendering(false); loadGallery(name); return; }
@@ -133,7 +132,6 @@ export default function StagingPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          // Cache buster included!
           const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
@@ -209,16 +207,27 @@ export default function StagingPage() {
         </div>
 
         {uploadedFiles.length === 0 && galleryImages.length === 0 && (
-            <div className="glass p-16 border-2 border-dashed border-slate-700 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50">
-                <Autocomplete
-                    apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-                    onPlaceSelected={(place) => { if (place && place.formatted_address) { setOrderAddress(place.formatted_address); } }}
-                    options={{ types: ["address"], componentRestrictions: { country: "no" } }}
-                    placeholder="PROJECT ADDRESS (OPTIONAL)..."
-                    className="w-full max-w-lg text-center bg-transparent border-b-2 border-slate-700 text-3xl font-black text-white outline-none focus:border-[#009183] uppercase pb-3"
-                />
+            <div className="glass p-16 border-2 border-dashed border-[#009183]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(0,145,131,0.05)]">
+                <div className="w-full max-w-2xl mx-auto space-y-4">
+                    <label className="text-[10px] font-bold text-[#009183] uppercase tracking-[0.2em] block text-center mb-6">
+                        📍 Søk etter eiendommens adresse
+                    </label>
+                    <Autocomplete
+                        apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                        onPlaceSelected={(place) => { if (place && place.formatted_address) { setOrderAddress(place.formatted_address); } }}
+                        options={{ types: ["address"], componentRestrictions: { country: "no" } }}
+                        placeholder="START Å SKRIVE ADRESSE..."
+                        className="w-full bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-[#009183] uppercase pb-4 transition-colors text-center placeholder:text-slate-600"
+                    />
+                    {orderAddress && (
+                        <div className="mt-8 p-6 bg-[#0B1120] rounded-2xl border border-[#009183]/30 text-center animate-in fade-in duration-300">
+                            <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Prosjekt opprettet:</p>
+                            <p className="text-xl text-[#00ff83] font-black uppercase tracking-wider">{orderAddress}</p>
+                        </div>
+                    )}
+                </div>
                 <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
-                <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-white text-black rounded-full font-black uppercase text-xs">Upload Images</button>
+                <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full font-black uppercase tracking-widest text-xs shadow-[0_0_20px_rgba(0,145,131,0.4)] transition-all">Upload Images</button>
             </div>
         )}
 
@@ -236,12 +245,12 @@ export default function StagingPage() {
 
                 {/* ROOMS */}
                 <div className="flex-1 space-y-6">
-                    <div className="flex justify-between items-center"><h3 className="text-xs font-black text-white uppercase tracking-widest">Room Layout</h3><button onClick={addRoom} className="px-4 py-2 border border-[#009183] text-[#009183] text-[10px] font-black uppercase rounded-xl">Add Room</button></div>
+                    <div className="flex justify-between items-center"><h3 className="text-xs font-black text-white uppercase tracking-widest">Room Layout</h3><button onClick={addRoom} className="px-4 py-2 border border-[#009183] text-[#009183] text-[10px] font-black uppercase rounded-xl hover:bg-[#009183]/10">Add Room</button></div>
                     {stagingRooms.map((room, i) => (
                         <div key={room.id} className="bg-[#0f172a] p-6 rounded-3xl border border-slate-800" onDragOver={handleDragOver} onDrop={(e) => handleStagingDrop(e, room.id)}>
                             <div className="flex justify-between items-center mb-4">
                                 <span className="text-xs font-black text-slate-300">ROOM {i+1}</span>
-                                <select value={room.style} onChange={(e) => updateRoomStyle(room.id, e.target.value)} className="bg-[#0B1120] text-xs font-bold uppercase p-2 rounded-lg border border-slate-700"><option value="staging_scandi">Scandinavian</option><option value="staging_luxury">Luxury</option><option value="staging_outdoor">Outdoor Lounge</option></select>
+                                <select value={room.style} onChange={(e) => updateRoomStyle(room.id, e.target.value)} className="bg-[#0B1120] text-xs font-bold uppercase p-2 rounded-lg border border-slate-700 outline-none focus:border-[#009183]"><option value="staging_scandi">Scandinavian</option><option value="staging_luxury">Luxury</option><option value="staging_outdoor">Outdoor Lounge</option></select>
                             </div>
                             <div className="flex flex-wrap gap-4 min-h-[120px]">
                                 {room.images.map(imgId => {
@@ -259,7 +268,7 @@ export default function StagingPage() {
                             </div>
                         </div>
                     ))}
-                    <div className="flex justify-end pt-6"><button onClick={startStagingRender} className="px-12 py-4 bg-[#009183] text-white font-black uppercase text-xs rounded-full shadow-lg">Generate Rooms</button></div>
+                    <div className="flex justify-end pt-6"><button onClick={startStagingRender} className="px-12 py-4 bg-gradient-to-r from-[#009183] to-[#00b09f] text-white font-black uppercase text-xs rounded-full shadow-[0_0_30px_rgba(0,145,131,0.4)] hover:scale-105 transition-transform">Generate Rooms</button></div>
                 </div>
             </div>
         )}
@@ -304,8 +313,8 @@ export default function StagingPage() {
             </div>
             <div className="flex gap-4 items-center bg-[#0f172a] p-4 rounded-2xl border border-white/10">
                 <input type="range" min="10" max="200" value={brushSize} onChange={(e) => setBrushSize(parseInt(e.target.value))} className="accent-[#009183]" />
-                <button onClick={() => setActiveModal('none')} className="px-6 py-2 text-slate-400 font-bold uppercase text-xs">Cancel</button>
-                <button onClick={saveFloorMask} className="px-8 py-2 bg-[#009183] text-white font-black uppercase text-xs rounded-xl">Save Mask</button>
+                <button onClick={() => setActiveModal('none')} className="px-6 py-2 text-slate-400 font-bold uppercase text-xs hover:text-white">Cancel</button>
+                <button onClick={saveFloorMask} className="px-8 py-2 bg-[#009183] text-white font-black uppercase text-xs rounded-xl hover:bg-[#00b09f]">Save Mask</button>
             </div>
         </div>
       )}

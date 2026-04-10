@@ -11,7 +11,6 @@ type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: 
 
 export default function OrdersPage() {
   const { user } = useUser();
-  
   const isAdmin = user?.primaryEmailAddress?.emailAddress === "petter.kilaas@diakrit.com"; 
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
 
@@ -20,6 +19,8 @@ export default function OrdersPage() {
   
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
+  // NYTT: State for å holde på tekst fra Copywriter-ordrer
+  const [generatedCopy, setGeneratedCopy] = useState<string>(""); 
   const [isLoadingGallery, setIsLoadingGallery] = useState(false);
 
   const [isRendering, setIsRendering] = useState(false);
@@ -47,39 +48,36 @@ export default function OrdersPage() {
   useEffect(() => {
     const fetchMyProjects = async () => {
       if (!user) return;
-      
-      let query = supabase
-        .from('projects')
-        .select('name, address, created_at, status')
-        .order('created_at', { ascending: false });
-
-      if (viewMode === 'mine') {
-        query = query.eq('user_id', user.id);
-      }
+      let query = supabase.from('projects').select('name, address, created_at, status').order('created_at', { ascending: false });
+      if (viewMode === 'mine') query = query.eq('user_id', user.id);
 
       const { data, error } = await query;
       if (!error && data) {
         setArchiveOrders(data.map(p => ({ 
-          name: p.name, 
-          address: p.address,
-          date: new Date(p.created_at).toLocaleDateString('no-NO'), 
-          status: p.status || 'processing' 
+          name: p.name, address: p.address, date: new Date(p.created_at).toLocaleDateString('no-NO'), status: p.status || 'processing' 
         })));
       }
     };
     
     fetchMyProjects();
-
-    const channel = supabase.channel('realtime-projects-archive').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
-        fetchMyProjects(); 
-    }).subscribe();
-
+    const channel = supabase.channel('realtime-projects-archive').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => { fetchMyProjects(); }).subscribe();
     return () => { supabase.removeChannel(channel); if (pollTimer.current) clearTimeout(pollTimer.current); };
   }, [user, viewMode]);
 
   const viewOrder = async (name: string) => { 
       if (pollTimer.current) clearTimeout(pollTimer.current);
-      setSelectedOrder(name); setIsLoadingGallery(true); setGalleryImages([]);
+      setSelectedOrder(name); 
+      setIsLoadingGallery(true); 
+      setGalleryImages([]);
+      setGeneratedCopy(""); // Reset tekst
+      
+      // Sjekk Alltid Supabase for tekst (i tilfelle det er et prospekt)
+      const { data } = await supabase.from('projects').select('generated_copy').eq('name', name).single();
+      if (data && data.generated_copy) {
+          setGeneratedCopy(data.generated_copy);
+      }
+
+      // Sjekk alltid etter bilder uansett
       await loadGallery(name);
       setIsLoadingGallery(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -87,16 +85,14 @@ export default function OrdersPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          // Cache buster included!
           const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
-          setGalleryImages(data.images); 
+          setGalleryImages(data.images || []); 
       } catch (e) { console.error(e); } 
   };
 
   const pollProgress = async (pollingJobName: string) => {
     try {
-        // Cache buster included!
         const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}&t=${Date.now()}`, { cache: 'no-store' }); 
         const s = await r.json();
         if (s.status === 'finished' || s.status === 'completed') { 
@@ -282,12 +278,13 @@ export default function OrdersPage() {
             <div className="animate-in fade-in duration-500 pb-20">
                 <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                     <div>
-                        <button onClick={() => setSelectedOrder(null)} className="text-[#009183] hover:text-white text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 transition-colors"><span>←</span> Back to List</button>
+                        <button onClick={() => { setSelectedOrder(null); setGeneratedCopy(""); }} className="text-[#009183] hover:text-white text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 transition-colors"><span>←</span> Back to List</button>
                         <p className="text-[#009183] font-bold text-sm tracking-widest mb-1">{selectedOrder}</p>
                         <h3 className="text-3xl font-black text-white uppercase">{archiveOrders.find(o => o.name === selectedOrder)?.address || "Unnamed Project"}</h3>
                     </div>
-                    {/* ENCODE COMPONENT FIKS */}
-                    <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(selectedOrder)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
+                    {galleryImages.length > 0 && (
+                        <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(selectedOrder)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
+                    )}
                 </div>
 
                 {isRendering && activeModal === 'none' && (
@@ -297,14 +294,27 @@ export default function OrdersPage() {
                   </div>
                 )}
 
+                {/* NYTT: Viser Generert Tekst hvis den finnes */}
+                {generatedCopy && !isRendering && (
+                    <div className="bg-[#0f172a] rounded-3xl p-10 border border-[#009183]/30 shadow-2xl relative mb-10">
+                        <button onClick={() => navigator.clipboard.writeText(generatedCopy)} className="absolute top-8 right-8 px-6 py-3 bg-[#009183] hover:bg-[#00b09f] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg">
+                            Kopier Tekst
+                        </button>
+                        <h4 className="text-xs font-black text-[#009183] uppercase tracking-widest mb-6">Generert Prospekt</h4>
+                        <div className="prose prose-invert max-w-none text-slate-300 leading-relaxed whitespace-pre-wrap text-lg">
+                            {generatedCopy}
+                        </div>
+                    </div>
+                )}
+
                 {isLoadingGallery ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-8 h-8 border-4 border-[#009183]/30 border-t-[#009183] rounded-full animate-spin"></div>
                         <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Loading Media...</p>
                     </div>
-                ) : galleryImages.length === 0 ? (
-                    <div className="text-center py-20 text-slate-500">No images found.</div>
-                ) : (
+                ) : galleryImages.length === 0 && !generatedCopy ? (
+                    <div className="text-center py-20 text-slate-500">No images or text found.</div>
+                ) : galleryImages.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         {galleryImages.map((item) => (
                             <div key={item.name} className="group flex flex-col bg-[#0f172a] rounded-[2rem] p-4 border border-white/5 shadow-xl">
@@ -346,7 +356,7 @@ export default function OrdersPage() {
                             </div>
                         ))}
                     </div>
-                )}
+                ) : null}
             </div>
         )}
       </main>
