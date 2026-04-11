@@ -5,11 +5,19 @@ import { useUser } from "@clerk/nextjs";
 import { supabase } from "../../supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
 
-const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
+const API = "https://petes-ai-studio-backend-v2-73jga2zlcq-lz.a.run.app";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: string; edited?: string; approved?: boolean; };
+
+const STATUS_MESSAGES = [
+    "Analyzing Spatial Data...",
+    "Understanding room geometry...",
+    "Selecting furniture styles...",
+    "Applying interior lighting...",
+    "Adding finishing touches..."
+];
 
 export default function StagingPage() {
   const { user } = useUser();
@@ -27,6 +35,7 @@ export default function StagingPage() {
   const [isRendering, setIsRendering] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
   const [progressStatus, setProgressStatus] = useState("Processing...");
+  const [statusMsgIndex, setStatusMsgIndex] = useState(0);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
   const [activeModal, setActiveModal] = useState<'none' | 'mask' | 'compare'>('none');
@@ -38,9 +47,79 @@ export default function StagingPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hiddenMaskCanvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
-  const pollTimer = useRef<NodeJS.Timeout | null>(null);
   const isDrawing = useRef(false);
   const bgImg = useRef<HTMLImageElement | null>(null);
+
+  // ==========================================
+  // DEN MAGISKE UX-PROGRESJONEN (Fake progress)
+  // ==========================================
+  useEffect(() => {
+    let pctInterval: NodeJS.Timeout;
+    let msgInterval: NodeJS.Timeout;
+
+    if (isRendering) {
+        setProgressPct(0);
+        setStatusMsgIndex(0);
+        setProgressStatus(STATUS_MESSAGES[0]);
+
+        pctInterval = setInterval(() => {
+            setProgressPct(prev => {
+                const remaining = 95 - prev;
+                const step = Math.max(0.1, remaining * 0.05);
+                return prev >= 95 ? 95 : prev + step;
+            });
+        }, 300);
+
+        msgInterval = setInterval(() => {
+            setStatusMsgIndex(prev => {
+                const next = (prev + 1) % STATUS_MESSAGES.length;
+                setProgressStatus(STATUS_MESSAGES[next]);
+                return next;
+            });
+        }, 4000);
+    }
+
+    return () => {
+        clearInterval(pctInterval);
+        clearInterval(msgInterval);
+    };
+  }, [isRendering]);
+
+  // ==========================================
+  // SUPABASE REALTIME LISTENER (Radiomottakeren)
+  // ==========================================
+  useEffect(() => {
+    if (!orderId) return;
+
+    const channel = supabase
+      .channel(`staging_progress_${orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'projects',
+          filter: `name=eq.${orderId}`
+        },
+        (payload) => {
+          const newStatus = payload.new.status;
+          
+          if (newStatus === 'completed' || newStatus === 'finished') {
+            setProgressPct(100);
+            setProgressStatus("Staging Complete! Loading gallery...");
+            setTimeout(() => {
+                setIsRendering(false);
+                loadGallery(orderId);
+            }, 600);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orderId]);
 
   const addRoom = () => {
     const newId = roomCounter + 1;
@@ -95,7 +174,7 @@ export default function StagingPage() {
 
   const startStagingRender = async () => {
     if (!orderId) return;
-    setIsRendering(true); setProgressPct(0); setProgressStatus("Analyzing Spatial Data...");
+    setIsRendering(true); 
     const fd = new FormData(); 
     fd.append('job_name', orderId);
     fd.append('address', orderAddress);
@@ -115,19 +194,9 @@ export default function StagingPage() {
     fd.append('config', JSON.stringify(cfg));
     
     try { 
+        // Vi trenger ikke lengre kalle pollProgress(). Serveren svarer, Supabase lytter!
         await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); 
-        pollProgress(orderId); 
     } catch (error) { console.error(error); }
-  };
-
-  const pollProgress = async (name: string) => {
-    try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
-        const s = await r.json();
-        if (s.status === 'finished' || s.status === 'completed') { setIsRendering(false); loadGallery(name); return; }
-        if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Staging Rooms... ${s.completed} / ${s.total}`); }
-    } catch (e) { console.error(e); }
-    pollTimer.current = setTimeout(() => pollProgress(name), 2000);
   };
 
   const loadGallery = async (name: string) => { 
@@ -273,11 +342,15 @@ export default function StagingPage() {
             </div>
         )}
 
-        {isRendering && (
-            <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 rounded-3xl bg-[#0f172a]/50 border border-[#009183]/30">
-                <p className="font-black uppercase tracking-widest text-sm text-[#009183] animate-pulse">{progressStatus}</p>
-                <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10"><div className="bg-[#009183] h-full rounded-full transition-all" style={{ width: `${progressPct}%` }}></div></div>
-            </div>
+        {/* --- RENDERING SPINNER --- */}
+        {isRendering && activeModal === 'none' && (
+          <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 rounded-3xl bg-[#0f172a]/50 border border-[#009183]/30 shadow-2xl mt-10">
+              <div className="text-6xl animate-bounce mb-4">🛋️</div>
+              <p className="font-black uppercase tracking-[0.3em] text-sm text-[#009183] transition-all">{progressStatus}</p>
+              <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10">
+                <div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(0,145,131,0.8)]" style={{ width: `${progressPct}%` }}></div>
+              </div>
+          </div>
         )}
 
         {galleryImages.length > 0 && !isRendering && (
