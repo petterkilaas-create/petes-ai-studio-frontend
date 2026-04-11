@@ -78,16 +78,14 @@ export default function ExpressPage() {
         setStatusMsgIndex(0);
         setProgressStatus(STATUS_MESSAGES[0]);
 
-        // Glir silkemykt opp mot 95%
         pctInterval = setInterval(() => {
             setProgressPct(prev => {
                 const remaining = 95 - prev;
-                const step = Math.max(0.1, remaining * 0.05); // Ease-out effekt
+                const step = Math.max(0.1, remaining * 0.05);
                 return prev >= 95 ? 95 : prev + step;
             });
         }, 300);
 
-        // Bytter tekst hver 4. sekund
         msgInterval = setInterval(() => {
             setStatusMsgIndex(prev => {
                 const next = (prev + 1) % STATUS_MESSAGES.length;
@@ -121,7 +119,6 @@ export default function ExpressPage() {
         },
         (payload) => {
           const newStatus = payload.new.status;
-          console.log("📡 PUSH VARSEL MOTTATT:", newStatus);
           
           if (newStatus === 'completed' || newStatus === 'finished') {
             setProgressPct(100);
@@ -129,7 +126,7 @@ export default function ExpressPage() {
             setTimeout(() => {
                 setIsRendering(false);
                 loadGallery(orderId);
-            }, 600); // Liten pause på 100% så brukeren ser at den traff målstreken
+            }, 600);
           }
         }
       )
@@ -383,8 +380,46 @@ export default function ExpressPage() {
         )}
       </main>
 
-      {/* --- MODALS FORBLIR UAVHENGIGE HER NEDE --- */}
-      {/* ... */}
+      {/* --- HER ER MODALENE (Vinduene) SOM JEG KUTTET I STYKKER SIST! --- */}
+      {activeModal === 'retouch' && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
+            <div className="flex justify-between items-center w-[85vw] max-w-[1100px]"><h2 className="text-2xl font-black text-[#009183] uppercase tracking-widest">Retouch Studio</h2><button onClick={() => setActiveModal('none')} className="text-slate-400 font-bold uppercase text-xs hover:text-white">Close</button></div>
+            <div className="relative w-[85vw] max-w-[1100px] aspect-[3/2] bg-black border border-white/10 rounded-3xl overflow-hidden shadow-2xl" onMouseMove={handleCanvasMouseMove} onMouseDown={handleCanvasMouseDown} onMouseUp={handleCanvasMouseUp} onMouseLeave={handleCanvasMouseUp}><canvas ref={canvasRef} className="absolute inset-0 w-full h-full z-10 cursor-none"></canvas></div>
+            <div className="w-[85vw] max-w-[1100px] flex gap-5 bg-[#0f172a] p-4 rounded-2xl items-center shadow-2xl border border-white/10">
+                <div className="flex flex-col gap-1 w-40 pl-2"><label className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">Brush: <span className="text-white">{brushSize}</span>px</label><input type="range" min="5" max="200" value={brushSize} onChange={(e) => setBrushSize(parseInt(e.target.value))} className="accent-[#009183] cursor-pointer" /></div>
+                <div className="w-px h-8 bg-slate-700 mx-2"></div>
+                <button onClick={undoCanvas} className="px-5 py-3 bg-[#0B1120] border border-slate-700 text-white font-bold text-xs rounded-xl">Undo</button>
+                <button onClick={clearCanvas} className="px-5 py-3 bg-red-900/20 text-red-400 font-bold text-xs rounded-xl border border-red-900/50">Reset</button>
+                <label className="flex items-center gap-2 text-slate-300 text-xs font-bold cursor-pointer ml-auto mr-4"><input type="checkbox" checked={saveAsNew} onChange={(e) => setSaveAsNew(e.target.checked)} className="w-4 h-4 accent-[#009183]" /> Save as new</label>
+                <input type="text" value={retouchPrompt} onChange={(e) => setRetouchPrompt(e.target.value)} placeholder="Instruction (e.g. remove car)..." className="flex-1 max-w-sm bg-[#0B1120] rounded-xl p-3 text-sm text-white outline-none border border-slate-700 focus:border-[#009183]" />
+                <button onClick={submitRetouch} className="px-8 py-3 bg-[#009183] text-white font-black uppercase text-xs rounded-xl">Execute</button>
+            </div>
+        </div>
+      )}
+
+      {activeModal === 'rerender' && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
+            <div className="bg-[#0f172a] rounded-3xl p-8 shadow-2xl border border-white/10 w-[500px]">
+                <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black text-white uppercase tracking-wider">Re-Render</h2><button onClick={() => setActiveModal('none')} className="text-slate-500 hover:text-white font-bold uppercase text-xs">Cancel</button></div>
+                <div className="space-y-6">
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Image Type</label><select value={rerenderData.type} onChange={(e) => setRerenderData({...rerenderData, type: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">New Style</label><select value={rerenderData.style} onChange={(e) => setRerenderData({...rerenderData, style: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><optgroup label="Lighting"><option value="weather_rain_to_sun">Rain to Sun</option><option value="dusk_blue_hour">Blue Hour</option><option value="sunny_midday">Sunny Midday</option></optgroup></select></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Custom Prompt</label><input type="text" value={rerenderData.prompt} onChange={(e) => setRerenderData({...rerenderData, prompt: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-[#009183]" /></div>
+                    <button onClick={submitRerender} className="w-full py-4 mt-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl shadow-[0_0_20px_rgba(0,145,131,0.2)]">Start Re-Render</button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {activeModal === 'compare' && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center" onClick={() => setActiveModal('none')}>
+            <div className="relative w-[90vw] max-w-[1100px] aspect-[3/2] rounded-[1.5rem] bg-black overflow-hidden shadow-2xl border border-white/10 cursor-col-resize" onMouseMove={handleSlider} onClick={(e) => e.stopPropagation()}>
+                <img id="modalAfter" src={compareData.edited} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10" alt="After" />
+                <img id="modalBefore" src={compareData.raw} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-20" alt="Before" style={{ clipPath: 'inset(0 50% 0 0)' }} />
+                <div id="modalHandle" className="absolute top-0 bottom-0 w-[2px] bg-white/50 z-30 -translate-x-1/2 pointer-events-none" style={{ left: '50%' }}><div className="absolute top-1/2 left-1/2 w-10 h-10 bg-[#009183] border-[3px] border-[#0B1120] rounded-full -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-white font-bold shadow-xl">↔</div></div>
+            </div>
+        </div>
+      )}
     </div>
   );
 }
