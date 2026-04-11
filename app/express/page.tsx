@@ -6,7 +6,7 @@ import Link from "next/link";
 import { supabase } from "../../supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
 
-const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
+const API = "https://petes-ai-studio-backend-v2-73jga2zlcq-lz.a.run.app";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: string; edited?: string; approved?: boolean; video?: string; };
@@ -28,12 +28,10 @@ export default function ExpressPage() {
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
   const [globalStyle, setGlobalStyle] = useState("dusk_blue_hour");
   
-  // NYTT: Order ID og Adresse separert
   const [orderId, setOrderId] = useState("");
   const [orderAddress, setOrderAddress] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
-  // Generer Order ID ved innlasting
   useEffect(() => {
     setOrderId(`ORD-${Math.random().toString(16).slice(2, 8).toUpperCase()}`);
   }, []);
@@ -55,10 +53,50 @@ export default function ExpressPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hiddenMaskCanvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
-  const pollTimer = useRef<NodeJS.Timeout | null>(null);
   const isDrawing = useRef(false);
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
+
+  // ==========================================
+  // SUPABASE REALTIME LISTENER (Radiomottakeren)
+  // ==========================================
+  useEffect(() => {
+    if (!orderId) return;
+
+    // Vi skrur på radiomottakeren og ber den lytte KUN på vår ordre (orderId) i projects-tabellen
+    const channel = supabase
+      .channel(`express_progress_${orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'projects',
+          filter: `name=eq.${orderId}`
+        },
+        (payload) => {
+          const newStatus = payload.new.status;
+          console.log("📡 PUSH VARSEL MOTTATT:", newStatus);
+          
+          if (newStatus === 'completed' || newStatus === 'finished') {
+            setIsRendering(false);
+            setProgressPct(100);
+            loadGallery(orderId);
+          } else if (newStatus === 'processing') {
+            // Vi kan legge inn mer granulær logikk her senere, 
+            // men for nå later vi som om baren beveger seg rolig opp til 90% mens vi venter.
+            setProgressPct(prev => Math.min(prev + 10, 90));
+          }
+        }
+      )
+      .subscribe();
+
+    // Når brukeren forlater siden, slår vi av radioen
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orderId]);
+
 
   const selectStyleAndProceed = (styleId: string) => { setGlobalStyle(styleId); setWizardStep(2); };
 
@@ -90,9 +128,8 @@ export default function ExpressPage() {
   
   const startExpressRender = async () => {
     if (!orderId || uploadedFiles.length === 0) return;
-    if (pollTimer.current) clearTimeout(pollTimer.current);
     
-    setIsRendering(true); setProgressPct(0); setProgressStatus("Uploading to cloud...");
+    setIsRendering(true); setProgressPct(10); setProgressStatus("AI is working...");
     const fd = new FormData(); 
     fd.append('job_name', orderId);
     fd.append('address', orderAddress);
@@ -103,31 +140,10 @@ export default function ExpressPage() {
     fd.append('config', JSON.stringify(cfg));
     
     try { 
+        // Vi trenger ikke lengre kalle pollProgress(). Serveren vil bare svare "started", 
+        // og så vil Supabase sende et push-varsel når den er ferdig!
         await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
-        pollProgress(orderId); 
     } catch (error) { console.error(error); }
-  };
-
-  const pollProgress = async (pollingJobName: string) => {
-  try {
-      // MAGIEN: &t=${Date.now()} tvinger Next.js til å drepe cachen
-      const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}&t=${Date.now()}`, { cache: 'no-store' }); 
-      const s = await r.json();
-      if (s.status === 'finished' || s.status === 'completed') { 
-          setIsRendering(false); setProgressPct(100);
-          if (pollTimer.current) clearTimeout(pollTimer.current);
-          setTimeout(() => { loadGallery(pollingJobName); }, 1000);
-          return; 
-      }
-      if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Processing... ${s.completed} / ${s.total}`); }
-  } catch (e) { console.error(e); }
-  pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
-};
-
-  const handleJobComplete = (targetJobName: string) => {
-      setIsRendering(false); setProgressPct(100);
-      if (pollTimer.current) clearTimeout(pollTimer.current);
-      setTimeout(() => { loadGallery(targetJobName); }, 1500);
   };
 
   const loadGallery = async (name: string) => { 
@@ -150,8 +166,8 @@ export default function ExpressPage() {
   const handleCanvasMouseUp = () => { if (isDrawing.current) { saveCanvasState(); isDrawing.current = false; renderCanvas(); } };
   const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !isDrawing.current) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height); hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); };
 
-  const submitRetouch = async () => { if(!retouchPrompt) return; setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch..."); const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas) return; const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height; const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return; aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height); const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return; const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height); for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } } aCtx.putImageData(maskData, 0, 0); apiCanvas.toBlob(async (b) => { if(!b) return; const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); pollProgress(orderId); } catch(e) { console.error(e); } }, 'image/png'); };
-  const submitRerender = async () => { setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render..."); const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt); try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(orderId); } catch(e) { console.error(e); } };
+  const submitRetouch = async () => { if(!retouchPrompt) return; setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch..."); const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas) return; const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height; const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return; aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height); const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return; const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height); for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } } aCtx.putImageData(maskData, 0, 0); apiCanvas.toBlob(async (b) => { if(!b) return; const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); } catch(e) { console.error(e); } }, 'image/png'); };
+  const submitRerender = async () => { setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render..."); const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt); try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); } catch(e) { console.error(e); } };
   const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(orderId); };
   const deleteSingleImage = async (imgName: string) => { if (!window.confirm("Are you sure you want to permanently delete this image?")) return; const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); try { await fetch(`${API}/delete-image/`, { method: 'POST', body: fd }); setGalleryImages(prev => prev.filter(img => img.name !== imgName)); } catch (e) { console.error("Failed to delete image:", e); } };
   const handleDownloadSingle = async (url: string, filename: string) => { try { const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'file'; document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100); } catch (error) { window.open(url, '_blank'); } };
