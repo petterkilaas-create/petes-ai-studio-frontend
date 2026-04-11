@@ -5,10 +5,19 @@ import { useUser } from "@clerk/nextjs";
 import Autocomplete from "react-google-autocomplete";
 import { supabase } from "../../supabaseClient"; 
 
-const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
+const API = "https://petes-ai-studio-backend-v2-73jga2zlcq-lz.a.run.app";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; };
+
+const STATUS_MESSAGES = [
+    "Directing the AI Cameras...",
+    "Generating cinematic motion...",
+    "Stitching scenes together...",
+    "Adding transitions & text...",
+    "Finalizing property film...",
+    "Polishing frame rates..."
+];
 
 export default function VideoPage() {
   const { user } = useUser();
@@ -27,10 +36,84 @@ export default function VideoPage() {
   const [isRendering, setIsRendering] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
   const [progressStatus, setProgressStatus] = useState("Processing...");
+  const [statusMsgIndex, setStatusMsgIndex] = useState(0);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pollTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // ==========================================
+  // DEN MAGISKE UX-PROGRESJONEN (Fake progress)
+  // ==========================================
+  useEffect(() => {
+    let pctInterval: NodeJS.Timeout;
+    let msgInterval: NodeJS.Timeout;
+
+    if (isRendering) {
+        setProgressPct(0);
+        setStatusMsgIndex(0);
+        setProgressStatus(STATUS_MESSAGES[0]);
+
+        pctInterval = setInterval(() => {
+            setProgressPct(prev => {
+                const remaining = 95 - prev;
+                // Video tar lang tid, så vi gjør progresjonen litt tregere her
+                const step = Math.max(0.05, remaining * 0.02); 
+                return prev >= 95 ? 95 : prev + step;
+            });
+        }, 500);
+
+        msgInterval = setInterval(() => {
+            setStatusMsgIndex(prev => {
+                const next = (prev + 1) % STATUS_MESSAGES.length;
+                setProgressStatus(STATUS_MESSAGES[next]);
+                return next;
+            });
+        }, 6000);
+    }
+
+    return () => {
+        clearInterval(pctInterval);
+        clearInterval(msgInterval);
+    };
+  }, [isRendering]);
+
+  // ==========================================
+  // SUPABASE REALTIME LISTENER (Radiomottakeren)
+  // ==========================================
+  useEffect(() => {
+    if (!orderId) return;
+
+    const channel = supabase
+      .channel(`video_progress_${orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'projects',
+          filter: `name=eq.${orderId}`
+        },
+        (payload) => {
+          if (!payload.new) return;
+          const newStatus = (payload.new as any).status;
+          
+          if (newStatus === 'completed' || newStatus === 'finished') {
+            setProgressPct(100);
+            setProgressStatus("Film Ready! Loading preview...");
+            setTimeout(() => {
+                setIsRendering(false);
+                loadGallery(orderId);
+            }, 800);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orderId]);
+
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
@@ -63,9 +146,15 @@ export default function VideoPage() {
           alert("You need to add at least 2 scenes to the timeline to generate a film.");
           return;
       }
-      if (pollTimer.current) clearTimeout(pollTimer.current);
       
-      setIsRendering(true); setProgressPct(0); setProgressStatus("Directing the AI Cameras...");
+      setIsRendering(true);
+
+      // Opprett rad i Supabase først (uten RLS-blokkering nå!)
+      if (user) {
+          await supabase.from('projects').insert([
+              { name: orderId, address: orderAddress, status: 'processing', user_id: user.id }
+          ]);
+      }
 
       const fd = new FormData();
       fd.append('job_name', orderId);
@@ -82,24 +171,9 @@ export default function VideoPage() {
       fd.append('config', JSON.stringify(cfg));
 
       try {
+          // Vi stoler nå på Realtime lytteren vår!
           await fetch(`${API}/start-property-film/`, { method: 'POST', body: fd });
-          pollProgress(orderId);
       } catch (error) { console.error(error); }
-  };
-
-  const pollProgress = async (pollingJobName: string) => {
-    try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}&t=${Date.now()}`, { cache: 'no-store' }); 
-        const s = await r.json();
-        if (s.status === 'finished' || s.status === 'completed') { 
-            setIsRendering(false); setProgressPct(100);
-            if (pollTimer.current) clearTimeout(pollTimer.current);
-            setTimeout(() => { loadGallery(pollingJobName); }, 1500);
-            return; 
-        }
-        if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Rendering Video Frames...`); }
-    } catch (e) { console.error(e); }
-    pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 4000); 
   };
 
   const loadGallery = async (name: string) => { 
@@ -149,7 +223,7 @@ export default function VideoPage() {
                       onPlaceSelected={(place) => { 
                           if (place && place.formatted_address) { 
                               setOrderAddress(place.formatted_address); 
-                              setVideoMeta(prev => ({...prev, address: place.formatted_address || ""})); // Auto-fill video meta too
+                              setVideoMeta(prev => ({...prev, address: place.formatted_address || ""})); 
                           } 
                       }}
                       options={{ types: ["address"], componentRestrictions: { country: "no" } }}
@@ -226,11 +300,13 @@ export default function VideoPage() {
           </div>
         )}
 
+        {/* --- RENDERING SPINNER --- */}
         {isRendering && (
-          <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 rounded-3xl bg-[#0f172a]/50 border border-purple-500/30">
-              <p className="font-black uppercase tracking-widest text-sm text-purple-400 animate-pulse">{progressStatus}</p>
+          <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 rounded-3xl bg-[#0f172a]/50 border border-purple-500/30 shadow-2xl mt-10">
+              <div className="text-6xl animate-bounce mb-4">🎬</div>
+              <p className="font-black uppercase tracking-[0.3em] text-sm text-purple-400 transition-all">{progressStatus}</p>
               <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10">
-                  <div className="bg-purple-500 h-full rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(147,51,234,0.5)]" style={{ width: `${progressPct}%` }}></div>
+                <div className="bg-gradient-to-r from-purple-600 to-purple-500 h-full rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(147,51,234,0.8)]" style={{ width: `${progressPct}%` }}></div>
               </div>
           </div>
         )}
