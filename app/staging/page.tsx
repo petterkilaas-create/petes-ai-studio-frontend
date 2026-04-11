@@ -96,13 +96,14 @@ export default function StagingPage() {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*', // Lytter nå på BÅDE opprettelse og oppdatering i databasen
           schema: 'public',
           table: 'projects',
           filter: `name=eq.${orderId}`
         },
         (payload) => {
-          const newStatus = payload.new.status;
+          if (!payload.new) return;
+          const newStatus = (payload.new as any).status;
           
           if (newStatus === 'completed' || newStatus === 'finished') {
             setProgressPct(100);
@@ -175,6 +176,14 @@ export default function StagingPage() {
   const startStagingRender = async () => {
     if (!orderId) return;
     setIsRendering(true); 
+
+    // NYTT: Vi oppretter raden i databasen FØR vi starter backend!
+    if (user) {
+        await supabase.from('projects').insert([
+            { name: orderId, address: orderAddress, status: 'processing', user_id: user.id }
+        ]);
+    }
+
     const fd = new FormData(); 
     fd.append('job_name', orderId);
     fd.append('address', orderAddress);
@@ -194,7 +203,6 @@ export default function StagingPage() {
     fd.append('config', JSON.stringify(cfg));
     
     try { 
-        // Vi trenger ikke lengre kalle pollProgress(). Serveren svarer, Supabase lytter!
         await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); 
     } catch (error) { console.error(error); }
   };
