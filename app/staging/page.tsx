@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs"; // <-- VIP pass
 import { supabase } from "../../supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
 
@@ -21,6 +21,7 @@ const STATUS_MESSAGES = [
 
 export default function StagingPage() {
   const { user } = useUser();
+  const { getToken } = useAuth(); // <-- VIP pass
 
   const [orderId, setOrderId] = useState("");
   const [orderAddress, setOrderAddress] = useState("");
@@ -86,41 +87,50 @@ export default function StagingPage() {
   }, [isRendering]);
 
   // ==========================================
-  // SUPABASE REALTIME LISTENER (Radiomottakeren)
+  // SIKKERHETSNETTET (Fallback Poller) + RADIO
   // ==========================================
   useEffect(() => {
     if (!orderId) return;
 
     const channel = supabase
       .channel(`staging_progress_${orderId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Lytter nå på BÅDE opprettelse og oppdatering i databasen
-          schema: 'public',
-          table: 'projects',
-          filter: `name=eq.${orderId}`
-        },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `name=eq.${orderId}` },
         (payload) => {
           if (!payload.new) return;
           const newStatus = (payload.new as any).status;
-          
           if (newStatus === 'completed' || newStatus === 'finished') {
-            setProgressPct(100);
-            setProgressStatus("Staging Complete! Loading gallery...");
-            setTimeout(() => {
-                setIsRendering(false);
-                loadGallery(orderId);
-            }, 600);
+            triggerFinish();
           }
         }
-      )
-      .subscribe();
+      ).subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [orderId]);
+
+  useEffect(() => {
+    let fallbackTimer: NodeJS.Timeout;
+    if (isRendering && orderId) {
+        fallbackTimer = setInterval(async () => {
+            try {
+                const { data } = await supabase.from('projects').select('status').eq('name', orderId).single();
+                if (data && (data.status === 'completed' || data.status === 'finished')) {
+                    console.log("Sikkerhetsnett fanget opp at jobben er ferdig!");
+                    triggerFinish();
+                }
+            } catch (e) { console.error("Poller error:", e); }
+        }, 5000);
+    }
+    return () => { if (fallbackTimer) clearInterval(fallbackTimer); };
+  }, [isRendering, orderId]);
+
+  const triggerFinish = () => {
+      setProgressPct(100);
+      setProgressStatus("Staging Complete! Loading gallery...");
+      setTimeout(() => {
+          setIsRendering(false);
+          loadGallery(orderId);
+      }, 800);
+  };
 
   const addRoom = () => {
     const newId = roomCounter + 1;
@@ -177,7 +187,6 @@ export default function StagingPage() {
     if (!orderId) return;
     setIsRendering(true); 
 
-    // NYTT: Vi oppretter raden i databasen FØR vi starter backend!
     if (user) {
         await supabase.from('projects').insert([
             { name: orderId, address: orderAddress, status: 'processing', user_id: user.id }
@@ -203,7 +212,12 @@ export default function StagingPage() {
     fd.append('config', JSON.stringify(cfg));
     
     try { 
-        await fetch(`${API}/start-staging-job/`, { method: 'POST', body: fd }); 
+        const token = await getToken(); // <-- Henter VIP Passet
+        await fetch(`${API}/start-staging-job/`, { 
+            method: 'POST', 
+            headers: { 'Authorization': `Bearer ${token}` }, // <-- Sender inn VIP passet
+            body: fd 
+        }); 
     } catch (error) { console.error(error); }
   };
 
