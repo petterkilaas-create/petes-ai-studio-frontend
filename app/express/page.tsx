@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useUser, UserButton } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { supabase } from "../../supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
@@ -32,6 +32,7 @@ const STATUS_MESSAGES = [
 
 export default function ExpressPage() {
   const { user } = useUser();
+  const { getToken } = useAuth(); // <-- VIP Pass for Clerk
 
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
   const [globalStyle, setGlobalStyle] = useState("dusk_blue_hour");
@@ -102,41 +103,50 @@ export default function ExpressPage() {
   }, [isRendering]);
 
   // ==========================================
-  // SUPABASE REALTIME LISTENER (Radiomottakeren)
+  // SIKKERHETSNETTET (Fallback Poller) + RADIO
   // ==========================================
   useEffect(() => {
     if (!orderId) return;
 
     const channel = supabase
       .channel(`express_progress_${orderId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'projects',
-          filter: `name=eq.${orderId}`
-        },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `name=eq.${orderId}` },
         (payload) => {
-          const newStatus = payload.new.status;
-          
+          if (!payload.new) return;
+          const newStatus = (payload.new as any).status;
           if (newStatus === 'completed' || newStatus === 'finished') {
-            setProgressPct(100);
-            setProgressStatus("Complete! Loading gallery...");
-            setTimeout(() => {
-                setIsRendering(false);
-                loadGallery(orderId);
-            }, 600);
+            triggerFinish();
           }
         }
-      )
-      .subscribe();
+      ).subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [orderId]);
 
+  useEffect(() => {
+    let fallbackTimer: NodeJS.Timeout;
+    if (isRendering && orderId) {
+        fallbackTimer = setInterval(async () => {
+            try {
+                const { data } = await supabase.from('projects').select('status').eq('name', orderId).single();
+                if (data && (data.status === 'completed' || data.status === 'finished')) {
+                    console.log("Sikkerhetsnett fanget opp at jobben er ferdig!");
+                    triggerFinish();
+                }
+            } catch (e) { console.error("Poller error:", e); }
+        }, 5000);
+    }
+    return () => { if (fallbackTimer) clearInterval(fallbackTimer); };
+  }, [isRendering, orderId]);
+
+  const triggerFinish = () => {
+      setProgressPct(100);
+      setProgressStatus("Complete! Loading gallery...");
+      setTimeout(() => {
+          setIsRendering(false);
+          loadGallery(orderId);
+      }, 800);
+  };
 
   const selectStyleAndProceed = (styleId: string) => { setGlobalStyle(styleId); setWizardStep(2); };
 
@@ -170,6 +180,13 @@ export default function ExpressPage() {
     if (!orderId || uploadedFiles.length === 0) return;
     
     setIsRendering(true);
+
+    if (user) {
+        await supabase.from('projects').insert([
+            { name: orderId, address: orderAddress, status: 'processing', user_id: user.id }
+        ]);
+    }
+
     const fd = new FormData(); 
     fd.append('job_name', orderId);
     fd.append('address', orderAddress);
@@ -180,7 +197,12 @@ export default function ExpressPage() {
     fd.append('config', JSON.stringify(cfg));
     
     try { 
-        await fetch(`${API}/start-job/`, { method: 'POST', body: fd }); 
+        const token = await getToken();
+        await fetch(`${API}/start-job/`, { 
+            method: 'POST', 
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: fd 
+        }); 
     } catch (error) { console.error(error); }
   };
 
@@ -204,12 +226,68 @@ export default function ExpressPage() {
   const handleCanvasMouseUp = () => { if (isDrawing.current) { saveCanvasState(); isDrawing.current = false; renderCanvas(); } };
   const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !isDrawing.current) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height); hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); };
 
-  const submitRetouch = async () => { if(!retouchPrompt) return; setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); setIsRendering(true); const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas) return; const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height; const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return; aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height); const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return; const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height); for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } } aCtx.putImageData(maskData, 0, 0); apiCanvas.toBlob(async (b) => { if(!b) return; const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); } catch(e) { console.error(e); } }, 'image/png'); };
-  const submitRerender = async () => { setActiveModal('none'); if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); setIsRendering(true); const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt); try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); } catch(e) { console.error(e); } };
-  const approveImage = async (imgName: string) => { const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(orderId); };
-  const deleteSingleImage = async (imgName: string) => { if (!window.confirm("Are you sure you want to permanently delete this image?")) return; const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); try { await fetch(`${API}/delete-image/`, { method: 'POST', body: fd }); setGalleryImages(prev => prev.filter(img => img.name !== imgName)); } catch (e) { console.error("Failed to delete image:", e); } };
-  const handleDownloadSingle = async (url: string, filename: string) => { try { const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'file'; document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100); } catch (error) { window.open(url, '_blank'); } };
-  const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => { const rect = e.currentTarget.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 100; const percent = Math.max(0, Math.min(100, x)); const beforeImg = document.getElementById('modalBefore'); const handle = document.getElementById('modalHandle'); if (beforeImg && handle) { beforeImg.style.clipPath = `inset(0 ${100 - percent}% 0 0)`; handle.style.left = `${percent}%`; } };
+  const submitRetouch = async () => { 
+      if(!retouchPrompt) return; 
+      setActiveModal('none'); 
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); 
+      setIsRendering(true); 
+      
+      const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; 
+      if (!canvas || !hiddenCanvas) return; 
+      const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height; 
+      const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return; aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height); 
+      const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return; 
+      const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height); 
+      for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } } 
+      aCtx.putImageData(maskData, 0, 0); 
+      
+      apiCanvas.toBlob(async (b) => { 
+          if(!b) return; 
+          const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
+          try { 
+              const token = await getToken();
+              await fetch(`${API}/execute-retouch/`, { 
+                  method:'POST', 
+                  headers: { 'Authorization': `Bearer ${token}` }, // DØRVAKT TIL RETOUCH
+                  body:fd 
+              }); 
+          } catch(e) { console.error(e); } 
+      }, 'image/png'); 
+  };
+
+  const submitRerender = async () => { 
+      setActiveModal('none'); 
+      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); 
+      setIsRendering(true); 
+      const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt); 
+      try { 
+          const token = await getToken();
+          await fetch(`${API}/re-render-single/`, { 
+              method: 'POST', 
+              headers: { 'Authorization': `Bearer ${token}` }, // DØRVAKT TIL RERENDER
+              body: fd 
+          }); 
+      } catch(e) { console.error(e); } 
+  };
+
+  const approveImage = async (imgName: string) => { 
+      const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); 
+      await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(orderId); 
+  };
+  
+  const deleteSingleImage = async (imgName: string) => { 
+      if (!window.confirm("Are you sure you want to permanently delete this image?")) return; 
+      const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); 
+      try { await fetch(`${API}/delete-image/`, { method: 'POST', body: fd }); setGalleryImages(prev => prev.filter(img => img.name !== imgName)); } catch (e) { console.error("Failed to delete image:", e); } 
+  };
+  
+  const handleDownloadSingle = async (url: string, filename: string) => { 
+      try { const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'file'; document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100); } catch (error) { window.open(url, '_blank'); } 
+  };
+  
+  const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => { 
+      const rect = e.currentTarget.getBoundingClientRect(); const x = ((e.clientX - rect.left) / rect.width) * 100; const percent = Math.max(0, Math.min(100, x)); const beforeImg = document.getElementById('modalBefore'); const handle = document.getElementById('modalHandle'); if (beforeImg && handle) { beforeImg.style.clipPath = `inset(0 ${100 - percent}% 0 0)`; handle.style.left = `${percent}%`; } 
+  };
 
   useEffect(() => { const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setActiveModal('none'); if ((e.metaKey || e.ctrlKey) && e.key === 'z') undoCanvas(); }; window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown); }, []);
 
