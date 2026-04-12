@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs"; // <-- VIP Pass
 import Autocomplete from "react-google-autocomplete";
 import { supabase } from "../../supabaseClient"; 
 
@@ -21,6 +21,7 @@ const STATUS_MESSAGES = [
 
 export default function VideoPage() {
   const { user } = useUser();
+  const { getToken } = useAuth(); // <-- Henter ut det magiske passet!
 
   const [orderId, setOrderId] = useState("");
   const [orderAddress, setOrderAddress] = useState("");
@@ -184,7 +185,12 @@ export default function VideoPage() {
       fd.append('config', JSON.stringify(cfg));
 
       try {
-          await fetch(`${API}/start-property-film/`, { method: 'POST', body: fd });
+          const token = await getToken(); // <-- Henter VIP Passet!
+          await fetch(`${API}/start-property-film/`, { 
+              method: 'POST', 
+              headers: { 'Authorization': `Bearer ${token}` }, // <-- Viser VIP passet til dørvakten
+              body: fd 
+          });
       } catch (error) { console.error(error); }
   };
 
