@@ -56,7 +56,6 @@ export default function VideoPage() {
         pctInterval = setInterval(() => {
             setProgressPct(prev => {
                 const remaining = 95 - prev;
-                // Video tar lang tid, så vi gjør progresjonen litt tregere her
                 const step = Math.max(0.05, remaining * 0.02); 
                 return prev >= 95 ? 95 : prev + step;
             });
@@ -78,41 +77,56 @@ export default function VideoPage() {
   }, [isRendering]);
 
   // ==========================================
-  // SUPABASE REALTIME LISTENER (Radiomottakeren)
+  // SIKKERHETSNETTET (Fallback Poller) + RADIO
   // ==========================================
   useEffect(() => {
     if (!orderId) return;
 
+    // 1. Radioen (Rask, men kan sovne)
     const channel = supabase
       .channel(`video_progress_${orderId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'projects',
-          filter: `name=eq.${orderId}`
-        },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `name=eq.${orderId}` },
         (payload) => {
           if (!payload.new) return;
           const newStatus = (payload.new as any).status;
-          
           if (newStatus === 'completed' || newStatus === 'finished') {
-            setProgressPct(100);
-            setProgressStatus("Film Ready! Loading preview...");
-            setTimeout(() => {
-                setIsRendering(false);
-                loadGallery(orderId);
-            }, 800);
+            triggerFinish();
           }
         }
-      )
-      .subscribe();
+      ).subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [orderId]);
+
+  useEffect(() => {
+    let fallbackTimer: NodeJS.Timeout;
+
+    // 2. Sikkerhetsnettet (Spør Supabase forsiktig hvert 5. sekund KUN når vi rendrer)
+    if (isRendering && orderId) {
+        fallbackTimer = setInterval(async () => {
+            try {
+                const { data } = await supabase.from('projects').select('status').eq('name', orderId).single();
+                if (data && (data.status === 'completed' || data.status === 'finished')) {
+                    console.log("Sikkerhetsnett fanget opp at jobben er ferdig!");
+                    triggerFinish();
+                }
+            } catch (e) {
+                console.error("Poller error:", e);
+            }
+        }, 5000);
+    }
+
+    return () => { if (fallbackTimer) clearInterval(fallbackTimer); };
+  }, [isRendering, orderId]);
+
+  const triggerFinish = () => {
+      setProgressPct(100);
+      setProgressStatus("Film Ready! Loading preview...");
+      setTimeout(() => {
+          setIsRendering(false);
+          loadGallery(orderId);
+      }, 800);
+  };
 
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,7 +163,6 @@ export default function VideoPage() {
       
       setIsRendering(true);
 
-      // Opprett rad i Supabase først (uten RLS-blokkering nå!)
       if (user) {
           await supabase.from('projects').insert([
               { name: orderId, address: orderAddress, status: 'processing', user_id: user.id }
@@ -171,7 +184,6 @@ export default function VideoPage() {
       fd.append('config', JSON.stringify(cfg));
 
       try {
-          // Vi stoler nå på Realtime lytteren vår!
           await fetch(`${API}/start-property-film/`, { method: 'POST', body: fd });
       } catch (error) { console.error(error); }
   };
