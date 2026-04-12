@@ -122,8 +122,11 @@ export default function StagingPage() {
     setIsRendering(true); 
 
     if (user) {
-        await supabase.from('projects').insert([{ name: orderId, address: orderAddress, status: 'processing', user_id: user.id }]);
-    }
+    await supabase.from('projects').upsert(
+        { name: orderId, address: orderAddress, status: 'processing', user_id: user.id },
+        { onConflict: 'name' }
+    );
+}
 
     const fd = new FormData(); 
     fd.append('job_name', orderId);
