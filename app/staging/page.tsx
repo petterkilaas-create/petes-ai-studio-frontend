@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useUser, useAuth } from "@clerk/nextjs"; // <-- VIP pass
+import { useUser, useAuth } from "@clerk/nextjs";
 import { supabase } from "../../supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
 
 const API = "https://petes-ai-studio-backend-v2-73jga2zlcq-lz.a.run.app";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
-type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; };
+type StagingRoom = { id: string; style: string; hero_img_id: string | null; images: string[]; room_category?: string; target_audience?: string; styling_density?: string; season?: string; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: string; edited?: string; approved?: boolean; };
 
 const STATUS_MESSAGES = [
@@ -21,7 +21,7 @@ const STATUS_MESSAGES = [
 
 export default function StagingPage() {
   const { user } = useUser();
-  const { getToken } = useAuth(); // <-- VIP pass
+  const { getToken } = useAuth();
 
   const [orderId, setOrderId] = useState("");
   const [orderAddress, setOrderAddress] = useState("");
@@ -42,7 +42,7 @@ export default function StagingPage() {
   const [activeModal, setActiveModal] = useState<'none' | 'mask' | 'compare'>('none');
   const [currentCanvasImgId, setCurrentCanvasImgId] = useState("");
   const [brushSize, setBrushSize] = useState(50);
-  const [compareData, setCompareData] = useState({ raw: "", edited: "" });
+  const [activeTab, setActiveTab] = useState<'staging' | 'renovation' | 'staging_plus'>('staging');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -114,7 +114,6 @@ export default function StagingPage() {
             try {
                 const { data } = await supabase.from('projects').select('status').eq('name', orderId).single();
                 if (data && (data.status === 'completed' || data.status === 'finished')) {
-                    console.log("Sikkerhetsnett fanget opp at jobben er ferdig!");
                     triggerFinish();
                 }
             } catch (e) { console.error("Poller error:", e); }
@@ -135,11 +134,24 @@ export default function StagingPage() {
   const addRoom = () => {
     const newId = roomCounter + 1;
     setRoomCounter(newId);
-    setStagingRooms(prev => [...prev, { id: `room_${newId}`, style: "staging_scandi", hero_img_id: null, images: [] }]);
+    setStagingRooms(prev => [...prev, { 
+        id: `room_${newId}`, 
+        style: "staging_nordic_minimalist", 
+        hero_img_id: null, 
+        images: [],
+        room_category: "Living Room",
+        target_audience: "Families",
+        styling_density: "Medium",
+        season: "none"
+    }]);
   };
 
   const updateRoomStyle = (roomId: string, newStyle: string) => {
     setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, style: newStyle } : r));
+  };
+
+  const updateRoomMetadata = (roomId: string, field: keyof StagingRoom, value: string) => {
+    setStagingRooms(prev => prev.map(r => r.id === roomId ? { ...r, [field]: value } : r));
   };
 
   const setHero = (roomId: string, imgId: string) => {
@@ -205,17 +217,25 @@ export default function StagingPage() {
             if (f) { 
                 fd.append('files', f.file); 
                 if (f.maskBlob) fd.append('files', f.maskBlob, `MASK_${f.file.name}.png`); 
-                cfg[f.file.name] = { room_id: room.id, is_hero: room.hero_img_id === imgId, style: room.style }; 
+                cfg[f.file.name] = { 
+                    room_id: room.id, 
+                    is_hero: room.hero_img_id === imgId, 
+                    style: room.style,
+                    room_category: room.room_category || "Living Room",
+                    target_audience: room.target_audience || "Families",
+                    styling_density: room.styling_density || "Medium",
+                    season: room.season || "none"
+                }; 
             }
         });
     });
     fd.append('config', JSON.stringify(cfg));
     
     try { 
-        const token = await getToken(); // <-- Henter VIP Passet
+        const token = await getToken();
         await fetch(`${API}/start-staging-job/`, { 
             method: 'POST', 
-            headers: { 'Authorization': `Bearer ${token}` }, // <-- Sender inn VIP passet
+            headers: { 'Authorization': `Bearer ${token}` },
             body: fd 
         }); 
     } catch (error) { console.error(error); }
@@ -287,8 +307,17 @@ export default function StagingPage() {
 
       <main className="flex-1 max-w-6xl mx-auto w-full p-8">
         <div className="mb-12 bg-[#0f172a] border border-slate-800 rounded-3xl p-8 shadow-xl flex justify-between items-start">
-            <div>
-                <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-4">🛋️ Virtual Staging</h1>
+            <div className="flex-1">
+                <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-6">
+                    {activeTab === 'staging' && '🛋️ Virtual Staging'}
+                    {activeTab === 'renovation' && '🔨 Renovation'}
+                    {activeTab === 'staging_plus' && '✨ Staging+'}
+                </h1>
+                <div className="flex gap-3 mb-4">
+                    <button onClick={() => setActiveTab('staging')} className={`px-6 py-2 rounded-full font-black uppercase tracking-widest text-xs transition-all ${activeTab === 'staging' ? 'bg-[#009183] text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>🛋️ Staging</button>
+                    <button onClick={() => setActiveTab('renovation')} className={`px-6 py-2 rounded-full font-black uppercase tracking-widest text-xs transition-all ${activeTab === 'renovation' ? 'bg-[#009183] text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>🔨 Renovation</button>
+                    <button onClick={() => setActiveTab('staging_plus')} className={`px-6 py-2 rounded-full font-black uppercase tracking-widest text-xs transition-all ${activeTab === 'staging_plus' ? 'bg-[#009183] text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>✨ Staging+</button>
+                </div>
                 <p className="text-slate-400 max-w-2xl">Transform empty spaces into furnished, inviting homes. Group photos by room and set a &quot;Hero&quot; angle.</p>
             </div>
             <div className="text-right border border-white/10 px-4 py-2 rounded-xl bg-white/5">
@@ -297,72 +326,129 @@ export default function StagingPage() {
             </div>
         </div>
 
-        {uploadedFiles.length === 0 && galleryImages.length === 0 && (
-            <div className="glass p-16 border-2 border-dashed border-[#009183]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(0,145,131,0.05)]">
-                <div className="w-full max-w-2xl mx-auto space-y-4">
-                    <label className="text-[10px] font-bold text-[#009183] uppercase tracking-[0.2em] block text-center mb-6">
-                        📍 Søk etter eiendommens adresse
-                    </label>
-                    <Autocomplete
-                        apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-                        onPlaceSelected={(place) => { if (place && place.formatted_address) { setOrderAddress(place.formatted_address); } }}
-                        options={{ types: ["address"], componentRestrictions: { country: "no" } }}
-                        placeholder="START Å SKRIVE ADRESSE..."
-                        className="w-full bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-[#009183] uppercase pb-4 transition-colors text-center placeholder:text-slate-600"
-                    />
-                    {orderAddress && (
-                        <div className="mt-8 p-6 bg-[#0B1120] rounded-2xl border border-[#009183]/30 text-center animate-in fade-in duration-300">
-                            <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Prosjekt opprettet:</p>
-                            <p className="text-xl text-[#00ff83] font-black uppercase tracking-wider">{orderAddress}</p>
-                        </div>
-                    )}
+        {activeTab === 'staging' && (
+          <>
+            {uploadedFiles.length === 0 && galleryImages.length === 0 && (
+                <div className="glass p-16 border-2 border-dashed border-[#009183]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(0,145,131,0.05)]">
+                    <div className="w-full max-w-2xl mx-auto space-y-4">
+                        <label className="text-[10px] font-bold text-[#009183] uppercase tracking-[0.2em] block text-center mb-6">
+                            📍 Søk etter eiendommens adresse
+                        </label>
+                        <Autocomplete
+                            apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                            onPlaceSelected={(place) => { if (place && place.formatted_address) { setOrderAddress(place.formatted_address); } }}
+                            options={{ types: ["address"], componentRestrictions: { country: "no" } }}
+                            placeholder="START Å SKRIVE ADRESSE..."
+                            className="w-full bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-[#009183] uppercase pb-4 transition-colors text-center placeholder:text-slate-600"
+                        />
+                        {orderAddress && (
+                            <div className="mt-8 p-6 bg-[#0B1120] rounded-2xl border border-[#009183]/30 text-center animate-in fade-in duration-300">
+                                <p className="text-xs text-slate-400 uppercase tracking-widest font-bold mb-2">Prosjekt opprettet:</p>
+                                <p className="text-xl text-[#00ff83] font-black uppercase tracking-wider">{orderAddress}</p>
+                            </div>
+                        )}
+                    </div>
+                    <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+                    <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full font-black uppercase tracking-widest text-xs shadow-[0_0_20px_rgba(0,145,131,0.4)] transition-all">Upload Images</button>
                 </div>
-                <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
-                <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full font-black uppercase tracking-widest text-xs shadow-[0_0_20px_rgba(0,145,131,0.4)] transition-all">Upload Images</button>
-            </div>
-        )}
+            )}
 
-        {uploadedFiles.length > 0 && !isRendering && galleryImages.length === 0 && (
-            <div className="flex gap-8 animate-in fade-in duration-500">
-                {/* UNASSIGNED POOL */}
-                <div className="w-1/3 bg-[#0B1120] p-6 rounded-3xl border border-slate-800">
-                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Unassigned Photos</h3>
-                    <div className="flex flex-wrap gap-3 p-4 bg-[#0f172a] rounded-2xl min-h-[400px]" onDragOver={handleDragOver} onDrop={(e) => handleStagingDrop(e, 'unassigned')}>
-                        {unassigned.map(f => (
-                            <img key={f.id} src={f.url} draggable onDragStart={(e) => handleDragStart(e, f.id)} className="w-24 h-24 object-cover rounded-xl border border-white/5 cursor-grab" alt="Upload"/>
+            {uploadedFiles.length > 0 && !isRendering && galleryImages.length === 0 && (
+                <div className="flex gap-8 animate-in fade-in duration-500">
+                    {/* UNASSIGNED POOL */}
+                    <div className="w-1/3 bg-[#0B1120] p-6 rounded-3xl border border-slate-800">
+                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Unassigned Photos</h3>
+                        <div className="flex flex-wrap gap-3 p-4 bg-[#0f172a] rounded-2xl min-h-[400px]" onDragOver={handleDragOver} onDrop={(e) => handleStagingDrop(e, 'unassigned')}>
+                            {unassigned.map(f => (
+                                <img key={f.id} src={f.url} draggable onDragStart={(e) => handleDragStart(e, f.id)} className="w-24 h-24 object-cover rounded-xl border border-white/5 cursor-grab" alt="Upload"/>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* ROOMS */}
+                    <div className="flex-1 space-y-6">
+                        <div className="flex justify-between items-center"><h3 className="text-xs font-black text-white uppercase tracking-widest">Room Layout</h3><button onClick={addRoom} className="px-4 py-2 border border-[#009183] text-[#009183] text-[10px] font-black uppercase rounded-xl hover:bg-[#009183]/10">Add Room</button></div>
+                        {stagingRooms.map((room, i) => (
+                            <div key={room.id} className="bg-[#0f172a] p-6 rounded-3xl border border-slate-800" onDragOver={handleDragOver} onDrop={(e) => handleStagingDrop(e, room.id)}>
+                                
+                                {/* DET NYE KONTROLLPANELET STARTER HER */}
+                                <div className="flex flex-col gap-3 mb-6 bg-[#0B1120] p-4 rounded-2xl border border-white/5">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ROOM {i+1} CONFIGURATION</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <select value={room.style} onChange={(e) => updateRoomMetadata(room.id, 'style', e.target.value)} className="bg-[#0f172a] text-[10px] font-bold uppercase p-3 rounded-xl border border-slate-700 outline-none focus:border-[#009183] text-white">
+                                            <optgroup label="Interior Styles">
+                                                <option value="staging_nordic_minimalist">Nordic Minimalist</option>
+                                                <option value="staging_japandi">Japandi</option>
+                                                <option value="staging_scandi_classic">Scandi Classic</option>
+                                                <option value="staging_soft_industrial">Soft Industrial</option>
+                                                <option value="staging_cozy_rustic_hygge">Cozy Rustic (Hygge)</option>
+                                            </optgroup>
+                                            <optgroup label="Exterior Styles">
+                                                <option value="staging_nordic_modern_steel">Modern Steel (Outdoor)</option>
+                                                <option value="staging_coastal_teak_luxury">Coastal Teak (Outdoor)</option>
+                                                <option value="staging_urban_balcony_bistro">Urban Balcony (Outdoor)</option>
+                                                <option value="staging_social_lounge_resort">Resort Lounge (Outdoor)</option>
+                                                <option value="staging_winter_terrace_hygge">Winter Terrace (Outdoor)</option>
+                                            </optgroup>
+                                        </select>
+                                        <select value={room.room_category} onChange={(e) => updateRoomMetadata(room.id, 'room_category', e.target.value)} className="bg-[#0f172a] text-[10px] font-bold uppercase p-3 rounded-xl border border-slate-700 outline-none focus:border-[#009183] text-white">
+                                            <option value="Living Room">Living Room</option>
+                                            <option value="Kitchen">Kitchen</option>
+                                            <option value="Bedroom">Bedroom</option>
+                                            <option value="Bathroom">Bathroom</option>
+                                            <option value="Office">Office</option>
+                                            <option value="Outdoor Patio">Outdoor Patio</option>
+                                            <option value="Balcony">Balcony</option>
+                                        </select>
+                                        <select value={room.target_audience} onChange={(e) => updateRoomMetadata(room.id, 'target_audience', e.target.value)} className="bg-[#0f172a] text-[10px] font-bold uppercase p-3 rounded-xl border border-slate-700 outline-none focus:border-[#009183] text-white">
+                                            <option value="Families">Families</option>
+                                            <option value="Young Professionals">Young Professionals</option>
+                                            <option value="High-Net-Worth Individuals">High-Net-Worth Individuals</option>
+                                            <option value="Tech-Savvy Renters">Tech-Savvy Renters</option>
+                                        </select>
+                                        <select value={room.styling_density} onChange={(e) => updateRoomMetadata(room.id, 'styling_density', e.target.value)} className="bg-[#0f172a] text-[10px] font-bold uppercase p-3 rounded-xl border border-slate-700 outline-none focus:border-[#009183] text-white">
+                                            <option value="Medium">Medium Density</option>
+                                            <option value="Low (Minimalist)">Low (Minimalist)</option>
+                                            <option value="High (Hygge)">High (Lived-in)</option>
+                                        </select>
+                                        <select value={room.season} onChange={(e) => updateRoomMetadata(room.id, 'season', e.target.value)} className="bg-[#0f172a] text-[10px] font-bold uppercase p-3 rounded-xl border border-slate-700 outline-none focus:border-[#009183] text-white col-span-2">
+                                            <option value="none">Default Lighting</option>
+                                            <option value="summer">Summer Light</option>
+                                            <option value="spring">Spring Light</option>
+                                            <option value="autumn_winter">Autumn/Winter Light</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                {/* DET NYE KONTROLLPANELET SLUTTER HER */}
+
+                                <div className="flex flex-wrap gap-4 min-h-[120px]">
+                                    {room.images.map(imgId => {
+                                        const f = uploadedFiles.find(x => x.id === imgId);
+                                        if(!f) return null;
+                                        const isHero = room.hero_img_id === imgId;
+                                        return (
+                                            <div key={f.id} className="relative w-28 h-28 group">
+                                                <img src={f.url} className={`w-full h-full object-cover rounded-xl border-2 ${isHero ? 'border-[#00ff83]' : 'border-transparent'}`} alt="Room img" />
+                                                <div onClick={() => openCanvasStudio(f.id)} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl cursor-pointer text-[10px] text-white font-black uppercase text-center leading-tight px-2">🖌️ Mask Floor</div>
+                                                <div onClick={() => setHero(room.id, f.id)} className={`absolute -top-2 -left-2 text-xl cursor-pointer ${isHero ? '' : 'grayscale'}`}>⭐</div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
                         ))}
+                        <div className="flex justify-end pt-6"><button onClick={startStagingRender} className="px-12 py-4 bg-gradient-to-r from-[#009183] to-[#00b09f] text-white font-black uppercase text-xs rounded-full shadow-[0_0_30px_rgba(0,145,131,0.4)] hover:scale-105 transition-transform">Generate Rooms</button></div>
                     </div>
                 </div>
-
-                {/* ROOMS */}
-                <div className="flex-1 space-y-6">
-                    <div className="flex justify-between items-center"><h3 className="text-xs font-black text-white uppercase tracking-widest">Room Layout</h3><button onClick={addRoom} className="px-4 py-2 border border-[#009183] text-[#009183] text-[10px] font-black uppercase rounded-xl hover:bg-[#009183]/10">Add Room</button></div>
-                    {stagingRooms.map((room, i) => (
-                        <div key={room.id} className="bg-[#0f172a] p-6 rounded-3xl border border-slate-800" onDragOver={handleDragOver} onDrop={(e) => handleStagingDrop(e, room.id)}>
-                            <div className="flex justify-between items-center mb-4">
-                                <span className="text-xs font-black text-slate-300">ROOM {i+1}</span>
-                                <select value={room.style} onChange={(e) => updateRoomStyle(room.id, e.target.value)} className="bg-[#0B1120] text-xs font-bold uppercase p-2 rounded-lg border border-slate-700 outline-none focus:border-[#009183]"><option value="staging_scandi">Scandinavian</option><option value="staging_luxury">Luxury</option><option value="staging_outdoor">Outdoor Lounge</option></select>
-                            </div>
-                            <div className="flex flex-wrap gap-4 min-h-[120px]">
-                                {room.images.map(imgId => {
-                                    const f = uploadedFiles.find(x => x.id === imgId);
-                                    if(!f) return null;
-                                    const isHero = room.hero_img_id === imgId;
-                                    return (
-                                        <div key={f.id} className="relative w-28 h-28 group">
-                                            <img src={f.url} className={`w-full h-full object-cover rounded-xl border-2 ${isHero ? 'border-[#00ff83]' : 'border-transparent'}`} alt="Room img" />
-                                            <div onClick={() => openCanvasStudio(f.id)} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl cursor-pointer text-[10px] text-white font-black uppercase text-center leading-tight px-2">🖌️ Mask Floor</div>
-                                            <div onClick={() => setHero(room.id, f.id)} className={`absolute -top-2 -left-2 text-xl cursor-pointer ${isHero ? '' : 'grayscale'}`}>⭐</div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    ))}
-                    <div className="flex justify-end pt-6"><button onClick={startStagingRender} className="px-12 py-4 bg-gradient-to-r from-[#009183] to-[#00b09f] text-white font-black uppercase text-xs rounded-full shadow-[0_0_30px_rgba(0,145,131,0.4)] hover:scale-105 transition-transform">Generate Rooms</button></div>
-                </div>
-            </div>
+            )}
+          </>
         )}
+
+        {activeTab === 'renovation' && <div className="glass p-16 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center rounded-3xl bg-[#0f172a]/50 mt-8 min-h-[400px]"><div className="text-6xl mb-4">🔨</div><h2 className="text-white font-black text-xl uppercase tracking-widest">Renovation Studio</h2><p className="text-slate-400 mt-2">Coming soon: Remove items and completely renovate spaces.</p></div>}
+
+        {activeTab === 'staging_plus' && <div className="glass p-16 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center rounded-3xl bg-[#0f172a]/50 mt-8 min-h-[400px]"><div className="text-6xl mb-4">✨</div><h2 className="text-white font-black text-xl uppercase tracking-widest">Staging+</h2><p className="text-slate-400 mt-2">Coming soon: Style multiple rooms with a persistent style seed.</p></div>}
 
         {/* --- RENDERING SPINNER --- */}
         {isRendering && activeModal === 'none' && (
