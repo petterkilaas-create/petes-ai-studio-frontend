@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs"; // <-- Henter inn VIP passet
 import { supabase } from "../../supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
 
@@ -12,6 +12,8 @@ type UploadedFile = { id: string; file: File; url: string; };
 
 export default function CopywriterPage() {
   const { user } = useUser();
+  const { getToken } = useAuth(); // <-- Pakker ut det magiske passet!
+  
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
 
   // --- STATE FOR HISTORIKK ---
@@ -108,7 +110,12 @@ export default function CopywriterPage() {
     uploadedFiles.forEach(f => { fd.append('files', f.file); });
 
     try {
-        const res = await fetch(`${API}/generate-copy/`, { method: 'POST', body: fd });
+        const token = await getToken(); // <-- Sikkerhet: VIP pass hentes
+        const res = await fetch(`${API}/generate-copy/`, { 
+            method: 'POST', 
+            headers: { 'Authorization': `Bearer ${token}` }, // <-- Vises frem til dørvakten
+            body: fd 
+        });
         const data = await res.json();
         
         if (data.status === 'success') {
