@@ -62,6 +62,16 @@ const getStyleDetails = (styleId: string) => {
   return { icon: '⚡', title: 'Unknown Style', desc: '' };
 };
 
+// --- SMART FIKS FOR FØR/ETTER SLIDER ---
+const getBeforeImageUrl = (url: string) => {
+    // Hvis bildet er en re-render eller retouch, fjern tidsstempelet for å finne original-varianten
+    if (url.includes('_rerender_') || url.includes('_retouch_')) {
+        return url.replace(/(_rerender_|_retouch_)\d+\.jpg$/, '.jpg');
+    }
+    // Ellers (første generering), bruk RAW-bildet
+    return url.replace('PROCESSED_', 'RAW_').replace(/_v\d+/, '');
+};
+
 export default function ExpressPage() {
   const { user } = useUser();
   const { getToken } = useAuth();
@@ -73,6 +83,9 @@ export default function ExpressPage() {
   const [orderId, setOrderId] = useState("");
   const [orderAddress, setOrderAddress] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+
+  // Tvinger oppdatering av bilder for å unngå nettleser-cache
+  const [cacheBuster, setCacheBuster] = useState(Date.now());
 
   useEffect(() => {
     setOrderId(`ORD-${Math.random().toString(16).slice(2, 8).toUpperCase()}`);
@@ -189,7 +202,8 @@ export default function ExpressPage() {
       try { 
           const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
-          setGalleryImages(data.images); 
+          setGalleryImages(data.images);
+          setCacheBuster(Date.now()); // Oppdaterer cache buster for ferske bilder
       } catch (e) { console.error(e); } 
   };
 
@@ -222,7 +236,13 @@ export default function ExpressPage() {
       
       apiCanvas.toBlob(async (b) => { 
           if(!b) return; 
-          const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); 
+          const fd = new FormData(); 
+          fd.append('job_name', orderId); 
+          fd.append('image_name', currentCanvasImgId); 
+          fd.append('prompt', retouchPrompt); 
+          fd.append('mask_file', b, 'mask.png'); 
+          // Fjernet save_new parameteret helt herfra
+          
           try { 
               const token = await getToken();
               await fetch(`${API}/execute-retouch/`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` }, body:fd }); 
@@ -243,7 +263,11 @@ export default function ExpressPage() {
 
   const approveImage = async (imgName: string) => { 
       const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); 
-      await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); loadGallery(orderId); 
+      await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); 
+      // Venter 1 sekund før vi laster inn på nytt, så cloud storage rekker å lagre vannmerket
+      setTimeout(() => {
+          loadGallery(orderId);
+      }, 1000);
   };
   
   const deleteSingleImage = async (imgName: string) => { 
@@ -319,38 +343,48 @@ export default function ExpressPage() {
         {wizardStep === 2 && uploadedFiles.length === 0 && galleryImages.length === 0 && !isRendering && (
           <div className="animate-in fade-in slide-in-from-right-8 duration-500">
               <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest">Step 2: Upload Photos</h2>
-                  <button onClick={() => setWizardStep(1)} className="text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Change Tool</button>
+                  <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest">Step 2: Project Details</h2>
+                  <button onClick={() => setWizardStep(1)} className="text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">← Change Tool</button>
               </div>
               
-              <div 
-                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }} 
-                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropZone(e); }}
-                  className="glass p-16 border-2 border-dashed border-[#009183]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(0,145,131,0.05)] hover:border-[#009183] transition-colors"
-              >
-                  <div className="text-center pointer-events-none">
-                      <div className="text-5xl mb-4">{getStyleDetails(globalStyle).icon}</div>
-                      <p className="text-white font-bold text-lg">Applying: <span className="text-[#009183] uppercase tracking-widest">{getStyleDetails(globalStyle).title}</span></p>
-                      <p className="text-slate-500 text-sm mt-2 font-bold uppercase tracking-widest">Drag & Drop images here</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* VENSTRE: Adresse-kortet */}
+                  <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-10 shadow-lg flex flex-col justify-center">
+                      <div className="mb-6 flex items-center gap-4">
+                          <div className="text-4xl">{getStyleDetails(globalStyle).icon}</div>
+                          <div>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Selected Tool</p>
+                              <p className="text-white font-bold text-lg uppercase tracking-widest">{getStyleDetails(globalStyle).title}</p>
+                          </div>
+                      </div>
+                      <div className="w-full space-y-4">
+                          <label className="text-[10px] font-bold text-[#009183] uppercase tracking-[0.2em] block">
+                              📍 Property Address (Optional)
+                          </label>
+                          <Autocomplete
+                              apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+                              onPlaceSelected={(place) => { if (place && place.formatted_address) { setOrderAddress(place.formatted_address); } }}
+                              options={{ types: ["address"], componentRestrictions: { country: "no" } }}
+                              placeholder="Search Address..."
+                              className="w-full bg-transparent border-b-2 border-slate-700 text-xl font-black text-white outline-none focus:border-[#009183] uppercase pb-2 transition-colors placeholder:text-slate-600"
+                          />
+                      </div>
                   </div>
-                  
-                  <div className="w-full max-w-2xl mx-auto space-y-4">
-                      <label className="text-[10px] font-bold text-[#009183] uppercase tracking-[0.2em] block text-center mb-6">
-                          📍 Add Address (Optional)
-                      </label>
-                      <Autocomplete
-                          apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-                          onPlaceSelected={(place) => { if (place && place.formatted_address) { setOrderAddress(place.formatted_address); } }}
-                          options={{ types: ["address"], componentRestrictions: { country: "no" } }}
-                          placeholder="SEARCH ADDRESS..."
-                          className="w-full bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-[#009183] uppercase pb-4 transition-colors text-center placeholder:text-slate-600"
-                      />
+
+                  {/* HØYRE: Drag & Drop sonen */}
+                  <div 
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }} 
+                      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropZone(e); }}
+                      className="glass p-10 border-2 border-dashed border-[#009183]/40 flex flex-col items-center justify-center text-center gap-6 rounded-3xl bg-[#0B1120]/50 shadow-[0_0_30px_rgba(0,145,131,0.05)] hover:border-[#009183] transition-colors cursor-pointer"
+                      onClick={() => fileInputRef.current?.click()}
+                  >
+                      <div className="text-5xl opacity-50">📸</div>
+                      <div>
+                          <p className="text-[#009183] font-black uppercase tracking-widest mb-2">Drag & Drop Images</p>
+                          <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">or click to browse your computer</p>
+                      </div>
+                      <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
                   </div>
-                  
-                  <input type="file" multiple className="hidden" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} />
-                  <button onClick={() => fileInputRef.current?.click()} className="px-12 py-4 bg-[#009183] text-white rounded-full font-black uppercase tracking-widest text-xs cursor-pointer hover:bg-[#00b09f] transition-all shadow-[0_0_20px_rgba(0,145,131,0.4)]">
-                      Select Images
-                  </button>
               </div>
           </div>
         )}
@@ -401,6 +435,7 @@ export default function ExpressPage() {
           <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 rounded-3xl bg-[#0f172a]/50 border border-[#009183]/30 shadow-2xl mt-10">
               <div className="text-6xl animate-bounce mb-4">{getStyleDetails(globalStyle).icon}</div>
               <p className="font-black uppercase tracking-[0.3em] text-sm text-[#009183] transition-all">{progressStatus}</p>
+              
               {/* NY GLØDENDE INDETERMINATE BAR (INGEN % TALL) */}
               <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-3 rounded-full overflow-hidden p-0.5 border border-white/10 relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#009183] to-transparent w-1/2 rounded-full animate-[shimmer_1.5s_infinite] shadow-[0_0_15px_rgba(0,145,131,0.8)]"></div>
@@ -424,9 +459,9 @@ export default function ExpressPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-20">
                     {galleryImages.map((item) => (
                         <div key={item.name} className="group flex flex-col bg-[#0f172a] rounded-[2rem] p-4 border border-white/5 shadow-xl">
-                            {/* SMART FIKS: Bytter PROCESSED med RAW for før-bildet */}
-                            <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-black mb-4 cursor-pointer" onClick={() => { setCompareData({raw: item.raw || item.url.replace('PROCESSED_', 'RAW_').replace(/_v\d+/, ''), edited: item.url}); setActiveModal('compare'); }}>
-                                <img src={item.url} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" alt="Result" />
+                            {/* SMART FIKS: Bruker getBeforeImageUrl og cache-buster ?v= */}
+                            <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-black mb-4 cursor-pointer" onClick={() => { setCompareData({raw: item.raw || getBeforeImageUrl(item.url), edited: item.url}); setActiveModal('compare'); }}>
+                                <img src={`${item.url}?v=${cacheBuster}`} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" alt="Result" />
                                 <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(item.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 transition-all border border-red-900/50">🗑️</button>
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center z-20 pointer-events-none"><span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm transition-opacity">Click to Compare</span></div>
                             </div>
@@ -496,8 +531,8 @@ export default function ExpressPage() {
       {activeModal === 'compare' && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex items-center justify-center" onClick={() => setActiveModal('none')}>
             <div className="relative w-[90vw] max-w-[1100px] aspect-[3/2] rounded-[1.5rem] bg-black overflow-hidden shadow-2xl border border-white/10 cursor-col-resize" onMouseMove={handleSlider} onClick={(e) => e.stopPropagation()}>
-                <img id="modalAfter" src={compareData.edited} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10" alt="After" />
-                <img id="modalBefore" src={compareData.raw} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-20" alt="Before" style={{ clipPath: 'inset(0 50% 0 0)' }} />
+                <img id="modalAfter" src={`${compareData.edited}?v=${cacheBuster}`} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-10" alt="After" />
+                <img id="modalBefore" src={`${compareData.raw}?v=${cacheBuster}`} className="absolute inset-0 w-full h-full object-cover pointer-events-none z-20" alt="Before" style={{ clipPath: 'inset(0 50% 0 0)' }} />
                 <div id="modalHandle" className="absolute top-0 bottom-0 w-[2px] bg-white/50 z-30 -translate-x-1/2 pointer-events-none" style={{ left: '50%' }}><div className="absolute top-1/2 left-1/2 w-10 h-10 bg-[#009183] border-[3px] border-[#0B1120] rounded-full -translate-x-1/2 -translate-y-1/2 flex items-center justify-center text-white font-bold shadow-xl">↔</div></div>
             </div>
         </div>
