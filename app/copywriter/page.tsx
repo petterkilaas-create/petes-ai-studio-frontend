@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useUser, useAuth } from "@clerk/nextjs"; // <-- Henter inn VIP passet
+import { useUser, useAuth } from "@clerk/nextjs"; 
 import { supabase } from "../../supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
 
@@ -12,7 +12,7 @@ type UploadedFile = { id: string; file: File; url: string; };
 
 export default function CopywriterPage() {
   const { user } = useUser();
-  const { getToken } = useAuth(); // <-- Pakker ut det magiske passet!
+  const { getToken } = useAuth(); // VIP Pass for Clerk!
   
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
 
@@ -26,44 +26,40 @@ export default function CopywriterPage() {
   const [orderAddress, setOrderAddress] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   
-  // Valg for prospektet
   const [propertyType, setPropertyType] = useState("Leilighet");
   const [targetAudience, setTargetAudience] = useState("Bred kjøpergruppe");
   const [tone, setTone] = useState("Varm og innbydende");
   const [length, setLength] = useState("Fyldig og detaljert");
   
-  // Tekster generert i DENNE sesjonen (V1, V2, etc.)
   const [sessionTexts, setSessionTexts] = useState<{version: number, text: string}[]>([]);
-
-  // Laste-tilstand
   const [isGenerating, setIsGenerating] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Generer unik ID ved innlasting
   useEffect(() => {
     setOrderId(`CPY-${Math.random().toString(16).slice(2, 8).toUpperCase()}`);
   }, []);
 
-  // --- FETCH ORDERS ---
-  useEffect(() => {
-    const fetchMyProjects = async () => {
-      if (!user) return;
-      let query = supabase.from('projects').select('name, address, created_at, status, generated_copy').order('created_at', { ascending: false });
-      if (viewMode === 'mine') query = query.eq('user_id', user.id);
+  // --- FETCH ORDERS (Skuddsikker standard-fetch) ---
+  const fetchMyProjects = async () => {
+    if (!user) return;
+    let query = supabase.from('projects')
+        .select('name, address, created_at, status, generated_copy')
+        .order('created_at', { ascending: false });
+        
+    if (viewMode === 'mine') query = query.eq('user_id', user.id);
 
-      const { data, error } = await query;
-      if (!error && data) {
-        const copyOrders = data.filter(p => p.generated_copy !== null && p.generated_copy.trim() !== "");
-        setArchiveOrders(copyOrders.map(p => ({ 
-          name: p.name, address: p.address, date: new Date(p.created_at).toLocaleDateString('no-NO'), status: 'completed', hasCopy: true
-        })));
-      }
-    };
-    
+    const { data, error } = await query;
+    if (!error && data) {
+      const copyOrders = data.filter(p => p.generated_copy !== null && p.generated_copy.trim() !== "");
+      setArchiveOrders(copyOrders.map(p => ({ 
+        name: p.name, address: p.address, date: new Date(p.created_at).toLocaleDateString('no-NO'), status: 'completed', hasCopy: true
+      })));
+    }
+  };
+
+  useEffect(() => {
     fetchMyProjects();
-    const channel = supabase.channel('realtime-projects-archive').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => { fetchMyProjects(); }).subscribe();
-    return () => { supabase.removeChannel(channel); };
   }, [user, viewMode]);
 
   // --- OPPLASTING & DRAG/DROP ---
@@ -89,12 +85,11 @@ export default function CopywriterPage() {
 
   const removeFile = (id: string) => setUploadedFiles(prev => prev.filter(f => f.id !== id));
 
-  // --- GENERER PROSPEKT (Synkront API-kall) ---
+  // --- GENERER PROSPEKT (Sikker & Synkron) ---
   const startCopyGeneration = async () => {
     if (!orderId || uploadedFiles.length === 0) return;
     setIsGenerating(true);
     
-    // Oppretter en ny "versjon" av ordren i databasen (f.eks. CPY-123-V1)
     const currentVersion = sessionTexts.length + 1;
     const versionedJobName = `${orderId}-V${currentVersion}`;
 
@@ -110,17 +105,17 @@ export default function CopywriterPage() {
     uploadedFiles.forEach(f => { fd.append('files', f.file); });
 
     try {
-        const token = await getToken(); // <-- Sikkerhet: VIP pass hentes
+        const token = await getToken(); 
         const res = await fetch(`${API}/generate-copy/`, { 
             method: 'POST', 
-            headers: { 'Authorization': `Bearer ${token}` }, // <-- Vises frem til dørvakten
+            headers: { 'Authorization': `Bearer ${token}` }, // Dørvakt på plass!
             body: fd 
         });
         const data = await res.json();
         
         if (data.status === 'success') {
-            // Legger den nye teksten øverst i listen på skjermen
             setSessionTexts(prev => [{version: currentVersion, text: data.copy}, ...prev]);
+            fetchMyProjects(); // Oppdaterer historikken umiddelbart!
         } else {
             alert("Error generating copy: " + data.message);
         }
@@ -131,7 +126,6 @@ export default function CopywriterPage() {
     }
   };
 
-  // --- VIS TIDLIGERE ORDRE (MODAL) ---
   const viewPastOrder = async (name: string, address: string) => { 
       const { data, error } = await supabase.from('projects').select('generated_copy').eq('name', name).single();
       if (!error && data && data.generated_copy) {
@@ -237,7 +231,6 @@ export default function CopywriterPage() {
                   </div>
               </div>
 
-              {/* DRAG & DROP SONE FOR BILDER */}
               <div 
                   onDragOver={(e) => e.preventDefault()} 
                   onDrop={handleDropZone}
@@ -252,7 +245,6 @@ export default function CopywriterPage() {
                       </button>
                   </div>
 
-                  {/* VISER BILDENE SOM ER LASTET OPP */}
                   {uploadedFiles.length > 0 && (
                       <div className="grid grid-cols-4 md:grid-cols-6 gap-4 mt-8 w-full">
                           {uploadedFiles.map(f => (
@@ -277,7 +269,7 @@ export default function CopywriterPage() {
               )}
           </div>
 
-          {/* --- RESULTS AREA (Lister opp tekstene under skjemaet) --- */}
+          {/* --- RESULTS AREA --- */}
           {sessionTexts.length > 0 && (
               <div className="space-y-8 mb-20 animate-in fade-in duration-500">
                   {sessionTexts.map((st) => (

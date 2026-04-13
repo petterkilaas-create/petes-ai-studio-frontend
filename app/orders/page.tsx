@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 import { supabase } from "../../supabaseClient"; 
 
 const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
@@ -11,6 +11,7 @@ type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: 
 
 export default function OrdersPage() {
   const { user } = useUser();
+  const { getToken } = useAuth(); // VIP Passet hentes inn!
   const isAdmin = user?.primaryEmailAddress?.emailAddress === "petter.kilaas@diakrit.com"; 
   const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine');
 
@@ -19,13 +20,12 @@ export default function OrdersPage() {
   
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
-  // NYTT: State for å holde på tekst fra Copywriter-ordrer
   const [generatedCopy, setGeneratedCopy] = useState<string>(""); 
   const [isLoadingGallery, setIsLoadingGallery] = useState(false);
 
   const [isRendering, setIsRendering] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
-  const [progressStatus, setProgressStatus] = useState("Processing...");
+  const [progressStatus, setProgressStatus] = useState("Venter på systemet..."); // Live tekst
 
   const [activeModal, setActiveModal] = useState<'none' | 'compare' | 'retouch' | 'rerender' | 'video'>('none');
   const [currentCanvasImgId, setCurrentCanvasImgId] = useState("");
@@ -40,13 +40,12 @@ export default function OrdersPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hiddenMaskCanvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
-  const pollTimer = useRef<NodeJS.Timeout | null>(null);
   const isDrawing = useRef(false);
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
-  useEffect(() => {
-    const fetchMyProjects = async () => {
+  // --- FETCH ORDERS ---
+  const fetchMyProjects = async () => {
       if (!user) return;
       let query = supabase.from('projects').select('name, address, created_at, status').order('created_at', { ascending: false });
       if (viewMode === 'mine') query = query.eq('user_id', user.id);
@@ -57,27 +56,27 @@ export default function OrdersPage() {
           name: p.name, address: p.address, date: new Date(p.created_at).toLocaleDateString('no-NO'), status: p.status || 'processing' 
         })));
       }
-    };
-    
+  };
+
+  useEffect(() => {
     fetchMyProjects();
-    const channel = supabase.channel('realtime-projects-archive').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => { fetchMyProjects(); }).subscribe();
-    return () => { supabase.removeChannel(channel); if (pollTimer.current) clearTimeout(pollTimer.current); };
   }, [user, viewMode]);
 
+  // --- VIEW ORDER ---
   const viewOrder = async (name: string) => { 
-      if (pollTimer.current) clearTimeout(pollTimer.current);
       setSelectedOrder(name); 
       setIsLoadingGallery(true); 
       setGalleryImages([]);
-      setGeneratedCopy(""); // Reset tekst
+      setGeneratedCopy(""); 
       
-      // Sjekk Alltid Supabase for tekst (i tilfelle det er et prospekt)
-      const { data } = await supabase.from('projects').select('generated_copy').eq('name', name).single();
-      if (data && data.generated_copy) {
-          setGeneratedCopy(data.generated_copy);
+      const { data } = await supabase.from('projects').select('generated_copy, status').eq('name', name).single();
+      if (data) {
+          if (data.generated_copy) setGeneratedCopy(data.generated_copy);
+          if (data.status === 'processing') {
+              setIsRendering(true);
+          }
       }
 
-      // Sjekk alltid etter bilder uansett
       await loadGallery(name);
       setIsLoadingGallery(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -91,29 +90,69 @@ export default function OrdersPage() {
       } catch (e) { console.error(e); } 
   };
 
-  const pollProgress = async (pollingJobName: string) => {
-    try {
-        const r = await fetch(`${API}/batch-progress/?job_name=${encodeURIComponent(pollingJobName)}&t=${Date.now()}`, { cache: 'no-store' }); 
-        const s = await r.json();
-        if (s.status === 'finished' || s.status === 'completed') { 
-            setIsRendering(false); setProgressPct(100);
-            if (pollTimer.current) clearTimeout(pollTimer.current);
-            setTimeout(() => { loadGallery(pollingJobName); }, 1000);
-            return; 
-        }
-        if (s.total > 0) { setProgressPct((s.completed / s.total) * 100); setProgressStatus(`Processing... ${s.completed} / ${s.total}`); }
-    } catch (e) { console.error(e); }
-    pollTimer.current = setTimeout(() => pollProgress(pollingJobName), 2000);
-  };
+  // ==========================================
+  // PROGRESS BAR & POLLING FOR VERKTØYENE
+  // ==========================================
+  useEffect(() => {
+    let pctInterval: NodeJS.Timeout;
 
+    if (isRendering) {
+        setProgressPct(0);
+        pctInterval = setInterval(() => {
+            setProgressPct(prev => {
+                const step = Math.max(0.1, (95 - prev) * 0.05);
+                return prev >= 95 ? 95 : prev + step;
+            });
+        }, 300);
+    }
+    return () => clearInterval(pctInterval);
+  }, [isRendering]);
+
+  useEffect(() => {
+    if (!isRendering || !selectedOrder) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await supabase
+          .from('projects')
+          .select('status, progress_message')
+          .eq('name', selectedOrder)
+          .single();
+
+        if (data) {
+          if (data.progress_message) setProgressStatus(data.progress_message);
+          
+          if (data.status === 'completed' || data.status === 'finished') {
+            clearInterval(interval);
+            setProgressPct(100);
+            setProgressStatus("Oppdatering ferdig! Laster inn på nytt...");
+            setTimeout(() => {
+                setIsRendering(false);
+                loadGallery(selectedOrder);
+                fetchMyProjects(); // Oppdater liste-status
+            }, 800);
+          }
+        }
+      } catch (err) { console.error("Polling feil:", err); }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [isRendering, selectedOrder]);
+
+
+  // --- MANAGE ORDERS ---
   const deleteOrder = async (e: React.MouseEvent, orderName: string) => {
     e.stopPropagation();
     if (!window.confirm(`Are you sure you want to permanently delete this project?`)) return;
     setArchiveOrders(prev => prev.filter(o => o.name !== orderName));
     if (selectedOrder === orderName) setSelectedOrder(null);
     if (user) await supabase.from('projects').delete().eq('name', orderName);
-    const fd = new FormData(); fd.append('job_name', orderName); fd.append('image_name', ''); 
-    fetch(`${API}/delete-image/`, { method: 'POST', body: fd }).catch(console.error);
+    
+    try {
+        const token = await getToken();
+        const fd = new FormData(); fd.append('job_name', orderName); fd.append('image_name', ''); 
+        fetch(`${API}/delete-image/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }).catch(console.error);
+    } catch(e) {}
   };
 
   const renameOrder = async (e: React.MouseEvent, oldName: string) => {
@@ -124,35 +163,89 @@ export default function OrdersPage() {
     setArchiveOrders(prev => prev.map(o => o.name === oldName ? { ...o, name: newName } : o));
     if (selectedOrder === oldName) setSelectedOrder(newName);
     if (user) await supabase.from('projects').update({ name: newName }).eq('name', oldName);
+    // Backend kall (krever muligens ikke token avhengig av backend-oppsett, men greit å ha)
     const fd = new FormData(); fd.append('old_name', oldName); fd.append('new_name', newName);
     fetch(`${API}/rename-order/`, { method: 'POST', body: fd }).catch(console.error);
   };
 
+  // --- VERKTØYKASSE MED CLERK AUTH ---
   const deleteSingleImage = async (imgName: string) => {
       if (!selectedOrder) return;
       if (!window.confirm("Are you sure you want to permanently delete this image?")) return;
-      const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', imgName);
+      
       try {
-          await fetch(`${API}/delete-image/`, { method: 'POST', body: fd });
+          const token = await getToken();
+          const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', imgName);
+          await fetch(`${API}/delete-image/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd });
           setGalleryImages(prev => prev.filter(img => img.name !== imgName));
       } catch (e) { console.error(e); }
   };
 
   const approveImage = async (imgName: string) => { 
       if(!selectedOrder) return;
-      const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', imgName); 
-      await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); 
-      loadGallery(selectedOrder); 
-  };
-
-  const handleDownloadSingle = async (url: string, filename: string) => {
       try {
-          const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'file';
-          document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-      } catch (error) { window.open(url, '_blank'); }
+          const token = await getToken();
+          const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', imgName); 
+          await fetch(`${API}/approve-image/`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` }, body:fd }); 
+          loadGallery(selectedOrder); 
+      } catch(e) { console.error(e); }
   };
 
+  const submitRetouch = async () => {
+      if(!retouchPrompt || !selectedOrder) return;
+      setActiveModal('none'); 
+      if (user) await supabase.from('projects').update({ status: 'processing', progress_message: 'Klargjør Retouch...' }).eq('name', selectedOrder);
+      setIsRendering(true);
+      
+      const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
+      if (!canvas || !hiddenCanvas) return;
+      
+      const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height;
+      const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return;
+      aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height);
+      
+      const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return;
+      const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } }
+      aCtx.putImageData(maskData, 0, 0);
+      
+      apiCanvas.toBlob(async (b) => {
+          if(!b) return;
+          const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
+          try { 
+              const token = await getToken();
+              await fetch(`${API}/execute-retouch/`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` }, body:fd }); 
+          } catch(e) { console.error(e); setIsRendering(false); }
+      }, 'image/png');
+  };
+
+  const submitRerender = async () => {
+      if(!selectedOrder) return;
+      setActiveModal('none');
+      if (user) await supabase.from('projects').update({ status: 'processing', progress_message: 'Klargjør Re-render...' }).eq('name', selectedOrder);
+      setIsRendering(true);
+      
+      const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
+      try { 
+          const token = await getToken();
+          await fetch(`${API}/re-render-single/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
+      } catch(e) { console.error(e); setIsRendering(false); }
+  };
+
+  const submitVideo = async () => {
+      if(!selectedOrder) return;
+      setActiveModal('none');
+      if (user) await supabase.from('projects').update({ status: 'processing', progress_message: 'Sender til Veo AI...' }).eq('name', selectedOrder);
+      setIsRendering(true); 
+      
+      const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('prompt', videoPrompt);
+      try { 
+          const token = await getToken();
+          await fetch(`${API}/generate-video/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
+      } catch(e) { console.error(e); setIsRendering(false); }
+  };
+
+  // --- CANVAS HELPERE ---
   const openCanvasStudio = (imgName: string, customUrl: string) => { setCurrentCanvasImgId(imgName); setActiveModal('retouch'); setBrushSize(50); const image = new Image(); image.crossOrigin = "Anonymous"; image.onload = () => { bgImg.current = image; initCanvas(); }; image.src = customUrl; };
   const initCanvas = () => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !bgImg.current) return; canvas.width = hiddenCanvas.width = bgImg.current.width; canvas.height = hiddenCanvas.height = bgImg.current.height; const hiddenCtx = hiddenCanvas.getContext('2d'); if (hiddenCtx) hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height); undoStack.current = []; saveCanvasState(); renderCanvas(); };
   const saveCanvasState = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return; const ctx = hiddenCanvas.getContext('2d'); if (!ctx) return; if (undoStack.current.length > 50) undoStack.current.shift(); undoStack.current.push(ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height)); };
@@ -164,43 +257,12 @@ export default function OrdersPage() {
   const handleCanvasMouseUp = () => { if (isDrawing.current) { saveCanvasState(); isDrawing.current = false; renderCanvas(); } };
   const drawOnCanvas = (e: React.MouseEvent<HTMLDivElement>) => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !isDrawing.current) return; const ctx = canvas.getContext('2d'); const hiddenCtx = hiddenCanvas.getContext('2d'); if (!ctx || !hiddenCtx) return; const rect = canvas.getBoundingClientRect(); const x = (e.clientX - rect.left) * (canvas.width / rect.width); const y = (e.clientY - rect.top) * (canvas.height / rect.height); hiddenCtx.lineWidth = brushSize; hiddenCtx.lineCap = 'round'; hiddenCtx.lineJoin = 'round'; hiddenCtx.strokeStyle = 'rgba(255, 255, 255, 1.0)'; hiddenCtx.lineTo(x, y); hiddenCtx.stroke(); ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineTo(x, y); ctx.stroke(); };
 
-  const submitRetouch = async () => {
-      if(!retouchPrompt || !selectedOrder) return;
-      setActiveModal('none'); 
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder);
-      setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Retouch...");
-      const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current;
-      if (!canvas || !hiddenCanvas) return;
-      const apiCanvas = document.createElement('canvas'); apiCanvas.width = canvas.width; apiCanvas.height = canvas.height;
-      const aCtx = apiCanvas.getContext('2d'); if (!aCtx) return;
-      aCtx.fillStyle = 'black'; aCtx.fillRect(0, 0, apiCanvas.width, apiCanvas.height);
-      const hiddenCtx = hiddenCanvas.getContext('2d'); if(!hiddenCtx) return;
-      const maskData = hiddenCtx.getImageData(0, 0, canvas.width, canvas.height);
-      for (let i = 0; i < maskData.data.length; i += 4) { if (maskData.data[i + 3] > 10) { maskData.data[i] = 255; maskData.data[i + 1] = 255; maskData.data[i + 2] = 255; maskData.data[i + 3] = 255; } }
-      aCtx.putImageData(maskData, 0, 0);
-      apiCanvas.toBlob(async (b) => {
-          if(!b) return;
-          const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
-          try { await fetch(`${API}/execute-retouch/`, { method:'POST', body:fd }); pollProgress(selectedOrder); } catch(e) { console.error(e); }
-      }, 'image/png');
-  };
-
-  const submitRerender = async () => {
-      if(!selectedOrder) return;
-      setActiveModal('none');
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder);
-      setIsRendering(true); setProgressPct(0); setProgressStatus("Initializing Re-Render...");
-      const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
-      try { await fetch(`${API}/re-render-single/`, { method: 'POST', body: fd }); pollProgress(selectedOrder); } catch(e) { console.error(e); }
-  };
-
-  const submitVideo = async () => {
-      if(!selectedOrder) return;
-      setActiveModal('none');
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', selectedOrder);
-      setIsRendering(true); setProgressPct(0); setProgressStatus("Generating Veo Magic...");
-      const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('prompt', videoPrompt);
-      try { await fetch(`${API}/generate-video/`, { method: 'POST', body: fd }); pollProgress(selectedOrder); } catch(e) { console.error(e); }
+  const handleDownloadSingle = async (url: string, filename: string) => {
+      try {
+          const response = await fetch(url); const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a'); link.href = blobUrl; link.download = filename || 'file';
+          document.body.appendChild(link); link.click(); document.body.removeChild(link); setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      } catch (error) { window.open(url, '_blank'); }
   };
 
   const handleSlider = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -278,23 +340,25 @@ export default function OrdersPage() {
             <div className="animate-in fade-in duration-500 pb-20">
                 <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                     <div>
-                        <button onClick={() => { setSelectedOrder(null); setGeneratedCopy(""); }} className="text-[#009183] hover:text-white text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 transition-colors"><span>←</span> Back to List</button>
+                        <button onClick={() => { setSelectedOrder(null); setGeneratedCopy(""); setIsRendering(false); }} className="text-[#009183] hover:text-white text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-2 transition-colors"><span>←</span> Back to List</button>
                         <p className="text-[#009183] font-bold text-sm tracking-widest mb-1">{selectedOrder}</p>
-                        <h3 className="text-3xl font-black text-white uppercase">{archiveOrders.find(o => o.name === selectedOrder)?.address || "Unnamed Project"}</h3>
+                        <h3 className="text-3xl font-black text-white uppercase">{archiveOrders.find(o => o.name === selectedOrder)?.address || "Project Gallery"}</h3>
                     </div>
                     {galleryImages.length > 0 && (
                         <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(selectedOrder)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
                     )}
                 </div>
 
+                {/* --- RENDERING LOADER --- */}
                 {isRendering && activeModal === 'none' && (
-                  <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8 rounded-3xl bg-[#0f172a]/50 border border-[#009183]/30">
-                      <p className="font-black uppercase tracking-[0.3em] text-sm text-[#009183] animate-pulse">{progressStatus}</p>
-                      <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10"><div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-700" style={{ width: `${progressPct}%` }}></div></div>
+                  <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 mb-8 rounded-3xl bg-[#0f172a]/50 border border-[#009183]/30 shadow-2xl">
+                      <p className="font-black uppercase tracking-[0.3em] text-sm text-[#009183] transition-all">{progressStatus}</p>
+                      <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10">
+                        <div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(0,145,131,0.8)]" style={{ width: `${progressPct}%` }}></div>
+                      </div>
                   </div>
                 )}
 
-                {/* NYTT: Viser Generert Tekst hvis den finnes */}
                 {generatedCopy && !isRendering && (
                     <div className="bg-[#0f172a] rounded-3xl p-10 border border-[#009183]/30 shadow-2xl relative mb-10">
                         <button onClick={() => navigator.clipboard.writeText(generatedCopy)} className="absolute top-8 right-8 px-6 py-3 bg-[#009183] hover:bg-[#00b09f] text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg">
@@ -312,9 +376,9 @@ export default function OrdersPage() {
                         <div className="w-8 h-8 border-4 border-[#009183]/30 border-t-[#009183] rounded-full animate-spin"></div>
                         <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Loading Media...</p>
                     </div>
-                ) : galleryImages.length === 0 && !generatedCopy ? (
-                    <div className="text-center py-20 text-slate-500">No images or text found.</div>
-                ) : galleryImages.length > 0 ? (
+                ) : galleryImages.length === 0 && !generatedCopy && !isRendering ? (
+                    <div className="text-center py-20 text-slate-500">No images or text found for this project.</div>
+                ) : galleryImages.length > 0 && !isRendering ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         {galleryImages.map((item) => (
                             <div key={item.name} className="group flex flex-col bg-[#0f172a] rounded-[2rem] p-4 border border-white/5 shadow-xl">

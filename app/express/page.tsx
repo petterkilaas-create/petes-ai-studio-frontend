@@ -2,40 +2,73 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
-import Link from "next/link";
 import { supabase } from "../../supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
 
-const API = "https://petes-ai-studio-backend-v2-73jga2zlcq-lz.a.run.app";
+const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: string; edited?: string; approved?: boolean; video?: string; };
 
-const STYLE_CARDS = [
-  { id: 'dusk_blue_hour', icon: '🌙', title: 'Blue Hour', desc: 'Deep indigo twilight sky with a warm, inviting interior glow.' },
-  { id: 'sunny_midday', icon: '☀️', title: 'Sunny Midday', desc: 'Crisp, bright daylight with crystal clear blue skies.' },
-  { id: 'weather_rain_to_sun', icon: '🌦️', title: 'Rain to Sun', desc: 'Magically dry up puddles and turn overcast skies sunny.' },
-  { id: 'dusk_purple_orange', icon: '🌅', title: 'Purple Dusk', desc: 'Vibrant, luxurious sunset with an orange horizon.' },
-  { id: 'early_morning', icon: '🌄', title: 'Early Morning', desc: 'Soft, pale Nordic morning light for a fresh aesthetic.' },
-  { id: 'winter', icon: '❄️', title: 'Winter Wonderland', desc: 'Add crisp, realistic snow to the ground, roof, and trees.' },
-  { id: 'autumn', icon: '🍂', title: 'Autumn Colors', desc: 'Turn green foliage into golden ochre and rust.' },
-  { id: 'summer', icon: '🌳', title: 'Peak Summer', desc: 'Ensure lush, vibrant green lawns and dense tree canopies.' },
-];
+const STYLE_CATEGORIES = {
+  retouch: {
+    id: 'retouch',
+    title: 'Fix-It Tools',
+    icon: '🧹',
+    items: [
+      { id: 'express_empty_room', icon: '🗑️', title: 'Empty Room', desc: 'Remove all furniture and clutter, leaving a clean slate.' },
+      { id: 'express_magic_cleanup', icon: '🧽', title: 'Magic Cleanup', desc: 'Auto-remove moving boxes, loose cables, and general clutter.' },
+      { id: 'express_privacy_blur', icon: '🕵️', title: 'Privacy Blur', desc: 'Seamlessly blur faces, family photos, and license plates.' },
+      { id: 'express_turn_on_lights', icon: '💡', title: 'Turn On Lights', desc: 'Ignite interior lamps and fixtures without making it night.' },
+      { id: 'express_light_styling', icon: '🪴', title: 'Light Styling', desc: 'Add subtle, realistic props (plants, bowls) to empty surfaces.' },
+      { id: 'express_lush_lawn', icon: '🌿', title: 'Lush Lawn', desc: 'Turn dead or brown grass into a perfect, manicured green lawn.' },
+      { id: 'express_pool_cleanup', icon: '🏊', title: 'Pool Cleanup', desc: 'Clean murky pool water into inviting, crystal-clear light blue.' },
+      { id: 'express_virtual_fireplace', icon: '🔥', title: 'Virtual Fireplace', desc: 'Ignite a realistic, cozy fire in an empty fireplace.' }
+    ]
+  },
+  seasonal: {
+    id: 'seasonal',
+    title: 'Time Traveler',
+    icon: '🍂',
+    items: [
+      { id: 'season_spring', icon: '🌷', title: 'Spring Fresh', desc: 'Melt remaining snow, add light green buds and spring vibes.' },
+      { id: 'season_summer', icon: '🌳', title: 'Peak Summer', desc: 'Ensure lush, vibrant green lawns and dense tree canopies.' },
+      { id: 'season_autumn', icon: '🍁', title: 'Autumn Colors', desc: 'Turn green foliage into golden ochre and rust.' },
+      { id: 'season_winter', icon: '❄️', title: 'Winter Wonderland', desc: 'Add crisp, realistic snow to the ground, roof, and trees.' },
+      { id: 'express_melt_snow', icon: '☀️', title: 'Melt Snow', desc: 'Completely remove all snow and ice, revealing bare ground.' }
+    ]
+  },
+  atmosphere: {
+    id: 'atmosphere',
+    title: 'Atmosphere',
+    icon: '🌌',
+    items: [
+      { id: 'dusk_blue_hour', icon: '🌙', title: 'Blue Hour', desc: 'Deep indigo twilight sky with a warm, inviting interior glow.' },
+      { id: 'dusk_golden_hour', icon: '🌅', title: 'Golden Sky', desc: 'Vibrant, luxurious sunset with warm pastel colors.' },
+      { id: 'dusk_purple_orange', icon: '🌆', title: 'Purple Sky', desc: 'Vibrant sunset with a purple and orange horizon.' },
+      { id: 'dusk_starry_night', icon: '✨', title: 'Starry Night', desc: 'Deep, dark twilight sky with emerging stars. Perfect for modern homes.' },
+      { id: 'dusk_aurora', icon: '🌌', title: 'Aurora Borealis', desc: 'Add a stunning, subtle Northern Lights effect to the evening sky.' },
+      { id: 'weather_rain_to_sun', icon: '🌦️', title: 'Rain to Sun', desc: 'Magically dry up puddles and turn overcast skies sunny.' },
+      { id: 'weather_dramatic_storm', icon: '🌩️', title: 'Dramatic Storm', desc: 'Dark, moody storm clouds to create architectural contrast.' }
+    ]
+  }
+};
 
-const STATUS_MESSAGES = [
-    "Uploading to cloud...",
-    "Analyzing architecture...",
-    "Applying AI lighting...",
-    "Rendering fine details...",
-    "Almost there, finalizing..."
-];
+const getStyleDetails = (styleId: string) => {
+  for (const category of Object.values(STYLE_CATEGORIES)) {
+    const found = category.items.find(item => item.id === styleId);
+    if (found) return found;
+  }
+  return { icon: '⚡', title: 'Unknown Style', desc: '' };
+};
 
 export default function ExpressPage() {
   const { user } = useUser();
-  const { getToken } = useAuth(); // <-- VIP Pass for Clerk
+  const { getToken } = useAuth();
 
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
-  const [globalStyle, setGlobalStyle] = useState("dusk_blue_hour");
+  const [activeCategoryTab, setActiveCategoryTab] = useState<string>('retouch');
+  const [globalStyle, setGlobalStyle] = useState("express_magic_cleanup");
   
   const [orderId, setOrderId] = useState("");
   const [orderAddress, setOrderAddress] = useState("");
@@ -46,16 +79,13 @@ export default function ExpressPage() {
   }, []);
 
   const [isRendering, setIsRendering] = useState(false);
-  const [progressPct, setProgressPct] = useState(0);
-  const [progressStatus, setProgressStatus] = useState("Processing...");
-  const [statusMsgIndex, setStatusMsgIndex] = useState(0);
+  const [progressStatus, setProgressStatus] = useState("Initializing AI Engine...");
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
   const [activeModal, setActiveModal] = useState<'none' | 'retouch' | 'compare' | 'rerender'>('none');
   const [currentCanvasImgId, setCurrentCanvasImgId] = useState("");
   const [brushSize, setBrushSize] = useState(50);
   const [retouchPrompt, setRetouchPrompt] = useState("");
-  const [saveAsNew, setSaveAsNew] = useState(true);
   const [rerenderData, setRerenderData] = useState({ type: "exterior", style: "dusk_blue_hour", prompt: "" });
   const [compareData, setCompareData] = useState({ raw: "", edited: "" });
 
@@ -67,85 +97,36 @@ export default function ExpressPage() {
   const bgImg = useRef<HTMLImageElement | null>(null);
   const undoStack = useRef<ImageData[]>([]);
 
-  // ==========================================
-  // DEN MAGISKE UX-PROGRESJONEN (Fake progress)
-  // ==========================================
   useEffect(() => {
-    let pctInterval: NodeJS.Timeout;
-    let msgInterval: NodeJS.Timeout;
-
     if (isRendering) {
-        setProgressPct(0);
-        setStatusMsgIndex(0);
-        setProgressStatus(STATUS_MESSAGES[0]);
-
-        pctInterval = setInterval(() => {
-            setProgressPct(prev => {
-                const remaining = 95 - prev;
-                const step = Math.max(0.1, remaining * 0.05);
-                return prev >= 95 ? 95 : prev + step;
-            });
-        }, 300);
-
-        msgInterval = setInterval(() => {
-            setStatusMsgIndex(prev => {
-                const next = (prev + 1) % STATUS_MESSAGES.length;
-                setProgressStatus(STATUS_MESSAGES[next]);
-                return next;
-            });
-        }, 4000);
+        setProgressStatus("Uploading files...");
     }
-
-    return () => {
-        clearInterval(pctInterval);
-        clearInterval(msgInterval);
-    };
   }, [isRendering]);
 
-  // ==========================================
-  // SIKKERHETSNETTET (Fallback Poller) + RADIO
-  // ==========================================
   useEffect(() => {
-    if (!orderId) return;
-
-    const channel = supabase
-      .channel(`express_progress_${orderId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `name=eq.${orderId}` },
-        (payload) => {
-          if (!payload.new) return;
-          const newStatus = (payload.new as any).status;
-          if (newStatus === 'completed' || newStatus === 'finished') {
+    if (!isRendering || !orderId) return;
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await supabase.from('projects').select('status, progress_message').eq('name', orderId).single();
+        if (data) {
+          if (data.progress_message) setProgressStatus(data.progress_message);
+          if (data.status === 'completed' || data.status === 'finished') {
+            clearInterval(interval);
             triggerFinish();
+          } else if (data.status === 'error') {
+            clearInterval(interval);
+            setIsRendering(false);
+            alert("An error occurred during processing. Please try again.");
           }
         }
-      ).subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [orderId]);
-
-  useEffect(() => {
-    let fallbackTimer: NodeJS.Timeout;
-    if (isRendering && orderId) {
-        fallbackTimer = setInterval(async () => {
-            try {
-                const { data } = await supabase.from('projects').select('status').eq('name', orderId).single();
-                if (data && (data.status === 'completed' || data.status === 'finished')) {
-                    console.log("Sikkerhetsnett fanget opp at jobben er ferdig!");
-                    triggerFinish();
-                }
-            } catch (e) { console.error("Poller error:", e); }
-        }, 5000);
-    }
-    return () => { if (fallbackTimer) clearInterval(fallbackTimer); };
+      } catch (err) { console.error("Polling error:", err); }
+    }, 2000);
+    return () => clearInterval(interval);
   }, [isRendering, orderId]);
 
   const triggerFinish = () => {
-      setProgressPct(100);
       setProgressStatus("Complete! Loading gallery...");
-      setTimeout(() => {
-          setIsRendering(false);
-          loadGallery(orderId);
-      }, 800);
+      setTimeout(() => { setIsRendering(false); loadGallery(orderId); }, 800);
   };
 
   const selectStyleAndProceed = (styleId: string) => { setGlobalStyle(styleId); setWizardStep(2); };
@@ -178,32 +159,30 @@ export default function ExpressPage() {
   
   const startExpressRender = async () => {
     if (!orderId || uploadedFiles.length === 0) return;
-    
     setIsRendering(true);
 
-    if (user) {
-        await supabase.from('projects').insert([
-            { name: orderId, address: orderAddress, status: 'processing', user_id: user.id }
-        ]);
-    }
+    try {
+        if (user) {
+            await supabase.from('projects').upsert([
+                { name: orderId, address: orderAddress, status: 'processing', user_id: user.id, progress_message: "Initializing AI engine..." }
+            ], { onConflict: 'name' });
+        }
 
-    const fd = new FormData(); 
-    fd.append('job_name', orderId);
-    fd.append('address', orderAddress);
-    if (user) fd.append('user_id', user.id); 
-    
-    const cfg: any = {}; 
-    uploadedFiles.forEach(f => { fd.append('files', f.file); cfg[f.file.name] = { type: f.type, style: f.style, prompt: f.prompt }; });
-    fd.append('config', JSON.stringify(cfg));
-    
-    try { 
+        const fd = new FormData(); 
+        fd.append('job_name', orderId);
+        fd.append('address', orderAddress);
+        if (user) fd.append('user_id', user.id); 
+        
+        const cfg: any = {}; 
+        uploadedFiles.forEach(f => { fd.append('files', f.file); cfg[f.file.name] = { type: f.type, style: f.style, prompt: f.prompt }; });
+        fd.append('config', JSON.stringify(cfg));
+        
         const token = await getToken();
-        await fetch(`${API}/start-job/`, { 
-            method: 'POST', 
-            headers: { 'Authorization': `Bearer ${token}` },
-            body: fd 
-        }); 
-    } catch (error) { console.error(error); }
+        await fetch(`${API}/start-job/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
+    } catch (error) { 
+        console.error(error); 
+        setIsRendering(false);
+    }
   };
 
   const loadGallery = async (name: string) => { 
@@ -214,7 +193,7 @@ export default function ExpressPage() {
       } catch (e) { console.error(e); } 
   };
 
-  // Canvas
+  // --- CANVAS & RETOUCH LOGIKK ---
   const openCanvasStudio = (imgIdOrName: string, customUrl: string | null = null) => { setCurrentCanvasImgId(imgIdOrName); setActiveModal('retouch'); setBrushSize(50); let targetUrl = customUrl; if (!targetUrl) { const fileObj = uploadedFiles.find(f => f.id === imgIdOrName); if (fileObj) targetUrl = fileObj.url; } if (targetUrl) { const image = new Image(); image.crossOrigin = "Anonymous"; image.onload = () => { bgImg.current = image; initCanvas(); }; image.src = targetUrl; } };
   const initCanvas = () => { const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; if (!canvas || !hiddenCanvas || !bgImg.current) return; canvas.width = hiddenCanvas.width = bgImg.current.width; canvas.height = hiddenCanvas.height = bgImg.current.height; const hiddenCtx = hiddenCanvas.getContext('2d'); if (hiddenCtx) hiddenCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height); undoStack.current = []; saveCanvasState(); renderCanvas(); };
   const saveCanvasState = () => { const hiddenCanvas = hiddenMaskCanvasRef.current; if (!hiddenCanvas) return; const ctx = hiddenCanvas.getContext('2d'); if (!ctx) return; if (undoStack.current.length > 50) undoStack.current.shift(); undoStack.current.push(ctx.getImageData(0, 0, hiddenCanvas.width, hiddenCanvas.height)); };
@@ -229,7 +208,7 @@ export default function ExpressPage() {
   const submitRetouch = async () => { 
       if(!retouchPrompt) return; 
       setActiveModal('none'); 
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); 
+      if (user) await supabase.from('projects').update({ status: 'processing', progress_message: 'Initializing Retouch...' }).eq('name', orderId).eq('user_id', user.id); 
       setIsRendering(true); 
       
       const canvas = canvasRef.current; const hiddenCanvas = hiddenMaskCanvasRef.current; 
@@ -243,31 +222,23 @@ export default function ExpressPage() {
       
       apiCanvas.toBlob(async (b) => { 
           if(!b) return; 
-          const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
+          const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); 
           try { 
               const token = await getToken();
-              await fetch(`${API}/execute-retouch/`, { 
-                  method:'POST', 
-                  headers: { 'Authorization': `Bearer ${token}` }, // DØRVAKT TIL RETOUCH
-                  body:fd 
-              }); 
-          } catch(e) { console.error(e); } 
+              await fetch(`${API}/execute-retouch/`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` }, body:fd }); 
+          } catch(e) { console.error(e); setIsRendering(false); } 
       }, 'image/png'); 
   };
 
   const submitRerender = async () => { 
       setActiveModal('none'); 
-      if (user) await supabase.from('projects').update({ status: 'processing' }).eq('name', orderId).eq('user_id', user.id); 
+      if (user) await supabase.from('projects').update({ status: 'processing', progress_message: 'Initializing Re-Render...' }).eq('name', orderId).eq('user_id', user.id); 
       setIsRendering(true); 
       const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt); 
       try { 
           const token = await getToken();
-          await fetch(`${API}/re-render-single/`, { 
-              method: 'POST', 
-              headers: { 'Authorization': `Bearer ${token}` }, // DØRVAKT TIL RERENDER
-              body: fd 
-          }); 
-      } catch(e) { console.error(e); } 
+          await fetch(`${API}/re-render-single/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
+      } catch(e) { console.error(e); setIsRendering(false); } 
   };
 
   const approveImage = async (imgName: string) => { 
@@ -301,9 +272,9 @@ export default function ExpressPage() {
         <div className="mb-12 flex justify-between items-start">
             <div>
                 <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-2 flex items-center gap-4">
-                    <span className="text-4xl">⚡</span> Express Retouch
+                    <span className="text-4xl">⚡</span> Express Studio
                 </h1>
-                <p className="text-slate-400 max-w-2xl">Enhance exteriors, fix blown-out windows, or magically alter the weather.</p>
+                <p className="text-slate-400 max-w-2xl">One-click magic edits, atmospheric skies, and seasonal transformations.</p>
             </div>
             <div className="text-right border border-white/10 px-4 py-2 rounded-xl bg-white/5">
                 <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Order ID</p>
@@ -315,8 +286,21 @@ export default function ExpressPage() {
         {wizardStep === 1 && uploadedFiles.length === 0 && galleryImages.length === 0 && !isRendering && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest mb-6">Step 1: Choose your magic</h2>
+                
+                <div className="flex gap-4 mb-8">
+                    {Object.values(STYLE_CATEGORIES).map((cat) => (
+                        <button 
+                            key={cat.id}
+                            onClick={() => setActiveCategoryTab(cat.id)}
+                            className={`px-6 py-3 rounded-full font-black uppercase tracking-widest text-[10px] transition-all border ${activeCategoryTab === cat.id ? 'bg-[#009183] border-[#009183] text-white shadow-[0_0_20px_rgba(0,145,131,0.4)]' : 'bg-transparent border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'}`}
+                        >
+                            {cat.icon} {cat.title}
+                        </button>
+                    ))}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {STYLE_CARDS.map(style => (
+                    {STYLE_CATEGORIES[activeCategoryTab as keyof typeof STYLE_CATEGORIES].items.map(style => (
                         <div 
                             key={style.id} 
                             onClick={() => selectStyleAndProceed(style.id)}
@@ -336,32 +320,29 @@ export default function ExpressPage() {
           <div className="animate-in fade-in slide-in-from-right-8 duration-500">
               <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest">Step 2: Upload Photos</h2>
-                  <button onClick={() => setWizardStep(1)} className="text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Change Style</button>
+                  <button onClick={() => setWizardStep(1)} className="text-slate-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Change Tool</button>
               </div>
               
               <div 
-                  onDragOver={(e) => e.preventDefault()} 
-                  onDrop={handleDropZone}
-                  className="glass p-16 border-2 border-dashed border-[#009183]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(0,145,131,0.05)]"
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }} 
+                  onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropZone(e); }}
+                  className="glass p-16 border-2 border-dashed border-[#009183]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(0,145,131,0.05)] hover:border-[#009183] transition-colors"
               >
-                  <div className="text-center">
-                      <div className="text-5xl mb-4">{STYLE_CARDS.find(s => s.id === globalStyle)?.icon}</div>
-                      <p className="text-white font-bold text-lg">Applying: <span className="text-[#009183] uppercase tracking-widest">{STYLE_CARDS.find(s => s.id === globalStyle)?.title}</span></p>
+                  <div className="text-center pointer-events-none">
+                      <div className="text-5xl mb-4">{getStyleDetails(globalStyle).icon}</div>
+                      <p className="text-white font-bold text-lg">Applying: <span className="text-[#009183] uppercase tracking-widest">{getStyleDetails(globalStyle).title}</span></p>
+                      <p className="text-slate-500 text-sm mt-2 font-bold uppercase tracking-widest">Drag & Drop images here</p>
                   </div>
                   
                   <div className="w-full max-w-2xl mx-auto space-y-4">
                       <label className="text-[10px] font-bold text-[#009183] uppercase tracking-[0.2em] block text-center mb-6">
-                          📍 Legg til adresse (Valgfritt)
+                          📍 Add Address (Optional)
                       </label>
                       <Autocomplete
                           apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-                          onPlaceSelected={(place) => {
-                              if (place && place.formatted_address) {
-                                  setOrderAddress(place.formatted_address);
-                              }
-                          }}
+                          onPlaceSelected={(place) => { if (place && place.formatted_address) { setOrderAddress(place.formatted_address); } }}
                           options={{ types: ["address"], componentRestrictions: { country: "no" } }}
-                          placeholder="SØK ETTER ADRESSE..."
+                          placeholder="SEARCH ADDRESS..."
                           className="w-full bg-transparent border-b-2 border-slate-700 text-2xl font-black text-white outline-none focus:border-[#009183] uppercase pb-4 transition-colors text-center placeholder:text-slate-600"
                       />
                   </div>
@@ -391,10 +372,17 @@ export default function ExpressPage() {
                     <div className="p-4 flex flex-col gap-3">
                         <div className="flex gap-2">
                             <select value={file.type} onChange={(e) => updateFileField(file.id, 'type', e.target.value)} className="w-1/3 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select>
+                            
                             <select value={file.style} onChange={(e) => updateFileField(file.id, 'style', e.target.value)} className="w-2/3 bg-[#0B1120] text-slate-300 rounded-lg px-2 py-2 text-[9px] font-bold uppercase border border-slate-700 outline-none">
-                                <optgroup label="Lighting"><option value="weather_rain_to_sun">Rain to Sun</option><option value="sunny_midday">Sunny Midday</option><option value="dusk_blue_hour">Blue Hour</option><option value="dusk_purple_orange">Purple Dusk</option><option value="early_morning">Early Morning</option></optgroup>
-                                <optgroup label="Season"><option value="winter">Winter</option><option value="autumn">Autumn</option><option value="spring">Spring</option><option value="summer">Summer</option></optgroup>
+                                {Object.values(STYLE_CATEGORIES).map(category => (
+                                    <optgroup key={category.id} label={category.title}>
+                                        {category.items.map(item => (
+                                            <option key={item.id} value={item.id}>{item.title}</option>
+                                        ))}
+                                    </optgroup>
+                                ))}
                             </select>
+
                         </div>
                         <input type="text" placeholder="Custom instructions (optional)..." value={file.prompt} onChange={(e) => updateFileField(file.id, 'prompt', e.target.value)} className="w-full bg-[#0B1120] rounded-lg px-3 py-2 text-[10px] text-white outline-none border border-slate-700 focus:border-[#009183]" />
                     </div>
@@ -411,11 +399,13 @@ export default function ExpressPage() {
         {/* --- RENDERING SPINNER --- */}
         {isRendering && activeModal === 'none' && (
           <div className="glass p-16 text-center space-y-8 animate-in fade-in duration-500 rounded-3xl bg-[#0f172a]/50 border border-[#009183]/30 shadow-2xl mt-10">
-              <div className="text-6xl animate-bounce mb-4">{STYLE_CARDS.find(s => s.id === globalStyle)?.icon || '⚡'}</div>
+              <div className="text-6xl animate-bounce mb-4">{getStyleDetails(globalStyle).icon}</div>
               <p className="font-black uppercase tracking-[0.3em] text-sm text-[#009183] transition-all">{progressStatus}</p>
-              <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-4 rounded-full overflow-hidden p-1 border border-white/10">
-                <div className="bg-gradient-to-r from-[#009183] to-[#00b09f] h-full rounded-full transition-all duration-300 shadow-[0_0_15px_rgba(0,145,131,0.8)]" style={{ width: `${progressPct}%` }}></div>
+              {/* NY GLØDENDE INDETERMINATE BAR (INGEN % TALL) */}
+              <div className="w-full max-w-2xl mx-auto bg-[#0B1120] h-3 rounded-full overflow-hidden p-0.5 border border-white/10 relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#009183] to-transparent w-1/2 rounded-full animate-[shimmer_1.5s_infinite] shadow-[0_0_15px_rgba(0,145,131,0.8)]"></div>
               </div>
+              <style jsx>{`@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }`}</style>
           </div>
         )}
 
@@ -434,7 +424,8 @@ export default function ExpressPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-20">
                     {galleryImages.map((item) => (
                         <div key={item.name} className="group flex flex-col bg-[#0f172a] rounded-[2rem] p-4 border border-white/5 shadow-xl">
-                            <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-black mb-4 cursor-pointer" onClick={() => { setCompareData({raw: item.raw || item.url, edited: item.url}); setActiveModal('compare'); }}>
+                            {/* SMART FIKS: Bytter PROCESSED med RAW for før-bildet */}
+                            <div className="relative aspect-[3/2] rounded-[1.5rem] overflow-hidden bg-black mb-4 cursor-pointer" onClick={() => { setCompareData({raw: item.raw || item.url.replace('PROCESSED_', 'RAW_').replace(/_v\d+/, ''), edited: item.url}); setActiveModal('compare'); }}>
                                 <img src={item.url} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" alt="Result" />
                                 <button onClick={(e) => { e.stopPropagation(); deleteSingleImage(item.name); }} className="absolute top-4 right-4 bg-red-950/80 text-red-400 hover:text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-black z-30 opacity-0 group-hover:opacity-100 transition-all border border-red-900/50">🗑️</button>
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300 flex items-center justify-center z-20 pointer-events-none"><span className="opacity-0 group-hover:opacity-100 text-white font-bold bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm transition-opacity">Click to Compare</span></div>
@@ -443,7 +434,7 @@ export default function ExpressPage() {
                                 {item.approved ? (
                                     <span className="px-4 py-2 bg-[#009183]/10 text-[#00ff83] border border-[#009183]/30 text-[9px] font-bold uppercase tracking-widest rounded-full">✅ Approved</span>
                                 ) : (
-                                    <button onClick={() => approveImage(item.name)} className="px-4 py-2 bg-[#009183] text-white text-[9px] font-bold uppercase tracking-widest rounded-full hover:bg-[#00b09f] shadow-[0_0_10px_rgba(0,145,131,0.2)] transition-all">Approve</button>
+                                    <button onClick={() => approveImage(item.name)} className="px-4 py-2 bg-[#009183] text-white text-[9px] font-bold uppercase tracking-widest rounded-full hover:bg-[#00b09f] shadow-[0_0_10px_rgba(0,145,131,0.2)] transition-all">Add AI watermark</button>
                                 )}
                                 {!item.approved && (
                                     <button onClick={() => openCanvasStudio(item.name, item.url)} className="px-4 py-2 bg-transparent border border-slate-700 text-slate-300 text-[9px] font-bold uppercase tracking-widest rounded-full hover:bg-slate-800 hover:text-white transition-colors">✏️ Retouch</button>
@@ -458,7 +449,7 @@ export default function ExpressPage() {
         )}
       </main>
 
-      {/* --- HER ER MODALENE (Vinduene) SOM JEG KUTTET I STYKKER SIST! --- */}
+      {/* --- MODALS --- */}
       {activeModal === 'retouch' && (
         <div className="fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-6">
             <div className="flex justify-between items-center w-[85vw] max-w-[1100px]"><h2 className="text-2xl font-black text-[#009183] uppercase tracking-widest">Retouch Studio</h2><button onClick={() => setActiveModal('none')} className="text-slate-400 font-bold uppercase text-xs hover:text-white">Close</button></div>
@@ -468,7 +459,7 @@ export default function ExpressPage() {
                 <div className="w-px h-8 bg-slate-700 mx-2"></div>
                 <button onClick={undoCanvas} className="px-5 py-3 bg-[#0B1120] border border-slate-700 text-white font-bold text-xs rounded-xl">Undo</button>
                 <button onClick={clearCanvas} className="px-5 py-3 bg-red-900/20 text-red-400 font-bold text-xs rounded-xl border border-red-900/50">Reset</button>
-                <label className="flex items-center gap-2 text-slate-300 text-xs font-bold cursor-pointer ml-auto mr-4"><input type="checkbox" checked={saveAsNew} onChange={(e) => setSaveAsNew(e.target.checked)} className="w-4 h-4 accent-[#009183]" /> Save as new</label>
+                {/* FJernet Save as new checkbox */}
                 <input type="text" value={retouchPrompt} onChange={(e) => setRetouchPrompt(e.target.value)} placeholder="Instruction (e.g. remove car)..." className="flex-1 max-w-sm bg-[#0B1120] rounded-xl p-3 text-sm text-white outline-none border border-slate-700 focus:border-[#009183]" />
                 <button onClick={submitRetouch} className="px-8 py-3 bg-[#009183] text-white font-black uppercase text-xs rounded-xl">Execute</button>
             </div>
@@ -481,7 +472,20 @@ export default function ExpressPage() {
                 <div className="flex justify-between items-center mb-8"><h2 className="text-xl font-black text-white uppercase tracking-wider">Re-Render</h2><button onClick={() => setActiveModal('none')} className="text-slate-500 hover:text-white font-bold uppercase text-xs">Cancel</button></div>
                 <div className="space-y-6">
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Image Type</label><select value={rerenderData.type} onChange={(e) => setRerenderData({...rerenderData, type: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><option value="exterior">Exterior</option><option value="interior">Interior</option><option value="drone">Drone</option></select></div>
-                    <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">New Style</label><select value={rerenderData.style} onChange={(e) => setRerenderData({...rerenderData, style: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]"><optgroup label="Lighting"><option value="weather_rain_to_sun">Rain to Sun</option><option value="dusk_blue_hour">Blue Hour</option><option value="sunny_midday">Sunny Midday</option></optgroup></select></div>
+                    
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">New Style</label>
+                        <select value={rerenderData.style} onChange={(e) => setRerenderData({...rerenderData, style: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white font-bold uppercase text-xs outline-none focus:border-[#009183]">
+                            {Object.values(STYLE_CATEGORIES).map(category => (
+                                <optgroup key={category.id} label={category.title}>
+                                    {category.items.map(item => (
+                                        <option key={item.id} value={item.id}>{item.title}</option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                        </select>
+                    </div>
+
                     <div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">Custom Prompt</label><input type="text" value={rerenderData.prompt} onChange={(e) => setRerenderData({...rerenderData, prompt: e.target.value})} className="w-full bg-[#0B1120] border border-slate-700 rounded-xl p-4 text-white text-sm outline-none focus:border-[#009183]" /></div>
                     <button onClick={submitRerender} className="w-full py-4 mt-4 bg-[#009183] text-white font-black uppercase text-xs rounded-xl shadow-[0_0_20px_rgba(0,145,131,0.2)]">Start Re-Render</button>
                 </div>

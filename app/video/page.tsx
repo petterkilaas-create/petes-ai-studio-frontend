@@ -1,27 +1,18 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useUser, useAuth } from "@clerk/nextjs"; // <-- VIP Pass
+import { useUser, useAuth } from "@clerk/nextjs";
 import Autocomplete from "react-google-autocomplete";
 import { supabase } from "../../supabaseClient"; 
 
-const API = "https://petes-ai-studio-backend-v2-73jga2zlcq-lz.a.run.app";
+const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; };
 
-const STATUS_MESSAGES = [
-    "Directing the AI Cameras...",
-    "Generating cinematic motion...",
-    "Stitching scenes together...",
-    "Adding transitions & text...",
-    "Finalizing property film...",
-    "Polishing frame rates..."
-];
-
 export default function VideoPage() {
   const { user } = useUser();
-  const { getToken } = useAuth(); // <-- Henter ut det magiske passet!
+  const { getToken } = useAuth(); // <-- VIP Pass for Clerk
 
   const [orderId, setOrderId] = useState("");
   const [orderAddress, setOrderAddress] = useState("");
@@ -36,23 +27,20 @@ export default function VideoPage() {
 
   const [isRendering, setIsRendering] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
-  const [progressStatus, setProgressStatus] = useState("Processing...");
-  const [statusMsgIndex, setStatusMsgIndex] = useState(0);
+  const [progressStatus, setProgressStatus] = useState("Klargjør film-motoren..."); // Styres nå av databasen
   const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ==========================================
-  // DEN MAGISKE UX-PROGRESJONEN (Fake progress)
+  // PROGRESS BAR ANIMASJON
   // ==========================================
   useEffect(() => {
     let pctInterval: NodeJS.Timeout;
-    let msgInterval: NodeJS.Timeout;
 
     if (isRendering) {
         setProgressPct(0);
-        setStatusMsgIndex(0);
-        setProgressStatus(STATUS_MESSAGES[0]);
+        setProgressStatus("Laster opp scener...");
 
         pctInterval = setInterval(() => {
             setProgressPct(prev => {
@@ -61,63 +49,40 @@ export default function VideoPage() {
                 return prev >= 95 ? 95 : prev + step;
             });
         }, 500);
-
-        msgInterval = setInterval(() => {
-            setStatusMsgIndex(prev => {
-                const next = (prev + 1) % STATUS_MESSAGES.length;
-                setProgressStatus(STATUS_MESSAGES[next]);
-                return next;
-            });
-        }, 6000);
     }
 
-    return () => {
-        clearInterval(pctInterval);
-        clearInterval(msgInterval);
-    };
+    return () => clearInterval(pctInterval);
   }, [isRendering]);
 
   // ==========================================
-  // SIKKERHETSNETTET (Fallback Poller) + RADIO
+  // DEN SKUDDSIKRE POLLEREN (Kopiert fra Staging)
   // ==========================================
   useEffect(() => {
-    if (!orderId) return;
+    if (!isRendering || !orderId) return;
 
-    // 1. Radioen (Rask, men kan sovne)
-    const channel = supabase
-      .channel(`video_progress_${orderId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects', filter: `name=eq.${orderId}` },
-        (payload) => {
-          if (!payload.new) return;
-          const newStatus = (payload.new as any).status;
-          if (newStatus === 'completed' || newStatus === 'finished') {
+    const interval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('status, progress_message')
+          .eq('name', orderId)
+          .single();
+
+        if (data) {
+          if (data.progress_message) {
+            setProgressStatus(data.progress_message); // Teksten oppdateres live fra backenden!
+          }
+          if (data.status === 'completed' || data.status === 'finished') {
+            clearInterval(interval);
             triggerFinish();
           }
         }
-      ).subscribe();
+      } catch (err) {
+        console.error("Polling feil:", err);
+      }
+    }, 2000);
 
-    return () => { supabase.removeChannel(channel); };
-  }, [orderId]);
-
-  useEffect(() => {
-    let fallbackTimer: NodeJS.Timeout;
-
-    // 2. Sikkerhetsnettet (Spør Supabase forsiktig hvert 5. sekund KUN når vi rendrer)
-    if (isRendering && orderId) {
-        fallbackTimer = setInterval(async () => {
-            try {
-                const { data } = await supabase.from('projects').select('status').eq('name', orderId).single();
-                if (data && (data.status === 'completed' || data.status === 'finished')) {
-                    console.log("Sikkerhetsnett fanget opp at jobben er ferdig!");
-                    triggerFinish();
-                }
-            } catch (e) {
-                console.error("Poller error:", e);
-            }
-        }, 5000);
-    }
-
-    return () => { if (fallbackTimer) clearInterval(fallbackTimer); };
+    return () => clearInterval(interval);
   }, [isRendering, orderId]);
 
   const triggerFinish = () => {
@@ -128,7 +93,6 @@ export default function VideoPage() {
           loadGallery(orderId);
       }, 800);
   };
-
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.length) return;
@@ -164,34 +128,37 @@ export default function VideoPage() {
       
       setIsRendering(true);
 
-      if (user) {
-          await supabase.from('projects').insert([
-              { name: orderId, address: orderAddress, status: 'processing', user_id: user.id }
-          ]);
-      }
-
-      const fd = new FormData();
-      fd.append('job_name', orderId);
-      fd.append('address', orderAddress);
-      if (user) fd.append('user_id', user.id);
-
-      const timelineFiles = videoTimeline.map(id => uploadedFiles.find(f => f.id === id)).filter(Boolean) as UploadedFile[];
-      timelineFiles.forEach(f => { fd.append('files', f.file); });
-
-      const cfg = {
-          timeline: timelineFiles.map(f => f.file.name),
-          meta: videoMeta
-      };
-      fd.append('config', JSON.stringify(cfg));
-
       try {
-          const token = await getToken(); // <-- Henter VIP Passet!
+          if (user) {
+              await supabase.from('projects').upsert([
+                  { name: orderId, address: orderAddress, status: 'processing', user_id: user.id }
+              ], { onConflict: 'name' });
+          }
+
+          const fd = new FormData();
+          fd.append('job_name', orderId);
+          fd.append('address', orderAddress);
+          if (user) fd.append('user_id', user.id);
+
+          const timelineFiles = videoTimeline.map(id => uploadedFiles.find(f => f.id === id)).filter(Boolean) as UploadedFile[];
+          timelineFiles.forEach(f => { fd.append('files', f.file); });
+
+          const cfg = {
+              timeline: timelineFiles.map(f => f.file.name),
+              meta: videoMeta
+          };
+          fd.append('config', JSON.stringify(cfg));
+
+          const token = await getToken();
           await fetch(`${API}/start-property-film/`, { 
               method: 'POST', 
-              headers: { 'Authorization': `Bearer ${token}` }, // <-- Viser VIP passet til dørvakten
+              headers: { 'Authorization': `Bearer ${token}` },
               body: fd 
           });
-      } catch (error) { console.error(error); }
+      } catch (error) { 
+          console.error("💥 FEIL I FRONTEND:", error); 
+          setIsRendering(false);
+      }
   };
 
   const loadGallery = async (name: string) => { 
@@ -230,6 +197,7 @@ export default function VideoPage() {
             </div>
         </div>
 
+        {/* --- UPLOAD SECTION --- */}
         {uploadedFiles.length === 0 && galleryImages.length === 0 && !isRendering && (
           <div className="glass p-16 border-2 border-dashed border-[#9333ea]/40 flex flex-col items-center gap-8 rounded-3xl bg-[#0f172a]/50 shadow-[0_0_30px_rgba(147,51,234,0.05)]">
               <div className="w-full max-w-2xl mx-auto space-y-4">
@@ -260,6 +228,7 @@ export default function VideoPage() {
           </div>
         )}
 
+        {/* --- TIMELINE STUDIO --- */}
         {uploadedFiles.length > 0 && !isRendering && galleryImages.length === 0 && (
           <div className="space-y-8 animate-in fade-in duration-500">
               
@@ -329,12 +298,13 @@ export default function VideoPage() {
           </div>
         )}
 
+        {/* --- RESULTS GALLERY --- */}
         {galleryImages.length > 0 && !isRendering && (
             <div className="animate-in fade-in slide-in-from-bottom-10 duration-500 max-w-3xl mx-auto mt-10">
                 <div className="flex justify-between items-end border-b border-white/10 pb-6 mb-10">
                     <div>
                         <p className="text-purple-400 font-bold text-sm tracking-widest">{orderId}</p>
-                        <h3 className="text-3xl font-black text-white uppercase">{orderAddress || "Unnamed Project"}</h3>
+                        <h3 className="text-3xl font-black text-white uppercase">{orderAddress || "Completed Project"}</h3>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-10 pb-20">
