@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { submitJob } from "../lib/api";
 import { useJobStatus } from "../lib/useJobStatus";
@@ -108,23 +107,6 @@ export default function ExpressV2Page() {
 
   const isProcessing = isSubmitting || (jobId !== null && job.status === "pending");
   const runDisabled = !file || isProcessing;
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#0B1120] flex flex-col items-center justify-center text-center px-6 gap-4">
-        <h1 className="text-2xl font-black text-white uppercase tracking-widest">
-          Please sign in
-        </h1>
-        <p className="text-slate-400">You need to be signed in to use Express V2.</p>
-        <Link
-          href="/sign-in"
-          className="px-6 py-3 rounded-full bg-[#009183] hover:bg-[#00a89a] text-white font-black uppercase tracking-widest text-[10px] transition-colors"
-        >
-          Sign in
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans text-white">
