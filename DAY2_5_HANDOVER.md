@@ -184,6 +184,10 @@ Inkludert i backend-handover seksjon 8.
 
 - **Test end-to-end ofte.** Express ringte døde endepunkter i 4 dager før noen
   oppdaget det.
-- **Middleware må hete `middleware.ts`** i Next.js 15+, ikke `proxy.ts`.
+- **Filnavnet skifter mellom Next-versjoner.** I Next.js 15 må filen hete
+  `middleware.ts` (ikke `proxy.ts`). I Next.js 16 er konvensjonen reversert:
+  filen heter `proxy.ts` (omdøpt på Dag 10 da vi oppgraderte). Hvis du jobber
+  på en eldre branch eller med en eldre Next-versjon, sjekk hvilken konvensjon
+  som gjelder.
 - **`useUser()` uten `isLoaded`** er konvensjonen i denne appen.
 - **Backend CORS må eksplisitt tillate localhost:3000** for lokal utvikling.
