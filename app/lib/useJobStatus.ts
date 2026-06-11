@@ -2,14 +2,25 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { pollJob } from "./api";
+import { pollJob, type Rejection } from "./api";
 
 export type JobStatus = "idle" | "pending" | "done" | "failed";
 
 export interface UseJobStatusResult {
   status: JobStatus;
   imageUrl: string | null;
+  /**
+   * Bruker-rettet feilmelding. Ved gate-avslag (se `rejection`) er dette
+   * meldingen UTEN rejected_*-prefiks — prefikset skal aldri vises i UI.
+   */
   error: string | null;
+  /**
+   * Strukturert gate-avslag fra scene-type-gaten (TG-NEW-58), eller null
+   * ved ekte pipeline-feil / ingen feil. UI kan bruke `reason` til aa
+   * tilby "Fortsett som eksterioer"-flyt (resubmit med
+   * scene_type="exterior" + force_scene_type=true).
+   */
+  rejection: Rejection | null;
 }
 
 const POLL_INTERVAL_MS = 2000;
@@ -20,6 +31,7 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
   const [status, setStatus] = useState<JobStatus>("idle");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rejection, setRejection] = useState<Rejection | null>(null);
 
   const objectUrlRef = useRef<string | null>(null);
 
@@ -28,6 +40,7 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
       setStatus("idle");
       setImageUrl(null);
       setError(null);
+      setRejection(null);
       return;
     }
 
@@ -35,6 +48,7 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
     setStatus("pending");
     setImageUrl(null);
     setError(null);
+    setRejection(null);
 
     const tick = async () => {
       try {
@@ -51,7 +65,12 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
           setStatus("done");
           clearInterval(intervalId);
         } else if (result.kind === "failed") {
-          setError(result.detail);
+          if (result.rejection) {
+            setRejection(result.rejection);
+            setError(result.rejection.message);
+          } else {
+            setError(result.detail);
+          }
           setStatus("failed");
           clearInterval(intervalId);
         }
@@ -76,5 +95,5 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
     };
   }, [jobId, getToken]);
 
-  return { status, imageUrl, error };
+  return { status, imageUrl, error, rejection };
 }
