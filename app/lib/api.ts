@@ -73,14 +73,22 @@ export type SubmitResult =
   | { kind: "async"; jobId: string; service: string };
 
 export type JobResult =
-  | { kind: "pending"; status: "queued" | "running" }
+  | { kind: "pending"; status: "queued" | "running"; retryAfterMs?: number }
   | { kind: "done"; imageBlob: Blob; resultUrl?: string; jobId: string }
   | { kind: "failed"; detail: string; rejection?: Rejection };
 
-type GetToken = () => Promise<string | null>;
+/**
+ * Token-henter fra Clerk (useAuth().getToken). Opsjonen skipCache brukes
+ * ved 401-retry: Clerk-JWT-er lever ~60 s, saa jobber som poller lenger
+ * enn det trenger et ferskt token midt i loopen.
+ */
+type GetToken = (options?: { skipCache?: boolean }) => Promise<string | null>;
 
-async function authHeader(getToken: GetToken): Promise<HeadersInit> {
-  const token = await getToken();
+async function authHeader(
+  getToken: GetToken,
+  options?: { skipCache?: boolean }
+): Promise<HeadersInit> {
+  const token = await getToken(options);
   if (!token) {
     throw new Error("Not authenticated: Clerk token unavailable");
   }
@@ -153,16 +161,37 @@ export async function submitJob(opts: {
   throw new Error(`submitJob failed (${res.status}): ${detail}`);
 }
 
+/** Parser Retry-After-header (sekunder) -> millisekunder, clampe 0-30 s. */
+function parseRetryAfterMs(res: Response): number | undefined {
+  const raw = res.headers.get("Retry-After");
+  if (raw === null) return undefined;
+  const seconds = Number(raw);
+  if (!Number.isFinite(seconds) || seconds < 0) return undefined;
+  return Math.min(seconds, 30) * 1000;
+}
+
 export async function pollJob(opts: {
   jobId: string;
   getToken: GetToken;
 }): Promise<JobResult> {
   const { jobId, getToken } = opts;
 
-  const res = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}`, {
+  const url = `${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}`;
+
+  let res = await fetch(url, {
     method: "GET",
     headers: await authHeader(getToken),
   });
+
+  // 401 = Clerk-tokenet har utloept (levetid ~60 s) — hent ferskt token
+  // utenom cache og prov EN gang til. Vedvarende 401 faller gjennom til
+  // den generiske feilgrenen nederst.
+  if (res.status === 401) {
+    res = await fetch(url, {
+      method: "GET",
+      headers: await authHeader(getToken, { skipCache: true }),
+    });
+  }
 
   if (res.status === 200) {
     const imageBlob = await res.blob();
@@ -172,8 +201,9 @@ export async function pollJob(opts: {
   }
 
   if (res.status === 202) {
+    const retryAfterMs = parseRetryAfterMs(res);
     const data = (await res.json()) as { status: "queued" | "running" };
-    return { kind: "pending", status: data.status };
+    return { kind: "pending", status: data.status, retryAfterMs };
   }
 
   if (res.status === 500) {

@@ -25,6 +25,12 @@ export interface UseJobStatusResult {
 
 const POLL_INTERVAL_MS = 2000;
 
+// Transient nettverksfeil dreper ikke loopen umiddelbart: vi proever paa
+// nytt med eksponentiell backoff (2 s, 4 s) og gir foerst opp ved tredje
+// paafoelgende feil. Et vellykket poll nullstiller telleren.
+const MAX_CONSECUTIVE_ERRORS = 3;
+const BACKOFF_BASE_MS = 2000;
+
 export function useJobStatus(jobId: string | null): UseJobStatusResult {
   const { getToken } = useAuth();
 
@@ -45,15 +51,28 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
     }
 
     let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let consecutiveErrors = 0;
+
     setStatus("pending");
     setImageUrl(null);
     setError(null);
     setRejection(null);
 
+    // setTimeout-basert scheduling (ikke setInterval) slik at neste poll
+    // kan utsettes per svar: backend-styrt via Retry-After paa 202, eller
+    // backoff etter nettverksfeil. Hindrer ogsaa overlappende ticks naar
+    // et poll-kall tar lengre tid enn intervallet.
+    const schedule = (delayMs: number) => {
+      if (cancelled) return;
+      timeoutId = setTimeout(() => void tick(), delayMs);
+    };
+
     const tick = async () => {
       try {
         const result = await pollJob({ jobId, getToken });
         if (cancelled) return;
+        consecutiveErrors = 0;
 
         if (result.kind === "done") {
           const url = URL.createObjectURL(result.imageBlob);
@@ -63,8 +82,10 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
           objectUrlRef.current = url;
           setImageUrl(url);
           setStatus("done");
-          clearInterval(intervalId);
-        } else if (result.kind === "failed") {
+          return;
+        }
+
+        if (result.kind === "failed") {
           if (result.rejection) {
             setRejection(result.rejection);
             setError(result.rejection.message);
@@ -72,22 +93,33 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
             setError(result.detail);
           }
           setStatus("failed");
-          clearInterval(intervalId);
+          return;
         }
+
+        // pending — backend kan styre tempoet via Retry-After.
+        schedule(result.retryAfterMs ?? POLL_INTERVAL_MS);
       } catch (err) {
         if (cancelled) return;
+        consecutiveErrors += 1;
+
+        if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
+          // 1. feil -> vent 2 s, 2. feil -> vent 4 s.
+          schedule(BACKOFF_BASE_MS * 2 ** (consecutiveErrors - 1));
+          return;
+        }
+
         setError(err instanceof Error ? err.message : String(err));
         setStatus("failed");
-        clearInterval(intervalId);
       }
     };
 
-    const intervalId = setInterval(tick, POLL_INTERVAL_MS);
     void tick();
 
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
