@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
-import { submitJob } from "../lib/api";
+import { submitJob, ValidationError, type ProcessParams } from "../lib/api";
 import { useJobStatus } from "../lib/useJobStatus";
+
+type SceneType = "auto" | "exterior" | "interior";
 
 export default function SceneTransformDebugPage() {
   const { user } = useUser();
@@ -11,6 +13,10 @@ export default function SceneTransformDebugPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Scene-type-gate-kontroller (TG-NEW-58-kontrakten fra Dag 18)
+  const [sceneType, setSceneType] = useState<SceneType>("auto");
+  const [forceSceneType, setForceSceneType] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -34,6 +40,7 @@ export default function SceneTransformDebugPage() {
   let statusText = "Idle";
   if (isSubmitting) statusText = "Submitting...";
   else if (jobId && job.status === "pending") statusText = "Processing...";
+  else if (job.rejection) statusText = "Avvist av scene-gate";
   else if (job.status === "failed") statusText = `Failed: ${job.error ?? "unknown"}`;
   else if (outputUrl) statusText = "Done";
   else if (submitError) statusText = `Failed: ${submitError}`;
@@ -44,7 +51,17 @@ export default function SceneTransformDebugPage() {
     setSubmitError(null);
   };
 
-  const handleRun = async () => {
+  const handleSceneTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value as SceneType;
+    setSceneType(value);
+    // force_scene_type=true er kun gyldig sammen med scene_type="exterior"
+    // (backend gir HTTP 400 ellers) — nullstill checkboxen ved bytte.
+    if (value !== "exterior") {
+      setForceSceneType(false);
+    }
+  };
+
+  const runWithParams = async (params: ProcessParams) => {
     if (!file || isSubmitting) return;
 
     setJobId(null);
@@ -55,6 +72,7 @@ export default function SceneTransformDebugPage() {
       const result = await submitJob({
         service: "scene_transform",
         image: file,
+        params,
         getToken,
       });
       if (result.kind === "async") {
@@ -64,10 +82,30 @@ export default function SceneTransformDebugPage() {
         setSubmitError("Unexpected sync response from backend");
       }
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : String(err));
+      if (err instanceof ValidationError) {
+        // Strukturelt kontraktsbrudd i params (HTTP 400) — vis detail direkte
+        setSubmitError(`Ugyldige parametre: ${err.detail}`);
+      } else {
+        setSubmitError(err instanceof Error ? err.message : String(err));
+      }
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleRun = () => {
+    void runWithParams({
+      scene_type: sceneType,
+      force_scene_type: forceSceneType,
+    });
+  };
+
+  // "Fortsett som eksteriør"-flyten: resubmit med eksplisitt override.
+  // Synkroniserer også kontrollene så UI-et viser hva som faktisk ble sendt.
+  const handleForceExterior = () => {
+    setSceneType("exterior");
+    setForceSceneType(true);
+    void runWithParams({ scene_type: "exterior", force_scene_type: true });
   };
 
   const handleReset = () => {
@@ -75,10 +113,13 @@ export default function SceneTransformDebugPage() {
     setJobId(null);
     setSubmitError(null);
     setIsSubmitting(false);
+    setSceneType("auto");
+    setForceSceneType(false);
   };
 
   const isProcessing = isSubmitting || (jobId !== null && job.status === "pending");
   const runDisabled = !file || isProcessing;
+  const rejection = job.rejection;
 
   return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans text-white">
@@ -124,6 +165,53 @@ export default function SceneTransformDebugPage() {
             />
           </div>
 
+          <div className="flex flex-wrap gap-6 items-end">
+            <div>
+              <label
+                htmlFor="scene-type-select"
+                className="text-[10px] font-black text-[#009183] uppercase tracking-[0.2em] block mb-3"
+              >
+                Scene type
+              </label>
+              <select
+                id="scene-type-select"
+                value={sceneType}
+                onChange={handleSceneTypeChange}
+                disabled={isProcessing}
+                className="bg-[#0B1120] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-[#009183] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="auto">Auto (classifier avgjør)</option>
+                <option value="exterior">Eksteriør</option>
+                <option value="interior">Interiør</option>
+              </select>
+            </div>
+
+            <label
+              className={`flex items-center gap-3 pb-2.5 text-sm select-none ${
+                sceneType === "exterior" && !isProcessing
+                  ? "text-slate-300 cursor-pointer"
+                  : "text-slate-600 cursor-not-allowed"
+              }`}
+              title={
+                sceneType === "exterior"
+                  ? "Hopper over classifier og kjører som eksteriør"
+                  : "Kun tilgjengelig når scene type er Eksteriør"
+              }
+            >
+              <input
+                type="checkbox"
+                checked={forceSceneType}
+                onChange={(e) => setForceSceneType(e.target.checked)}
+                disabled={sceneType !== "exterior" || isProcessing}
+                className="w-4 h-4 accent-[#009183] disabled:cursor-not-allowed"
+              />
+              <span>
+                Tving eksteriør{" "}
+                <span className="text-slate-500">(hopp over classifier)</span>
+              </span>
+            </label>
+          </div>
+
           <div className="flex gap-3">
             <button
               onClick={handleRun}
@@ -141,7 +229,30 @@ export default function SceneTransformDebugPage() {
             </button>
           </div>
 
-          {(submitError || job.status === "failed") && (
+          {rejection && (
+            <div className="border border-amber-500/50 bg-amber-500/10 rounded-xl p-4 text-sm text-amber-200 space-y-3">
+              <p className="font-black uppercase tracking-widest text-[10px]">
+                {rejection.reason === "interior"
+                  ? "Bildet ble vurdert som interiør"
+                  : "Usikker scene-vurdering"}
+              </p>
+              <p className="break-words text-amber-100">{rejection.message}</p>
+              <p className="text-amber-200/70 text-xs">
+                {rejection.reason === "interior"
+                  ? "Eksteriør-presets passer ikke for interiørbilder. Hvis du er sikker på at dette faktisk er et eksteriørbilde, kan du overstyre vurderingen:"
+                  : "Klassifisereren klarte ikke avgjøre scene-typen. Hvis dette er et eksteriørbilde, kan du fortsette med eksplisitt overstyring:"}
+              </p>
+              <button
+                onClick={handleForceExterior}
+                disabled={runDisabled}
+                className="px-6 py-2.5 rounded-full bg-amber-500 hover:bg-amber-400 disabled:bg-slate-700 disabled:cursor-not-allowed text-[#0B1120] font-black uppercase tracking-widest text-[10px] transition-colors"
+              >
+                Fortsett som eksteriør
+              </button>
+            </div>
+          )}
+
+          {(submitError || (job.status === "failed" && !rejection)) && (
             <div className="border border-[#ef4444]/50 bg-[#ef4444]/10 rounded-xl p-4 text-sm text-[#fca5a5]">
               <p className="font-black uppercase tracking-widest text-[10px] mb-1">Error</p>
               <p className="break-words">{submitError ?? job.error}</p>
