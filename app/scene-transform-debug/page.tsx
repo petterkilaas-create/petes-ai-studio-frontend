@@ -7,6 +7,11 @@ import { useJobStatus } from "../lib/useJobStatus";
 
 type SceneType = "auto" | "exterior" | "interior";
 
+// "none" = ingen preset_id sendes -> backend ruter til segmenterings-
+// preview-stien (SAM3, roed/blaa overlay). Med preset valgt rutes jobben
+// til generativ sti der scene-type-gaten (TG-NEW-58) kjoerer.
+type PresetChoice = "none" | "klart_vaer" | "skumring";
+
 export default function SceneTransformDebugPage() {
   const { user } = useUser();
   const { getToken } = useAuth();
@@ -17,6 +22,7 @@ export default function SceneTransformDebugPage() {
   // Scene-type-gate-kontroller (TG-NEW-58-kontrakten fra Dag 18)
   const [sceneType, setSceneType] = useState<SceneType>("auto");
   const [forceSceneType, setForceSceneType] = useState(false);
+  const [presetId, setPresetId] = useState<PresetChoice>("none");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -93,19 +99,29 @@ export default function SceneTransformDebugPage() {
     }
   };
 
+  // Felles params-bygging: preset_id sendes kun naar valgt, slik at
+  // "none" beholder dagens segmenterings-preview-oppfoersel uendret.
+  const buildParams = (overrides?: Partial<ProcessParams>): ProcessParams => ({
+    ...(presetId !== "none" ? { preset_id: presetId } : {}),
+    scene_type: sceneType,
+    force_scene_type: forceSceneType,
+    ...overrides,
+  });
+
   const handleRun = () => {
-    void runWithParams({
-      scene_type: sceneType,
-      force_scene_type: forceSceneType,
-    });
+    void runWithParams(buildParams());
   };
 
   // "Fortsett som eksteriør"-flyten: resubmit med eksplisitt override.
+  // Preset folger med (via buildParams) — ellers ville resubmiten falt
+  // tilbake til segmenterings-stien og aldri truffet generativ sti.
   // Synkroniserer også kontrollene så UI-et viser hva som faktisk ble sendt.
   const handleForceExterior = () => {
     setSceneType("exterior");
     setForceSceneType(true);
-    void runWithParams({ scene_type: "exterior", force_scene_type: true });
+    void runWithParams(
+      buildParams({ scene_type: "exterior", force_scene_type: true })
+    );
   };
 
   const handleReset = () => {
@@ -115,6 +131,7 @@ export default function SceneTransformDebugPage() {
     setIsSubmitting(false);
     setSceneType("auto");
     setForceSceneType(false);
+    setPresetId("none");
   };
 
   const isProcessing = isSubmitting || (jobId !== null && job.status === "pending");
@@ -168,6 +185,26 @@ export default function SceneTransformDebugPage() {
           <div className="flex flex-wrap gap-6 items-end">
             <div>
               <label
+                htmlFor="preset-select"
+                className="text-[10px] font-black text-[#009183] uppercase tracking-[0.2em] block mb-3"
+              >
+                Preset
+              </label>
+              <select
+                id="preset-select"
+                value={presetId}
+                onChange={(e) => setPresetId(e.target.value as PresetChoice)}
+                disabled={isProcessing}
+                className="bg-[#0B1120] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-[#009183] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="none">Ingen (segmenterings-preview)</option>
+                <option value="klart_vaer">Klart vær</option>
+                <option value="skumring">Skumring</option>
+              </select>
+            </div>
+
+            <div>
+              <label
                 htmlFor="scene-type-select"
                 className="text-[10px] font-black text-[#009183] uppercase tracking-[0.2em] block mb-3"
               >
@@ -211,6 +248,12 @@ export default function SceneTransformDebugPage() {
               </span>
             </label>
           </div>
+
+          <p className="text-xs text-slate-500">
+            Uten preset kjøres kun segmenterings-preview (rød/blå overlay) —
+            scene-type-gaten og generativ transformasjon kjører bare når et
+            preset er valgt.
+          </p>
 
           <div className="flex gap-3">
             <button
