@@ -5,7 +5,7 @@ import { useUser, useAuth } from "@clerk/nextjs";
 import { supabase } from "../../supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
 
-const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
+import { API_BASE } from "../lib/api";
 
 type OrderArchive = { name: string; address?: string; date: string; status: string; hasCopy: boolean; };
 type UploadedFile = { id: string; file: File; url: string; };
@@ -106,7 +106,7 @@ export default function CopywriterPage() {
 
     try {
         const token = await getToken(); 
-        const res = await fetch(`${API}/generate-copy/`, { 
+        const res = await fetch(`${API_BASE}/generate-copy/`, { 
             method: 'POST', 
             headers: { 'Authorization': `Bearer ${token}` }, // Dørvakt på plass!
             body: fd 

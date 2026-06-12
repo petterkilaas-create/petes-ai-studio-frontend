@@ -5,7 +5,7 @@ import { useUser, useAuth } from "@clerk/nextjs";
 import Autocomplete from "react-google-autocomplete";
 import { supabase } from "../../supabaseClient"; 
 
-const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
+import { API_BASE } from "../lib/api";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; };
@@ -150,7 +150,7 @@ export default function VideoPage() {
           fd.append('config', JSON.stringify(cfg));
 
           const token = await getToken();
-          await fetch(`${API}/start-property-film/`, { 
+          await fetch(`${API_BASE}/start-property-film/`, { 
               method: 'POST', 
               headers: { 'Authorization': `Bearer ${token}` },
               body: fd 
@@ -163,7 +163,7 @@ export default function VideoPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
+          const res = await fetch(`${API_BASE}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images); 
       } catch (e) { console.error(e); } 

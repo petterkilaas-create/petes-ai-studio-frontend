@@ -5,7 +5,7 @@ import { useUser, useAuth } from "@clerk/nextjs";
 import { supabase } from "../../supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
 
-const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
+import { API_BASE } from "../lib/api";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; maskBlob: Blob | null; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: string; edited?: string; approved?: boolean; video?: string; };
@@ -191,7 +191,7 @@ export default function ExpressPage() {
         fd.append('config', JSON.stringify(cfg));
         
         const token = await getToken();
-        await fetch(`${API}/start-job/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
+        await fetch(`${API_BASE}/start-job/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
     } catch (error) { 
         console.error(error); 
         setIsRendering(false);
@@ -200,7 +200,7 @@ export default function ExpressPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
+          const res = await fetch(`${API_BASE}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images);
           setCacheBuster(Date.now()); // Oppdaterer cache buster for ferske bilder
@@ -245,7 +245,7 @@ export default function ExpressPage() {
           
           try { 
               const token = await getToken();
-              await fetch(`${API}/execute-retouch/`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` }, body:fd }); 
+              await fetch(`${API_BASE}/execute-retouch/`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` }, body:fd }); 
           } catch(e) { console.error(e); setIsRendering(false); } 
       }, 'image/png'); 
   };
@@ -257,13 +257,13 @@ export default function ExpressPage() {
       const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt); 
       try { 
           const token = await getToken();
-          await fetch(`${API}/re-render-single/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
+          await fetch(`${API_BASE}/re-render-single/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
       } catch(e) { console.error(e); setIsRendering(false); } 
   };
 
   const approveImage = async (imgName: string) => { 
       const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); 
-      await fetch(`${API}/approve-image/`, { method:'POST', body:fd }); 
+      await fetch(`${API_BASE}/approve-image/`, { method:'POST', body:fd }); 
       // Venter 1 sekund før vi laster inn på nytt, så cloud storage rekker å lagre vannmerket
       setTimeout(() => {
           loadGallery(orderId);
@@ -273,7 +273,7 @@ export default function ExpressPage() {
   const deleteSingleImage = async (imgName: string) => { 
       if (!window.confirm("Are you sure you want to permanently delete this image?")) return; 
       const fd = new FormData(); fd.append('job_name', orderId); fd.append('image_name', imgName); 
-      try { await fetch(`${API}/delete-image/`, { method: 'POST', body: fd }); setGalleryImages(prev => prev.filter(img => img.name !== imgName)); } catch (e) { console.error("Failed to delete image:", e); } 
+      try { await fetch(`${API_BASE}/delete-image/`, { method: 'POST', body: fd }); setGalleryImages(prev => prev.filter(img => img.name !== imgName)); } catch (e) { console.error("Failed to delete image:", e); } 
   };
   
   const handleDownloadSingle = async (url: string, filename: string) => { 
@@ -453,7 +453,7 @@ export default function ExpressPage() {
                         <h3 className="text-3xl font-black text-white uppercase">{orderAddress || "Unnamed Project"}</h3>
                     </div>
                     <div className="flex gap-3">
-                        <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(orderId)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
+                        <button onClick={() => window.location.href = `${API_BASE}/download-zip/${encodeURIComponent(orderId)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 pb-20">
