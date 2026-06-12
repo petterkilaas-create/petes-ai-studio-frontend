@@ -53,56 +53,63 @@ const CATEGORIES: Category[] = [
         title: "Privacy Blur",
         desc: "Seamlessly blur faces, family photos, and license plates.",
       },
-      {
-        id: "lawn_green",
-        service: "lawn_green",
-        kind: "simple",
-        icon: "🌿",
-        title: "Lush Lawn",
-        desc: "Turn dead or brown grass into a perfect, manicured green lawn.",
-      },
-      {
-        id: "pool_enhance",
-        service: "pool_enhance",
-        kind: "simple",
-        icon: "🏊",
-        title: "Pool Cleanup",
-        desc: "Clean murky pool water into inviting, crystal-clear light blue.",
-      },
-    ],
-  },
-  {
-    id: "atmosphere",
-    title: "Atmosphere",
-    icon: "🌌",
-    items: [
-      {
-        id: "lamp_on",
-        service: "lamp_on",
-        kind: "simple",
-        icon: "💡",
-        title: "Turn On Lights",
-        desc: "Ignite interior lamps and fixtures without making it night.",
-      },
-      {
-        id: "fireplace_ignite",
-        service: "fireplace_ignite",
-        kind: "simple",
-        icon: "🔥",
-        title: "Virtual Fireplace",
-        desc: "Ignite a realistic, cozy fire in an empty fireplace.",
-      },
-      // Skjult inntil sky_replace-pipeline finnes i backend (Dag 21+)
+      // Skjult inntil lawn_green-pipeline finnes i backend (Dag 21+)
       // {
-      //   id: "sky_replace",
-      //   service: "sky_replace",
+      //   id: "lawn_green",
+      //   service: "lawn_green",
       //   kind: "simple",
-      //   icon: "🌤️",
-      //   title: "Sky Replace",
-      //   desc: "Swap a dull or blown-out sky for a clean, natural blue one.",
+      //   icon: "🌿",
+      //   title: "Lush Lawn",
+      //   desc: "Turn dead or brown grass into a perfect, manicured green lawn.",
+      // },
+      // Skjult inntil pool_enhance-pipeline finnes i backend (Dag 21+)
+      // {
+      //   id: "pool_enhance",
+      //   service: "pool_enhance",
+      //   kind: "simple",
+      //   icon: "🏊",
+      //   title: "Pool Cleanup",
+      //   desc: "Clean murky pool water into inviting, crystal-clear light blue.",
       // },
     ],
   },
+  // Hele Atmosphere-kategorien skjult: alle kortene er backend-stubber uten
+  // pipeline (lamp_on, fireplace_ignite, sky_replace). Vis igjen naar minst
+  // ett kort har en faktisk pipeline i backend (Dag 21+).
+  // {
+  //   id: "atmosphere",
+  //   title: "Atmosphere",
+  //   icon: "🌌",
+  //   items: [
+  //     // Skjult inntil lamp_on-pipeline finnes i backend (Dag 21+)
+  //     // {
+  //     //   id: "lamp_on",
+  //     //   service: "lamp_on",
+  //     //   kind: "simple",
+  //     //   icon: "💡",
+  //     //   title: "Turn On Lights",
+  //     //   desc: "Ignite interior lamps and fixtures without making it night.",
+  //     // },
+  //     // Skjult inntil fireplace_ignite-pipeline finnes i backend (Dag 21+)
+  //     // {
+  //     //   id: "fireplace_ignite",
+  //     //   service: "fireplace_ignite",
+  //     //   kind: "simple",
+  //     //   icon: "🔥",
+  //     //   title: "Virtual Fireplace",
+  //     //   desc: "Ignite a realistic, cozy fire in an empty fireplace.",
+  //     // },
+  //     // Skjult inntil sky_replace-pipeline finnes i backend (Dag 21+)
+  //     // {
+  //     //   id: "sky_replace",
+  //     //   service: "sky_replace",
+  //     //   kind: "simple",
+  //     //   icon: "🌤️",
+  //     //   title: "Sky Replace",
+  //     //   desc: "Swap a dull or blown-out sky for a clean, natural blue one.",
+  //     // },
+  //   ],
+  // },
   {
     id: "timetraveler",
     title: "Time Traveler",
