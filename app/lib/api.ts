@@ -1,6 +1,11 @@
-export const API_BASE: string =
-  process.env.NEXT_PUBLIC_API_BASE ??
-  "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
+const apiBase = process.env.NEXT_PUBLIC_API_BASE;
+if (!apiBase) {
+  throw new Error(
+    "NEXT_PUBLIC_API_BASE er ikke satt. Legg den i .env.local lokalt, " +
+      "eller i Vercel Environment Variables (Production/Preview)."
+  );
+}
+export const API_BASE: string = apiBase;
 
 /**
  * Typet speil av backendens ProcessParams (Dag 18, PR #65).
