@@ -92,14 +92,15 @@ const CATEGORIES: Category[] = [
         title: "Virtual Fireplace",
         desc: "Ignite a realistic, cozy fire in an empty fireplace.",
       },
-      {
-        id: "sky_replace",
-        service: "sky_replace",
-        kind: "simple",
-        icon: "🌤️",
-        title: "Sky Replace",
-        desc: "Swap a dull or blown-out sky for a clean, natural blue one.",
-      },
+      // Skjult inntil sky_replace-pipeline finnes i backend (Dag 21+)
+      // {
+      //   id: "sky_replace",
+      //   service: "sky_replace",
+      //   kind: "simple",
+      //   icon: "🌤️",
+      //   title: "Sky Replace",
+      //   desc: "Swap a dull or blown-out sky for a clean, natural blue one.",
+      // },
     ],
   },
   {
