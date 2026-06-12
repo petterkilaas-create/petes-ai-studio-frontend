@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { supabase } from "../../supabaseClient"; 
 
-const API = "https://petes-ai-studio-backend-v2-32654019163.europe-north1.run.app";
+import { API_BASE } from "../lib/api";
 
 type OrderArchive = { name: string; address?: string; date: string; status: string; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: string; edited?: string; approved?: boolean; };
@@ -84,7 +84,7 @@ export default function OrdersPage() {
 
   const loadGallery = async (name: string) => { 
       try { 
-          const res = await fetch(`${API}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
+          const res = await fetch(`${API_BASE}/list-finished/?job_name=${encodeURIComponent(name)}&t=${Date.now()}`, { cache: 'no-store' }); 
           const data = await res.json(); 
           setGalleryImages(data.images || []); 
       } catch (e) { console.error(e); } 
@@ -151,7 +151,7 @@ export default function OrdersPage() {
     try {
         const token = await getToken();
         const fd = new FormData(); fd.append('job_name', orderName); fd.append('image_name', ''); 
-        fetch(`${API}/delete-image/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }).catch(console.error);
+        fetch(`${API_BASE}/delete-image/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }).catch(console.error);
     } catch(e) {}
   };
 
@@ -165,7 +165,7 @@ export default function OrdersPage() {
     if (user) await supabase.from('projects').update({ name: newName }).eq('name', oldName);
     // Backend kall (krever muligens ikke token avhengig av backend-oppsett, men greit å ha)
     const fd = new FormData(); fd.append('old_name', oldName); fd.append('new_name', newName);
-    fetch(`${API}/rename-order/`, { method: 'POST', body: fd }).catch(console.error);
+    fetch(`${API_BASE}/rename-order/`, { method: 'POST', body: fd }).catch(console.error);
   };
 
   // --- VERKTØYKASSE MED CLERK AUTH ---
@@ -176,7 +176,7 @@ export default function OrdersPage() {
       try {
           const token = await getToken();
           const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', imgName);
-          await fetch(`${API}/delete-image/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd });
+          await fetch(`${API_BASE}/delete-image/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd });
           setGalleryImages(prev => prev.filter(img => img.name !== imgName));
       } catch (e) { console.error(e); }
   };
@@ -186,7 +186,7 @@ export default function OrdersPage() {
       try {
           const token = await getToken();
           const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', imgName); 
-          await fetch(`${API}/approve-image/`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` }, body:fd }); 
+          await fetch(`${API_BASE}/approve-image/`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` }, body:fd }); 
           loadGallery(selectedOrder); 
       } catch(e) { console.error(e); }
   };
@@ -214,7 +214,7 @@ export default function OrdersPage() {
           const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('prompt', retouchPrompt); fd.append('mask_file', b, 'mask.png'); fd.append('save_new', saveAsNew.toString()); 
           try { 
               const token = await getToken();
-              await fetch(`${API}/execute-retouch/`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` }, body:fd }); 
+              await fetch(`${API_BASE}/execute-retouch/`, { method:'POST', headers: { 'Authorization': `Bearer ${token}` }, body:fd }); 
           } catch(e) { console.error(e); setIsRendering(false); }
       }, 'image/png');
   };
@@ -228,7 +228,7 @@ export default function OrdersPage() {
       const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('image_type', rerenderData.type); fd.append('style', rerenderData.style); fd.append('prompt', rerenderData.prompt);
       try { 
           const token = await getToken();
-          await fetch(`${API}/re-render-single/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
+          await fetch(`${API_BASE}/re-render-single/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
       } catch(e) { console.error(e); setIsRendering(false); }
   };
 
@@ -241,7 +241,7 @@ export default function OrdersPage() {
       const fd = new FormData(); fd.append('job_name', selectedOrder); fd.append('image_name', currentCanvasImgId); fd.append('prompt', videoPrompt);
       try { 
           const token = await getToken();
-          await fetch(`${API}/generate-video/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
+          await fetch(`${API_BASE}/generate-video/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd }); 
       } catch(e) { console.error(e); setIsRendering(false); }
   };
 
@@ -345,7 +345,7 @@ export default function OrdersPage() {
                         <h3 className="text-3xl font-black text-white uppercase">{archiveOrders.find(o => o.name === selectedOrder)?.address || "Project Gallery"}</h3>
                     </div>
                     {galleryImages.length > 0 && (
-                        <button onClick={() => window.location.href = `${API}/download-zip/${encodeURIComponent(selectedOrder)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
+                        <button onClick={() => window.location.href = `${API_BASE}/download-zip/${encodeURIComponent(selectedOrder)}`} className="px-6 py-3 bg-white text-[#0B1120] rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-[#009183] hover:text-white transition-all shadow-lg">Download ZIP</button>
                     )}
                 </div>
 
