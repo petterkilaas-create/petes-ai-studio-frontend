@@ -31,7 +31,9 @@ export interface ProcessParams {
 /**
  * Strukturert gate-avslag fra scene-type-gaten (TG-NEW-58).
  * `message` er den norske, bruker-rettede meldingen UTEN prefiks —
- * raatt `rejected_*:`-prefiks skal aldri vises i UI.
+ * den kommer ferdig formulert fra backend og baerer alt UI trenger
+ * (inkl. ev. confidence-tekst), saa Rejection holder seg til
+ * {reason, message} og RejectionPanel trenger ingen endring.
  */
 export type RejectionReason = "interior" | "uncertain";
 
@@ -41,19 +43,40 @@ export interface Rejection {
 }
 
 /**
- * Parser `rejected_interior:` / `rejected_uncertain:`-prefiksene fra
- * backendens FAILED-detail (Dag 18-kontrakt).
- *
- * TG-NEW-70: naar backend faar strukturert error-form (kode + melding
- * i stedet for prefikset streng), er denne funksjonen DET ENESTE
- * stedet i frontend som skal endres. Ikke parse prefikser andre steder.
+ * Strukturert jobb-status fra GET /v1/jobs/{id} (TG-NEW-70).
+ * Gate-avslag kommer naa som HTTP 200 med status="rejected" og et
+ * `code`/`message`/`classifier`-felt — ikke lenger HTTP 500 med
+ * `rejected_*:`-prefikset detail.
  */
-export function parseRejection(detail: string): Rejection | null {
-  const match = detail.match(/^rejected_(interior|uncertain):\s*([\s\S]*)$/);
-  if (!match) return null;
+interface JobStatusBody {
+  job_id?: string;
+  service?: string;
+  status?: string;
+  code?: string;
+  message?: string;
+  classifier?: { verdict?: string; confidence?: number };
+}
+
+/**
+ * Mapper backendens strukturerte avslags-svar til Rejection-typen utad.
+ * `code` -> `reason`: rejected_interior -> "interior",
+ * rejected_uncertain -> "uncertain". Returnerer null for ukjente koder.
+ *
+ * TG-NEW-70: backend leverer naa kode + ferdig melding direkte (ingen
+ * prefiks aa strippe). Dette er fortsatt DET ENESTE stedet i frontend
+ * som tolker rejected_*-koder — ikke tolk dem andre steder.
+ */
+export function parseRejection(body: JobStatusBody): Rejection | null {
+  const reason: RejectionReason | null =
+    body.code === "rejected_interior"
+      ? "interior"
+      : body.code === "rejected_uncertain"
+        ? "uncertain"
+        : null;
+  if (reason === null) return null;
   return {
-    reason: match[1] as RejectionReason,
-    message: match[2].trim(),
+    reason,
+    message: (body.message ?? "").trim(),
   };
 }
 
@@ -199,6 +222,25 @@ export async function pollJob(opts: {
   }
 
   if (res.status === 200) {
+    // 200 baerer to terminal-former (TG-NEW-70): et ferdig resultatbilde
+    // (binaert) ELLER en strukturert status-JSON. Gate-avslag kommer naa
+    // som 200 + application/json med status="rejected"; et fullfoert
+    // resultat er bildebytes. Content-Type skiller dem.
+    const contentType = res.headers.get("Content-Type") ?? "";
+    if (contentType.includes("application/json")) {
+      const data = (await res.json()) as JobStatusBody;
+      if (data.status === "rejected") {
+        const rejection = parseRejection(data);
+        const detail = data.message ?? data.code ?? "rejected";
+        return rejection !== null
+          ? { kind: "failed", detail, rejection }
+          : { kind: "failed", detail };
+      }
+      // Uventet status-JSON paa 200 uten rejected — behandle som feil
+      // i stedet for aa tolke JSON-bytes som et bilde.
+      return { kind: "failed", detail: data.message ?? JSON.stringify(data) };
+    }
+
     const imageBlob = await res.blob();
     const resultUrl = res.headers.get("X-Result-URL") ?? undefined;
     const responseJobId = res.headers.get("X-Job-ID") ?? jobId;
@@ -211,17 +253,8 @@ export async function pollJob(opts: {
     return { kind: "pending", status: data.status, retryAfterMs };
   }
 
-  if (res.status === 500) {
-    // Gate-avslag (rejected_interior/rejected_uncertain) kommer i dag som
-    // HTTP 500 med prefikset detail (TG-NEW-70 vil gi 4xx + strukturert
-    // form senere). parseRejection skiller dem fra ekte pipeline-feil.
-    const detail = await extractDetail(res);
-    const rejection = parseRejection(detail);
-    return rejection !== null
-      ? { kind: "failed", detail, rejection }
-      : { kind: "failed", detail };
-  }
-
+  // Gate-avslag er ikke lenger HTTP 500 (TG-NEW-70 fjernet prefiks-formen);
+  // 500 er derfor naa kun ekte pipeline-feil.
   const detail = await extractDetail(res);
   throw new Error(`pollJob failed (${res.status}): ${detail}`);
 }
