@@ -258,3 +258,110 @@ export async function pollJob(opts: {
   const detail = await extractDetail(res);
   throw new Error(`pollJob failed (${res.status}): ${detail}`);
 }
+
+/**
+ * Wire-form (raa JSON) for en rad fra GET /v1/jobs — snake_case slik
+ * backend sender den. Mappes til camelCase JobSummary internt.
+ * Eksporteres ikke; kun listJobs ser denne formen.
+ */
+interface JobSummaryWire {
+  job_id: string;
+  service: string;
+  status: string;
+  created_at: string | null;
+  result_url: string | null;
+  variant_urls: string[] | null;
+  error: string | null;
+}
+
+/**
+ * Effektiv status fra GET /v1/jobs (backendens effective_job_status):
+ * en foreldreloes queued/running eldre enn staleness-terskelen vises
+ * som "failed", ikke som evig "kjoerer".
+ */
+export type JobSummaryStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "rejected";
+
+/**
+ * En rad i jobb-historikken (GET /v1/jobs, TG-NEW-74 PR #76).
+ *
+ * Kontrakts-asymmetri vs. pollJob, viktig: listingen baerer KUN en flat
+ * `error`-streng for failed/rejected (allerede bruker-rettet og prefiks-
+ * fri). Den har IKKE `code`/`classifier` slik singular poll har — saa
+ * History-siden viser `error` raatt som tekst og kjoerer IKKE
+ * parseRejection paa disse radene.
+ *
+ * `resultUrl` er ferskt re-signert og settes kun for succeeded-rader. En
+ * gammel rad uten lagret bilde har `resultUrl: null` (ingen doed lenke) —
+ * vis raden uten thumbnail, det er ikke en feil.
+ */
+export interface JobSummary {
+  jobId: string;
+  service: string;
+  status: JobSummaryStatus;
+  createdAt: string | null;
+  resultUrl: string | null;
+  variantUrls: string[] | null;
+  error: string | null;
+}
+
+/**
+ * Henter den autentiserte brukerens jobb-historikk (nyeste foerst) fra
+ * GET /v1/jobs. Autorisering er server-side: backend avleder user_id fra
+ * Clerk-tokenet, aldri fra en param — en bruker kan ikke be om en annens
+ * historikk.
+ *
+ * Paginering: `before` er `createdAt` fra siste rad i forrige side (en
+ * ISO-streng), ikke en job_id. Responsen er et bart array uten next-
+ * cursor; kalleren plukker selv `createdAt` fra siste element for neste
+ * side. `limit` klemmes til [1, 100] paa backend (default 50).
+ *
+ * Foelger samme 401-retry som pollJob: Clerk-JWT lever ~60 s, saa et
+ * utloept token hentes paa nytt med skipCache og kallet proeves EN gang til.
+ */
+export async function listJobs(opts: {
+  limit?: number;
+  before?: string;
+  getToken: GetToken;
+}): Promise<JobSummary[]> {
+  const { limit, before, getToken } = opts;
+
+  const params = new URLSearchParams();
+  if (limit !== undefined) params.set("limit", String(limit));
+  if (before !== undefined) params.set("before", before);
+  const qs = params.toString();
+  const url = `${API_BASE}/v1/jobs${qs ? `?${qs}` : ""}`;
+
+  let res = await fetch(url, {
+    method: "GET",
+    headers: await authHeader(getToken),
+  });
+
+  // 401 = utloept Clerk-token — hent ferskt (skipCache) og proev EN gang til.
+  if (res.status === 401) {
+    res = await fetch(url, {
+      method: "GET",
+      headers: await authHeader(getToken, { skipCache: true }),
+    });
+  }
+
+  if (res.status !== 200) {
+    const detail = await extractDetail(res);
+    throw new Error(`listJobs failed (${res.status}): ${detail}`);
+  }
+
+  const rows = (await res.json()) as JobSummaryWire[];
+  return rows.map((row) => ({
+    jobId: row.job_id,
+    service: row.service,
+    status: row.status as JobSummaryStatus,
+    createdAt: row.created_at,
+    resultUrl: row.result_url,
+    variantUrls: row.variant_urls,
+    error: row.error,
+  }));
+}
