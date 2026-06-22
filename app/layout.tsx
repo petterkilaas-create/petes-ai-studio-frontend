@@ -1,7 +1,6 @@
 import "./globals.css";
 import { ClerkProvider, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
@@ -20,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Link href="/copywriter" className="...">✍️ Copywriter</Link>
                 <div className="w-px h-4 bg-slate-700"></div>
                 <Link href="/orders" className="hover:text-white transition-colors">📁 Orders</Link>
+                <Link href="/history" className="hover:text-white transition-colors">🕘 Historikk</Link>
               </nav>
             </div>
             <UserButton />
