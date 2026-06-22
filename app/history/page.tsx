@@ -151,11 +151,13 @@ export default function HistoryPage() {
   }, [loadInitial]);
 
   const loadMore = useCallback(async () => {
-    // Cursor = createdAt fra siste rad med et gyldig tidsstempel (backend
-    // pagineres .lt("created_at", before)). Finnes ingen → ikke flere sider.
-    const cursor =
-      [...jobs].reverse().find((j) => j.createdAt !== null)?.createdAt ?? null;
-    if (cursor === null) {
+    // Keyset-cursor (TG-NEW-79): plukk SISTE rad med gyldig tidsstempel og
+    // send BAADE createdAt og jobId — de maa komme fra samme rad. Backend
+    // pagineres paa (created_at, job_id), saa rader med delt created_at paa
+    // sidegrensen tapes ikke. Finnes ingen slik rad → ikke flere sider.
+    const cursorRow =
+      [...jobs].reverse().find((j) => j.createdAt !== null) ?? null;
+    if (cursorRow === null) {
       setHasMore(false);
       return;
     }
@@ -164,7 +166,8 @@ export default function HistoryPage() {
     try {
       const rows = await listJobs({
         limit: PAGE_SIZE,
-        before: cursor,
+        before: cursorRow.createdAt as string,
+        beforeId: cursorRow.jobId,
         getToken,
       });
       // Defensiv dedup paa jobId: tie-breaker-gapet i cursoren (kjent

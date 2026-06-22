@@ -315,10 +315,15 @@ export interface JobSummary {
  * Clerk-tokenet, aldri fra en param — en bruker kan ikke be om en annens
  * historikk.
  *
- * Paginering: `before` er `createdAt` fra siste rad i forrige side (en
- * ISO-streng), ikke en job_id. Responsen er et bart array uten next-
- * cursor; kalleren plukker selv `createdAt` fra siste element for neste
- * side. `limit` klemmes til [1, 100] paa backend (default 50).
+ * Paginering (keyset, TG-NEW-79): `before` (createdAt) og `beforeId`
+ * (jobId) er et PAR fra samme rad — den siste i forrige side. Backend
+ * pagineres paa (created_at, job_id), saa rader som deler created_at paa
+ * sidegrensen tapes ikke. `beforeId` er valgfri: utelates den, faller
+ * backend tilbake til created_at-only (.lt) — bakoverkompatibelt. Begge
+ * MAA komme fra samme rad, ellers blir keyset-paret inkonsistent.
+ * Responsen er et bart array uten next-cursor; kalleren plukker selv
+ * (createdAt, jobId) fra siste element. `limit` klemmes til [1, 100] paa
+ * backend (default 50).
  *
  * Foelger samme 401-retry som pollJob: Clerk-JWT lever ~60 s, saa et
  * utloept token hentes paa nytt med skipCache og kallet proeves EN gang til.
@@ -326,13 +331,15 @@ export interface JobSummary {
 export async function listJobs(opts: {
   limit?: number;
   before?: string;
+  beforeId?: string;
   getToken: GetToken;
 }): Promise<JobSummary[]> {
-  const { limit, before, getToken } = opts;
+  const { limit, before, beforeId, getToken } = opts;
 
   const params = new URLSearchParams();
   if (limit !== undefined) params.set("limit", String(limit));
   if (before !== undefined) params.set("before", before);
+  if (beforeId !== undefined) params.set("before_id", beforeId);
   const qs = params.toString();
   const url = `${API_BASE}/v1/jobs${qs ? `?${qs}` : ""}`;
 
