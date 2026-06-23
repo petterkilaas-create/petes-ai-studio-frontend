@@ -107,8 +107,13 @@ export default function SceneTransformDebugPage() {
 
   // Felles params-bygging: preset_id sendes kun naar valgt, slik at
   // "none" beholder dagens segmenterings-preview-oppfoersel uendret.
+  // quality_tier="STANDARD" foelger med preset-stien (fast, usynlig) saa
+  // skumring alltid treffer generativ sti og aldri faller stille til
+  // maske-preview. Utelates for "none" — previewen skal forbli en maske.
   const buildParams = (overrides?: Partial<ProcessParams>): ProcessParams => ({
-    ...(presetId !== "none" ? { preset_id: presetId, model } : {}),
+    ...(presetId !== "none"
+      ? { preset_id: presetId, model, quality_tier: "STANDARD" }
+      : {}),
     scene_type: sceneType,
     force_scene_type: forceSceneType,
     ...overrides,
@@ -150,11 +155,10 @@ export default function SceneTransformDebugPage() {
         <header className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-black uppercase tracking-widest mb-2 flex items-center gap-4">
-              <span className="text-4xl">🧪</span> Scene Transform Debug
+              Skumring
             </h1>
             <p className="text-slate-400 max-w-2xl text-sm">
-              Debug-side for SCENE_TRANSFORM-segmentering. Last opp et bilde og se
-              composited preview med rød (må bevares) og blå (kan endres) overlay.
+              Gjør om et dagfoto til skumring.
             </p>
           </div>
           <div className="text-right border border-white/10 px-4 py-2 rounded-xl bg-white/5">
@@ -163,16 +167,21 @@ export default function SceneTransformDebugPage() {
           </div>
         </header>
 
-        <div className="flex gap-6 items-center text-sm text-slate-300">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-4 h-4 rounded bg-red-500 opacity-60"></span>
-            <span>Rød = må bevares (immutable)</span>
+        {/* Intern maske-legende (roed=maa bevares / blaa=kan endres) skjult
+            for demo — forklarer et segmenterings-konsept som forvirrer her.
+            Wrappet i {false && ...} saa den er triviell aa skru paa igjen. */}
+        {false && (
+          <div className="flex gap-6 items-center text-sm text-slate-300">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-4 h-4 rounded bg-red-500 opacity-60"></span>
+              <span>Rød = må bevares (immutable)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-4 h-4 rounded bg-blue-500 opacity-60"></span>
+              <span>Blå = kan endres (mutable)</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-4 h-4 rounded bg-blue-500 opacity-60"></span>
-            <span>Blå = kan endres (mutable)</span>
-          </div>
-        </div>
+        )}
 
         <section className="bg-[#0f172a] border border-slate-800 rounded-3xl p-8 space-y-6">
           <div>
@@ -352,7 +361,7 @@ export default function SceneTransformDebugPage() {
 
           <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-6">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-              Output (composited preview)
+              Resultat
             </p>
             {outputUrl ? (
               <>
