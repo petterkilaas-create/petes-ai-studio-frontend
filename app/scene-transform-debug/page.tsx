@@ -355,12 +355,25 @@ export default function SceneTransformDebugPage() {
               Output (composited preview)
             </p>
             {outputUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={outputUrl}
-                alt="Output result"
-                className="w-full h-auto rounded-xl border border-slate-800"
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={outputUrl}
+                  alt="Output result"
+                  className="w-full h-auto rounded-xl border border-slate-800"
+                />
+                {/* Blob-URL-en ER det ferdige PNG-resultatet og er samme-opphav,
+                    saa <a download> laster ned direkte uten fetch. presetId er
+                    aldri "none" naar et resultat finnes, saa filnavnet blir
+                    f.eks. skumring-resultat.png. Speiler kjoer-knappens styling. */}
+                <a
+                  href={outputUrl}
+                  download={`${presetId}-resultat.png`}
+                  className="mt-4 inline-block px-8 py-3 rounded-full bg-[#009183] hover:bg-[#00a89a] text-white font-black uppercase tracking-widest text-[10px] transition-colors shadow-[0_0_20px_rgba(0,145,131,0.4)]"
+                >
+                  Last ned bilde
+                </a>
+              </>
             ) : (
               <div className="aspect-square w-full rounded-xl border border-dashed border-slate-700 flex items-center justify-center text-slate-600 text-sm">
                 {isProcessing ? "Processing..." : "No result yet"}
