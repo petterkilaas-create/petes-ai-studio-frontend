@@ -24,6 +24,12 @@ export default function SceneTransformDebugPage() {
   const [forceSceneType, setForceSceneType] = useState(false);
   const [presetId, setPresetId] = useState<PresetChoice>("none");
 
+  // Modell-valg (TG-NEW-66). Literal-typen gjenbrukes fra ProcessParams.model
+  // i api.ts — ikke en egen streng-type. Sendes kun naar et preset er valgt
+  // (se buildParams), siden segmenterings-previewen ikke bruker model.
+  const [model, setModel] =
+    useState<NonNullable<ProcessParams["model"]>>("flux2_flex");
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -102,7 +108,7 @@ export default function SceneTransformDebugPage() {
   // Felles params-bygging: preset_id sendes kun naar valgt, slik at
   // "none" beholder dagens segmenterings-preview-oppfoersel uendret.
   const buildParams = (overrides?: Partial<ProcessParams>): ProcessParams => ({
-    ...(presetId !== "none" ? { preset_id: presetId } : {}),
+    ...(presetId !== "none" ? { preset_id: presetId, model } : {}),
     scene_type: sceneType,
     force_scene_type: forceSceneType,
     ...overrides,
@@ -200,6 +206,28 @@ export default function SceneTransformDebugPage() {
                 <option value="none">Ingen (segmenterings-preview)</option>
                 <option value="klart_vaer">Klart vær</option>
                 <option value="skumring">Skumring</option>
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="model-select"
+                className="text-[10px] font-black text-[#009183] uppercase tracking-[0.2em] block mb-3"
+              >
+                Modell
+              </label>
+              <select
+                id="model-select"
+                value={model}
+                onChange={(e) =>
+                  setModel(e.target.value as NonNullable<ProcessParams["model"]>)
+                }
+                disabled={presetId === "none" || isProcessing}
+                className="bg-[#0B1120] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-[#009183] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="flux2_flex">FLUX.2 Flex (standard)</option>
+                <option value="gpt_image_2">GPT-Image-2</option>
+                <option value="nano_banana_pro">Nano Banana Pro (Gemini 3 Pro)</option>
               </select>
             </div>
 
