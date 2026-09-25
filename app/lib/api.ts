@@ -55,6 +55,21 @@ interface JobStatusBody {
   code?: string;
   message?: string;
   classifier?: { verdict?: string; confidence?: number };
+  /** Signert URL til resultatbildet (awaiting_approval, 2c-2). */
+  result_url?: string;
+  /** Grunner fra port 1 (needs_review, 2c-2). */
+  reasons?: unknown;
+}
+
+/**
+ * Port 1 har stoppet jobben foer generering (needs_review, 2c-2).
+ * `code` er f.eks. gate_review eller fireplace_answer_missing; `reasons`
+ * speiler GateResult.reasons (list[str]) i backend. Intern visning inntil
+ * megler-teksten kommer.
+ */
+export interface Review {
+  code: string;
+  reasons: string[];
 }
 
 /**
@@ -100,10 +115,66 @@ export type SubmitResult =
   | { kind: "sync"; imageBlob: Blob; requestId: string }
   | { kind: "async"; jobId: string; service: string };
 
+/**
+ * Poll-resultat. Alt unntatt "pending" er terminalt — pollingen stopper.
+ *
+ * Kontrakt 2c-2 (godkjent av Petter Dag 29), begge HTTP 200 + JSON:
+ * - awaiting_approval: {status, result_url} — bildet finnes, ikke godkjent.
+ * - needs_review: {status, code, reasons} — port 1 stoppet, intet bilde.
+ * Ukjent status (200-JSON eller 202) gir "unknown": aldri evig polling,
+ * aldri roed feil.
+ */
 export type JobResult =
   | { kind: "pending"; status: "queued" | "running"; retryAfterMs?: number }
   | { kind: "done"; imageBlob: Blob; resultUrl?: string; jobId: string }
+  | { kind: "awaiting_approval"; resultUrl: string; jobId: string }
+  | { kind: "needs_review"; review: Review }
+  | { kind: "unknown"; status: string | null; httpStatus: number }
   | { kind: "failed"; detail: string; rejection?: Rejection };
+
+function unknownStatus(status: unknown, httpStatus: number): JobResult {
+  return {
+    kind: "unknown",
+    status: typeof status === "string" ? status : null,
+    httpStatus,
+  };
+}
+
+/**
+ * Tolker status-JSON fra HTTP 200. Det ENESTE stedet som kjenner
+ * terminal-statusene i poll-kontrakten.
+ */
+export function parseStatusBody(data: JobStatusBody, jobId: string): JobResult {
+  if (data.status === "rejected") {
+    const rejection = parseRejection(data);
+    const detail = data.message ?? data.code ?? "rejected";
+    return rejection !== null
+      ? { kind: "failed", detail, rejection }
+      : { kind: "failed", detail };
+  }
+  if (data.status === "awaiting_approval") {
+    // Uten result_url er svaret et kontraktsbrudd — vis noeytralt, ikke
+    // "Til kontroll" uten bilde.
+    if (typeof data.result_url !== "string" || data.result_url === "") {
+      return unknownStatus(data.status, 200);
+    }
+    return {
+      kind: "awaiting_approval",
+      resultUrl: data.result_url,
+      jobId: data.job_id ?? jobId,
+    };
+  }
+  if (data.status === "needs_review") {
+    const reasons = Array.isArray(data.reasons)
+      ? data.reasons.filter((r): r is string => typeof r === "string")
+      : [];
+    return {
+      kind: "needs_review",
+      review: { code: data.code ?? "", reasons },
+    };
+  }
+  return unknownStatus(data.status, 200);
+}
 
 /**
  * Token-henter fra Clerk (useAuth().getToken). Opsjonen skipCache brukes
@@ -228,17 +299,9 @@ export async function pollJob(opts: {
     // resultat er bildebytes. Content-Type skiller dem.
     const contentType = res.headers.get("Content-Type") ?? "";
     if (contentType.includes("application/json")) {
-      const data = (await res.json()) as JobStatusBody;
-      if (data.status === "rejected") {
-        const rejection = parseRejection(data);
-        const detail = data.message ?? data.code ?? "rejected";
-        return rejection !== null
-          ? { kind: "failed", detail, rejection }
-          : { kind: "failed", detail };
-      }
-      // Uventet status-JSON paa 200 uten rejected — behandle som feil
-      // i stedet for aa tolke JSON-bytes som et bilde.
-      return { kind: "failed", detail: data.message ?? JSON.stringify(data) };
+      // JSON-bytes tolkes aldri som bilde; ukjent status -> "unknown".
+      const data = ((await res.json()) ?? {}) as JobStatusBody;
+      return parseStatusBody(data, jobId);
     }
 
     const imageBlob = await res.blob();
@@ -249,8 +312,13 @@ export async function pollJob(opts: {
 
   if (res.status === 202) {
     const retryAfterMs = parseRetryAfterMs(res);
-    const data = (await res.json()) as { status: "queued" | "running" };
-    return { kind: "pending", status: data.status, retryAfterMs };
+    const data = ((await res.json()) ?? {}) as { status?: unknown };
+    // Kun queued/running er ikke-terminale. Alt annet paa 202 stopper
+    // pollingen (tidligere: evig polling paa ukjent status, AUDIT_2C avvik 4).
+    if (data.status === "queued" || data.status === "running") {
+      return { kind: "pending", status: data.status, retryAfterMs };
+    }
+    return unknownStatus(data.status, 202);
   }
 
   // Gate-avslag er ikke lenger HTTP 500 (TG-NEW-70 fjernet prefiks-formen);
@@ -284,7 +352,27 @@ export type JobSummaryStatus =
   | "running"
   | "succeeded"
   | "failed"
-  | "rejected";
+  | "rejected"
+  | "awaiting_approval"
+  | "needs_review"
+  | "unknown";
+
+const KNOWN_SUMMARY_STATUSES: ReadonlySet<string> = new Set([
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "rejected",
+  "awaiting_approval",
+  "needs_review",
+]);
+
+/** Ukjente verdier (f.eks. cancelled) blir "unknown" — /history krasjer aldri. */
+export function normalizeSummaryStatus(raw: unknown): JobSummaryStatus {
+  return typeof raw === "string" && KNOWN_SUMMARY_STATUSES.has(raw)
+    ? (raw as JobSummaryStatus)
+    : "unknown";
+}
 
 /**
  * En rad i jobb-historikken (GET /v1/jobs, TG-NEW-74 PR #76).
@@ -295,7 +383,8 @@ export type JobSummaryStatus =
  * History-siden viser `error` raatt som tekst og kjoerer IKKE
  * parseRejection paa disse radene.
  *
- * `resultUrl` er ferskt re-signert og settes kun for succeeded-rader. En
+ * `resultUrl` er ferskt re-signert og settes for succeeded-rader (og,
+ * fra 2c-3b, awaiting_approval-rader). En
  * gammel rad uten lagret bilde har `resultUrl: null` (ingen doed lenke) —
  * vis raden uten thumbnail, det er ikke en feil.
  */
@@ -365,7 +454,7 @@ export async function listJobs(opts: {
   return rows.map((row) => ({
     jobId: row.job_id,
     service: row.service,
-    status: row.status as JobSummaryStatus,
+    status: normalizeSummaryStatus(row.status),
     createdAt: row.created_at,
     resultUrl: row.result_url,
     variantUrls: row.variant_urls,

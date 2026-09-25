@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { listJobs, type JobSummary, type JobSummaryStatus } from "../lib/api";
+import { hasResultImage, statusVariant } from "./statusVariants";
 
 // Sidestoerrelse pr. henting. before-cursoren pagineres paa createdAt fra
 // siste rad (backendens kontrakt) — se loadMore().
@@ -41,34 +42,7 @@ function formatDate(iso: string | null): string {
 // Status-pill: visuelt identisk med husets badge-moenster, men frikoblet fra
 // StatusBadge (som tar en annen status-union — se PR-notat).
 function StatusPill({ status }: { status: JobSummaryStatus }) {
-  const variants: Record<
-    JobSummaryStatus,
-    { label: string; cls: string; pulse?: boolean }
-  > = {
-    succeeded: {
-      label: "Fullført",
-      cls: "bg-green-900/30 text-green-400 border-green-500/20",
-    },
-    failed: {
-      label: "Feilet",
-      cls: "bg-red-900/30 text-red-400 border-red-500/20",
-    },
-    rejected: {
-      label: "Avvist",
-      cls: "bg-amber-900/30 text-amber-400 border-amber-500/20",
-    },
-    queued: {
-      label: "I kø",
-      cls: "bg-yellow-900/30 text-yellow-400 border-yellow-500/20",
-      pulse: true,
-    },
-    running: {
-      label: "Kjører",
-      cls: "bg-yellow-900/30 text-yellow-400 border-yellow-500/20",
-      pulse: true,
-    },
-  };
-  const v = variants[status];
+  const v = statusVariant(status);
   return (
     <span
       className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${v.cls} ${
@@ -81,9 +55,12 @@ function StatusPill({ status }: { status: JobSummaryStatus }) {
 }
 
 function JobCard({ job }: { job: JobSummary }) {
-  const hasThumb = job.status === "succeeded" && job.resultUrl !== null;
+  const hasThumb = hasResultImage(job.status) && job.resultUrl !== null;
   const showError =
-    (job.status === "failed" || job.status === "rejected") && !!job.error;
+    (job.status === "failed" ||
+      job.status === "rejected" ||
+      job.status === "needs_review") &&
+    !!job.error;
 
   return (
     <div className="flex flex-col bg-[#0f172a] border border-slate-800 rounded-3xl shadow-xl overflow-hidden">

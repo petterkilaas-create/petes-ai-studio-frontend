@@ -7,8 +7,16 @@ import {
   ValidationError,
   type ProcessParams,
   type Rejection,
+  type Review,
 } from "../lib/api";
 import { useJobStatus } from "../lib/useJobStatus";
+import {
+  deriveProcessStatus,
+  isProcessingStatus,
+  type ProcessStatus,
+} from "./processStatus";
+
+export type { ProcessStatus } from "./processStatus";
 
 /**
  * Samlet livssyklus for en /v1/process-jobb: submit -> (sync-blob | poll).
@@ -22,16 +30,21 @@ import { useJobStatus } from "../lib/useJobStatus";
  * object-URL-en selv. Async-svar (202) gir en jobId som delegeres til
  * useJobStatus, som selv eier sin resultat-URL og polling.
  */
-export type ProcessStatus = "idle" | "uploading" | "running" | "done" | "failed";
-
 export interface UseProcessJobResult {
   status: ProcessStatus;
-  /** Object-URL til resultatbildet (sync-blob eller poll-resultat). */
+  /**
+   * Resultatbildet: object-URL (sync-blob eller poll-bytes), eller signert
+   * URL ved awaiting_approval.
+   */
   resultUrl: string | null;
   /** Bruker-rettet feilmelding (ValidationError-detail eller poll-feil). */
   error: string | null;
   /** Strukturert scene-gate-avslag (TG-NEW-58), eller null. */
   rejection: Rejection | null;
+  /** needs_review: code + reasons fra port 1, ellers null. */
+  review: Review | null;
+  /** Ved ukjent status: raa status og HTTP-kode, ellers null. */
+  unknownDetail: string | null;
   /** True mens vi laster opp eller poller. */
   isProcessing: boolean;
   run: (file: File, service: string, params?: ProcessParams) => Promise<void>;
@@ -129,22 +142,22 @@ export function useProcessJob(): UseProcessJobResult {
     lastRunRef.current = null;
   }, [revokeSyncUrl]);
 
-  let status: ProcessStatus = "idle";
-  if (isSubmitting) status = "uploading";
-  else if (submitError) status = "failed";
-  else if (syncResultUrl) status = "done";
-  else if (jobId) {
-    if (job.status === "failed") status = "failed";
-    else if (job.status === "done") status = "done";
-    else status = "running";
-  }
+  const status: ProcessStatus = deriveProcessStatus({
+    isSubmitting,
+    submitError,
+    syncResultUrl,
+    jobId,
+    jobStatus: job.status,
+  });
 
   return {
     status,
     resultUrl: syncResultUrl ?? job.imageUrl,
     error: submitError ?? job.error,
     rejection: job.rejection,
-    isProcessing: status === "uploading" || status === "running",
+    review: job.review,
+    unknownDetail: job.unknownDetail,
+    isProcessing: isProcessingStatus(status),
     run,
     resubmitForced,
     reset,

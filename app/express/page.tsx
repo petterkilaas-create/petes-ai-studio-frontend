@@ -6,6 +6,9 @@ import { useProcessJob } from "../hooks/useProcessJob";
 import { StatusBadge } from "../components/StatusBadge";
 import { ErrorPanel } from "../components/ErrorPanel";
 import { RejectionPanel } from "../components/RejectionPanel";
+import { ReviewPanel } from "../components/ReviewPanel";
+import { UnknownStatusPanel } from "../components/UnknownStatusPanel";
+import { ApprovalNotice } from "../components/ApprovalNotice";
 
 // "simple" = service alene (ingen params, backend-defaults gjelder).
 // "scene"  = scene_transform med preset_id + scene-type-gate (TG-NEW-58),
@@ -17,6 +20,11 @@ interface Tool {
   service: string;
   presetId?: string;
   kind: ToolKind;
+  /**
+   * Scene-type-velger + "Tving eksterioer" for scene-kort. Standard true;
+   * false der backend bestemmer bildetypen selv (skumring, nivaa 2).
+   */
+  sceneGate?: boolean;
   icon: string;
   title: string;
   desc: string;
@@ -129,6 +137,7 @@ const CATEGORIES: Category[] = [
         service: "scene_transform",
         presetId: "skumring",
         kind: "scene",
+        sceneGate: false,
         icon: "🌆",
         title: "Skumring",
         desc: "Transform the scene to a warm, inviting dusk.",
@@ -158,6 +167,8 @@ export default function ExpressPage() {
     null;
 
   const isProcessing = job.isProcessing;
+  const showSceneControls =
+    selectedTool?.kind === "scene" && selectedTool.sceneGate !== false;
   const runDisabled = !selectedTool || !preview.file || isProcessing;
 
   const selectTool = (toolId: string) => {
@@ -182,10 +193,13 @@ export default function ExpressPage() {
       // Eksakt param-oppsett kopiert fra scene-transform-debug: preset_id
       // sendes alltid for Time Traveler-kort (generativ sti), pluss
       // scene_type + force_scene_type. Ingen quality_tier/aspect_ratio.
+      // Uten scene-velger (sceneGate: false) sendes ingen scene-felter —
+      // backend-defaults (auto/false), identisk med det som ble sendt foer.
       job.run(preview.file, selectedTool.service, {
         ...(selectedTool.presetId ? { preset_id: selectedTool.presetId } : {}),
-        scene_type: sceneType,
-        force_scene_type: forceSceneType,
+        ...(showSceneControls
+          ? { scene_type: sceneType, force_scene_type: forceSceneType }
+          : {}),
       });
     } else {
       // Simple tjenester: service alene, backend-defaults (som i prod).
@@ -307,8 +321,8 @@ export default function ExpressPage() {
               />
             </div>
 
-            {/* Step 3: scene-type-kontroller KUN for scene_transform-kort */}
-            {selectedTool.kind === "scene" && (
+            {/* Step 3: scene-type-kontroller KUN for scene_transform-kort med sceneGate */}
+            {showSceneControls && (
               <div className="flex flex-wrap gap-6 items-end border-t border-slate-800 pt-6">
                 <div>
                   <label
@@ -387,6 +401,14 @@ export default function ExpressPage() {
             {job.status === "failed" && !job.rejection && (
               <ErrorPanel message={job.error} />
             )}
+
+            {job.status === "needs_review" && job.review && (
+              <ReviewPanel review={job.review} />
+            )}
+
+            {job.status === "unknown" && (
+              <UnknownStatusPanel detail={job.unknownDetail} />
+            )}
           </section>
         )}
 
@@ -415,6 +437,9 @@ export default function ExpressPage() {
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
                 Output
               </p>
+              {job.status === "awaiting_approval" && job.resultUrl && (
+                <ApprovalNotice />
+              )}
               {job.resultUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img

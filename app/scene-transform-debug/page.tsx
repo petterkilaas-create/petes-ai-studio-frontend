@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import { submitJob, ValidationError, type ProcessParams } from "../lib/api";
 import { useJobStatus } from "../lib/useJobStatus";
+import { ReviewPanel } from "../components/ReviewPanel";
+import { UnknownStatusPanel } from "../components/UnknownStatusPanel";
+import { ApprovalNotice } from "../components/ApprovalNotice";
 
 type SceneType = "auto" | "exterior" | "interior";
 
@@ -54,6 +57,9 @@ export default function SceneTransformDebugPage() {
   else if (jobId && job.status === "pending") statusText = "Processing...";
   else if (job.rejection) statusText = "Avvist av scene-gate";
   else if (job.status === "failed") statusText = `Failed: ${job.error ?? "unknown"}`;
+  else if (job.status === "awaiting_approval") statusText = "Til kontroll";
+  else if (job.status === "needs_review") statusText = "Til gjennomgang";
+  else if (job.status === "unknown") statusText = "Ukjent status";
   else if (outputUrl) statusText = "Done";
   else if (submitError) statusText = `Failed: ${submitError}`;
 
@@ -332,6 +338,14 @@ export default function SceneTransformDebugPage() {
             </div>
           )}
 
+          {job.status === "needs_review" && job.review && (
+            <ReviewPanel review={job.review} />
+          )}
+
+          {job.status === "unknown" && (
+            <UnknownStatusPanel detail={job.unknownDetail} />
+          )}
+
           {(submitError || (job.status === "failed" && !rejection)) && (
             <div className="border border-[#ef4444]/50 bg-[#ef4444]/10 rounded-xl p-4 text-sm text-[#fca5a5]">
               <p className="font-black uppercase tracking-widest text-[10px] mb-1">Error</p>
@@ -365,6 +379,7 @@ export default function SceneTransformDebugPage() {
             </p>
             {outputUrl ? (
               <>
+                {job.status === "awaiting_approval" && <ApprovalNotice />}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={outputUrl}
@@ -372,7 +387,9 @@ export default function SceneTransformDebugPage() {
                   className="w-full h-auto rounded-xl border border-slate-800"
                 />
                 {/* Blob-URL-en ER det ferdige PNG-resultatet og er samme-opphav,
-                    saa <a download> laster ned direkte uten fetch. presetId er
+                    saa <a download> laster ned direkte uten fetch. Ved
+                    awaiting_approval er URL-en signert og cross-origin: da
+                    ignorerer nettleseren download og aapner bildet. presetId er
                     aldri "none" naar et resultat finnes, saa filnavnet blir
                     f.eks. skumring-resultat.png. Speiler kjoer-knappens styling. */}
                 <a

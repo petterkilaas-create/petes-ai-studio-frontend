@@ -3,7 +3,8 @@
 import type { ProcessStatus } from "../hooks/useProcessJob";
 
 /**
- * Liten status-indikator (Idle/Uploading/Running/Done/Failed).
+ * Liten status-indikator (Idle/Uploading/Running/Done/Failed, pluss
+ * sluttstatusene fra 2c-2).
  * Visuelt moenster trukket ut av express-v2 sin status-boks i headeren.
  */
 const LABELS: Record<ProcessStatus, string> = {
@@ -11,6 +12,9 @@ const LABELS: Record<ProcessStatus, string> = {
   uploading: "Uploading...",
   running: "Running...",
   done: "Done",
+  awaiting_approval: "Til kontroll",
+  needs_review: "Til gjennomgang",
+  unknown: "Ukjent status",
   failed: "Failed",
 };
 
