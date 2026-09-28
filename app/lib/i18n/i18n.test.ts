@@ -12,7 +12,7 @@ test("pickLocale: nb, no og nn gir norsk, alt annet engelsk", () => {
 });
 
 test("kodene fra audit 2d §8 har norsk tekst", () => {
-  assert.equal(codeText("nb", "reviewCode", "fireplace_answer_missing"), "Bildet har peis. Skal den være tent?");
+  assert.equal(codeText("nb", "reviewCode", "fireplace_answer_missing"), "Venter på svar om peisen.");
   assert.equal(codeText("nb", "reviewCode", "gate_review"), "Bildet må sjekkes før vi lager det.");
   assert.equal(codeText("nb", "reasonCode", "analysis_uncertain"), "Analysen var usikker.");
   assert.equal(
@@ -51,4 +51,35 @@ test("nb og en har de samme noeklene og kodene", () => {
 test("t setter inn verdier og lar ukjente plassholdere staa", () => {
   assert.equal(t("nb", "action.reasonCount", { n: 3, max: 500 }), "3 av 500 tegn");
   assert.equal(t("en", "action.reasonCount", { n: 3 }), "3 of {max} characters");
+});
+
+test("peistekstene er ulike, og spoersmaalet staar bare i kontrollen (avvik 11)", () => {
+  for (const locale of ["nb", "en"] as const) {
+    const missing = codeText(locale, "reviewCode", "fireplace_answer_missing");
+    const present = codeText(locale, "reasonCode", "fireplace_present");
+    const question = t(locale, "action.fireplaceQuestion");
+    assert.notEqual(missing, present, locale);
+    for (const text of [missing, present]) {
+      assert.notEqual(text, question, locale);
+      assert.ok(!text.includes("?"), `${locale}: ${text}`);
+    }
+  }
+  assert.equal(codeText("nb", "reasonCode", "fireplace_present"), "Analysen fant peis.");
+  assert.equal(codeText("en", "reviewCode", "fireplace_answer_missing"), "Waiting for an answer about the fireplace.");
+  assert.equal(codeText("en", "reasonCode", "fireplace_present"), "The analysis found a fireplace.");
+});
+
+test("Rett-tekstene fra prompten (2d-2b)", () => {
+  assert.equal(
+    t("nb", "correct.confirmExists"),
+    "Jeg bekrefter at lyskildene jeg har slått på, finnes i originalbildet."
+  );
+  assert.equal(t("nb", "correct.roundsLeft", { n: 1 }), "Runder igjen: 1");
+  assert.equal(
+    t("nb", "correct.roundFailed"),
+    "Det nye bildet kunne ikke lages. Du har fortsatt forrige bilde, og runden er ikke brukt."
+  );
+  assert.equal(codeText("nb", "decisionError", "correction_limit"), "Du har brukt rundene dine.");
+  assert.equal(t("nb", "review.lightPromoted"), "Slått på av deg");
+  assert.equal(t("nb", "review.lightDisabled"), "Slått av av deg");
 });

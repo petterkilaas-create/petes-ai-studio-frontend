@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import {
@@ -13,20 +13,34 @@ import {
   type RunValue,
 } from "../../lib/api";
 import { useJobStatus } from "../../lib/useJobStatus";
-import { codeText, t, type Locale, type UiKey } from "../../lib/i18n";
+import { codeText, t, type CodeGroup, type Locale, type UiKey } from "../../lib/i18n";
 import { useLocale } from "../../lib/i18n/useLocale";
 import {
   buildDecision,
   decisionControls,
-  hasVariantToggle,
   outcome,
   reasonLength,
   reasonTooLong,
   resultImageUrl,
   shouldPoll,
+  variantOptions,
   type FireplaceAnswer,
   type ImageVariant,
 } from "../../lib/review";
+import {
+  buildCorrection,
+  canSubmitCorrection,
+  canToggle,
+  correctionControls,
+  correctionFireplaceShown,
+  correctionResult,
+  initialToggles,
+  isOn,
+  needsConfirmation,
+  previousFireplaceAnswer,
+  setToggle,
+  type Toggles,
+} from "../../lib/correction";
 
 /**
  * Godkjenningssiden (2d-1): megleren avgjoer egne jobber i «Til kontroll»
@@ -35,12 +49,15 @@ import {
  * Tilgang sjekkes i backend (fremmed eller ukjent jobb gir 404). Knappene
  * styres av `allowed_actions`; all tekst og alle koder gaar via ordlista.
  * Ingen pris vises, fordi eksterne kunder skal bruke siden.
+ *
+ * «Rett» (2d-2b): megleren slaar kandidater paa og godkjente av, og lager
+ * et nytt bilde fra originalen. Antall runder kommer fra backend.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
 
 /** Melding etter en avgjoerelse: ui-tekst eller kode fra backend. */
-type Message = { key: UiKey } | { code: string | null };
+type Message = { key: UiKey } | { group: CodeGroup; code: string | null };
 
 const CARD = "bg-[#0f172a] border border-slate-800 rounded-3xl p-6";
 const LABEL = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4";
@@ -48,6 +65,11 @@ const FOCUS =
   "focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120]";
 const BTN_PRIMARY = `px-6 py-3 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
 const BTN_SECONDARY = `px-6 py-3 bg-transparent border border-slate-700 text-slate-300 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+const VARIANT_LABEL: Record<ImageVariant, UiKey> = {
+  lifted: "review.variantLifted",
+  raw: "review.variantRaw",
+  previous: "review.previousRound",
+};
 const BTN_DANGER = `px-6 py-3 bg-transparent border border-red-500/40 text-red-300 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-red-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
 
 function ImageBox({ url, alt, locale }: { url: string | null; alt: string; locale: Locale }) {
@@ -64,14 +86,46 @@ function ImageBox({ url, alt, locale }: { url: string | null; alt: string; local
   );
 }
 
+/** Rett-modus for en liste: null naar brukeren ikke retter. */
+interface LightEditing {
+  toggles: Toggles;
+  /** Ustabile og avviste er kandidater (promote); godkjente kan slaas av. */
+  candidate: boolean;
+  disabled: boolean;
+  onToggle: (light: ReviewLight, on: boolean) => void;
+}
+
+function LightLabel({ light, locale }: { light: ReviewLight; locale: Locale }) {
+  return (
+    <>
+      <span className="font-bold">{codeText(locale, "lightType", light.type)}</span>
+      {/* location er fritekst fra analysen; React escaper den. */}
+      {light.location && <span className="text-slate-400"> · {light.location}</span>}
+      {light.reasonCode !== null && (
+        <span className="text-slate-500">
+          {" "}
+          ({codeText(locale, "lightReason", light.reasonCode)})
+        </span>
+      )}
+      {(light.state === "promoted" || light.state === "disabled") && (
+        <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-[#009183]/20 text-[#5eead4] text-[10px] font-bold">
+          {t(locale, light.state === "promoted" ? "review.lightPromoted" : "review.lightDisabled")}
+        </span>
+      )}
+    </>
+  );
+}
+
 function LightList({
   title,
   lights,
   locale,
+  editing,
 }: {
   title: string;
   lights: ReviewLight[];
   locale: Locale;
+  editing: LightEditing | null;
 }) {
   return (
     <div>
@@ -81,20 +135,47 @@ function LightList({
       {lights.length === 0 ? (
         <p className="text-xs text-slate-500">{t(locale, "review.lightsEmpty")}</p>
       ) : (
-        <ul className="space-y-1 text-xs text-slate-300">
-          {lights.map((light, i) => (
-            <li key={`${light.id ?? "x"}-${i}`}>
-              <span className="font-bold">{codeText(locale, "lightType", light.type)}</span>
-              {/* location er fritekst fra analysen; React escaper den. */}
-              {light.location && <span className="text-slate-400"> · {light.location}</span>}
-              {light.reasonCode !== null && (
-                <span className="text-slate-500">
-                  {" "}
-                  ({codeText(locale, "lightReason", light.reasonCode)})
-                </span>
-              )}
-            </li>
-          ))}
+        <ul className={`${editing ? "space-y-2" : "space-y-1"} text-xs text-slate-300`}>
+          {lights.map((light, i) => {
+            const rowKey = `${light.key ?? light.id ?? "x"}-${i}`;
+            if (editing === null) {
+              return (
+                <li key={rowKey}>
+                  <LightLabel light={light} locale={locale} />
+                </li>
+              );
+            }
+            const editable = canToggle(light, editing.candidate);
+            const on = isOn(light, editing.toggles);
+            // Ekte bryter (checkbox med role=switch) med hele raden som
+            // etikett, minst 44 px hoey for tommel paa mobil.
+            return (
+              <li key={rowKey}>
+                <label
+                  className={`flex items-center gap-3 min-h-11 px-3 py-2 rounded-xl border ${
+                    editable ? "border-slate-700 cursor-pointer" : "border-slate-800 opacity-60"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={on}
+                    disabled={!editable || editing.disabled}
+                    onChange={(e) => editing.onToggle(light, e.target.checked)}
+                    className={`w-5 h-5 shrink-0 accent-[#009183] ${FOCUS}`}
+                  />
+                  <span className="flex-1">
+                    <LightLabel light={light} locale={locale} />
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {editable
+                      ? t(locale, on ? "correct.lightOn" : "correct.lightOff")
+                      : t(locale, "correct.locked")}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -145,6 +226,15 @@ export default function GodkjenningPage({
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
+  // Rett (2d-2b). Bryterne holdes paa key og nullstilles ved Avbryt.
+  const [editing, setEditing] = useState(false);
+  const [toggles, setToggles] = useState<Toggles>({});
+  const [correctAnswer, setCorrectAnswer] = useState<FireplaceAnswer>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
+  // Synkront vern mot dobbeltklikk; busy-state rekker ikke aa oppdatere
+  // mellom to raske klikk. Backend har ogsaa eget vern.
+  const inFlight = useRef(false);
   // Etter 202 (continue), eller naar siden aapnes mens jobben kjoerer: poll
   // med den eksisterende mekanismen til jobben er ferdig eller venter igjen,
   // og hent saa review paa nytt.
@@ -184,7 +274,8 @@ export default function GodkjenningPage({
   const locked = busy || blocked || polling;
 
   const decide = async (action: DecisionAction) => {
-    if (locked) return;
+    if (locked || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setMessage(null);
     try {
@@ -209,13 +300,16 @@ export default function GodkjenningPage({
           await fetchReview();
           break;
         case "blocked":
-          setMessage({ code: out.code });
+          setMessage({ group: "decisionError", code: out.code });
           // 409: ingen ny handling. 422 (ugyldig body, f.eks. begrunnelsen)
           // kan rettes av megleren, saa knappene blir staaende.
           if (out.code !== "invalid_decision") setBlocked(true);
           break;
         case "not_found":
           setLoad({ kind: "not_found" });
+          break;
+        case "unavailable":
+          setMessage({ group: "decisionError", code: out.code });
           break;
         case "error":
           setMessage({ key: "decision.error" });
@@ -224,6 +318,72 @@ export default function GodkjenningPage({
     } catch {
       setMessage({ key: "decision.error" });
     } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  };
+
+  const startCorrection = () => {
+    if (load.kind !== "ok") return;
+    setToggles(initialToggles(load.review.lights));
+    setCorrectAnswer(previousFireplaceAnswer(load.review.fireplace));
+    setConfirmed(false);
+    setRejectOpen(false);
+    setMessage(null);
+    setEditing(true);
+  };
+
+  const cancelCorrection = () => {
+    setEditing(false);
+    setToggles({});
+    setConfirmed(false);
+  };
+
+  const submitCorrection = async () => {
+    if (load.kind !== "ok" || locked || inFlight.current) return;
+    const review = load.review;
+    inFlight.current = true;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const body = buildCorrection(
+        review.lights,
+        toggles,
+        correctionFireplaceShown(review.fireplace),
+        correctAnswer
+      );
+      const result = correctionResult(await postDecision({ jobId, decision: body, getToken }));
+      switch (result.kind) {
+        case "poll":
+          cancelCorrection();
+          setPollJobId(jobId);
+          break;
+        case "reload":
+          cancelCorrection();
+          setMessage(result.message);
+          await fetchReview();
+          break;
+        case "limit":
+          cancelCorrection();
+          setLimitReached(true);
+          setMessage(result.message);
+          break;
+        case "blocked":
+          setMessage(result.message);
+          setBlocked(true);
+          break;
+        case "retry":
+          // 422 og 503: valgene staar, saa brukeren kan proeve igjen.
+          setMessage(result.message);
+          break;
+        case "not_found":
+          setLoad({ kind: "not_found" });
+          break;
+      }
+    } catch {
+      setMessage({ key: "decision.error" });
+    } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };
@@ -233,7 +393,7 @@ export default function GodkjenningPage({
       ? null
       : "key" in message
         ? t(locale, message.key)
-        : codeText(locale, "decisionError", message.code);
+        : codeText(locale, message.group, message.code);
 
   return (
     <div className="flex flex-col bg-[#0B1120] text-white min-h-screen font-sans">
@@ -285,9 +445,31 @@ export default function GodkjenningPage({
             const review = load.review;
             const controls = decisionControls(review, answer);
             const done = outcome(review);
-            const showToggle = hasVariantToggle(review.images);
-            const shownVariant: ImageVariant = showToggle ? variant : "lifted";
+            const options = variantOptions(review.images);
+            const shownVariant: ImageVariant = options.includes(variant) ? variant : "lifted";
             const tooLong = reasonTooLong(reasonText);
+            const correction = correctionControls(review);
+            const canCorrect = correction.show && !limitReached && done === null;
+            const isEditing = editing && canCorrect;
+            const fireplaceShown = correctionFireplaceShown(review.fireplace);
+            const correctionBody = buildCorrection(review.lights, toggles, fireplaceShown, correctAnswer);
+            const overrides = correctionBody.overrides ?? { promote: [], disable: [], add: [] };
+            const confirmNeeded = needsConfirmation(overrides);
+            const submitEnabled = canSubmitCorrection({
+              overrides,
+              confirmed,
+              fireplaceShown,
+              answer: correctAnswer,
+            });
+            const lightEditing = (candidate: boolean): LightEditing | null =>
+              isEditing
+                ? {
+                    toggles,
+                    candidate,
+                    disabled: locked,
+                    onToggle: (light, on) => setToggles((prev) => setToggle(prev, light, candidate, on)),
+                  }
+                : null;
 
             return (
               <>
@@ -304,9 +486,9 @@ export default function GodkjenningPage({
                   <div className={CARD}>
                     <div className="flex items-center justify-between gap-3 mb-4">
                       <p className={`${LABEL} mb-0`}>{t(locale, "review.result")}</p>
-                      {showToggle && (
-                        <div className="flex gap-1" role="group">
-                          {(["lifted", "raw"] as const).map((v) => (
+                      {options.length > 0 && (
+                        <div className="flex flex-wrap justify-end gap-1" role="group">
+                          {options.map((v) => (
                             <button
                               key={v}
                               onClick={() => setVariant(v)}
@@ -317,7 +499,7 @@ export default function GodkjenningPage({
                                   : "border-slate-700 text-slate-400 hover:text-white"
                               }`}
                             >
-                              {t(locale, v === "lifted" ? "review.variantLifted" : "review.variantRaw")}
+                              {t(locale, VARIANT_LABEL[v])}
                             </button>
                           ))}
                         </div>
@@ -325,7 +507,7 @@ export default function GodkjenningPage({
                     </div>
                     <ImageBox
                       url={resultImageUrl(review.images, shownVariant)}
-                      alt={t(locale, "review.result")}
+                      alt={t(locale, shownVariant === "previous" ? "review.previousRound" : "review.result")}
                       locale={locale}
                     />
                   </div>
@@ -344,101 +526,129 @@ export default function GodkjenningPage({
 
                 {done === null && (
                   <section className={`${CARD} flex flex-col gap-4`}>
-                    {controls.fireplaceQuestion && (
-                      <div>
-                        <p className="text-sm text-white font-bold mb-2">
-                          {t(locale, "action.fireplaceQuestion")}
-                        </p>
-                        <div className="flex gap-2" role="group">
-                          {(["yes", "no"] as const).map((a) => (
-                            <button
-                              key={a}
-                              onClick={() => setAnswer(a)}
-                              disabled={locked}
-                              aria-pressed={answer === a}
-                              className={answer === a ? BTN_PRIMARY : BTN_SECONDARY}
-                            >
-                              {t(locale, a === "yes" ? "action.yes" : "action.no")}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                    {correction.roundFailed && (
+                      <p
+                        className="text-sm text-amber-200 bg-amber-900/30 border border-amber-500/40 rounded-xl p-3"
+                        role="status"
+                      >
+                        {t(locale, "correct.roundFailed")}
+                      </p>
                     )}
 
-                    {controls.none ? (
-                      <p className="text-sm text-slate-400">{t(locale, "action.noneAllowed")}</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-3">
-                        {controls.approve && (
-                          <button
-                            onClick={() => void decide("approve")}
-                            disabled={locked}
-                            className={BTN_PRIMARY}
-                          >
-                            {t(locale, "action.approve")}
-                          </button>
-                        )}
-                        {controls.continue && (
-                          <button
-                            onClick={() => void decide("continue")}
-                            disabled={locked || !controls.continueEnabled}
-                            className={BTN_PRIMARY}
-                          >
-                            {t(locale, "action.continue")}
-                          </button>
-                        )}
-                        {controls.reject && !rejectOpen && (
-                          <button
-                            onClick={() => setRejectOpen(true)}
-                            disabled={locked}
-                            className={BTN_DANGER}
-                          >
-                            {t(locale, "action.reject")}
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {controls.continue && (
-                      <p className="text-xs text-slate-400">{t(locale, "action.newImage")}</p>
-                    )}
-
-                    {controls.reject && rejectOpen && (
-                      <div className="flex flex-col gap-2">
-                        <textarea
-                          value={reasonText}
-                          onChange={(e) => setReasonText(e.target.value)}
-                          placeholder={t(locale, "action.reasonPlaceholder")}
-                          aria-label={t(locale, "action.reasonPlaceholder")}
-                          rows={3}
-                          disabled={locked}
-                          className={`w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-sm text-white ${FOCUS}`}
-                        />
-                        <p className={`text-xs ${tooLong ? "text-red-400" : "text-slate-500"}`}>
-                          {tooLong
-                            ? t(locale, "action.reasonTooLong", { max: REASON_MAX_LEN })
-                            : t(locale, "action.reasonCount", {
-                                n: reasonLength(reasonText),
-                                max: REASON_MAX_LEN,
-                              })}
-                        </p>
-                        <div className="flex flex-wrap gap-3">
-                          <button
-                            onClick={() => void decide("reject")}
-                            disabled={locked || tooLong}
-                            className={BTN_DANGER}
-                          >
-                            {t(locale, "action.confirmReject")}
-                          </button>
-                          <button
-                            onClick={() => setRejectOpen(false)}
-                            disabled={locked}
-                            className={BTN_SECONDARY}
-                          >
+                    {isEditing ? (
+                      <div className="flex flex-col gap-3">
+                        <p className="text-sm text-white font-bold">{t(locale, "correct.title")}</p>
+                        <p className="text-xs text-slate-400">{t(locale, "correct.hint")}</p>
+                        <div>
+                          <button onClick={cancelCorrection} disabled={locked} className={BTN_SECONDARY}>
                             {t(locale, "action.cancel")}
                           </button>
                         </div>
                       </div>
+                    ) : (
+                      <>
+                        {controls.fireplaceQuestion && (
+                          <div>
+                            <p className="text-sm text-white font-bold mb-2">
+                              {t(locale, "action.fireplaceQuestion")}
+                            </p>
+                            <div className="flex gap-2" role="group">
+                              {(["yes", "no"] as const).map((a) => (
+                                <button
+                                  key={a}
+                                  onClick={() => setAnswer(a)}
+                                  disabled={locked}
+                                  aria-pressed={answer === a}
+                                  className={answer === a ? BTN_PRIMARY : BTN_SECONDARY}
+                                >
+                                  {t(locale, a === "yes" ? "action.yes" : "action.no")}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {controls.none ? (
+                          <p className="text-sm text-slate-400">{t(locale, "action.noneAllowed")}</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-3">
+                            {controls.approve && (
+                              <button
+                                onClick={() => void decide("approve")}
+                                disabled={locked}
+                                className={BTN_PRIMARY}
+                              >
+                                {t(locale, "action.approve")}
+                              </button>
+                            )}
+                            {controls.continue && (
+                              <button
+                                onClick={() => void decide("continue")}
+                                disabled={locked || !controls.continueEnabled}
+                                className={BTN_PRIMARY}
+                              >
+                                {t(locale, "action.continue")}
+                              </button>
+                            )}
+                            {canCorrect && (
+                              <button onClick={startCorrection} disabled={locked} className={BTN_SECONDARY}>
+                                {t(locale, "action.correct")}
+                              </button>
+                            )}
+                            {controls.reject && !rejectOpen && (
+                              <button
+                                onClick={() => setRejectOpen(true)}
+                                disabled={locked}
+                                className={BTN_DANGER}
+                              >
+                                {t(locale, "action.reject")}
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {controls.continue && (
+                          <p className="text-xs text-slate-400">{t(locale, "action.newImage")}</p>
+                        )}
+
+                        {controls.reject && rejectOpen && (
+                          <div className="flex flex-col gap-2">
+                            <textarea
+                              value={reasonText}
+                              onChange={(e) => setReasonText(e.target.value)}
+                              placeholder={t(locale, "action.reasonPlaceholder")}
+                              aria-label={t(locale, "action.reasonPlaceholder")}
+                              rows={3}
+                              disabled={locked}
+                              className={`w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-sm text-white ${FOCUS}`}
+                            />
+                            <p className={`text-xs ${tooLong ? "text-red-400" : "text-slate-500"}`}>
+                              {tooLong
+                                ? t(locale, "action.reasonTooLong", { max: REASON_MAX_LEN })
+                                : t(locale, "action.reasonCount", {
+                                    n: reasonLength(reasonText),
+                                    max: REASON_MAX_LEN,
+                                  })}
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                              <button
+                                onClick={() => void decide("reject")}
+                                disabled={locked || tooLong}
+                                className={BTN_DANGER}
+                              >
+                                {t(locale, "action.confirmReject")}
+                              </button>
+                              <button
+                                onClick={() => setRejectOpen(false)}
+                                disabled={locked}
+                                className={BTN_SECONDARY}
+                              >
+                                {t(locale, "action.cancel")}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {(busy || polling) && (
@@ -451,7 +661,7 @@ export default function GodkjenningPage({
                   </section>
                 )}
 
-                {messageText !== null && (
+                {messageText !== null && !isEditing && (
                   <p
                     className="text-sm text-amber-300 bg-amber-900/20 border border-amber-500/20 rounded-xl p-3"
                     role="status"
@@ -527,17 +737,88 @@ export default function GodkjenningPage({
                       title={t(locale, "review.lightsApproved")}
                       lights={review.lights.approved}
                       locale={locale}
+                      editing={lightEditing(false)}
                     />
                     <LightList
                       title={t(locale, "review.lightsUnstable")}
                       lights={review.lights.unstable}
                       locale={locale}
+                      editing={lightEditing(true)}
                     />
                     <LightList
                       title={t(locale, "review.lightsRejected")}
                       lights={review.lights.rejected}
                       locale={locale}
+                      editing={lightEditing(true)}
                     />
+
+                    {isEditing && (
+                      <div className="flex flex-col gap-4 border-t border-slate-800 pt-4">
+                        {fireplaceShown && (
+                          <div>
+                            <p className="text-sm text-white font-bold mb-2">
+                              {t(locale, "action.fireplaceQuestion")}
+                            </p>
+                            <div className="flex gap-2" role="group">
+                              {(["yes", "no"] as const).map((a) => (
+                                <button
+                                  key={a}
+                                  onClick={() => setCorrectAnswer(a)}
+                                  disabled={locked}
+                                  aria-pressed={correctAnswer === a}
+                                  className={correctAnswer === a ? BTN_PRIMARY : BTN_SECONDARY}
+                                >
+                                  {t(locale, a === "yes" ? "action.yes" : "action.no")}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {confirmNeeded && (
+                          <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-white">
+                            <input
+                              type="checkbox"
+                              checked={confirmed}
+                              disabled={locked}
+                              onChange={(e) => setConfirmed(e.target.checked)}
+                              className={`w-5 h-5 mt-0.5 shrink-0 accent-[#009183] ${FOCUS}`}
+                            />
+                            <span>{t(locale, "correct.confirmExists")}</span>
+                          </label>
+                        )}
+
+                        <p className="text-xs text-slate-400">
+                          {t(locale, "correct.roundsLeft", { n: correction.roundsLeft })}
+                        </p>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={() => void submitCorrection()}
+                            disabled={locked || !submitEnabled}
+                            className={BTN_PRIMARY}
+                          >
+                            {t(locale, "action.makeNewImage")}
+                          </button>
+                          <button onClick={cancelCorrection} disabled={locked} className={BTN_SECONDARY}>
+                            {t(locale, "action.cancel")}
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-400">{t(locale, "correct.newImageFromOriginal")}</p>
+                        {messageText !== null && (
+                          <p
+                            className="text-sm text-amber-300 bg-amber-900/20 border border-amber-500/20 rounded-xl p-3"
+                            role="status"
+                          >
+                            {messageText}
+                          </p>
+                        )}
+                        {busy && (
+                          <p className="text-xs text-slate-400" role="status">
+                            {t(locale, "action.working")}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </section>
               </>

@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import {
   buildDecision,
   decisionControls,
-  hasVariantToggle,
   outcome,
   reasonLength,
   reasonTooLong,
   resultImageUrl,
   shouldPoll,
+  variantOptions,
 } from "./review.ts";
 import type { DecisionAction } from "./api.ts";
 
@@ -69,15 +69,30 @@ test("begrunnelsen telles i tegn etter trimming, grense 500", () => {
 });
 
 test("bryter løftet/rått bare naar begge bildene finnes", () => {
-  const both = { originalUrl: "o", resultUrl: "lifted", rawUrl: "raw" };
-  assert.equal(hasVariantToggle(both), true);
+  const both = { originalUrl: "o", resultUrl: "lifted", rawUrl: "raw", previous: null };
+  assert.deepEqual(variantOptions(both), ["lifted", "raw"]);
   assert.equal(resultImageUrl(both, "lifted"), "lifted");
   assert.equal(resultImageUrl(both, "raw"), "raw");
-  const onlyResult = { originalUrl: "o", resultUrl: "lifted", rawUrl: null };
-  assert.equal(hasVariantToggle(onlyResult), false);
+  const onlyResult = { originalUrl: "o", resultUrl: "lifted", rawUrl: null, previous: null };
+  assert.deepEqual(variantOptions(onlyResult), []);
   assert.equal(resultImageUrl(onlyResult, "raw"), "lifted");
-  const none = { originalUrl: "o", resultUrl: null, rawUrl: null };
+  const none = { originalUrl: "o", resultUrl: null, rawUrl: null, previous: null };
   assert.equal(resultImageUrl(none, "lifted"), null);
+});
+
+test("«Forrige runde» bare naar images.previous har et bilde", () => {
+  const previous = { round: 0, resultUrl: "prev", rawUrl: "prev-raw" };
+  const both = { originalUrl: "o", resultUrl: "lifted", rawUrl: "raw", previous };
+  assert.deepEqual(variantOptions(both), ["lifted", "raw", "previous"]);
+  assert.equal(resultImageUrl(both, "previous"), "prev");
+  const onlyResult = { originalUrl: "o", resultUrl: "lifted", rawUrl: null, previous };
+  assert.deepEqual(variantOptions(onlyResult), ["lifted", "previous"]);
+  const rawOnly = { ...both, previous: { round: 0, resultUrl: null, rawUrl: "prev-raw" } };
+  assert.equal(resultImageUrl(rawOnly, "previous"), "prev-raw");
+  const empty = { ...both, previous: { round: 0, resultUrl: null, rawUrl: null } };
+  assert.deepEqual(variantOptions(empty), ["lifted", "raw"]);
+  // Uten previous faller «Forrige runde» tilbake til gjeldende bilde.
+  assert.equal(resultImageUrl({ ...both, previous: null }, "previous"), "lifted");
 });
 
 test("outcome: venter gir null, ellers riktig linje", () => {

@@ -79,20 +79,33 @@ export function shouldPoll(status: string): boolean {
   return status === "queued" || status === "running";
 }
 
-export type ImageVariant = "lifted" | "raw";
+export type ImageVariant = "lifted" | "raw" | "previous";
 
-/** Resultatbildet for valgt variant. Rått faller tilbake til løftet. */
+/**
+ * Resultatbildet for valgt variant. Rått faller tilbake til løftet;
+ * «Forrige runde» viser det løftede bildet fra forrige runde (2d-2b).
+ */
 export function resultImageUrl(
   images: JobReviewDetail["images"],
   variant: ImageVariant
 ): string | null {
+  if (variant === "previous" && images.previous) {
+    return images.previous.resultUrl ?? images.previous.rawUrl;
+  }
   if (variant === "raw" && images.rawUrl) return images.rawUrl;
   return images.resultUrl ?? images.rawUrl;
 }
 
-/** Bryteren løftet/rått vises bare naar begge bildene finnes. */
-export function hasVariantToggle(images: JobReviewDetail["images"]): boolean {
-  return images.resultUrl !== null && images.rawUrl !== null;
+/**
+ * Knappene i bildebryteren: løftet/rått naar begge bildene finnes, og
+ * «Forrige runde» naar images.previous har et bilde. Tom liste = ingen bryter.
+ */
+export function variantOptions(images: JobReviewDetail["images"]): ImageVariant[] {
+  const options: ImageVariant[] =
+    images.resultUrl !== null && images.rawUrl !== null ? ["lifted", "raw"] : ["lifted"];
+  const prev = images.previous;
+  if (prev && (prev.resultUrl !== null || prev.rawUrl !== null)) options.push("previous");
+  return options.length > 1 ? options : [];
 }
 
 /**
