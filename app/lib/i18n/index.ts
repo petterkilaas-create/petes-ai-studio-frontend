@@ -24,7 +24,8 @@ export type CodeGroup =
   | "lightReason"
   | "imageType"
   | "skyVisibility"
-  | "decisionError";
+  | "decisionError"
+  | "overrideCode";
 
 const nbUi = {
   "review.title": "Kontroll av bildet",
@@ -62,6 +63,9 @@ const nbUi = {
   "review.statusRunning": "Lager nytt bilde…",
   "review.statusOther": "Jobben venter ikke på deg nå.",
   "review.reasonLabel": "Begrunnelse",
+  "review.previousRound": "Forrige runde",
+  "review.lightPromoted": "Slått på av deg",
+  "review.lightDisabled": "Slått av av deg",
   "action.approve": "Godkjenn",
   "action.reject": "Avvis",
   "action.continue": "Send videre",
@@ -76,6 +80,17 @@ const nbUi = {
   "action.reasonCount": "{n} av {max} tegn",
   "action.reasonTooLong": "Begrunnelsen kan være høyst {max} tegn.",
   "action.noneAllowed": "Ingen handlinger er tilgjengelige for denne jobben.",
+  "action.correct": "Rett",
+  "action.makeNewImage": "Lag nytt bilde",
+  "correct.title": "Rett lyskildene",
+  "correct.hint": "Slå lyskildene av eller på i listen over lyskilder.",
+  "correct.roundsLeft": "Runder igjen: {n}",
+  "correct.newImageFromOriginal": "Dette lager et nytt bilde fra originalen.",
+  "correct.confirmExists": "Jeg bekrefter at lyskildene jeg har slått på, finnes i originalbildet.",
+  "correct.lightOn": "På",
+  "correct.lightOff": "Av",
+  "correct.locked": "Kan ikke endres",
+  "correct.roundFailed": "Det nye bildet kunne ikke lages. Du har fortsatt forrige bilde, og runden er ikke brukt.",
   "decision.statusChanged": "Jobben ble endret i mellomtiden. Siden er oppdatert.",
   "decision.error": "Noe gikk galt. Prøv igjen senere.",
   "express.openReview": "Åpne kontroll",
@@ -101,7 +116,7 @@ const nb: Dictionary = {
   codes: {
     reviewCode: {
       gate_review: "Bildet må sjekkes før vi lager det.",
-      fireplace_answer_missing: "Bildet har peis. Skal den være tent?",
+      fireplace_answer_missing: "Venter på svar om peisen.",
       needs_review: "Bildet må sjekkes før vi lager det.",
     },
     reasonCode: {
@@ -109,7 +124,7 @@ const nb: Dictionary = {
       analysis_uncertain: "Analysen var usikker.",
       image_type_disagreement: "Analysen var uenig om hva slags bilde dette er.",
       image_type_untested: "Denne bildetypen støttes ikke ennå.",
-      fireplace_present: "Bildet har peis. Skal den være tent?",
+      fireplace_present: "Analysen fant peis.",
       fireplace_disagreement: "Analysen var uenig om bildet har peis.",
     },
     flagCode: {
@@ -149,8 +164,13 @@ const nb: Dictionary = {
     decisionError: {
       action_not_allowed: "Denne handlingen er ikke tillatt for jobben nå.",
       status_changed: "Jobben ble endret i mellomtiden. Siden er oppdatert.",
-      invalid_decision: "Forespørselen var ugyldig. Sjekk begrunnelsen og prøv igjen.",
-      original_missing: "Originalbildet mangler, så jobben kan ikke sendes videre.",
+      invalid_decision: "Forespørselen var ugyldig. Sjekk valgene og prøv igjen.",
+      original_missing: "Originalbildet mangler, så vi kan ikke lage et nytt bilde.",
+      correction_limit: "Du har brukt rundene dine.",
+      archive_failed: "Det nye bildet kunne ikke startes. Prøv igjen.",
+    },
+    overrideCode: {
+      too_many_lights: "For mange lyskilder er slått på. Slå av noen og prøv igjen.",
     },
   },
   generic: {
@@ -162,6 +182,7 @@ const nb: Dictionary = {
     imageType: "Ukjent bildetype",
     skyVisibility: "Ukjent",
     decisionError: "Noe gikk galt. Prøv igjen senere.",
+    overrideCode: "Valgene kunne ikke brukes. Last siden på nytt og prøv igjen.",
   },
 };
 
@@ -202,6 +223,9 @@ const en: Dictionary = {
     "review.statusRunning": "Creating a new image…",
     "review.statusOther": "This job is not waiting for you right now.",
     "review.reasonLabel": "Reason",
+    "review.previousRound": "Previous round",
+    "review.lightPromoted": "Turned on by you",
+    "review.lightDisabled": "Turned off by you",
     "action.approve": "Approve",
     "action.reject": "Reject",
     "action.continue": "Continue",
@@ -216,6 +240,17 @@ const en: Dictionary = {
     "action.reasonCount": "{n} of {max} characters",
     "action.reasonTooLong": "The reason can be at most {max} characters.",
     "action.noneAllowed": "No actions are available for this job.",
+    "action.correct": "Correct",
+    "action.makeNewImage": "Create new image",
+    "correct.title": "Correct the light sources",
+    "correct.hint": "Turn the light sources on or off in the list of light sources.",
+    "correct.roundsLeft": "Rounds left: {n}",
+    "correct.newImageFromOriginal": "This creates a new image from the original.",
+    "correct.confirmExists": "I confirm that the light sources I have turned on exist in the original image.",
+    "correct.lightOn": "On",
+    "correct.lightOff": "Off",
+    "correct.locked": "Cannot be changed",
+    "correct.roundFailed": "The new image could not be created. You still have the previous image, and the round has not been used.",
     "decision.statusChanged": "The job changed in the meantime. The page has been updated.",
     "decision.error": "Something went wrong. Please try again later.",
     "express.openReview": "Open review",
@@ -229,7 +264,7 @@ const en: Dictionary = {
   codes: {
     reviewCode: {
       gate_review: "The image needs a check before we create it.",
-      fireplace_answer_missing: "The image has a fireplace. Should it be lit?",
+      fireplace_answer_missing: "Waiting for an answer about the fireplace.",
       needs_review: "The image needs a check before we create it.",
     },
     reasonCode: {
@@ -237,7 +272,7 @@ const en: Dictionary = {
       analysis_uncertain: "The analysis was uncertain.",
       image_type_disagreement: "The analysis disagreed on what kind of image this is.",
       image_type_untested: "This image type is not supported yet.",
-      fireplace_present: "The image has a fireplace. Should it be lit?",
+      fireplace_present: "The analysis found a fireplace.",
       fireplace_disagreement: "The analysis disagreed on whether the image has a fireplace.",
     },
     flagCode: {
@@ -277,8 +312,13 @@ const en: Dictionary = {
     decisionError: {
       action_not_allowed: "This action is not allowed for the job right now.",
       status_changed: "The job changed in the meantime. The page has been updated.",
-      invalid_decision: "The request was invalid. Check the reason and try again.",
-      original_missing: "The original image is missing, so the job cannot continue.",
+      invalid_decision: "The request was invalid. Check your choices and try again.",
+      original_missing: "The original image is missing, so we cannot create a new image.",
+      correction_limit: "You have used your rounds.",
+      archive_failed: "The new image could not be started. Please try again.",
+    },
+    overrideCode: {
+      too_many_lights: "Too many light sources are turned on. Turn some off and try again.",
     },
   },
   generic: {
@@ -290,6 +330,7 @@ const en: Dictionary = {
     imageType: "Unknown image type",
     skyVisibility: "Unknown",
     decisionError: "Something went wrong. Please try again later.",
+    overrideCode: "Your choices could not be used. Reload the page and try again.",
   },
 };
 

@@ -181,9 +181,13 @@ test("getReview 200 normaliserer svaret og ignorerer ukjente handlinger", async 
   if (r.kind !== "ok") return;
   assert.deepEqual(r.review.allowedActions, ["reject"]);
   assert.deepEqual(r.review.reasonCodes, ["analysis_uncertain", "brand_new_code"]);
+  // Svar fra foer 2d-2a (uten key/editable/state) gir laaste lyskilder.
   assert.deepEqual(r.review.lights.rejected[0], {
-    id: "L3", type: "candle", location: "vindu", reasonCode: "not_confirmed",
+    key: null, id: "L3", run: 2, type: "candle", location: "vindu", reasonCode: "not_confirmed",
+    editable: false, state: null,
   });
+  assert.deepEqual(r.review.correction, { roundsLeft: 0, lastRoundFailed: false });
+  assert.equal(r.review.images.previous, null);
   assert.equal(r.review.lights.approved[0].reasonCode, null);
   assert.deepEqual(r.review.imageType.runValues, ["interior", "exterior_facade"]);
   assert.equal(r.review.images.originalUrl, "https://x/o.jpg");
@@ -222,19 +226,77 @@ test("parseDecisionResponse: 200, 202, 409, 422, 404 og annet", () => {
   );
   assert.deepEqual(
     api.parseDecisionResponse(409, { detail: { code: "action_not_allowed", status: "needs_review" } }),
-    { kind: "blocked", code: "action_not_allowed", fields: [] }
+    { kind: "blocked", code: "action_not_allowed", fields: [], overrideCode: null }
   );
   assert.deepEqual(
     api.parseDecisionResponse(422, { detail: { code: "invalid_decision", fields: ["reason"] } }),
-    { kind: "blocked", code: "invalid_decision", fields: ["reason"] }
+    { kind: "blocked", code: "invalid_decision", fields: ["reason"], overrideCode: null }
   );
   // Uten detail-innpakning godtas ogsaa.
   assert.deepEqual(api.parseDecisionResponse(422, { code: "invalid_decision", fields: ["action"] }), {
-    kind: "blocked", code: "invalid_decision", fields: ["action"],
+    kind: "blocked", code: "invalid_decision", fields: ["action"], overrideCode: null,
   });
   assert.deepEqual(api.parseDecisionResponse(404, { detail: "job not found" }), { kind: "not_found" });
   assert.deepEqual(api.parseDecisionResponse(500, null), { kind: "error", httpStatus: 500 });
-  assert.deepEqual(api.parseDecisionResponse(409, "tekst"), { kind: "blocked", code: null, fields: [] });
+  assert.deepEqual(api.parseDecisionResponse(409, "tekst"), {
+    kind: "blocked", code: null, fields: [], overrideCode: null,
+  });
+});
+
+test("parseDecisionResponse for Rett (2d-2a): correction_limit, override_code og 503", () => {
+  assert.deepEqual(
+    api.parseDecisionResponse(409, {
+      detail: { code: "correction_limit", rounds_used: 1, max_rounds: 1, rounds_left: 0 },
+    }),
+    { kind: "blocked", code: "correction_limit", fields: [], overrideCode: null }
+  );
+  assert.deepEqual(
+    api.parseDecisionResponse(422, {
+      detail: { code: "invalid_decision", fields: ["overrides"], override_code: "too_many_lights" },
+    }),
+    { kind: "blocked", code: "invalid_decision", fields: ["overrides"], overrideCode: "too_many_lights" }
+  );
+  assert.deepEqual(api.parseDecisionResponse(503, { detail: { code: "archive_failed" } }), {
+    kind: "unavailable", code: "archive_failed",
+  });
+  assert.deepEqual(api.parseDecisionResponse(503, { detail: "decisions not available" }), {
+    kind: "unavailable", code: null,
+  });
+});
+
+test("normalizeReview leser Rett-feltene (2d-2a)", () => {
+  const r = api.normalizeReview(
+    {
+      allowed_actions: ["approve", "reject", "correct"],
+      lights: {
+        approved: [
+          { key: "L1", id: "L1", run: null, type: "pendant", location: "x", editable: true, state: "approved" },
+          { key: "L2", id: "L2", run: null, type: "pendant", location: "y", editable: true, state: "teleported" },
+        ],
+        unstable: [{ key: "r2:L3", id: "L3", run: 2, type: "spotlight", editable: false, state: "promoted" }],
+        rejected: [],
+      },
+      correction: { rounds_used: 1, rounds_left: 0, max_rounds: 1, last_round_failed: true },
+      images: {
+        original_url: "o", result_url: "r", raw_url: "rr",
+        previous: { round: 0, result_url: "p", raw_url: "pr" },
+      },
+    },
+    "j1"
+  );
+  assert.deepEqual(r.allowedActions, ["approve", "reject", "correct"]);
+  assert.deepEqual(r.lights.approved[0], {
+    key: "L1", id: "L1", run: null, type: "pendant", location: "x", reasonCode: null,
+    editable: true, state: "approved",
+  });
+  assert.equal(r.lights.approved[1].state, null, "ukjent state");
+  assert.equal(r.lights.unstable[0].run, 2);
+  assert.equal(r.lights.unstable[0].editable, false);
+  assert.deepEqual(r.correction, { roundsLeft: 0, lastRoundFailed: true });
+  assert.deepEqual(r.images.previous, { round: 0, resultUrl: "p", rawUrl: "pr" });
+  // Negativt eller oedelagt rundetall blir 0.
+  assert.equal(api.normalizeReview({ correction: { rounds_left: -1 } }, "j1").correction.roundsLeft, 0);
+  assert.equal(api.normalizeReview({ correction: { rounds_left: "1" } }, "j1").correction.roundsLeft, 0);
 });
 
 test("postDecision sender JSON-body og tolker svaret", async () => {

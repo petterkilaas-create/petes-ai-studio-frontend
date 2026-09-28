@@ -503,20 +503,49 @@ export async function listJobs(opts: {
 // Godkjenning (2d-1): GET /v1/jobs/{id}/review og POST /v1/jobs/{id}/decision
 // ---------------------------------------------------------------------------
 
-export type DecisionAction = "approve" | "reject" | "continue";
+export type DecisionAction = "approve" | "reject" | "continue" | "correct";
 
-const DECISION_ACTIONS: ReadonlySet<string> = new Set(["approve", "reject", "continue"]);
+const DECISION_ACTIONS: ReadonlySet<string> = new Set(["approve", "reject", "continue", "correct"]);
 
 /** Maks lengde paa begrunnelsen (backend renser og sjekker igjen, 422 over). */
 export const REASON_MAX_LEN = 500;
 
+/**
+ * Hva som gjelder for gjeldende bilde (2d-2a): approved/disabled for
+ * godkjente, candidate/promoted for ustabile og avviste.
+ */
+export type LightState = "approved" | "disabled" | "candidate" | "promoted";
+
+const LIGHT_STATES: ReadonlySet<string> = new Set(["approved", "disabled", "candidate", "promoted"]);
+
 /** En lyskilde fra analysen. `type` og `reasonCode` er koder, `location` fritekst. */
 export interface ReviewLight {
+  /** Noekkel i UI (2d-2a): "L1" for godkjente, "r2:L3" for kandidater. Tolkes aldri. */
+  key: string | null;
   id: string | null;
+  /** Kjoeringen kandidaten kom fra (1 eller 2); null for godkjente. */
+  run: number | null;
   type: string | null;
   location: string | null;
   /** Bare for avviste lyskilder, f.eks. "not_confirmed". */
   reasonCode: string | null;
+  /** false naar id-en er tvetydig i kjoeringen, eller feltet mangler. */
+  editable: boolean;
+  state: LightState | null;
+}
+
+/** Retterunder (2d-2a). Antallet kommer alltid fra backend. */
+export interface ReviewCorrection {
+  roundsLeft: number;
+  /** Siste retterunde feilet; jobben har forrige bilde, og runden er ikke telt. */
+  lastRoundFailed: boolean;
+}
+
+/** Body for «Rett»: hele avviket fra analysen, ikke endringen fra forrige runde. */
+export interface CorrectionOverrides {
+  promote: { run: number; id: string }[];
+  disable: string[];
+  add: never[];
 }
 
 export interface RunValue {
@@ -542,7 +571,14 @@ export interface JobReviewDetail {
   imageType: RunValue;
   skyVisibility: RunValue;
   lights: { approved: ReviewLight[]; unstable: ReviewLight[]; rejected: ReviewLight[] };
-  images: { originalUrl: string | null; resultUrl: string | null; rawUrl: string | null };
+  correction: ReviewCorrection;
+  images: {
+    originalUrl: string | null;
+    resultUrl: string | null;
+    rawUrl: string | null;
+    /** Bildet fra forrige runde, eller null foer foerste runde er ferdig. */
+    previous: { round: number | null; resultUrl: string | null; rawUrl: string | null } | null;
+  };
   decisions: { action: string | null; at: string | null; byRole: string | null; reason: string | null }[];
 }
 
@@ -562,12 +598,21 @@ function records(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 function toLight(raw: Record<string, unknown>): ReviewLight {
+  const state = stringOrNull(raw.state);
   return {
+    key: stringOrNull(raw.key),
     id: stringOrNull(raw.id),
+    run: numberOrNull(raw.run),
     type: stringOrNull(raw.type),
     location: stringOrNull(raw.location),
     reasonCode: stringOrNull(raw.reason_code),
+    editable: raw.editable === true,
+    state: state !== null && LIGHT_STATES.has(state) ? (state as LightState) : null,
   };
 }
 
@@ -585,6 +630,9 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
   const fireplace = isRecord(r.fireplace) ? r.fireplace : {};
   const lights = isRecord(r.lights) ? r.lights : {};
   const images = isRecord(r.images) ? r.images : {};
+  const previous = isRecord(images.previous) ? images.previous : null;
+  const correction = isRecord(r.correction) ? r.correction : {};
+  const roundsLeft = numberOrNull(correction.rounds_left);
   return {
     jobId: stringOrNull(r.job_id) ?? jobId,
     status: stringOrNull(r.status) ?? "unknown",
@@ -607,10 +655,22 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
       unstable: records(lights.unstable).map(toLight),
       rejected: records(lights.rejected).map(toLight),
     },
+    correction: {
+      roundsLeft: roundsLeft !== null && roundsLeft > 0 ? roundsLeft : 0,
+      lastRoundFailed: correction.last_round_failed === true,
+    },
     images: {
       originalUrl: stringOrNull(images.original_url),
       resultUrl: stringOrNull(images.result_url),
       rawUrl: stringOrNull(images.raw_url),
+      previous:
+        previous === null
+          ? null
+          : {
+              round: numberOrNull(previous.round),
+              resultUrl: stringOrNull(previous.result_url),
+              rawUrl: stringOrNull(previous.raw_url),
+            },
     },
     decisions: records(r.decisions).map((d) => ({
       action: stringOrNull(d.action),
@@ -671,8 +731,10 @@ export interface DecisionRequest {
   action: DecisionAction;
   /** Valgfri, bare ved reject. Hoeyst REASON_MAX_LEN tegn. */
   reason?: string;
-  /** Peissvar ved continue (2d-1b). */
+  /** Peissvar ved continue (2d-1b) og correct (2d-2a; utelatt = forrige svar). */
   fireplace_fire?: "yes" | "no";
+  /** Bare ved correct (2d-2a). */
+  overrides?: CorrectionOverrides;
 }
 
 /**
@@ -681,15 +743,18 @@ export interface DecisionRequest {
  * - poll (202): jobben kjoerer (continue); poll til awaiting_approval eller
  *   sluttstatus, hent saa review paa nytt.
  * - status_changed (409): noen andre har avgjort; last paa nytt og vis melding.
- * - blocked (409 action_not_allowed/original_missing, 422 invalid_decision):
- *   vis melding, ingen ny handling.
+ * - blocked (409 action_not_allowed/original_missing/correction_limit,
+ *   422 invalid_decision med eventuell override_code): vis melding.
+ * - unavailable (503): archive_failed eller backend uten database; trygt aa
+ *   proeve igjen.
  * - not_found (404), error (alt annet).
  */
 export type DecisionOutcome =
   | { kind: "updated"; status: string | null }
   | { kind: "poll"; status: string | null }
   | { kind: "status_changed"; status: string | null }
-  | { kind: "blocked"; code: string | null; fields: string[] }
+  | { kind: "blocked"; code: string | null; fields: string[]; overrideCode: string | null }
+  | { kind: "unavailable"; code: string | null }
   | { kind: "not_found" }
   | { kind: "error"; httpStatus: number };
 
@@ -709,8 +774,14 @@ export function parseDecisionResponse(httpStatus: number, body: unknown): Decisi
     return { kind: "status_changed", status };
   }
   if (httpStatus === 409 || httpStatus === 422) {
-    return { kind: "blocked", code, fields: stringList(inner.fields) };
+    return {
+      kind: "blocked",
+      code,
+      fields: stringList(inner.fields),
+      overrideCode: stringOrNull(inner.override_code),
+    };
   }
+  if (httpStatus === 503) return { kind: "unavailable", code };
   return { kind: "error", httpStatus };
 }
 
