@@ -13,6 +13,20 @@ import type { UiKey } from "./i18n";
 
 export type FireplaceAnswer = "yes" | "no" | null;
 
+/**
+ * Peisvalgene (2d-2d, Petter 28.09): to valg, verdiene er uendret mot
+ * backend. Et tredje valg («som i originalen») er droppet etter probe.
+ */
+export const FIREPLACE_OPTIONS: readonly { value: "yes" | "no"; key: UiKey }[] = [
+  { value: "yes", key: "action.fireplaceLit" },
+  { value: "no", key: "action.fireplaceNotLit" },
+];
+
+/** Tekst for et lagret peissvar. */
+export function fireplaceAnswerKey(answer: "yes" | "no"): UiKey {
+  return answer === "yes" ? "action.fireplaceLit" : "action.fireplaceNotLit";
+}
+
 /** Samme grense som backend (REASON_MAX_LEN i api.ts). */
 const REASON_MAX = 500;
 
@@ -20,7 +34,7 @@ export interface DecisionControls {
   approve: boolean;
   reject: boolean;
   continue: boolean;
-  /** Vis peisspoersmaalet (Ja/Nei). Bare sammen med continue. */
+  /** Vis peisspoersmaalet (Tent/Ikke tent). Bare sammen med continue. */
   fireplaceQuestion: boolean;
   /** «Send videre» kan trykkes: continue er lov, og peissvar finnes naar det kreves. */
   continueEnabled: boolean;
