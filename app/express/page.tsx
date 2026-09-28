@@ -9,6 +9,8 @@ import { RejectionPanel } from "../components/RejectionPanel";
 import { ReviewPanel } from "../components/ReviewPanel";
 import { UnknownStatusPanel } from "../components/UnknownStatusPanel";
 import { ApprovalNotice } from "../components/ApprovalNotice";
+import { ReviewerRejectedPanel } from "../components/ReviewerRejectedPanel";
+import { OpenReviewLink } from "../components/OpenReviewLink";
 
 // "simple" = service alene (ingen params, backend-defaults gjelder).
 // "scene"  = scene_transform med preset_id + scene-type-gate (TG-NEW-58),
@@ -404,6 +406,14 @@ export default function ExpressPage() {
 
             {job.status === "needs_review" && job.review && (
               <ReviewPanel review={job.review} />
+            )}
+
+            {(job.status === "awaiting_approval" ||
+              job.status === "needs_review") &&
+              job.jobId && <OpenReviewLink jobId={job.jobId} />}
+
+            {job.status === "rejected_by_reviewer" && (
+              <ReviewerRejectedPanel reason={job.reviewerReason} />
             )}
 
             {job.status === "unknown" && (

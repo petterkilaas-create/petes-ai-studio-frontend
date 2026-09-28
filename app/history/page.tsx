@@ -1,9 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { listJobs, type JobSummary, type JobSummaryStatus } from "../lib/api";
-import { hasResultImage, statusVariant } from "./statusVariants";
+import {
+  listJobs,
+  WAITING_FOR_ME_STATUSES,
+  type JobSummary,
+  type JobSummaryStatus,
+} from "../lib/api";
+import {
+  canOpenReview,
+  hasResultImage,
+  isRejectedByReviewer,
+  REVIEWER_REJECTED_CLS,
+  statusVariant,
+} from "./statusVariants";
+import { OpenReviewLink } from "../components/OpenReviewLink";
+import { t } from "../lib/i18n";
+import { useLocale } from "../lib/i18n/useLocale";
 
 // Sidestoerrelse pr. henting. before-cursoren pagineres paa createdAt fra
 // siste rad (backendens kontrakt) — se loadMore().
@@ -41,8 +55,17 @@ function formatDate(iso: string | null): string {
 
 // Status-pill: visuelt identisk med husets badge-moenster, men frikoblet fra
 // StatusBadge (som tar en annen status-union — se PR-notat).
-function StatusPill({ status }: { status: JobSummaryStatus }) {
-  const v = statusVariant(status);
+function StatusPill({
+  status,
+  rejectedByYou = false,
+}: {
+  status: JobSummaryStatus;
+  rejectedByYou?: boolean;
+}) {
+  const locale = useLocale();
+  const v = rejectedByYou
+    ? { label: t(locale, "history.rejectedByYou"), cls: REVIEWER_REJECTED_CLS, pulse: false }
+    : statusVariant(status);
   return (
     <span
       className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${v.cls} ${
@@ -55,8 +78,12 @@ function StatusPill({ status }: { status: JobSummaryStatus }) {
 }
 
 function JobCard({ job }: { job: JobSummary }) {
+  const locale = useLocale();
   const hasThumb = hasResultImage(job.status) && job.resultUrl !== null;
+  const rejectedByYou = isRejectedByReviewer(job);
+  // Avvist av megleren: vis begrunnelsen, aldri raa `error`.
   const showError =
+    !rejectedByYou &&
     (job.status === "failed" ||
       job.status === "rejected" ||
       job.status === "needs_review") &&
@@ -85,7 +112,7 @@ function JobCard({ job }: { job: JobSummary }) {
           <span className="font-bold text-white text-sm truncate">
             {serviceLabel(job.service)}
           </span>
-          <StatusPill status={job.status} />
+          <StatusPill status={job.status} rejectedByYou={rejectedByYou} />
         </div>
         <span className="text-slate-400 text-xs">
           {formatDate(job.createdAt)}
@@ -95,6 +122,16 @@ function JobCard({ job }: { job: JobSummary }) {
             {job.error}
           </p>
         )}
+        {rejectedByYou && job.reason && (
+          <p className="text-xs text-slate-300 bg-[#0B1120] border border-slate-800 rounded-xl p-3 leading-relaxed break-words">
+            {t(locale, "review.reasonLabel")}: {job.reason}
+          </p>
+        )}
+        {canOpenReview(job.status) && (
+          <div>
+            <OpenReviewLink jobId={job.jobId} labelKey="history.openReview" />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -102,6 +139,11 @@ function JobCard({ job }: { job: JobSummary }) {
 
 export default function HistoryPage() {
   const { getToken } = useAuth();
+  const locale = useLocale();
+
+  // «Venter paa meg» (2d-1): ?status=awaiting_approval,needs_review.
+  const [waitingOnly, setWaitingOnly] = useState(false);
+  const statuses = waitingOnly ? WAITING_FOR_ME_STATUSES : undefined;
 
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,19 +151,25 @@ export default function HistoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
 
+  // Bytte av filter mens en henting pagaar: bare det siste svaret teller.
+  const requestRef = useRef(0);
+
   const loadInitial = useCallback(async () => {
+    const request = ++requestRef.current;
     setLoading(true);
     setError(null);
     try {
-      const rows = await listJobs({ limit: PAGE_SIZE, getToken });
+      const rows = await listJobs({ limit: PAGE_SIZE, statuses, getToken });
+      if (request !== requestRef.current) return;
       setJobs(rows);
       setHasMore(rows.length === PAGE_SIZE);
     } catch (err) {
+      if (request !== requestRef.current) return;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) setLoading(false);
     }
-  }, [getToken]);
+  }, [getToken, statuses]);
 
   useEffect(() => {
     void loadInitial();
@@ -138,6 +186,7 @@ export default function HistoryPage() {
       setHasMore(false);
       return;
     }
+    const request = requestRef.current;
     setLoadingMore(true);
     setError(null);
     try {
@@ -145,8 +194,11 @@ export default function HistoryPage() {
         limit: PAGE_SIZE,
         before: cursorRow.createdAt as string,
         beforeId: cursorRow.jobId,
+        statuses,
         getToken,
       });
+      // Filteret er byttet mens vi hentet: forkast siden.
+      if (request !== requestRef.current) return;
       // Defensiv dedup paa jobId: tie-breaker-gapet i cursoren (kjent
       // backend-grense) skal aldri kunne gi en dobbel rad i UI-et.
       setJobs((prev) => {
@@ -160,7 +212,7 @@ export default function HistoryPage() {
     } finally {
       setLoadingMore(false);
     }
-  }, [jobs, getToken]);
+  }, [jobs, getToken, statuses]);
 
   return (
     <div className="flex flex-col bg-[#0B1120] text-white min-h-screen font-sans">
@@ -174,13 +226,31 @@ export default function HistoryPage() {
               Alle jobbene dine, nyeste først.
             </p>
           </div>
-          <button
-            onClick={() => void loadInitial()}
-            disabled={loading}
-            className="px-5 py-2.5 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-colors shadow-[0_0_15px_rgba(0,145,131,0.3)] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120]"
-          >
-            Oppdater
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1" role="group">
+              {([false, true] as const).map((waiting) => (
+                <button
+                  key={String(waiting)}
+                  onClick={() => setWaitingOnly(waiting)}
+                  aria-pressed={waitingOnly === waiting}
+                  className={`px-4 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120] ${
+                    waitingOnly === waiting
+                      ? "bg-slate-800 border-slate-500 text-white"
+                      : "border-slate-700 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {t(locale, waiting ? "history.waitingForMe" : "history.all")}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => void loadInitial()}
+              disabled={loading}
+              className="px-5 py-2.5 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-colors shadow-[0_0_15px_rgba(0,145,131,0.3)] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120]"
+            >
+              Oppdater
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -202,6 +272,12 @@ export default function HistoryPage() {
             >
               Prøv igjen
             </button>
+          </div>
+        ) : jobs.length === 0 && waitingOnly ? (
+          <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-16 text-center max-w-lg mx-auto">
+            <p className="text-white font-bold text-lg">
+              {t(locale, "history.emptyWaiting")}
+            </p>
           </div>
         ) : jobs.length === 0 ? (
           <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-16 text-center max-w-lg mx-auto">

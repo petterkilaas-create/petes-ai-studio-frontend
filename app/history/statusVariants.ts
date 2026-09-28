@@ -59,3 +59,19 @@ export function statusVariant(status: string): StatusVariant {
 export function hasResultImage(status: string): boolean {
   return status === "succeeded" || status === "awaiting_approval";
 }
+
+/** Farge for «Avvist av deg» (2d-1): noeytral, ikke roed. Teksten kommer fra ordlista. */
+export const REVIEWER_REJECTED_CLS = "bg-slate-800/60 text-slate-300 border-slate-500/30";
+
+/**
+ * Jobb avvist av megleren selv (2d-1a): kjennes paa `code` fra listingen,
+ * aldri ved aa tolke `error`-teksten (Petter 28.09, valg B).
+ */
+export function isRejectedByReviewer(job: { status: string; code: string | null }): boolean {
+  return job.status === "failed" && job.code === "rejected_by_reviewer";
+}
+
+/** Statuser der kortet lenker til godkjenningssiden («Åpne kontroll»). */
+export function canOpenReview(status: string): boolean {
+  return status === "awaiting_approval" || status === "needs_review";
+}

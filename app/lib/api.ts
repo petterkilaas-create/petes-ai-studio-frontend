@@ -59,6 +59,8 @@ interface JobStatusBody {
   result_url?: string;
   /** Grunner fra port 1 (needs_review, 2c-2). */
   reasons?: unknown;
+  /** Meglerens egen begrunnelse ved rejected_by_reviewer (2d-1). */
+  reason?: unknown;
 }
 
 /**
@@ -123,6 +125,10 @@ export type SubmitResult =
  * - needs_review: {status, code, reasons} — port 1 stoppet, intet bilde.
  * Ukjent status (200-JSON eller 202) gir "unknown": aldri evig polling,
  * aldri roed feil.
+ *
+ * Kontrakt 2d-1a (Petter 28.09, alternativ B): jobb avvist av megleren er
+ * HTTP 200 + JSON {status:"failed", code:"rejected_by_reviewer", reason}.
+ * Det er en avgjoerelse, ikke en feil -> "rejected_by_reviewer".
  */
 export type JobResult =
   | { kind: "pending"; status: "queued" | "running"; retryAfterMs?: number }
@@ -130,6 +136,7 @@ export type JobResult =
   | { kind: "awaiting_approval"; resultUrl: string; jobId: string }
   | { kind: "needs_review"; review: Review }
   | { kind: "unknown"; status: string | null; httpStatus: number }
+  | { kind: "rejected_by_reviewer"; reason: string | null }
   | { kind: "failed"; detail: string; rejection?: Rejection };
 
 function unknownStatus(status: unknown, httpStatus: number): JobResult {
@@ -138,6 +145,10 @@ function unknownStatus(status: unknown, httpStatus: number): JobResult {
     status: typeof status === "string" ? status : null,
     httpStatus,
   };
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
 /**
@@ -163,6 +174,9 @@ export function parseStatusBody(data: JobStatusBody, jobId: string): JobResult {
       resultUrl: data.result_url,
       jobId: data.job_id ?? jobId,
     };
+  }
+  if (data.status === "failed" && data.code === "rejected_by_reviewer") {
+    return { kind: "rejected_by_reviewer", reason: nonEmptyString(data.reason) };
   }
   if (data.status === "needs_review") {
     const reasons = Array.isArray(data.reasons)
@@ -340,6 +354,10 @@ interface JobSummaryWire {
   result_url: string | null;
   variant_urls: string[] | null;
   error: string | null;
+  /** 2d-1a: kode for raden (rejected_by_reviewer, needs_review-koden) eller null. */
+  code?: string | null;
+  /** 2d-1a: meglerens begrunnelse ved rejected_by_reviewer, ellers null. */
+  reason?: string | null;
 }
 
 /**
@@ -377,11 +395,12 @@ export function normalizeSummaryStatus(raw: unknown): JobSummaryStatus {
 /**
  * En rad i jobb-historikken (GET /v1/jobs, TG-NEW-74 PR #76).
  *
- * Kontrakts-asymmetri vs. pollJob, viktig: listingen baerer KUN en flat
+ * Kontrakts-asymmetri vs. pollJob, viktig: listingen baerer en flat
  * `error`-streng for failed/rejected (allerede bruker-rettet og prefiks-
- * fri). Den har IKKE `code`/`classifier` slik singular poll har — saa
- * History-siden viser `error` raatt som tekst og kjoerer IKKE
- * parseRejection paa disse radene.
+ * fri). Den har IKKE `classifier` slik singular poll har — saa History-
+ * siden kjoerer IKKE parseRejection paa disse radene. Fra 2d-1a har raden
+ * `code`/`reason`; en jobb avvist av megleren kjennes paa `code`, aldri
+ * ved aa tolke `error`-teksten.
  *
  * `resultUrl` er ferskt re-signert og settes for succeeded-rader (og,
  * fra 2c-3b, awaiting_approval-rader). En
@@ -396,7 +415,18 @@ export interface JobSummary {
   resultUrl: string | null;
   variantUrls: string[] | null;
   error: string | null;
+  /**
+   * Kode fra backend (2d-1a): "rejected_by_reviewer" for jobb avvist av
+   * megleren, koden fra port 1 for needs_review, ellers null. Mangler
+   * feltet (eldre backend), er den null.
+   */
+  code: string | null;
+  /** Meglerens begrunnelse ved rejected_by_reviewer, ellers null. */
+  reason: string | null;
 }
+
+/** Statusene i filteret «Venter paa meg» (GET /v1/jobs?status=, 2d-1a). */
+export const WAITING_FOR_ME_STATUSES = ["awaiting_approval", "needs_review"] as const;
 
 /**
  * Henter den autentiserte brukerens jobb-historikk (nyeste foerst) fra
@@ -421,14 +451,19 @@ export async function listJobs(opts: {
   limit?: number;
   before?: string;
   beforeId?: string;
+  /** Statusfilter (2d-1a, hvitliste i backend), f.eks. WAITING_FOR_ME_STATUSES. */
+  statuses?: readonly string[];
   getToken: GetToken;
 }): Promise<JobSummary[]> {
-  const { limit, before, beforeId, getToken } = opts;
+  const { limit, before, beforeId, statuses, getToken } = opts;
 
   const params = new URLSearchParams();
   if (limit !== undefined) params.set("limit", String(limit));
   if (before !== undefined) params.set("before", before);
   if (beforeId !== undefined) params.set("before_id", beforeId);
+  if (statuses !== undefined && statuses.length > 0) {
+    params.set("status", statuses.join(","));
+  }
   const qs = params.toString();
   const url = `${API_BASE}/v1/jobs${qs ? `?${qs}` : ""}`;
 
@@ -459,5 +494,241 @@ export async function listJobs(opts: {
     resultUrl: row.result_url,
     variantUrls: row.variant_urls,
     error: row.error,
+    code: nonEmptyString(row.code),
+    reason: nonEmptyString(row.reason),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Godkjenning (2d-1): GET /v1/jobs/{id}/review og POST /v1/jobs/{id}/decision
+// ---------------------------------------------------------------------------
+
+export type DecisionAction = "approve" | "reject" | "continue";
+
+const DECISION_ACTIONS: ReadonlySet<string> = new Set(["approve", "reject", "continue"]);
+
+/** Maks lengde paa begrunnelsen (backend renser og sjekker igjen, 422 over). */
+export const REASON_MAX_LEN = 500;
+
+/** En lyskilde fra analysen. `type` og `reasonCode` er koder, `location` fritekst. */
+export interface ReviewLight {
+  id: string | null;
+  type: string | null;
+  location: string | null;
+  /** Bare for avviste lyskilder, f.eks. "not_confirmed". */
+  reasonCode: string | null;
+}
+
+export interface RunValue {
+  value: string | null;
+  runValues: string[];
+}
+
+/**
+ * Det megleren trenger for aa avgjoere en jobb (GET /v1/jobs/{id}/review).
+ * Bare koder og data; tekstene kommer fra ordlista (app/lib/i18n).
+ */
+export interface JobReviewDetail {
+  jobId: string;
+  status: string;
+  /** gate_review | fireplace_answer_missing | null */
+  code: string | null;
+  reasonCodes: string[];
+  flagCodes: string[];
+  /** Bare kjente handlinger; ukjente fra backend ignoreres. */
+  allowedActions: DecisionAction[];
+  validRuns: number;
+  fireplace: { present: boolean; disagreement: boolean; answer: string | null };
+  imageType: RunValue;
+  skyVisibility: RunValue;
+  lights: { approved: ReviewLight[]; unstable: ReviewLight[]; rejected: ReviewLight[] };
+  images: { originalUrl: string | null; resultUrl: string | null; rawUrl: string | null };
+  decisions: { action: string | null; at: string | null; byRole: string | null; reason: string | null }[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+}
+
+function records(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function toLight(raw: Record<string, unknown>): ReviewLight {
+  return {
+    id: stringOrNull(raw.id),
+    type: stringOrNull(raw.type),
+    location: stringOrNull(raw.location),
+    reasonCode: stringOrNull(raw.reason_code),
+  };
+}
+
+function toRunValue(raw: unknown): RunValue {
+  const r = isRecord(raw) ? raw : {};
+  return { value: stringOrNull(r.value), runValues: stringList(r.run_values) };
+}
+
+/**
+ * Normaliserer review-svaret. Manglende eller feil felt gir tomme verdier,
+ * aldri krasj; ukjente koder beholdes og oversettes med generisk tekst.
+ */
+export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
+  const r = isRecord(raw) ? raw : {};
+  const fireplace = isRecord(r.fireplace) ? r.fireplace : {};
+  const lights = isRecord(r.lights) ? r.lights : {};
+  const images = isRecord(r.images) ? r.images : {};
+  return {
+    jobId: stringOrNull(r.job_id) ?? jobId,
+    status: stringOrNull(r.status) ?? "unknown",
+    code: stringOrNull(r.code),
+    reasonCodes: stringList(r.reason_codes),
+    flagCodes: stringList(r.flag_codes),
+    allowedActions: stringList(r.allowed_actions).filter((a): a is DecisionAction =>
+      DECISION_ACTIONS.has(a)
+    ),
+    validRuns: typeof r.valid_runs === "number" ? r.valid_runs : 0,
+    fireplace: {
+      present: fireplace.present === true,
+      disagreement: fireplace.disagreement === true,
+      answer: stringOrNull(fireplace.answer),
+    },
+    imageType: toRunValue(r.image_type),
+    skyVisibility: toRunValue(r.sky_visibility),
+    lights: {
+      approved: records(lights.approved).map(toLight),
+      unstable: records(lights.unstable).map(toLight),
+      rejected: records(lights.rejected).map(toLight),
+    },
+    images: {
+      originalUrl: stringOrNull(images.original_url),
+      resultUrl: stringOrNull(images.result_url),
+      rawUrl: stringOrNull(images.raw_url),
+    },
+    decisions: records(r.decisions).map((d) => ({
+      action: stringOrNull(d.action),
+      at: stringOrNull(d.at),
+      byRole: stringOrNull(d.by_role),
+      reason: stringOrNull(d.reason),
+    })),
+  };
+}
+
+export type ReviewFetchResult =
+  | { kind: "ok"; review: JobReviewDetail }
+  /** 404: ukjent, fremmed eller ikke en skumringsjobb (samme svar). */
+  | { kind: "not_found" }
+  /** 503: degradert modus i backend. */
+  | { kind: "unavailable" }
+  | { kind: "error"; httpStatus: number };
+
+/** GET med samme 401-retry som pollJob/listJobs. */
+async function authedFetch(
+  url: string,
+  init: RequestInit,
+  getToken: GetToken
+): Promise<Response> {
+  const withAuth = async (options?: { skipCache?: boolean }) => ({
+    ...init,
+    headers: { ...(init.headers ?? {}), ...(await authHeader(getToken, options)) },
+  });
+  const res = await fetch(url, await withAuth());
+  if (res.status !== 401) return res;
+  return fetch(url, await withAuth({ skipCache: true }));
+}
+
+async function readJson(res: Response): Promise<unknown> {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function getReview(opts: {
+  jobId: string;
+  getToken: GetToken;
+}): Promise<ReviewFetchResult> {
+  const { jobId, getToken } = opts;
+  const url = `${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/review`;
+  const res = await authedFetch(url, { method: "GET" }, getToken);
+  if (res.status === 200) {
+    return { kind: "ok", review: normalizeReview(await readJson(res), jobId) };
+  }
+  if (res.status === 404) return { kind: "not_found" };
+  if (res.status === 503) return { kind: "unavailable" };
+  return { kind: "error", httpStatus: res.status };
+}
+
+export interface DecisionRequest {
+  action: DecisionAction;
+  /** Valgfri, bare ved reject. Hoeyst REASON_MAX_LEN tegn. */
+  reason?: string;
+  /** Peissvar ved continue (2d-1b). */
+  fireplace_fire?: "yes" | "no";
+}
+
+/**
+ * Utfallet av POST /v1/jobs/{id}/decision:
+ * - updated (200): avgjort, hent review paa nytt.
+ * - poll (202): jobben kjoerer (continue); poll til awaiting_approval eller
+ *   sluttstatus, hent saa review paa nytt.
+ * - status_changed (409): noen andre har avgjort; last paa nytt og vis melding.
+ * - blocked (409 action_not_allowed/original_missing, 422 invalid_decision):
+ *   vis melding, ingen ny handling.
+ * - not_found (404), error (alt annet).
+ */
+export type DecisionOutcome =
+  | { kind: "updated"; status: string | null }
+  | { kind: "poll"; status: string | null }
+  | { kind: "status_changed"; status: string | null }
+  | { kind: "blocked"; code: string | null; fields: string[] }
+  | { kind: "not_found" }
+  | { kind: "error"; httpStatus: number };
+
+/**
+ * Ren tolkning av svaret. FastAPI pakker feil i {"detail": {...}}; formen
+ * uten innpakning godtas ogsaa.
+ */
+export function parseDecisionResponse(httpStatus: number, body: unknown): DecisionOutcome {
+  const outer = isRecord(body) ? body : {};
+  const inner = isRecord(outer.detail) ? outer.detail : outer;
+  const code = stringOrNull(inner.code);
+  const status = stringOrNull(inner.status);
+  if (httpStatus === 200) return { kind: "updated", status };
+  if (httpStatus === 202) return { kind: "poll", status };
+  if (httpStatus === 404) return { kind: "not_found" };
+  if (httpStatus === 409 && code === "status_changed") {
+    return { kind: "status_changed", status };
+  }
+  if (httpStatus === 409 || httpStatus === 422) {
+    return { kind: "blocked", code, fields: stringList(inner.fields) };
+  }
+  return { kind: "error", httpStatus };
+}
+
+export async function postDecision(opts: {
+  jobId: string;
+  decision: DecisionRequest;
+  getToken: GetToken;
+}): Promise<DecisionOutcome> {
+  const { jobId, decision, getToken } = opts;
+  const url = `${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/decision`;
+  const res = await authedFetch(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(decision),
+    },
+    getToken
+  );
+  return parseDecisionResponse(res.status, await readJson(res));
 }
