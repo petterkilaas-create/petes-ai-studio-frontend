@@ -79,3 +79,15 @@ test("pending-jobb gir running og isProcessing true", () => {
   assert.equal(ps, "running");
   assert.equal(isProcessingStatus(ps), true);
 });
+
+test("rejected_by_reviewer: egen sluttstatus, ikke failed, polling stopper", () => {
+  const s = terminalState({ kind: "rejected_by_reviewer", reason: "Feil vindu" }, noBlob);
+  assert.ok(s);
+  assert.equal(s.status, "rejected_by_reviewer");
+  assert.equal(s.reviewerReason, "Feil vindu");
+  assert.equal(s.error, null);
+  assert.equal(s.rejection, null);
+  const ps = processStatusFor(s.status);
+  assert.equal(ps, "rejected_by_reviewer");
+  assert.equal(isProcessingStatus(ps), false);
+});

@@ -94,3 +94,184 @@ test("listJobs normaliserer ukjente statuser til unknown", async () => {
     ["awaiting_approval", "needs_review", "unknown", "unknown", "succeeded"]
   );
 });
+
+// ---- 2d-1: avvist av megleren, listing, review og decision -----------------
+
+function captureFetch(status: number, body: unknown) {
+  const calls: { url: string; init: RequestInit | undefined }[] = [];
+  globalThis.fetch = (async (url: string, init?: RequestInit) => {
+    calls.push({ url: String(url), init });
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  return calls;
+}
+
+test("200 failed + rejected_by_reviewer gir egen sluttstatus med begrunnelse", async () => {
+  mockFetch(200, { status: "failed", code: "rejected_by_reviewer", reason: "Feil vindu" });
+  const r = await api.pollJob({ jobId: "j1", getToken });
+  assert.deepEqual(r, { kind: "rejected_by_reviewer", reason: "Feil vindu" });
+});
+
+test("rejected_by_reviewer uten begrunnelse gir reason null", async () => {
+  for (const reason of [null, undefined, "", "  ", 7]) {
+    mockFetch(200, { status: "failed", code: "rejected_by_reviewer", reason });
+    const r = await api.pollJob({ jobId: "j1", getToken });
+    assert.deepEqual(r, { kind: "rejected_by_reviewer", reason: null }, String(reason));
+  }
+});
+
+test("200 failed med annen kode er fortsatt unknown (ikke avvist)", async () => {
+  mockFetch(200, { status: "failed", code: "something_else" });
+  const r = await api.pollJob({ jobId: "j1", getToken });
+  assert.equal(r.kind, "unknown");
+});
+
+test("listJobs sender statusfilteret og leser code/reason", async () => {
+  const row = { service: "scene_transform", created_at: null, result_url: null, variant_urls: null };
+  const calls = captureFetch(200, [
+    { ...row, job_id: "a", status: "failed", error: "rejected_by_reviewer: x", code: "rejected_by_reviewer", reason: "x" },
+    { ...row, job_id: "b", status: "needs_review", error: null, code: "needs_review", reason: null },
+    { ...row, job_id: "c", status: "succeeded", error: null },
+  ]);
+  const rows = await api.listJobs({ statuses: api.WAITING_FOR_ME_STATUSES, getToken });
+  assert.equal(
+    new URL(calls[0].url).searchParams.get("status"),
+    "awaiting_approval,needs_review"
+  );
+  assert.deepEqual(
+    rows.map((r) => [r.code, r.reason]),
+    [["rejected_by_reviewer", "x"], ["needs_review", null], [null, null]]
+  );
+});
+
+test("listJobs uten filter sender ikke status", async () => {
+  const calls = captureFetch(200, []);
+  await api.listJobs({ getToken });
+  assert.equal(new URL(calls[0].url).searchParams.has("status"), false);
+});
+
+const REVIEW_BODY = {
+  job_id: "j1",
+  status: "needs_review",
+  code: "gate_review",
+  reason_codes: ["analysis_uncertain", "brand_new_code"],
+  flag_codes: ["sky_visibility_disagreement"],
+  allowed_actions: ["reject", "teleport"],
+  valid_runs: 2,
+  fireplace: { present: true, disagreement: false, answer: null },
+  image_type: { value: "interior", run_values: ["interior", "exterior_facade"] },
+  sky_visibility: { value: "limited", run_values: ["limited", "limited"] },
+  lights: {
+    approved: [{ id: "L1", type: "pendant", location: "over bordet" }],
+    unstable: [{ id: "L2", type: "floor_lamp", location: "hjørnet", run: 1 }],
+    rejected: [{ id: "L3", type: "candle", location: "vindu", run: 2, reason_code: "not_confirmed" }],
+  },
+  images: { original_url: "https://x/o.jpg", result_url: null, raw_url: null },
+  decisions: [],
+};
+
+test("getReview 200 normaliserer svaret og ignorerer ukjente handlinger", async () => {
+  const calls = captureFetch(200, REVIEW_BODY);
+  const r = await api.getReview({ jobId: "j 1", getToken });
+  assert.equal(calls[0].url, "http://api.test/v1/jobs/j%201/review");
+  assert.equal(r.kind, "ok");
+  if (r.kind !== "ok") return;
+  assert.deepEqual(r.review.allowedActions, ["reject"]);
+  assert.deepEqual(r.review.reasonCodes, ["analysis_uncertain", "brand_new_code"]);
+  assert.deepEqual(r.review.lights.rejected[0], {
+    id: "L3", type: "candle", location: "vindu", reasonCode: "not_confirmed",
+  });
+  assert.equal(r.review.lights.approved[0].reasonCode, null);
+  assert.deepEqual(r.review.imageType.runValues, ["interior", "exterior_facade"]);
+  assert.equal(r.review.images.originalUrl, "https://x/o.jpg");
+});
+
+test("normalizeReview krasjer ikke paa tomt eller oedelagt svar", () => {
+  for (const raw of [null, {}, [], "x", { lights: "x", images: 3, fireplace: [], decisions: [1, null] }]) {
+    const r = api.normalizeReview(raw, "j1");
+    assert.equal(r.jobId, "j1");
+    assert.equal(r.status, "unknown");
+    assert.deepEqual(r.allowedActions, []);
+    assert.deepEqual(r.lights, { approved: [], unstable: [], rejected: [] });
+    assert.equal(r.fireplace.present, false);
+  }
+});
+
+test("getReview 404, 503 og 500", async () => {
+  captureFetch(404, { detail: "job not found" });
+  assert.deepEqual(await api.getReview({ jobId: "j1", getToken }), { kind: "not_found" });
+  captureFetch(503, { detail: "decisions not available" });
+  assert.deepEqual(await api.getReview({ jobId: "j1", getToken }), { kind: "unavailable" });
+  captureFetch(500, {});
+  assert.deepEqual(await api.getReview({ jobId: "j1", getToken }), { kind: "error", httpStatus: 500 });
+});
+
+test("parseDecisionResponse: 200, 202, 409, 422, 404 og annet", () => {
+  assert.deepEqual(api.parseDecisionResponse(200, { job_id: "j1", status: "succeeded" }), {
+    kind: "updated", status: "succeeded",
+  });
+  assert.deepEqual(api.parseDecisionResponse(202, { status: "running", status_url: "/v1/jobs/j1" }), {
+    kind: "poll", status: "running",
+  });
+  assert.deepEqual(
+    api.parseDecisionResponse(409, { detail: { code: "status_changed", status: "succeeded" } }),
+    { kind: "status_changed", status: "succeeded" }
+  );
+  assert.deepEqual(
+    api.parseDecisionResponse(409, { detail: { code: "action_not_allowed", status: "needs_review" } }),
+    { kind: "blocked", code: "action_not_allowed", fields: [] }
+  );
+  assert.deepEqual(
+    api.parseDecisionResponse(422, { detail: { code: "invalid_decision", fields: ["reason"] } }),
+    { kind: "blocked", code: "invalid_decision", fields: ["reason"] }
+  );
+  // Uten detail-innpakning godtas ogsaa.
+  assert.deepEqual(api.parseDecisionResponse(422, { code: "invalid_decision", fields: ["action"] }), {
+    kind: "blocked", code: "invalid_decision", fields: ["action"],
+  });
+  assert.deepEqual(api.parseDecisionResponse(404, { detail: "job not found" }), { kind: "not_found" });
+  assert.deepEqual(api.parseDecisionResponse(500, null), { kind: "error", httpStatus: 500 });
+  assert.deepEqual(api.parseDecisionResponse(409, "tekst"), { kind: "blocked", code: null, fields: [] });
+});
+
+test("postDecision sender JSON-body og tolker svaret", async () => {
+  const calls = captureFetch(200, { job_id: "j1", status: "failed", code: "rejected_by_reviewer", reason: "x" });
+  const r = await api.postDecision({
+    jobId: "j1",
+    decision: { action: "reject", reason: "x" },
+    getToken,
+  });
+  assert.deepEqual(r, { kind: "updated", status: "failed" });
+  assert.equal(calls[0].url, "http://api.test/v1/jobs/j1/decision");
+  assert.equal(calls[0].init?.method, "POST");
+  assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { action: "reject", reason: "x" });
+  const headers = calls[0].init?.headers as Record<string, string>;
+  assert.equal(headers.Authorization, "Bearer tok");
+  assert.equal(headers["Content-Type"], "application/json");
+});
+
+test("postDecision 401 proever en gang til med ferskt token", async () => {
+  let n = 0;
+  const skips: unknown[] = [];
+  globalThis.fetch = (async () => {
+    n += 1;
+    return new Response(JSON.stringify(n === 1 ? {} : { status: "succeeded" }), {
+      status: n === 1 ? 401 : 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+  const r = await api.postDecision({
+    jobId: "j1",
+    decision: { action: "approve" },
+    getToken: async (o?: { skipCache?: boolean }) => {
+      skips.push(o?.skipCache);
+      return "tok";
+    },
+  });
+  assert.equal(n, 2);
+  assert.deepEqual(skips, [undefined, true]);
+  assert.deepEqual(r, { kind: "updated", status: "succeeded" });
+});

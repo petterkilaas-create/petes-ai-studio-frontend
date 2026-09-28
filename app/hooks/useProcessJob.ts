@@ -45,6 +45,10 @@ export interface UseProcessJobResult {
   review: Review | null;
   /** Ved ukjent status: raa status og HTTP-kode, ellers null. */
   unknownDetail: string | null;
+  /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
+  reviewerReason: string | null;
+  /** Async-jobbens id (for lenken til /godkjenning), ellers null. */
+  jobId: string | null;
   /** True mens vi laster opp eller poller. */
   isProcessing: boolean;
   run: (file: File, service: string, params?: ProcessParams) => Promise<void>;
@@ -157,6 +161,8 @@ export function useProcessJob(): UseProcessJobResult {
     rejection: job.rejection,
     review: job.review,
     unknownDetail: job.unknownDetail,
+    reviewerReason: job.reviewerReason,
+    jobId,
     isProcessing: isProcessingStatus(status),
     run,
     resubmitForced,

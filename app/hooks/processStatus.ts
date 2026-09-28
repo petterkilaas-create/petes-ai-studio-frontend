@@ -11,6 +11,7 @@ export type ProcessStatus =
   | "done"
   | "awaiting_approval"
   | "needs_review"
+  | "rejected_by_reviewer"
   | "unknown"
   | "failed";
 
@@ -31,6 +32,7 @@ export function deriveProcessStatus(input: {
     case "done":
     case "awaiting_approval":
     case "needs_review":
+    case "rejected_by_reviewer":
     case "unknown":
       return jobStatus;
     default:

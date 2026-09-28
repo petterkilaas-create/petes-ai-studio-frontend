@@ -1,6 +1,8 @@
 "use client";
 
 import type { ProcessStatus } from "../hooks/useProcessJob";
+import { t } from "../lib/i18n";
+import { useLocale } from "../lib/i18n/useLocale";
 
 /**
  * Liten status-indikator (Idle/Uploading/Running/Done/Failed, pluss
@@ -14,6 +16,8 @@ const LABELS: Record<ProcessStatus, string> = {
   done: "Done",
   awaiting_approval: "Til kontroll",
   needs_review: "Til gjennomgang",
+  // Ny tekst (2d-1) gaar via ordlista; se label under.
+  rejected_by_reviewer: "Avvist av deg",
   unknown: "Ukjent status",
   failed: "Failed",
 };
@@ -25,8 +29,13 @@ export interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, error }: StatusBadgeProps) {
+  const locale = useLocale();
   const label =
-    status === "failed" && error ? `Failed: ${error}` : LABELS[status];
+    status === "failed" && error
+      ? `Failed: ${error}`
+      : status === "rejected_by_reviewer"
+        ? t(locale, "status.rejectedByYou")
+        : LABELS[status];
 
   return (
     <div className="text-right border border-white/10 px-4 py-2 rounded-xl bg-white/5">

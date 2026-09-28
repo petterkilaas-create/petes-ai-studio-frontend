@@ -11,6 +11,7 @@ export type JobStatus =
   | "done"
   | "awaiting_approval"
   | "needs_review"
+  | "rejected_by_reviewer"
   | "unknown"
   | "failed";
 
@@ -20,6 +21,8 @@ export interface TerminalJobState {
   error: string | null;
   rejection: Rejection | null;
   review: Review | null;
+  /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
+  reviewerReason: string | null;
   /** Raa status + HTTP-kode ved ukjent status, for liten debug-tekst. */
   unknownDetail: string | null;
 }
@@ -38,6 +41,7 @@ export function terminalState(
     error: null,
     rejection: null,
     review: null,
+    reviewerReason: null,
     unknownDetail: null,
   };
   switch (result.kind) {
@@ -49,6 +53,8 @@ export function terminalState(
       return { ...base, status: "awaiting_approval", imageUrl: result.resultUrl };
     case "needs_review":
       return { ...base, status: "needs_review", review: result.review };
+    case "rejected_by_reviewer":
+      return { ...base, status: "rejected_by_reviewer", reviewerReason: result.reason };
     case "unknown":
       return {
         ...base,

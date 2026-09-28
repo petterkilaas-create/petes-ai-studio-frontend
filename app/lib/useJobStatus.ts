@@ -26,6 +26,8 @@ export interface UseJobStatusResult {
   review: Review | null;
   /** Ved ukjent status: raa status og HTTP-kode, ellers null. */
   unknownDetail: string | null;
+  /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
+  reviewerReason: string | null;
 }
 
 const POLL_INTERVAL_MS = 2000;
@@ -45,6 +47,7 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
   const [rejection, setRejection] = useState<Rejection | null>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [unknownDetail, setUnknownDetail] = useState<string | null>(null);
+  const [reviewerReason, setReviewerReason] = useState<string | null>(null);
 
   const objectUrlRef = useRef<string | null>(null);
 
@@ -56,6 +59,7 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
       setRejection(null);
       setReview(null);
       setUnknownDetail(null);
+      setReviewerReason(null);
       return;
     }
 
@@ -69,6 +73,7 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
     setRejection(null);
     setReview(null);
     setUnknownDetail(null);
+    setReviewerReason(null);
 
     // setTimeout-basert scheduling (ikke setInterval) slik at neste poll
     // kan utsettes per svar: backend-styrt via Retry-After paa 202, eller
@@ -101,6 +106,7 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
           setRejection(next.rejection);
           setReview(next.review);
           setUnknownDetail(next.unknownDetail);
+          setReviewerReason(next.reviewerReason);
           setStatus(next.status);
           return;
         }
@@ -138,5 +144,5 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
     };
   }, [jobId, getToken]);
 
-  return { status, imageUrl, error, rejection, review, unknownDetail };
+  return { status, imageUrl, error, rejection, review, unknownDetail, reviewerReason };
 }
