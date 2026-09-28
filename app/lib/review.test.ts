@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   buildDecision,
   decisionControls,
+  FIREPLACE_OPTIONS,
+  fireplaceAnswerKey,
   outcome,
   reasonLength,
   reasonTooLong,
@@ -58,6 +60,18 @@ test("buildDecision: begrunnelse bare ved reject, peissvar bare ved continue", (
   assert.deepEqual(buildDecision("reject", "   ", null), { action: "reject" });
   assert.deepEqual(buildDecision("continue", "tekst", "no"), { action: "continue", fireplace_fire: "no" });
   assert.deepEqual(buildDecision("continue", "", null), { action: "continue" });
+});
+
+test("peisvalgene sender fortsatt yes og no (2d-2d)", () => {
+  assert.deepEqual(FIREPLACE_OPTIONS, [
+    { value: "yes", key: "action.fireplaceLit" },
+    { value: "no", key: "action.fireplaceNotLit" },
+  ]);
+  for (const { value } of FIREPLACE_OPTIONS) {
+    assert.deepEqual(buildDecision("continue", "", value), { action: "continue", fireplace_fire: value });
+  }
+  assert.equal(fireplaceAnswerKey("yes"), "action.fireplaceLit");
+  assert.equal(fireplaceAnswerKey("no"), "action.fireplaceNotLit");
 });
 
 test("begrunnelsen telles i tegn etter trimming, grense 500", () => {

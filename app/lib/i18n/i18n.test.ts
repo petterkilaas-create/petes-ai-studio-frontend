@@ -69,6 +69,21 @@ test("peistekstene er ulike, og spoersmaalet staar bare i kontrollen (avvik 11)"
   assert.equal(codeText("en", "reasonCode", "fireplace_present"), "The analysis found a fireplace.");
 });
 
+test("peisknappene heter Tent/Ikke tent, med linja om slukking (2d-2d)", () => {
+  assert.equal(t("nb", "action.fireplaceLit"), "Tent");
+  assert.equal(t("nb", "action.fireplaceNotLit"), "Ikke tent");
+  assert.equal(t("en", "action.fireplaceLit"), "Lit");
+  assert.equal(t("en", "action.fireplaceNotLit"), "Not lit");
+  assert.equal(
+    t("nb", "action.fireplaceNotLitHint"),
+    "Velger du «Ikke tent», slukkes ilden hvis den brenner i originalen."
+  );
+  assert.equal(
+    t("en", "action.fireplaceNotLitHint"),
+    'If you choose "Not lit", a fire burning in the original will be put out.'
+  );
+});
+
 test("Rett-tekstene fra prompten (2d-2b)", () => {
   assert.equal(
     t("nb", "correct.confirmExists"),

@@ -18,6 +18,8 @@ import { useLocale } from "../../lib/i18n/useLocale";
 import {
   buildDecision,
   decisionControls,
+  FIREPLACE_OPTIONS,
+  fireplaceAnswerKey,
   outcome,
   reasonLength,
   reasonTooLong,
@@ -83,6 +85,43 @@ function ImageBox({ url, alt, locale }: { url: string | null; alt: string; local
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={url} alt={alt} className="w-full h-auto rounded-xl border border-slate-800" />
+  );
+}
+
+/**
+ * Peisspoersmaalet med Tent/Ikke tent (2d-2d). Brukes baade for «Send
+ * videre» og i Rett-modus. Linja under knappene sier at «Ikke tent» slukker
+ * ild i originalen; den staar utenfor knappene saa de holder seg korte paa mobil.
+ */
+function FireplaceChoice({
+  answer,
+  onChange,
+  disabled,
+  locale,
+}: {
+  answer: FireplaceAnswer;
+  onChange: (answer: "yes" | "no") => void;
+  disabled: boolean;
+  locale: Locale;
+}) {
+  return (
+    <div>
+      <p className="text-sm text-white font-bold mb-2">{t(locale, "action.fireplaceQuestion")}</p>
+      <div className="flex gap-2" role="group">
+        {FIREPLACE_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            disabled={disabled}
+            aria-pressed={answer === option.value}
+            className={answer === option.value ? BTN_PRIMARY : BTN_SECONDARY}
+          >
+            {t(locale, option.key)}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-slate-400 mt-2">{t(locale, "action.fireplaceNotLitHint")}</p>
+    </div>
   );
 }
 
@@ -548,24 +587,12 @@ export default function GodkjenningPage({
                     ) : (
                       <>
                         {controls.fireplaceQuestion && (
-                          <div>
-                            <p className="text-sm text-white font-bold mb-2">
-                              {t(locale, "action.fireplaceQuestion")}
-                            </p>
-                            <div className="flex gap-2" role="group">
-                              {(["yes", "no"] as const).map((a) => (
-                                <button
-                                  key={a}
-                                  onClick={() => setAnswer(a)}
-                                  disabled={locked}
-                                  aria-pressed={answer === a}
-                                  className={answer === a ? BTN_PRIMARY : BTN_SECONDARY}
-                                >
-                                  {t(locale, a === "yes" ? "action.yes" : "action.no")}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
+                          <FireplaceChoice
+                            answer={answer}
+                            onChange={setAnswer}
+                            disabled={locked}
+                            locale={locale}
+                          />
                         )}
 
                         {controls.none ? (
@@ -721,7 +748,7 @@ export default function GodkjenningPage({
                       {(review.fireplace.answer === "yes" || review.fireplace.answer === "no") && (
                         <p className="text-xs text-slate-400">
                           {t(locale, "review.fireplaceAnswered", {
-                            answer: t(locale, review.fireplace.answer === "yes" ? "action.yes" : "action.no"),
+                            answer: t(locale, fireplaceAnswerKey(review.fireplace.answer)),
                           })}
                         </p>
                       )}
@@ -755,24 +782,12 @@ export default function GodkjenningPage({
                     {isEditing && (
                       <div className="flex flex-col gap-4 border-t border-slate-800 pt-4">
                         {fireplaceShown && (
-                          <div>
-                            <p className="text-sm text-white font-bold mb-2">
-                              {t(locale, "action.fireplaceQuestion")}
-                            </p>
-                            <div className="flex gap-2" role="group">
-                              {(["yes", "no"] as const).map((a) => (
-                                <button
-                                  key={a}
-                                  onClick={() => setCorrectAnswer(a)}
-                                  disabled={locked}
-                                  aria-pressed={correctAnswer === a}
-                                  className={correctAnswer === a ? BTN_PRIMARY : BTN_SECONDARY}
-                                >
-                                  {t(locale, a === "yes" ? "action.yes" : "action.no")}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
+                          <FireplaceChoice
+                            answer={correctAnswer}
+                            onChange={setCorrectAnswer}
+                            disabled={locked}
+                            locale={locale}
+                          />
                         )}
 
                         {confirmNeeded && (
