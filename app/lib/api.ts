@@ -566,6 +566,11 @@ export interface RunValue {
 export interface JobReviewDetail {
   jobId: string;
   status: string;
+  /**
+   * `ai_jobs.version` slik backend leste raden (TG-NEW-130). Sendes uendret
+   * tilbake som `expected_version`; null naar backend ikke sender feltet.
+   */
+  version: number | null;
   /** gate_review | fireplace_answer_missing | null */
   code: string | null;
   reasonCodes: string[];
@@ -653,6 +658,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
   return {
     jobId: stringOrNull(r.job_id) ?? jobId,
     status: stringOrNull(r.status) ?? "unknown",
+    version: typeof r.version === "number" && Number.isInteger(r.version) && r.version >= 0 ? r.version : null,
     code: stringOrNull(r.code),
     reasonCodes: stringList(r.reason_codes),
     flagCodes: stringList(r.flag_codes),
@@ -753,6 +759,8 @@ export interface DecisionRequest {
   fireplace_fire?: "yes" | "no";
   /** Bare ved correct (2d-2a). */
   overrides?: CorrectionOverrides;
+  /** `version` fra review-svaret siden viser (TG-NEW-130); utelatt uten version. */
+  expected_version?: number;
 }
 
 /**
@@ -760,7 +768,8 @@ export interface DecisionRequest {
  * - updated (200): avgjort, hent review paa nytt.
  * - poll (202): jobben kjoerer (continue); poll til awaiting_approval eller
  *   sluttstatus, hent saa review paa nytt.
- * - status_changed (409): noen andre har avgjort; last paa nytt og vis melding.
+ * - status_changed (409): noen andre har avgjort, eller siden viser en eldre
+ *   versjon (TG-NEW-130); last paa nytt og vis melding.
  * - blocked (409 action_not_allowed/original_missing/correction_limit,
  *   422 invalid_decision med eventuell override_code): vis melding.
  * - unavailable (503): archive_failed eller backend uten database; trygt aa

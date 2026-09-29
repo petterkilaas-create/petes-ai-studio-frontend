@@ -101,15 +101,19 @@ export function previousFireplaceAnswer(fireplace: JobReviewDetail["fireplace"])
   return fireplace.answer === "yes" || fireplace.answer === "no" ? fireplace.answer : null;
 }
 
-/** Body for «Lag nytt bilde». Peissvaret er bare med naar spoersmaalet vises. */
+/**
+ * Body for «Lag nytt bilde». Peissvaret er bare med naar spoersmaalet vises.
+ * `expected_version` er versjonen i review-svaret (TG-NEW-130), utelatt uten version.
+ */
 export function buildCorrection(
-  lights: Lights,
+  review: Pick<JobReviewDetail, "lights" | "version">,
   toggles: Toggles,
   fireplaceShown: boolean,
   answer: FireplaceAnswer
 ): DecisionRequest {
-  const body: DecisionRequest = { action: "correct", overrides: buildOverrides(lights, toggles) };
+  const body: DecisionRequest = { action: "correct", overrides: buildOverrides(review.lights, toggles) };
   if (fireplaceShown && answer !== null) body.fireplace_fire = answer;
+  if (review.version !== null) body.expected_version = review.version;
   return body;
 }
 

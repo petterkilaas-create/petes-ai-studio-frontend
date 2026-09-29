@@ -43,6 +43,7 @@ import {
   setToggle,
   type Toggles,
 } from "../../lib/correction";
+import { runDecision } from "../../lib/decide";
 import { duskFacts, type ReviewDusk } from "../../lib/dusk";
 
 /**
@@ -318,6 +319,8 @@ export default function GodkjenningPage({
   }, [jobId, getToken]);
 
   useEffect(() => {
+    // setLoad kjoerer foerst etter await i fetchReview, ikke synkront i effekten.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchReview();
   }, [fetchReview]);
 
@@ -325,6 +328,8 @@ export default function GodkjenningPage({
   // vi ikke paa nytt: activePollId er den samme, saa useJobStatus starter ikke igjen.
   const pollDone = activePollId !== null && job.status !== "idle" && job.status !== "pending";
   useEffect(() => {
+    // Som over: setState skjer etter await i fetchReview.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (pollDone) void fetchReview();
   }, [pollDone, fetchReview]);
 
@@ -336,54 +341,53 @@ export default function GodkjenningPage({
   const polling = activePollId !== null && !pollDone;
   const locked = busy || blocked || polling;
 
-  const decide = async (action: DecisionAction) => {
-    if (locked || inFlight.current) return;
-    inFlight.current = true;
-    setBusy(true);
-    setMessage(null);
-    try {
-      const out = await postDecision({
-        jobId,
-        decision: buildDecision(action, reasonText, answer),
-        getToken,
-      });
-      switch (out.kind) {
-        case "updated":
-          setRejectOpen(false);
-          setReasonText("");
-          await fetchReview();
-          break;
-        case "poll":
-          setRejectOpen(false);
-          setPollJobId(jobId);
-          break;
-        case "status_changed":
-          setRejectOpen(false);
-          setMessage({ key: "decision.statusChanged" });
-          await fetchReview();
-          break;
-        case "blocked":
-          setMessage({ group: "decisionError", code: out.code });
-          // 409: ingen ny handling. 422 (ugyldig body, f.eks. begrunnelsen)
-          // kan rettes av megleren, saa knappene blir staaende.
-          if (out.code !== "invalid_decision") setBlocked(true);
-          break;
-        case "not_found":
-          setLoad({ kind: "not_found" });
-          break;
-        case "unavailable":
-          setMessage({ group: "decisionError", code: out.code });
-          break;
-        case "error":
-          setMessage({ key: "decision.error" });
-          break;
-      }
-    } catch {
-      setMessage({ key: "decision.error" });
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
+  const decide = (action: DecisionAction) => {
+    if (locked || load.kind !== "ok") return;
+    const review = load.review;
+    void runDecision({
+      inFlight,
+      send: () =>
+        postDecision({ jobId, decision: buildDecision(action, reasonText, answer, review), getToken }),
+      // Etter 200 og 409 status_changed (ny versjon, TG-NEW-130).
+      refetch: fetchReview,
+      onStart: () => {
+        setBusy(true);
+        setMessage(null);
+      },
+      onError: () => setMessage({ key: "decision.error" }),
+      onSettled: () => setBusy(false),
+      handle: (out) => {
+        switch (out.kind) {
+          case "updated":
+            setRejectOpen(false);
+            setReasonText("");
+            break;
+          case "poll":
+            setRejectOpen(false);
+            setPollJobId(jobId);
+            break;
+          case "status_changed":
+            setRejectOpen(false);
+            setMessage({ key: "decision.statusChanged" });
+            break;
+          case "blocked":
+            setMessage({ group: "decisionError", code: out.code });
+            // 409: ingen ny handling. 422 (ugyldig body, f.eks. begrunnelsen)
+            // kan rettes av megleren, saa knappene blir staaende.
+            if (out.code !== "invalid_decision") setBlocked(true);
+            break;
+          case "not_found":
+            setLoad({ kind: "not_found" });
+            break;
+          case "unavailable":
+            setMessage({ group: "decisionError", code: out.code });
+            break;
+          case "error":
+            setMessage({ key: "decision.error" });
+            break;
+        }
+      },
+    });
   };
 
   const startCorrection = () => {
@@ -402,53 +406,60 @@ export default function GodkjenningPage({
     setConfirmed(false);
   };
 
-  const submitCorrection = async () => {
-    if (load.kind !== "ok" || locked || inFlight.current) return;
+  const submitCorrection = () => {
+    if (load.kind !== "ok" || locked) return;
     const review = load.review;
-    inFlight.current = true;
-    setBusy(true);
-    setMessage(null);
-    try {
-      const body = buildCorrection(
-        review.lights,
-        toggles,
-        correctionFireplaceShown(review.fireplace),
-        correctAnswer
-      );
-      const result = correctionResult(await postDecision({ jobId, decision: body, getToken }));
-      switch (result.kind) {
-        case "poll":
-          cancelCorrection();
-          setPollJobId(jobId);
-          break;
-        case "reload":
-          cancelCorrection();
-          setMessage(result.message);
-          await fetchReview();
-          break;
-        case "limit":
-          cancelCorrection();
-          setLimitReached(true);
-          setMessage(result.message);
-          break;
-        case "blocked":
-          setMessage(result.message);
-          setBlocked(true);
-          break;
-        case "retry":
-          // 422 og 503: valgene staar, saa brukeren kan proeve igjen.
-          setMessage(result.message);
-          break;
-        case "not_found":
-          setLoad({ kind: "not_found" });
-          break;
-      }
-    } catch {
-      setMessage({ key: "decision.error" });
-    } finally {
-      inFlight.current = false;
-      setBusy(false);
-    }
+    void runDecision({
+      inFlight,
+      send: () =>
+        postDecision({
+          jobId,
+          decision: buildCorrection(
+            review,
+            toggles,
+            correctionFireplaceShown(review.fireplace),
+            correctAnswer
+          ),
+          getToken,
+        }),
+      // Etter 200 og 409 status_changed (ny versjon, TG-NEW-130).
+      refetch: fetchReview,
+      onStart: () => {
+        setBusy(true);
+        setMessage(null);
+      },
+      onError: () => setMessage({ key: "decision.error" }),
+      onSettled: () => setBusy(false),
+      handle: (out) => {
+        const result = correctionResult(out);
+        switch (result.kind) {
+          case "poll":
+            cancelCorrection();
+            setPollJobId(jobId);
+            break;
+          case "reload":
+            cancelCorrection();
+            setMessage(result.message);
+            break;
+          case "limit":
+            cancelCorrection();
+            setLimitReached(true);
+            setMessage(result.message);
+            break;
+          case "blocked":
+            setMessage(result.message);
+            setBlocked(true);
+            break;
+          case "retry":
+            // 422 og 503: valgene staar, saa brukeren kan proeve igjen.
+            setMessage(result.message);
+            break;
+          case "not_found":
+            setLoad({ kind: "not_found" });
+            break;
+        }
+      },
+    });
   };
 
   const messageText =
@@ -515,7 +526,7 @@ export default function GodkjenningPage({
             const canCorrect = correction.show && !limitReached && done === null;
             const isEditing = editing && canCorrect;
             const fireplaceShown = correctionFireplaceShown(review.fireplace);
-            const correctionBody = buildCorrection(review.lights, toggles, fireplaceShown, correctAnswer);
+            const correctionBody = buildCorrection(review, toggles, fireplaceShown, correctAnswer);
             const overrides = correctionBody.overrides ?? { promote: [], disable: [], add: [] };
             const confirmNeeded = needsConfirmation(overrides);
             const submitEnabled = canSubmitCorrection({

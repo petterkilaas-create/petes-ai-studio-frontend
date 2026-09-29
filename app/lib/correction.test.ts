@@ -44,7 +44,7 @@ test("startverdier fra state: paa for approved/promoted, av for disabled/candida
 
 test("body: ingen endring gir tomme lister (V-3, nytt forsoek)", () => {
   const l = lights();
-  assert.deepEqual(buildCorrection(l, initialToggles(l), false, null), {
+  assert.deepEqual(buildCorrection({ lights: l, version: null }, initialToggles(l), false, null), {
     action: "correct",
     overrides: { promote: [], disable: [], add: [] },
   });
@@ -55,7 +55,7 @@ test("body: to kandidater slaas paa (B08)", () => {
   let t = initialToggles(l);
   t = setToggle(t, l.unstable[0], true, true);
   t = setToggle(t, l.rejected[0], true, true);
-  assert.deepEqual(buildCorrection(l, t, false, null), {
+  assert.deepEqual(buildCorrection({ lights: l, version: null }, t, false, null), {
     action: "correct",
     overrides: { promote: [{ run: 2, id: "L3" }, { run: 1, id: "L4" }], disable: [], add: [] },
   });
@@ -73,10 +73,10 @@ test("body: begge deler, og peissvar bare naar spoersmaalet vises", () => {
   t = setToggle(t, l.approved[0], false, false);
   t = setToggle(t, l.rejected[0], true, true);
   const expected = { promote: [{ run: 1, id: "L4" }], disable: ["L1"], add: [] };
-  assert.deepEqual(buildCorrection(l, t, true, "no"), {
+  assert.deepEqual(buildCorrection({ lights: l, version: null }, t, true, "no"), {
     action: "correct", overrides: expected, fireplace_fire: "no",
   });
-  assert.deepEqual(buildCorrection(l, t, false, "no"), { action: "correct", overrides: expected });
+  assert.deepEqual(buildCorrection({ lights: l, version: null }, t, false, "no"), { action: "correct", overrides: expected });
 });
 
 test("body: hele avviket fra analysen sendes, ogsaa fra forrige runde", () => {
