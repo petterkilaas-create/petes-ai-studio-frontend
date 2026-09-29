@@ -11,6 +11,8 @@ import { UnknownStatusPanel } from "../components/UnknownStatusPanel";
 import { ApprovalNotice } from "../components/ApprovalNotice";
 import { ReviewerRejectedPanel } from "../components/ReviewerRejectedPanel";
 import { OpenReviewLink } from "../components/OpenReviewLink";
+import { DuskChoicePicker } from "../components/DuskChoicePicker";
+import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "../lib/dusk";
 import { t } from "../lib/i18n";
 import { useLocale } from "../lib/i18n/useLocale";
 
@@ -160,6 +162,8 @@ export default function ExpressPage() {
   // kontrakt som scene-transform-debug.
   const [sceneType, setSceneType] = useState<SceneType>("auto");
   const [forceSceneType, setForceSceneType] = useState(false);
+  // Skumringsvalg (2f-b): tidspunkt og himmel, alltid et gyldig par.
+  const [dusk, setDusk] = useState<DuskChoice>(DEFAULT_DUSK);
 
   const locale = useLocale();
   const preview = useImagePreview();
@@ -174,6 +178,8 @@ export default function ExpressPage() {
   const isProcessing = job.isProcessing;
   const showSceneControls =
     selectedTool?.kind === "scene" && selectedTool.sceneGate !== false;
+  const showDuskControls =
+    selectedTool !== null && isDuskOrder(selectedTool.service, selectedTool.presetId);
   const runDisabled = !selectedTool || !preview.file || isProcessing;
 
   const selectTool = (toolId: string) => {
@@ -182,6 +188,7 @@ export default function ExpressPage() {
     // Nullstill scene-kontroller og resultat ved bytte av verktoy.
     setSceneType("auto");
     setForceSceneType(false);
+    setDusk(DEFAULT_DUSK);
     job.reset();
   };
 
@@ -205,6 +212,8 @@ export default function ExpressPage() {
         ...(showSceneControls
           ? { scene_type: sceneType, force_scene_type: forceSceneType }
           : {}),
+        // Skumring: alltid begge feltene; andre kort: ingen (2f-b).
+        ...duskParams(selectedTool.service, selectedTool.presetId, dusk),
       });
     } else {
       // Simple tjenester: service alene, backend-defaults (som i prod).
@@ -217,6 +226,7 @@ export default function ExpressPage() {
     job.reset();
     setSceneType("auto");
     setForceSceneType(false);
+    setDusk(DEFAULT_DUSK);
   };
 
   const handleForceExterior = () => {
@@ -377,6 +387,15 @@ export default function ExpressPage() {
                   </span>
                 </label>
               </div>
+            )}
+
+            {showDuskControls && (
+              <DuskChoicePicker
+                value={dusk}
+                onChange={setDusk}
+                disabled={isProcessing}
+                locale={locale}
+              />
             )}
 
             <div className="flex gap-3">

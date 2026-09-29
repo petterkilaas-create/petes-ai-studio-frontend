@@ -43,6 +43,7 @@ import {
   setToggle,
   type Toggles,
 } from "../../lib/correction";
+import { duskFacts, type ReviewDusk } from "../../lib/dusk";
 
 /**
  * Godkjenningssiden (2d-1): megleren avgjoer egne jobber i «Til kontroll»
@@ -244,6 +245,29 @@ function RunValueLine({
           })}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Skumringsvalgene (2f-b, valg A): egen undertittel, saa de ikke blandes med
+ * analysens himmel-linje. Himmelen vises ikke som valg naar den ikke ble
+ * brukt (sky_applied false). Uten dusk fra backend vises ingenting.
+ */
+function DuskFactsBlock({ dusk, locale }: { dusk: ReviewDusk | null; locale: Locale }) {
+  const facts = duskFacts(dusk);
+  if (facts === null) return null;
+  return (
+    <div>
+      <p className={LABEL}>{t(locale, "review.duskTitle")}</p>
+      <p className="text-xs text-slate-400">{t(locale, "dusk.time")}</p>
+      <p className="text-sm text-white mb-2">{codeText(locale, "duskTime", facts.time)}</p>
+      <p className="text-xs text-slate-400">{t(locale, "dusk.sky")}</p>
+      <p className="text-sm text-white">
+        {facts.sky.kind === "not_applied"
+          ? t(locale, "review.duskSkyNotApplied")
+          : codeText(locale, "duskSky", facts.sky.code)}
+      </p>
     </div>
   );
 }
@@ -724,6 +748,7 @@ export default function GodkjenningPage({
                         </ul>
                       </div>
                     )}
+                    <DuskFactsBlock dusk={review.dusk} locale={locale} />
                     <RunValueLine
                       label={t(locale, "review.imageType")}
                       value={review.imageType}

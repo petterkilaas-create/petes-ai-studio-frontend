@@ -1,3 +1,6 @@
+// Bare typer: api.ts har ingen runtime-importer (testes med node --test).
+import type { DuskSky, DuskTime, ReviewDusk } from "./dusk";
+
 const apiBase = process.env.NEXT_PUBLIC_API_BASE;
 if (!apiBase) {
   throw new Error(
@@ -26,6 +29,9 @@ export interface ProcessParams {
   preset_id?: string;
   model?: "flux2_flex" | "gpt_image_2" | "nano_banana_pro";
   quality_tier?: string;
+  /** Skumringsvalg (2f-b): sendes alltid begge for skumring, ellers aldri. */
+  dusk_time?: DuskTime;
+  dusk_sky?: DuskSky;
 }
 
 /**
@@ -570,6 +576,8 @@ export interface JobReviewDetail {
   fireplace: { present: boolean; disagreement: boolean; answer: string | null };
   imageType: RunValue;
   skyVisibility: RunValue;
+  /** Skumringsvalgene (2f-a); null naar backend ikke sender feltet. */
+  dusk: ReviewDusk | null;
   lights: { approved: ReviewLight[]; unstable: ReviewLight[]; rejected: ReviewLight[] };
   correction: ReviewCorrection;
   images: {
@@ -616,6 +624,15 @@ function toLight(raw: Record<string, unknown>): ReviewLight {
   };
 }
 
+function toDusk(raw: unknown): ReviewDusk | null {
+  if (!isRecord(raw)) return null;
+  return {
+    time: stringOrNull(raw.time),
+    sky: stringOrNull(raw.sky),
+    skyApplied: typeof raw.sky_applied === "boolean" ? raw.sky_applied : null,
+  };
+}
+
 function toRunValue(raw: unknown): RunValue {
   const r = isRecord(raw) ? raw : {};
   return { value: stringOrNull(r.value), runValues: stringList(r.run_values) };
@@ -650,6 +667,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     },
     imageType: toRunValue(r.image_type),
     skyVisibility: toRunValue(r.sky_visibility),
+    dusk: toDusk(r.dusk),
     lights: {
       approved: records(lights.approved).map(toLight),
       unstable: records(lights.unstable).map(toLight),

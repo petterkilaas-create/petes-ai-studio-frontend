@@ -25,7 +25,9 @@ export type CodeGroup =
   | "imageType"
   | "skyVisibility"
   | "decisionError"
-  | "overrideCode";
+  | "overrideCode"
+  | "duskTime"
+  | "duskSky";
 
 const nbUi = {
   "review.title": "Kontroll av bildet",
@@ -104,6 +106,12 @@ const nbUi = {
   "job.failed": "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
   "job.rejected": "Bildet passet ikke for dette verktøyet og ble ikke laget.",
   "history.loadError": "Noe gikk galt. Prøv igjen om litt.",
+  "dusk.title": "Stemning",
+  "dusk.time": "Tidspunkt",
+  "dusk.sky": "Himmel",
+  "dusk.hint": "Himmelen brukes bare hvis bildet har synlig himmel.",
+  "review.duskTitle": "Valgt stemning",
+  "review.duskSkyNotApplied": "ikke brukt (ingen himmel i bildet)",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -176,6 +184,17 @@ const nb: Dictionary = {
     overrideCode: {
       too_many_lights: "For mange lyskilder er slått på. Slå av noen og prøv igjen.",
     },
+    duskTime: {
+      early: "Tidlig skumring",
+      late: "Sen kveld",
+    },
+    duskSky: {
+      clear: "Klar blå time",
+      light_clouds: "Lette skyer",
+      pink_clouds: "Rosa skyer",
+      dark: "Mørk kveldshimmel",
+      starry: "Stjernehimmel",
+    },
   },
   generic: {
     reviewCode: "Bildet må sjekkes.",
@@ -187,6 +206,8 @@ const nb: Dictionary = {
     skyVisibility: "Ukjent",
     decisionError: "Noe gikk galt. Prøv igjen senere.",
     overrideCode: "Valgene kunne ikke brukes. Last siden på nytt og prøv igjen.",
+    duskTime: "Ukjent tidspunkt",
+    duskSky: "Ukjent himmel",
   },
 };
 
@@ -268,6 +289,12 @@ const en: Dictionary = {
     "job.failed": "The image could not be processed. Please try again, or contact us.",
     "job.rejected": "The image did not suit this tool and was not created.",
     "history.loadError": "Something went wrong. Please try again shortly.",
+    "dusk.title": "Mood",
+    "dusk.time": "Time",
+    "dusk.sky": "Sky",
+    "dusk.hint": "The sky is only used if the image has visible sky.",
+    "review.duskTitle": "Chosen mood",
+    "review.duskSkyNotApplied": "not used (no sky in the image)",
   },
   codes: {
     reviewCode: {
@@ -328,6 +355,17 @@ const en: Dictionary = {
     overrideCode: {
       too_many_lights: "Too many light sources are turned on. Turn some off and try again.",
     },
+    duskTime: {
+      early: "Early dusk",
+      late: "Late evening",
+    },
+    duskSky: {
+      clear: "Clear blue hour",
+      light_clouds: "Light clouds",
+      pink_clouds: "Pink clouds",
+      dark: "Dark evening sky",
+      starry: "Starry sky",
+    },
   },
   generic: {
     reviewCode: "The image needs a check.",
@@ -339,6 +377,8 @@ const en: Dictionary = {
     skyVisibility: "Unknown",
     decisionError: "Something went wrong. Please try again later.",
     overrideCode: "Your choices could not be used. Reload the page and try again.",
+    duskTime: "Unknown time",
+    duskSky: "Unknown sky",
   },
 };
 
