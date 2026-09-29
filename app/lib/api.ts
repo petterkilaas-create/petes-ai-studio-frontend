@@ -858,6 +858,18 @@ export async function getReview(opts: {
   return { kind: "error", httpStatus: res.status };
 }
 
+/**
+ * GET /v1/jobs/{id}/download (merking PR 4): det godkjente bildet med
+ * AI-ikonet. Svaret tolkes av downloadMarkedImage i download.ts.
+ */
+export async function fetchJobDownload(opts: {
+  jobId: string;
+  getToken: GetToken;
+}): Promise<Response> {
+  const url = `${API_BASE}/v1/jobs/${encodeURIComponent(opts.jobId)}/download`;
+  return authedFetch(url, { method: "GET" }, opts.getToken);
+}
+
 export interface DecisionRequest {
   action: DecisionAction;
   /** Valgfri, bare ved reject. Hoeyst REASON_MAX_LEN tegn. */

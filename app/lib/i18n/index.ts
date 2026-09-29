@@ -134,6 +134,12 @@ const nbUi = {
   "action.copy": "Kopier",
   "review.copied": "Kopiert",
   "review.copyFailed": "Kunne ikke kopiere. Marker teksten og kopier den selv.",
+  "review.download": "Last ned merket bilde",
+  "review.downloading": "Laster ned …",
+  "review.downloadFailed": "Kunne ikke laste ned bildet. Prøv igjen om litt.",
+  "review.downloadNotAllowed": "Bare eieren av jobben kan laste ned bildet.",
+  "review.downloadBroken": "Bildet kunne ikke hentes. Kontakt oss.",
+  "history.open": "Åpne",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -357,6 +363,12 @@ const en: Dictionary = {
     "action.copy": "Copy",
     "review.copied": "Copied",
     "review.copyFailed": "Could not copy. Select the text and copy it yourself.",
+    "review.download": "Download labelled image",
+    "review.downloading": "Downloading …",
+    "review.downloadFailed": "Could not download the image. Please try again shortly.",
+    "review.downloadNotAllowed": "Only the job owner can download the image.",
+    "review.downloadBroken": "The image could not be retrieved. Please contact us.",
+    "history.open": "Open",
   },
   codes: {
     reviewCode: {
