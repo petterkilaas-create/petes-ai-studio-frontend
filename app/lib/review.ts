@@ -71,17 +71,20 @@ export function reasonTooLong(text: string): boolean {
 
 /**
  * Body for POST …/decision. Begrunnelse sendes bare ved reject og bare
- * naar den ikke er tom; peissvar bare ved continue.
+ * naar den ikke er tom; peissvar bare ved continue. `expected_version` er
+ * versjonen i review-svaret siden viser (TG-NEW-130), utelatt uten version.
  */
 export function buildDecision(
   action: DecisionAction,
   reason: string,
-  answer: FireplaceAnswer
+  answer: FireplaceAnswer,
+  review: Pick<JobReviewDetail, "version">
 ): DecisionRequest {
   const body: DecisionRequest = { action };
   const trimmed = reason.trim();
   if (action === "reject" && trimmed !== "") body.reason = trimmed;
   if (action === "continue" && answer !== null) body.fireplace_fire = answer;
+  if (review.version !== null) body.expected_version = review.version;
   return body;
 }
 

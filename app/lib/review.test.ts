@@ -14,6 +14,9 @@ import {
 } from "./review.ts";
 import type { DecisionAction } from "./api.ts";
 
+// Review-svar uten version (backend fra foer TG-NEW-130).
+const NO_VERSION = { version: null };
+
 function review(allowed: DecisionAction[], present = false, disagreement = false) {
   return { allowedActions: allowed, fireplace: { present, disagreement, answer: null } };
 }
@@ -55,11 +58,11 @@ test("ingen handlinger gir none", () => {
 });
 
 test("buildDecision: begrunnelse bare ved reject, peissvar bare ved continue", () => {
-  assert.deepEqual(buildDecision("approve", "tekst", "yes"), { action: "approve" });
-  assert.deepEqual(buildDecision("reject", "  Feil vindu  ", "yes"), { action: "reject", reason: "Feil vindu" });
-  assert.deepEqual(buildDecision("reject", "   ", null), { action: "reject" });
-  assert.deepEqual(buildDecision("continue", "tekst", "no"), { action: "continue", fireplace_fire: "no" });
-  assert.deepEqual(buildDecision("continue", "", null), { action: "continue" });
+  assert.deepEqual(buildDecision("approve", "tekst", "yes", NO_VERSION), { action: "approve" });
+  assert.deepEqual(buildDecision("reject", "  Feil vindu  ", "yes", NO_VERSION), { action: "reject", reason: "Feil vindu" });
+  assert.deepEqual(buildDecision("reject", "   ", null, NO_VERSION), { action: "reject" });
+  assert.deepEqual(buildDecision("continue", "tekst", "no", NO_VERSION), { action: "continue", fireplace_fire: "no" });
+  assert.deepEqual(buildDecision("continue", "", null, NO_VERSION), { action: "continue" });
 });
 
 test("peisvalgene sender fortsatt yes og no (2d-2d)", () => {
@@ -68,7 +71,7 @@ test("peisvalgene sender fortsatt yes og no (2d-2d)", () => {
     { value: "no", key: "action.fireplaceNotLit" },
   ]);
   for (const { value } of FIREPLACE_OPTIONS) {
-    assert.deepEqual(buildDecision("continue", "", value), { action: "continue", fireplace_fire: value });
+    assert.deepEqual(buildDecision("continue", "", value, NO_VERSION), { action: "continue", fireplace_fire: value });
   }
   assert.equal(fireplaceAnswerKey("yes"), "action.fireplaceLit");
   assert.equal(fireplaceAnswerKey("no"), "action.fireplaceNotLit");

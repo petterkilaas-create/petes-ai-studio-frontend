@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 // foer dynamisk import. fetch mockes; ingen nettverkskall.
 process.env.NEXT_PUBLIC_API_BASE = "http://api.test";
 const api = await import("./api.ts");
+const { buildDecision } = await import("./review.ts");
+const { buildCorrection, initialToggles } = await import("./correction.ts");
 
 const realFetch = globalThis.fetch;
 const getToken = async () => "tok";
@@ -201,7 +203,51 @@ test("normalizeReview krasjer ikke paa tomt eller oedelagt svar", () => {
     assert.deepEqual(r.allowedActions, []);
     assert.deepEqual(r.lights, { approved: [], unstable: [], rejected: [] });
     assert.equal(r.fireplace.present, false);
+    assert.equal(r.version, null);
   }
+});
+
+// ---- TG-NEW-130: version fra review, expected_version i decision ---------
+
+test("normalizeReview: version er et heltall >= 0, ellers null", () => {
+  assert.equal(api.normalizeReview({ ...REVIEW_BODY, version: 1 }, "j1").version, 1);
+  assert.equal(api.normalizeReview({ ...REVIEW_BODY, version: 0 }, "j1").version, 0);
+  assert.equal(api.normalizeReview(REVIEW_BODY, "j1").version, null);
+  for (const bad of ["0", -1, 1.5, true, null, Number.NaN]) {
+    assert.equal(api.normalizeReview({ ...REVIEW_BODY, version: bad }, "j1").version, null, String(bad));
+  }
+});
+
+/** Henter review, sender alle fire handlingene og gir body-ene slik fetch fikk dem. */
+async function sentBodies(reviewBody: unknown): Promise<Record<string, unknown>[]> {
+  captureFetch(200, reviewBody);
+  const r = await api.getReview({ jobId: "j1", getToken });
+  assert.equal(r.kind, "ok");
+  if (r.kind !== "ok") return [];
+  const review = r.review;
+  const calls = captureFetch(200, { job_id: "j1", status: "succeeded" });
+  const decisions = [
+    buildDecision("approve", "", null, review),
+    buildDecision("reject", "Feil vindu", null, review),
+    buildDecision("continue", "", "yes", review),
+    buildCorrection(review, initialToggles(review.lights), false, null),
+  ];
+  for (const decision of decisions) await api.postDecision({ jobId: "j1", decision, getToken });
+  return calls.map((c) => JSON.parse(String(c.init?.body)));
+}
+
+test("alle fire handlingene sender expected_version lik review.version", async () => {
+  for (const version of [7, 0]) {
+    const bodies = await sentBodies({ ...REVIEW_BODY, version });
+    assert.deepEqual(bodies.map((b) => b.action), ["approve", "reject", "continue", "correct"]);
+    for (const body of bodies) assert.equal(body.expected_version, version, String(body.action));
+  }
+});
+
+test("uten version i review sendes ikke expected_version, og ingenting krasjer", async () => {
+  const bodies = await sentBodies(REVIEW_BODY);
+  assert.equal(bodies.length, 4);
+  for (const body of bodies) assert.equal("expected_version" in body, false, String(body.action));
 });
 
 test("getReview 404, 503 og 500", async () => {
