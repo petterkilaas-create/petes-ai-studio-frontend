@@ -3,8 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
 import {
+  getCapabilities,
   listJobs,
   WAITING_FOR_ME_STATUSES,
+  type Capabilities,
+  type JobScope,
   type JobSummary,
   type JobSummaryStatus,
 } from "../lib/api";
@@ -16,9 +19,19 @@ import {
   statusVariant,
 } from "./statusVariants";
 import { OpenReviewLink } from "../components/OpenReviewLink";
-import { messageText, t } from "../lib/i18n";
+import { messageText, t, type UiKey } from "../lib/i18n";
 import { jobMessage } from "../lib/jobMessage";
 import { useLocale } from "../lib/i18n/useLocale";
+import {
+  effectiveScope,
+  emptyWaitingKey,
+  ownerBadge,
+  rejectedLabelKey,
+  scopeFallback,
+  showScopeToggle,
+  subtitleKey,
+  waitingLabelKey,
+} from "../lib/roles";
 
 // Sidestoerrelse pr. henting. before-cursoren pagineres paa createdAt fra
 // siste rad (backendens kontrakt) — se loadMore().
@@ -58,14 +71,15 @@ function formatDate(iso: string | null): string {
 // StatusBadge (som tar en annen status-union — se PR-notat).
 function StatusPill({
   status,
-  rejectedByYou = false,
+  rejectedKey = null,
 }: {
   status: JobSummaryStatus;
-  rejectedByYou?: boolean;
+  /** Avvist ved godkjenning: «av deg» eller «av eieren» (TG-NEW-127). */
+  rejectedKey?: UiKey | null;
 }) {
   const locale = useLocale();
-  const v = rejectedByYou
-    ? { label: t(locale, "history.rejectedByYou"), cls: REVIEWER_REJECTED_CLS, pulse: false }
+  const v = rejectedKey !== null
+    ? { label: t(locale, rejectedKey), cls: REVIEWER_REJECTED_CLS, pulse: false }
     : statusVariant(status);
   return (
     <span
@@ -82,6 +96,7 @@ function JobCard({ job }: { job: JobSummary }) {
   const locale = useLocale();
   const hasThumb = hasResultImage(job.status) && job.resultUrl !== null;
   const rejectedByYou = isRejectedByReviewer(job);
+  const other = ownerBadge(job);
   // Kort melding ut fra status og `code`, aldri raa `error` (TG-NEW-121).
   // Avvist av megleren: merket sier det, og begrunnelsen vises under.
   const message = rejectedByYou ? null : jobMessage(job.status, job.code);
@@ -109,11 +124,28 @@ function JobCard({ job }: { job: JobSummary }) {
           <span className="font-bold text-white text-sm truncate">
             {serviceLabel(job.service)}
           </span>
-          <StatusPill status={job.status} rejectedByYou={rejectedByYou} />
+          <StatusPill
+            status={job.status}
+            rejectedKey={rejectedByYou ? rejectedLabelKey(job) : null}
+          />
         </div>
         <span className="text-slate-400 text-xs">
           {formatDate(job.createdAt)}
         </span>
+        {other && (
+          // TG-NEW-127: en annen brukers jobb (scope=all). Bare de 6 siste
+          // tegnene i eierens id; navn og e-post krever Clerk secret key.
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-indigo-500/40 bg-indigo-900/30 text-indigo-200">
+              {t(locale, "history.notYours")}
+            </span>
+            {other.ownerShort && (
+              <span>
+                {t(locale, "history.owner")}: <span className="font-mono">{other.ownerShort}</span>
+              </span>
+            )}
+          </div>
+        )}
         {message && (
           <p className="text-xs text-slate-300 bg-[#0B1120] border border-slate-800 rounded-xl p-3 leading-relaxed">
             {messageText(locale, message)}
@@ -142,6 +174,23 @@ export default function HistoryPage() {
   const [waitingOnly, setWaitingOnly] = useState(false);
   const statuses = waitingOnly ? WAITING_FOR_ME_STATUSES : undefined;
 
+  // TG-NEW-127: bryteren «Mine jobber / Alle brukere» vises bare naar /me gir
+  // view_all. Uten svar (null) eller ved feil: ingen bryter, egne jobber.
+  const [caps, setCaps] = useState<Capabilities | null>(null);
+  const [chosenScope, setChosenScope] = useState<JobScope>("mine");
+  const scope = effectiveScope(caps, chosenScope);
+  const [scopeNotice, setScopeNotice] = useState<UiKey | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCapabilities({ getToken }).then((c) => {
+      if (!cancelled) setCaps(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken]);
+
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -156,17 +205,26 @@ export default function HistoryPage() {
     setLoading(true);
     setError(null);
     try {
-      const rows = await listJobs({ limit: PAGE_SIZE, statuses, getToken });
+      const rows = await listJobs({ limit: PAGE_SIZE, statuses, scope, getToken });
       if (request !== requestRef.current) return;
       setJobs(rows);
       setHasMore(rows.length === PAGE_SIZE);
     } catch (err) {
       if (request !== requestRef.current) return;
+      // 403/422 for scope: tilbake til «Mine jobber» med en kort melding.
+      // Bytte av scope gir ny loadInitial via avhengighetene under.
+      const fallback = scopeFallback(err);
+      if (fallback !== null) {
+        if (fallback.hideToggle) setCaps({ viewAll: false });
+        setChosenScope("mine");
+        setScopeNotice(fallback.messageKey);
+        return;
+      }
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       if (request === requestRef.current) setLoading(false);
     }
-  }, [getToken, statuses]);
+  }, [getToken, statuses, scope]);
 
   useEffect(() => {
     void loadInitial();
@@ -192,6 +250,7 @@ export default function HistoryPage() {
         before: cursorRow.createdAt as string,
         beforeId: cursorRow.jobId,
         statuses,
+        scope,
         getToken,
       });
       // Filteret er byttet mens vi hentet: forkast siden.
@@ -209,7 +268,7 @@ export default function HistoryPage() {
     } finally {
       setLoadingMore(false);
     }
-  }, [jobs, getToken, statuses]);
+  }, [jobs, getToken, statuses, scope]);
 
   return (
     <div className="flex flex-col bg-[#0B1120] text-white min-h-screen font-sans">
@@ -220,10 +279,31 @@ export default function HistoryPage() {
               Historikk
             </h1>
             <p className="text-slate-400 text-sm">
-              Alle jobbene dine, nyeste først.
+              {t(locale, subtitleKey(scope))}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {showScopeToggle(caps) && (
+              <div className="flex gap-1" role="group">
+                {(["mine", "all"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      setChosenScope(s);
+                      setScopeNotice(null);
+                    }}
+                    aria-pressed={scope === s}
+                    className={`px-4 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120] ${
+                      scope === s
+                        ? "bg-slate-800 border-slate-500 text-white"
+                        : "border-slate-700 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {t(locale, s === "all" ? "history.scope.all" : "history.scope.mine")}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex gap-1" role="group">
               {([false, true] as const).map((waiting) => (
                 <button
@@ -236,7 +316,7 @@ export default function HistoryPage() {
                       : "border-slate-700 text-slate-400 hover:text-white"
                   }`}
                 >
-                  {t(locale, waiting ? "history.waitingForMe" : "history.all")}
+                  {t(locale, waiting ? waitingLabelKey(scope) : "history.all")}
                 </button>
               ))}
             </div>
@@ -249,6 +329,12 @@ export default function HistoryPage() {
             </button>
           </div>
         </div>
+
+        {scopeNotice && (
+          <p className="text-xs text-amber-200 bg-amber-900/30 border border-amber-500/40 rounded-xl p-3 mb-6" role="status">
+            {t(locale, scopeNotice)}
+          </p>
+        )}
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -275,7 +361,7 @@ export default function HistoryPage() {
         ) : jobs.length === 0 && waitingOnly ? (
           <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-16 text-center max-w-lg mx-auto">
             <p className="text-white font-bold text-lg">
-              {t(locale, "history.emptyWaiting")}
+              {t(locale, emptyWaitingKey(scope))}
             </p>
           </div>
         ) : jobs.length === 0 ? (

@@ -29,6 +29,7 @@ import {
   type FireplaceAnswer,
   type ImageVariant,
 } from "../../lib/review";
+import { isReadOnlyOther } from "../../lib/roles";
 import {
   buildCorrection,
   canSubmitCorrection,
@@ -545,8 +546,21 @@ export default function GodkjenningPage({
                   }
                 : null;
 
+            const readOnly = isReadOnlyOther(review);
+
             return (
               <>
+                {readOnly && (
+                  // TG-NEW-127: admin paa en annen brukers jobb. Knappene styres
+                  // fortsatt bare av allowed_actions, som da er tom.
+                  <p
+                    className="text-sm text-indigo-100 bg-indigo-900/30 border border-indigo-500/40 rounded-xl p-3"
+                    role="status"
+                  >
+                    {t(locale, "review.readOnlyOther")}
+                  </p>
+                )}
+
                 {/* Original og resultat: side om side paa skjerm, under hverandre paa mobil. */}
                 <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className={CARD}>
@@ -631,7 +645,10 @@ export default function GodkjenningPage({
                         )}
 
                         {controls.none ? (
-                          <p className="text-sm text-slate-400">{t(locale, "action.noneAllowed")}</p>
+                          // Linja om bare lesing sier det samme lenger opp.
+                          !readOnly && (
+                            <p className="text-sm text-slate-400">{t(locale, "action.noneAllowed")}</p>
+                          )
                         ) : (
                           <div className="flex flex-wrap gap-3">
                             {controls.approve && (
@@ -760,34 +777,38 @@ export default function GodkjenningPage({
                       </div>
                     )}
                     <DuskFactsBlock dusk={review.dusk} locale={locale} />
-                    <RunValueLine
-                      label={t(locale, "review.imageType")}
-                      value={review.imageType}
-                      group="imageType"
-                      locale={locale}
-                    />
-                    <RunValueLine
-                      label={t(locale, "review.sky")}
-                      value={review.skyVisibility}
-                      group="skyVisibility"
-                      locale={locale}
-                    />
-                    <div>
-                      <p className="text-xs text-slate-400">{t(locale, "review.fireplace")}</p>
-                      <p className="text-sm text-white">
-                        {review.fireplace.disagreement
-                          ? t(locale, "review.fireplaceDisagreement")
-                          : review.fireplace.present
-                            ? t(locale, "review.fireplacePresent")
-                            : t(locale, "review.fireplaceNone")}
-                      </p>
-                      {(review.fireplace.answer === "yes" || review.fireplace.answer === "no") && (
-                        <p className="text-xs text-slate-400">
-                          {t(locale, "review.fireplaceAnswered", {
-                            answer: t(locale, fireplaceAnswerKey(review.fireplace.answer)),
-                          })}
+                    {/* Analysen har egen undertittel, saa «Valgt stemning» bare gjelder valgene. */}
+                    <div className="flex flex-col gap-4">
+                      <p className={`${LABEL} mb-0`}>{t(locale, "review.analysisTitle")}</p>
+                      <RunValueLine
+                        label={t(locale, "review.imageType")}
+                        value={review.imageType}
+                        group="imageType"
+                        locale={locale}
+                      />
+                      <RunValueLine
+                        label={t(locale, "review.sky")}
+                        value={review.skyVisibility}
+                        group="skyVisibility"
+                        locale={locale}
+                      />
+                      <div>
+                        <p className="text-xs text-slate-400">{t(locale, "review.fireplace")}</p>
+                        <p className="text-sm text-white">
+                          {review.fireplace.disagreement
+                            ? t(locale, "review.fireplaceDisagreement")
+                            : review.fireplace.present
+                              ? t(locale, "review.fireplacePresent")
+                              : t(locale, "review.fireplaceNone")}
                         </p>
-                      )}
+                        {(review.fireplace.answer === "yes" || review.fireplace.answer === "no") && (
+                          <p className="text-xs text-slate-400">
+                            {t(locale, "review.fireplaceAnswered", {
+                              answer: t(locale, fireplaceAnswerKey(review.fireplace.answer)),
+                            })}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
 

@@ -364,6 +364,10 @@ interface JobSummaryWire {
   code?: string | null;
   /** 2d-1a: meglerens begrunnelse ved rejected_by_reviewer, ellers null. */
   reason?: string | null;
+  /** TG-NEW-127: false for en annen brukers jobb (scope=all). */
+  is_owner?: boolean;
+  /** TG-NEW-127: de 6 siste tegnene i eierens id, eller null. */
+  owner_short?: string | null;
 }
 
 /**
@@ -429,10 +433,43 @@ export interface JobSummary {
   code: string | null;
   /** Meglerens begrunnelse ved rejected_by_reviewer, ellers null. */
   reason: string | null;
+  /**
+   * TG-NEW-127: false bare naar backend sier `is_owner: false`. Mangler
+   * feltet (eldre backend), regnes jobben som egen.
+   */
+  isOwner: boolean;
+  /** De 6 siste tegnene i eierens id (for «Eier: …»), ellers null. */
+  ownerShort: string | null;
 }
 
 /** Statusene i filteret «Venter paa meg» (GET /v1/jobs?status=, 2d-1a). */
 export const WAITING_FOR_ME_STATUSES = ["awaiting_approval", "needs_review"] as const;
+
+/** Omfanget i listen (TG-NEW-127): egne jobber, eller alle (bare admin). */
+export type JobScope = "mine" | "all";
+
+/**
+ * Feilsvar fra GET /v1/jobs. `code` er `detail.code` fra backend, f.eks.
+ * scope_not_allowed (403) eller invalid_scope (422), ellers null.
+ */
+export class ListJobsError extends Error {
+  readonly httpStatus: number;
+  readonly code: string | null;
+
+  constructor(httpStatus: number, code: string | null) {
+    super(`listJobs failed (${httpStatus})${code ? `: ${code}` : ""}`);
+    this.name = "ListJobsError";
+    this.httpStatus = httpStatus;
+    this.code = code;
+  }
+}
+
+/** Koden i et feilsvar: FastAPI pakker den i {"detail": {...}}. */
+export function errorCode(body: unknown): string | null {
+  const outer = isRecord(body) ? body : {};
+  const inner = isRecord(outer.detail) ? outer.detail : outer;
+  return stringOrNull(inner.code);
+}
 
 /**
  * Henter den autentiserte brukerens jobb-historikk (nyeste foerst) fra
@@ -459,9 +496,11 @@ export async function listJobs(opts: {
   beforeId?: string;
   /** Statusfilter (2d-1a, hvitliste i backend), f.eks. WAITING_FOR_ME_STATUSES. */
   statuses?: readonly string[];
+  /** TG-NEW-127: "all" sender scope=all; "mine" eller utelatt sender ingenting. */
+  scope?: JobScope;
   getToken: GetToken;
 }): Promise<JobSummary[]> {
-  const { limit, before, beforeId, statuses, getToken } = opts;
+  const { limit, before, beforeId, statuses, scope, getToken } = opts;
 
   const params = new URLSearchParams();
   if (limit !== undefined) params.set("limit", String(limit));
@@ -470,6 +509,7 @@ export async function listJobs(opts: {
   if (statuses !== undefined && statuses.length > 0) {
     params.set("status", statuses.join(","));
   }
+  if (scope === "all") params.set("scope", "all");
   const qs = params.toString();
   const url = `${API_BASE}/v1/jobs${qs ? `?${qs}` : ""}`;
 
@@ -487,8 +527,7 @@ export async function listJobs(opts: {
   }
 
   if (res.status !== 200) {
-    const detail = await extractDetail(res);
-    throw new Error(`listJobs failed (${res.status}): ${detail}`);
+    throw new ListJobsError(res.status, errorCode(await readJson(res)));
   }
 
   const rows = (await res.json()) as JobSummaryWire[];
@@ -502,7 +541,45 @@ export async function listJobs(opts: {
     error: row.error,
     code: nonEmptyString(row.code),
     reason: nonEmptyString(row.reason),
+    isOwner: row.is_owner !== false,
+    ownerShort: nonEmptyString(row.owner_short),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Egenskaper for visningen (TG-NEW-127): GET /me
+// ---------------------------------------------------------------------------
+
+/** Hva brukeren kan se. Aldri selve rollen; serveren sjekker alt selv. */
+export interface Capabilities {
+  /** Vis bryteren «Mine jobber / Alle brukere». */
+  viewAll: boolean;
+}
+
+export const NO_CAPABILITIES: Capabilities = { viewAll: false };
+
+/**
+ * Leser `capabilities` fra GET /me. Mangler feltet eller noekkelen, eller er
+ * verdien ikke `true`, er svaret false. Ukjente noekler ignoreres.
+ */
+export function parseCapabilities(raw: unknown): Capabilities {
+  const r = isRecord(raw) ? raw : {};
+  const caps = isRecord(r.capabilities) ? r.capabilities : {};
+  return { viewAll: caps.view_all === true };
+}
+
+/**
+ * GET /me (paa roten, ikke under /v1). Feil gir NO_CAPABILITIES, aldri
+ * unntak: bryteren er bare visning, og siden skal virke uten den.
+ */
+export async function getCapabilities(opts: { getToken: GetToken }): Promise<Capabilities> {
+  try {
+    const res = await authedFetch(`${API_BASE}/me`, { method: "GET" }, opts.getToken);
+    if (res.status !== 200) return NO_CAPABILITIES;
+    return parseCapabilities(await readJson(res));
+  } catch {
+    return NO_CAPABILITIES;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -571,6 +648,11 @@ export interface JobReviewDetail {
    * tilbake som `expected_version`; null naar backend ikke sender feltet.
    */
   version: number | null;
+  /**
+   * TG-NEW-127: false naar brukeren ser en annen brukers jobb (bare lesing).
+   * Mangler feltet (eldre backend), regnes jobben som egen.
+   */
+  isOwner: boolean;
   /** gate_review | fireplace_answer_missing | null */
   code: string | null;
   reasonCodes: string[];
@@ -659,6 +741,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     jobId: stringOrNull(r.job_id) ?? jobId,
     status: stringOrNull(r.status) ?? "unknown",
     version: typeof r.version === "number" && Number.isInteger(r.version) && r.version >= 0 ? r.version : null,
+    isOwner: r.is_owner !== false,
     code: stringOrNull(r.code),
     reasonCodes: stringList(r.reason_codes),
     flagCodes: stringList(r.flag_codes),
