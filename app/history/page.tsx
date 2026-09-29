@@ -12,9 +12,9 @@ import {
   type JobSummaryStatus,
 } from "../lib/api";
 import {
-  canOpenReview,
   hasResultImage,
   isRejectedByReviewer,
+  openLinkKey,
   REVIEWER_REJECTED_CLS,
   statusVariant,
 } from "./statusVariants";
@@ -97,6 +97,7 @@ function JobCard({ job }: { job: JobSummary }) {
   const hasThumb = hasResultImage(job.status) && job.resultUrl !== null;
   const rejectedByYou = isRejectedByReviewer(job);
   const other = ownerBadge(job);
+  const openKey = openLinkKey(job);
   // Kort melding ut fra status og `code`, aldri raa `error` (TG-NEW-121).
   // Avvist av megleren: merket sier det, og begrunnelsen vises under.
   const message = rejectedByYou ? null : jobMessage(job.status, job.code);
@@ -156,9 +157,9 @@ function JobCard({ job }: { job: JobSummary }) {
             {t(locale, "review.reasonLabel")}: {job.reason}
           </p>
         )}
-        {canOpenReview(job.status) && (
+        {openKey && (
           <div>
-            <OpenReviewLink jobId={job.jobId} labelKey="history.openReview" />
+            <OpenReviewLink jobId={job.jobId} labelKey={openKey} />
           </div>
         )}
       </div>

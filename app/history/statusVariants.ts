@@ -1,4 +1,5 @@
-import type { JobSummaryStatus } from "../lib/api";
+import type { JobSummary, JobSummaryStatus } from "../lib/api";
+import type { UiKey } from "../lib/i18n";
 
 export interface StatusVariant {
   label: string;
@@ -74,4 +75,20 @@ export function isRejectedByReviewer(job: { status: string; code: string | null 
 /** Statuser der kortet lenker til godkjenningssiden («Åpne kontroll»). */
 export function canOpenReview(status: string): boolean {
   return status === "awaiting_approval" || status === "needs_review";
+}
+
+/**
+ * Lenken til godkjenningssiden paa et kort, eller null:
+ * - «Åpne kontroll» for awaiting_approval/needs_review (som foer).
+ * - «Åpne» for egne godkjente skumringsjobber (merking PR 4), der
+ *   «Last ned merket bilde» og «Tekst til annonsen» ligger. Andre tjenester
+ *   har ingen godkjenningsside (backend gir 404), og admin kan ikke laste
+ *   ned andres bilder.
+ */
+export function openLinkKey(job: Pick<JobSummary, "status" | "service" | "isOwner">): UiKey | null {
+  if (canOpenReview(job.status)) return "history.openReview";
+  if (job.status === "succeeded" && job.service === "scene_transform" && job.isOwner !== false) {
+    return "history.open";
+  }
+  return null;
 }

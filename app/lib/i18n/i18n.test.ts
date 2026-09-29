@@ -127,3 +127,19 @@ test("merketeksten: nb og en har noeklene og alle kodene fra kontrakten", () => 
   assert.equal(t("nb", "review.disclosureHelp"), "Lim den inn i annonsen sammen med bildet.");
   assert.equal(t("nb", "review.copyFailed"), "Kunne ikke kopiere. Marker teksten og kopier den selv.");
 });
+
+test("nedlastingen (merking PR 4): nb og en har noeklene", () => {
+  const keys = [
+    "review.download",
+    "review.downloading",
+    "review.downloadFailed",
+    "review.downloadNotAllowed",
+    "review.downloadBroken",
+    "history.open",
+  ] as const;
+  for (const locale of ["nb", "en"] as const) {
+    for (const key of keys) assert.ok(DICTIONARIES[locale].ui[key].trim().length > 0, `${locale} ${key}`);
+  }
+  assert.equal(t("nb", "review.download"), "Last ned merket bilde");
+  assert.equal(t("nb", "review.downloadBroken"), "Bildet kunne ikke hentes. Kontakt oss.");
+});
