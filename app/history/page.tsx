@@ -16,7 +16,8 @@ import {
   statusVariant,
 } from "./statusVariants";
 import { OpenReviewLink } from "../components/OpenReviewLink";
-import { t } from "../lib/i18n";
+import { messageText, t } from "../lib/i18n";
+import { jobMessage } from "../lib/jobMessage";
 import { useLocale } from "../lib/i18n/useLocale";
 
 // Sidestoerrelse pr. henting. before-cursoren pagineres paa createdAt fra
@@ -81,13 +82,9 @@ function JobCard({ job }: { job: JobSummary }) {
   const locale = useLocale();
   const hasThumb = hasResultImage(job.status) && job.resultUrl !== null;
   const rejectedByYou = isRejectedByReviewer(job);
-  // Avvist av megleren: vis begrunnelsen, aldri raa `error`.
-  const showError =
-    !rejectedByYou &&
-    (job.status === "failed" ||
-      job.status === "rejected" ||
-      job.status === "needs_review") &&
-    !!job.error;
+  // Kort melding ut fra status og `code`, aldri raa `error` (TG-NEW-121).
+  // Avvist av megleren: merket sier det, og begrunnelsen vises under.
+  const message = rejectedByYou ? null : jobMessage(job.status, job.code);
 
   return (
     <div className="flex flex-col bg-[#0f172a] border border-slate-800 rounded-3xl shadow-xl overflow-hidden">
@@ -117,9 +114,9 @@ function JobCard({ job }: { job: JobSummary }) {
         <span className="text-slate-400 text-xs">
           {formatDate(job.createdAt)}
         </span>
-        {showError && (
+        {message && (
           <p className="text-xs text-slate-300 bg-[#0B1120] border border-slate-800 rounded-xl p-3 leading-relaxed">
-            {job.error}
+            {messageText(locale, message)}
           </p>
         )}
         {rejectedByYou && job.reason && (
@@ -265,7 +262,9 @@ export default function HistoryPage() {
             <p className="text-red-400 font-bold text-sm mb-2 uppercase tracking-widest">
               Kunne ikke hente historikk
             </p>
-            <p className="text-slate-400 text-xs mb-6 break-words">{error}</p>
+            <p className="text-slate-400 text-xs mb-6 break-words">
+              {t(locale, "history.loadError")}
+            </p>
             <button
               onClick={() => void loadInitial()}
               className="px-6 py-3 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120]"
@@ -302,7 +301,7 @@ export default function HistoryPage() {
 
             {error && (
               <p className="text-center text-xs text-red-400 mb-6 break-words">
-                {error}
+                {t(locale, "history.loadError")}
               </p>
             )}
 

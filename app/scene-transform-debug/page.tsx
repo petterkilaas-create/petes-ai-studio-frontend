@@ -339,7 +339,7 @@ export default function SceneTransformDebugPage() {
           )}
 
           {job.status === "needs_review" && job.review && (
-            <ReviewPanel review={job.review} />
+            <ReviewPanel review={job.review} debug />
           )}
 
           {job.status === "unknown" && (

@@ -11,6 +11,8 @@ import { UnknownStatusPanel } from "../components/UnknownStatusPanel";
 import { ApprovalNotice } from "../components/ApprovalNotice";
 import { ReviewerRejectedPanel } from "../components/ReviewerRejectedPanel";
 import { OpenReviewLink } from "../components/OpenReviewLink";
+import { t } from "../lib/i18n";
+import { useLocale } from "../lib/i18n/useLocale";
 
 // "simple" = service alene (ingen params, backend-defaults gjelder).
 // "scene"  = scene_transform med preset_id + scene-type-gate (TG-NEW-58),
@@ -159,6 +161,7 @@ export default function ExpressPage() {
   const [sceneType, setSceneType] = useState<SceneType>("auto");
   const [forceSceneType, setForceSceneType] = useState(false);
 
+  const locale = useLocale();
   const preview = useImagePreview();
   const job = useProcessJob();
 
@@ -237,7 +240,8 @@ export default function ExpressPage() {
               transformations.
             </p>
           </div>
-          <StatusBadge status={job.status} error={job.error} />
+          {/* Uten error: den raa teksten skal ikke vises (TG-NEW-121). */}
+          <StatusBadge status={job.status} />
         </header>
 
         {/* --- STEP 1: VELG VERKTOY --- */}
@@ -400,8 +404,10 @@ export default function ExpressPage() {
               />
             )}
 
+            {/* Teknisk feil har ingen kode: alltid den generiske meldingen,
+                aldri job.error (TG-NEW-121). */}
             {job.status === "failed" && !job.rejection && (
-              <ErrorPanel message={job.error} />
+              <ErrorPanel message={t(locale, "job.failed")} />
             )}
 
             {job.status === "needs_review" && job.review && (
@@ -417,7 +423,7 @@ export default function ExpressPage() {
             )}
 
             {job.status === "unknown" && (
-              <UnknownStatusPanel detail={job.unknownDetail} />
+              <UnknownStatusPanel />
             )}
           </section>
         )}
