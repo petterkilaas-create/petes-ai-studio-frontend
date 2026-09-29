@@ -299,6 +299,19 @@ test("normalizeReview leser Rett-feltene (2d-2a)", () => {
   assert.equal(api.normalizeReview({ correction: { rounds_left: "1" } }, "j1").correction.roundsLeft, 0);
 });
 
+test("normalizeReview leser dusk (2f-a): true, false, null og uten feltet", () => {
+  const dusk = (raw: unknown) => api.normalizeReview({ dusk: raw }, "j1").dusk;
+  assert.deepEqual(dusk({ time: "late", sky: "starry", sky_applied: true }), {
+    time: "late", sky: "starry", skyApplied: true,
+  });
+  assert.equal(dusk({ time: "late", sky: "starry", sky_applied: false })?.skyApplied, false);
+  assert.equal(dusk({ time: "early", sky: "clear", sky_applied: null })?.skyApplied, null);
+  // Backend foer 2f-a: ingen dusk, og ingen krasj.
+  assert.equal(api.normalizeReview({}, "j1").dusk, null);
+  for (const raw of [null, "late", 42, ["late"]]) assert.equal(dusk(raw), null, String(raw));
+  assert.deepEqual(dusk({ time: 3, sky_applied: "yes" }), { time: null, sky: null, skyApplied: null });
+});
+
 test("postDecision sender JSON-body og tolker svaret", async () => {
   const calls = captureFetch(200, { job_id: "j1", status: "failed", code: "rejected_by_reviewer", reason: "x" });
   const r = await api.postDecision({
