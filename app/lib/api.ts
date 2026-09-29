@@ -1,5 +1,6 @@
 // Bare typer: api.ts har ingen runtime-importer (testes med node --test).
 import type { DuskSky, DuskTime, ReviewDusk } from "./dusk";
+import type { ReviewDisclosure } from "./disclosure";
 
 const apiBase = process.env.NEXT_PUBLIC_API_BASE;
 if (!apiBase) {
@@ -665,6 +666,8 @@ export interface JobReviewDetail {
   skyVisibility: RunValue;
   /** Skumringsvalgene (2f-a); null naar backend ikke sender feltet. */
   dusk: ReviewDusk | null;
+  /** Kodene til merketeksten (merking PR 1); null naar ikke skumring eller feltet mangler. */
+  disclosure: ReviewDisclosure | null;
   lights: { approved: ReviewLight[]; unstable: ReviewLight[]; rejected: ReviewLight[] };
   correction: ReviewCorrection;
   images: {
@@ -720,6 +723,26 @@ function toDusk(raw: unknown): ReviewDusk | null {
   };
 }
 
+/**
+ * `edited` leses strengt: er lista ikke en liste, eller har den noe som ikke
+ * er tekst, blir den null (ugyldig) i stedet for aa filtreres. Ellers kunne
+ * et ledd falle bort i stillhet.
+ */
+function toDisclosure(raw: unknown): ReviewDisclosure | null {
+  if (!isRecord(raw)) return null;
+  const edited = raw.edited;
+  return {
+    version: stringOrNull(raw.version),
+    base: stringOrNull(raw.base),
+    time: stringOrNull(raw.time),
+    scope: stringOrNull(raw.scope),
+    edited:
+      Array.isArray(edited) && edited.every((v): v is string => typeof v === "string") ? edited : null,
+    source: stringOrNull(raw.source),
+    status: stringOrNull(raw.status),
+  };
+}
+
 function toRunValue(raw: unknown): RunValue {
   const r = isRecord(raw) ? raw : {};
   return { value: stringOrNull(r.value), runValues: stringList(r.run_values) };
@@ -757,6 +780,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     imageType: toRunValue(r.image_type),
     skyVisibility: toRunValue(r.sky_visibility),
     dusk: toDusk(r.dusk),
+    disclosure: toDisclosure(r.disclosure),
     lights: {
       approved: records(lights.approved).map(toLight),
       unstable: records(lights.unstable).map(toLight),
