@@ -101,6 +101,9 @@ const nbUi = {
   "history.rejectedByYou": "Avvist av deg",
   "history.emptyWaiting": "Ingen jobber venter på deg.",
   "status.rejectedByYou": "Avvist av deg",
+  "job.failed": "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
+  "job.rejected": "Bildet passet ikke for dette verktøyet og ble ikke laget.",
+  "history.loadError": "Noe gikk galt. Prøv igjen om litt.",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -262,6 +265,9 @@ const en: Dictionary = {
     "history.rejectedByYou": "Rejected by you",
     "history.emptyWaiting": "No jobs are waiting for you.",
     "status.rejectedByYou": "Rejected by you",
+    "job.failed": "The image could not be processed. Please try again, or contact us.",
+    "job.rejected": "The image did not suit this tool and was not created.",
+    "history.loadError": "Something went wrong. Please try again shortly.",
   },
   codes: {
     reviewCode: {
@@ -376,4 +382,12 @@ export function codeText(locale: Locale, group: CodeGroup, code: unknown): strin
     return table[code];
   }
   return dict.generic[group];
+}
+
+/** Melding som enten er en ui-noekkel eller en kode fra backend. */
+export type Message = { key: UiKey } | { group: CodeGroup; code: unknown };
+
+/** Tekst for en Message: ui-noekkel via t, kode via codeText (aldri krasj). */
+export function messageText(locale: Locale, message: Message): string {
+  return "key" in message ? t(locale, message.key) : codeText(locale, message.group, message.code);
 }
