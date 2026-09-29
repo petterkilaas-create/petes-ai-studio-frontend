@@ -130,7 +130,7 @@ export function variantOptions(images: JobReviewDetail["images"]): ImageVariant[
  * eller null naar den venter (awaiting_approval/needs_review).
  */
 export function outcome(
-  review: Pick<JobReviewDetail, "status" | "decisions">
+  review: Pick<JobReviewDetail, "status" | "decisions"> & Partial<Pick<JobReviewDetail, "isOwner">>
 ): { key: UiKey; reason: string | null } | null {
   switch (review.status) {
     case "awaiting_approval":
@@ -144,7 +144,9 @@ export function outcome(
     case "failed": {
       const last = review.decisions.at(-1);
       if (last?.action === "reject") {
-        return { key: "review.statusRejected", reason: last.reason };
+        // TG-NEW-127: paa en annen brukers jobb var det eieren som avviste.
+        const key = review.isOwner === false ? "review.statusRejectedByOwner" : "review.statusRejected";
+        return { key, reason: last.reason };
       }
       return { key: "review.statusOther", reason: null };
     }

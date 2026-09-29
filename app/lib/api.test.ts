@@ -155,6 +155,91 @@ test("listJobs uten filter sender ikke status", async () => {
   assert.equal(new URL(calls[0].url).searchParams.has("status"), false);
 });
 
+test("listJobs: scope=all bare for «all», og statusfilteret foelger med", async () => {
+  const calls = captureFetch(200, []);
+  await api.listJobs({ scope: "all", statuses: api.WAITING_FOR_ME_STATUSES, getToken });
+  await api.listJobs({ scope: "mine", statuses: api.WAITING_FOR_ME_STATUSES, getToken });
+  await api.listJobs({ getToken });
+  const params = calls.map((c) => new URL(c.url).searchParams);
+  assert.equal(params[0].get("scope"), "all");
+  assert.equal(params[0].get("status"), "awaiting_approval,needs_review");
+  // «Mine jobber» sender ingenting (taaler eldre backend).
+  assert.equal(params[1].has("scope"), false);
+  assert.equal(params[1].get("status"), "awaiting_approval,needs_review");
+  assert.equal(params[2].has("scope"), false);
+});
+
+test("listJobs leser is_owner og owner_short; uten feltene er raden egen", async () => {
+  const row = { service: "scene_transform", status: "succeeded", created_at: null, result_url: null, variant_urls: null, error: null };
+  captureFetch(200, [
+    { ...row, job_id: "a", is_owner: false, owner_short: "abc123" },
+    { ...row, job_id: "b", is_owner: true, owner_short: "zzz999" },
+    { ...row, job_id: "c" },
+    { ...row, job_id: "d", is_owner: false, owner_short: null },
+  ]);
+  const rows = await api.listJobs({ scope: "all", getToken });
+  assert.deepEqual(
+    rows.map((r) => [r.isOwner, r.ownerShort]),
+    [[false, "abc123"], [true, "zzz999"], [true, null], [false, null]]
+  );
+});
+
+test("listJobs 403 og 422 kaster ListJobsError med koden", async () => {
+  mockFetch(403, { detail: { code: "scope_not_allowed" } });
+  await assert.rejects(api.listJobs({ scope: "all", getToken }), (err: unknown) => {
+    assert.ok(err instanceof api.ListJobsError);
+    assert.equal(err.httpStatus, 403);
+    assert.equal(err.code, "scope_not_allowed");
+    return true;
+  });
+  mockFetch(422, { detail: { code: "invalid_scope", allowed: ["mine", "all"] } });
+  await assert.rejects(api.listJobs({ scope: "all", getToken }), (err: unknown) => {
+    assert.ok(err instanceof api.ListJobsError);
+    assert.equal(err.httpStatus, 422);
+    assert.equal(err.code, "invalid_scope");
+    return true;
+  });
+  // Svar uten JSON-body: kode null, ingen krasj.
+  globalThis.fetch = (async () => new Response("boom", { status: 500 })) as typeof fetch;
+  await assert.rejects(api.listJobs({ getToken }), (err: unknown) => {
+    assert.ok(err instanceof api.ListJobsError);
+    assert.equal(err.code, null);
+    return true;
+  });
+});
+
+test("parseCapabilities: bare view_all === true gir viewAll", () => {
+  assert.deepEqual(api.parseCapabilities({ capabilities: { view_all: true, future: 1 } }), { viewAll: true });
+  for (const raw of [
+    { capabilities: { view_all: false } },
+    { capabilities: { view_all: "true" } },
+    { capabilities: {} },
+    { user_id: "u" },
+    null,
+    "x",
+  ]) {
+    assert.deepEqual(api.parseCapabilities(raw), { viewAll: false }, JSON.stringify(raw));
+  }
+});
+
+test("getCapabilities kaller /me, og feil gir viewAll false", async () => {
+  const calls = captureFetch(200, { user_id: "u", capabilities: { view_all: true } });
+  assert.deepEqual(await api.getCapabilities({ getToken }), { viewAll: true });
+  assert.equal(new URL(calls[0].url).pathname, "/me");
+  mockFetch(500, { detail: "x" });
+  assert.deepEqual(await api.getCapabilities({ getToken }), { viewAll: false });
+  globalThis.fetch = (async () => {
+    throw new Error("nett");
+  }) as typeof fetch;
+  assert.deepEqual(await api.getCapabilities({ getToken }), { viewAll: false });
+});
+
+test("normalizeReview: is_owner false gir bare lesing; mangler feltet, er jobben egen", () => {
+  assert.equal(api.normalizeReview({ is_owner: false }, "j").isOwner, false);
+  assert.equal(api.normalizeReview({ is_owner: true }, "j").isOwner, true);
+  assert.equal(api.normalizeReview({}, "j").isOwner, true);
+});
+
 const REVIEW_BODY = {
   job_id: "j1",
   status: "needs_review",
