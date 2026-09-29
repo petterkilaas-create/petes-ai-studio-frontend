@@ -481,3 +481,30 @@ test("postDecision 401 proever en gang til med ferskt token", async () => {
   assert.deepEqual(skips, [undefined, true]);
   assert.deepEqual(r, { kind: "updated", status: "succeeded" });
 });
+
+// ---- Merking PR 2: disclosure fra review --------------------------------
+
+test("normalizeReview beholder disclosure med alle felt, og taaler at den mangler", () => {
+  const disclosure = {
+    version: "1",
+    base: "evening_from_day",
+    time: "late",
+    scope: "interior",
+    edited: ["interior_lamps", "candles", "fireplace_fire"],
+    source: "recorded",
+    status: "ok",
+  };
+  assert.deepEqual(api.normalizeReview({ ...REVIEW_BODY, disclosure }, "j1").disclosure, disclosure);
+  assert.equal(api.normalizeReview(REVIEW_BODY, "j1").disclosure, null);
+  assert.equal(api.normalizeReview({ ...REVIEW_BODY, disclosure: null }, "j1").disclosure, null);
+  assert.deepEqual(api.normalizeReview({ disclosure: { edited: [] } }, "j1").disclosure, {
+    version: null, base: null, time: null, scope: null, edited: [], source: null, status: null,
+  });
+});
+
+test("normalizeReview: ugyldig edited blir null, aldri filtrert", () => {
+  for (const edited of [["sky", 3], "sky", null, undefined, [null]]) {
+    const r = api.normalizeReview({ disclosure: { base: "evening_from_day", edited, status: "ok" } }, "j1");
+    assert.equal(r.disclosure?.edited, null, JSON.stringify(edited));
+  }
+});

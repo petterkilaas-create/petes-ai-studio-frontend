@@ -27,7 +27,10 @@ export type CodeGroup =
   | "decisionError"
   | "overrideCode"
   | "duskTime"
-  | "duskSky";
+  | "duskSky"
+  | "disclosureBase"
+  | "disclosureTime"
+  | "disclosureEdited";
 
 const nbUi = {
   "review.title": "Kontroll av bildet",
@@ -125,6 +128,12 @@ const nbUi = {
   "history.owner": "Eier",
   "history.rejectedByOwner": "Avvist av eieren",
   "history.scopeFallback": "Du har ikke tilgang til alle brukeres jobber. Viser dine jobber.",
+  "review.disclosureTitle": "Tekst til annonsen",
+  "review.disclosureHelp": "Lim den inn i annonsen sammen med bildet.",
+  "review.disclosureMissing": "Merketeksten kunne ikke lages. Kontakt oss.",
+  "action.copy": "Kopier",
+  "review.copied": "Kopiert",
+  "review.copyFailed": "Kunne ikke kopiere. Marker teksten og kopier den selv.",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -208,6 +217,24 @@ const nb: Dictionary = {
       dark: "Mørk kveldshimmel",
       starry: "Stjernehimmel",
     },
+    // Merketeksten (merking PR 2). Settes sammen i app/lib/disclosure.ts,
+    // som aldri bruker den generiske teksten: ukjent kode gir ingen tekst.
+    disclosureBase: {
+      evening_from_day: "Kveldsbilde laget med AI fra dagsbilde.",
+    },
+    disclosureTime: {
+      early: "Tidspunkt: tidlig skumring.",
+      late: "Tidspunkt: sen kveld.",
+    },
+    disclosureEdited: {
+      sky: "himmel",
+      window_lights: "lys i vinduer",
+      neighbour_window_lights: "lys i nabohus",
+      exterior_lamps: "utelys",
+      interior_lamps: "lamper i rommet",
+      candles: "stearinlys",
+      fireplace_fire: "ild i peisen",
+    },
   },
   generic: {
     reviewCode: "Bildet må sjekkes.",
@@ -221,6 +248,9 @@ const nb: Dictionary = {
     overrideCode: "Valgene kunne ikke brukes. Last siden på nytt og prøv igjen.",
     duskTime: "Ukjent tidspunkt",
     duskSky: "Ukjent himmel",
+    disclosureBase: "Merketeksten kunne ikke lages.",
+    disclosureTime: "Merketeksten kunne ikke lages.",
+    disclosureEdited: "Merketeksten kunne ikke lages.",
   },
 };
 
@@ -321,6 +351,12 @@ const en: Dictionary = {
     "history.owner": "Owner",
     "history.rejectedByOwner": "Rejected by the owner",
     "history.scopeFallback": "You do not have access to all users' jobs. Showing your jobs.",
+    "review.disclosureTitle": "Text for the listing",
+    "review.disclosureHelp": "Paste it into the listing together with the image.",
+    "review.disclosureMissing": "The disclosure text could not be created. Please contact us.",
+    "action.copy": "Copy",
+    "review.copied": "Copied",
+    "review.copyFailed": "Could not copy. Select the text and copy it yourself.",
   },
   codes: {
     reviewCode: {
@@ -392,6 +428,22 @@ const en: Dictionary = {
       dark: "Dark evening sky",
       starry: "Starry sky",
     },
+    disclosureBase: {
+      evening_from_day: "Evening image created with AI from a daytime photo.",
+    },
+    disclosureTime: {
+      early: "Time of day: early dusk.",
+      late: "Time of day: late evening.",
+    },
+    disclosureEdited: {
+      sky: "sky",
+      window_lights: "lights in windows",
+      neighbour_window_lights: "lights in neighbouring houses",
+      exterior_lamps: "outdoor lights",
+      interior_lamps: "lamps in the room",
+      candles: "candles",
+      fireplace_fire: "fire in the fireplace",
+    },
   },
   generic: {
     reviewCode: "The image needs a check.",
@@ -405,6 +457,9 @@ const en: Dictionary = {
     overrideCode: "Your choices could not be used. Reload the page and try again.",
     duskTime: "Unknown time",
     duskSky: "Unknown sky",
+    disclosureBase: "The disclosure text could not be created.",
+    disclosureTime: "The disclosure text could not be created.",
+    disclosureEdited: "The disclosure text could not be created.",
   },
 };
 

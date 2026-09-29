@@ -98,3 +98,32 @@ test("Rett-tekstene fra prompten (2d-2b)", () => {
   assert.equal(t("nb", "review.lightPromoted"), "Slått på av deg");
   assert.equal(t("nb", "review.lightDisabled"), "Slått av av deg");
 });
+
+test("merketeksten: nb og en har noeklene og alle kodene fra kontrakten", () => {
+  const keys = [
+    "review.disclosureTitle",
+    "review.disclosureHelp",
+    "review.disclosureMissing",
+    "action.copy",
+    "review.copied",
+    "review.copyFailed",
+  ] as const;
+  const edited = [
+    "sky",
+    "window_lights",
+    "neighbour_window_lights",
+    "exterior_lamps",
+    "interior_lamps",
+    "candles",
+    "fireplace_fire",
+  ];
+  for (const locale of ["nb", "en"] as const) {
+    const dict = DICTIONARIES[locale];
+    for (const key of keys) assert.ok(dict.ui[key].trim().length > 0, `${locale} ${key}`);
+    assert.deepEqual(Object.keys(dict.codes.disclosureBase), ["evening_from_day"]);
+    assert.deepEqual(Object.keys(dict.codes.disclosureTime).sort(), ["early", "late"]);
+    assert.deepEqual(Object.keys(dict.codes.disclosureEdited), edited);
+  }
+  assert.equal(t("nb", "review.disclosureHelp"), "Lim den inn i annonsen sammen med bildet.");
+  assert.equal(t("nb", "review.copyFailed"), "Kunne ikke kopiere. Marker teksten og kopier den selv.");
+});
