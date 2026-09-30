@@ -7,9 +7,6 @@ import type { Rejection } from "../lib/api";
  * ErrorPanel. Viser den bruker-rettede meldingen (uten raatt rejected_*-
  * prefiks, som allerede er strippet i api.ts) og en "Fortsett som
  * eksterioer"-knapp.
- *
- * Tekster og visuelt moenster er kopiert uendret fra den live-verifiserte
- * referansen scene-transform-debug (alle tre verdikt-stier for TG-NEW-58).
  */
 export interface RejectionPanelProps {
   rejection: Rejection;

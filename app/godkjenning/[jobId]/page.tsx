@@ -420,7 +420,7 @@ export default function GodkjenningPage({
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
-  // Rett (2d-2b). Bryterne holdes paa key og nullstilles ved Avbryt.
+  // «Korriger bildet» (2d-2b). Bryterne holdes paa key og nullstilles ved Avbryt.
   const [editing, setEditing] = useState(false);
   const [toggles, setToggles] = useState<Toggles>({});
   const [correctAnswer, setCorrectAnswer] = useState<FireplaceAnswer>(null);

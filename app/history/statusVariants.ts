@@ -64,7 +64,7 @@ export function hasResultImage(status: string): boolean {
 /**
  * Miniatyren kortet viser (Lekkasjen L2): bare den merkede `thumbUrl`, og
  * bare for statuser med resultatbilde. null gir kortet uten bilde («Ingen
- * forhåndsvisning»), aldri resultUrl/variantUrls.
+ * forhåndsvisning»).
  */
 export function thumbSrc(job: Pick<JobSummary, "status" | "thumbUrl">): string | null {
   return hasResultImage(job.status) ? job.thumbUrl : null;

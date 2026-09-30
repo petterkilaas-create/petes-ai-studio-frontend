@@ -2,7 +2,7 @@
 
 /**
  * Roed feilvisning for generiske submit-/poll-feil og ValidationError.
- * Visuelt moenster trukket ut av express-v2 / scene-transform-debug.
+ * Visuelt moenster trukket ut av express-v2.
  *
  * Skilles bevisst fra RejectionPanel (gult): et scene-gate-avslag er
  * ikke en feil, og skal aldri vises som roed feil.

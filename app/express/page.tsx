@@ -28,8 +28,7 @@ export default function ExpressPage() {
   const [activeCategoryId, setActiveCategoryId] = useState<string>(CATEGORIES[0]?.id ?? "");
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
 
-  // Scene-type-gate-kontroller (kun for scene_transform-kort), samme
-  // kontrakt som scene-transform-debug.
+  // Scene-type-gate-kontroller (kun for scene_transform-kort).
   const [sceneType, setSceneType] = useState<SceneType>("auto");
   const [forceSceneType, setForceSceneType] = useState(false);
   // Skumringsvalg (2f-b): tidspunkt og himmel, alltid et gyldig par.
@@ -73,9 +72,8 @@ export default function ExpressPage() {
   const handleRun = () => {
     if (!selectedTool || !preview.file || isProcessing) return;
     if (selectedTool.kind === "scene") {
-      // Eksakt param-oppsett kopiert fra scene-transform-debug: preset_id
-      // sendes alltid for Time Traveler-kort (generativ sti), pluss
-      // scene_type + force_scene_type. Ingen quality_tier/aspect_ratio.
+      // Param-oppsettet: preset_id sendes alltid for Time Traveler-kort
+      // (generativ sti), pluss scene_type + force_scene_type. Ingen quality_tier/aspect_ratio.
       // Uten scene-velger (sceneGate: false) sendes ingen scene-felter —
       // backend-defaults (auto/false), identisk med det som ble sendt foer.
       job.run(preview.file, selectedTool.service, {

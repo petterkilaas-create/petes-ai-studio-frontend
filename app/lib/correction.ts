@@ -165,7 +165,7 @@ export interface CodeMessage {
  * Hva siden gjoer etter svaret paa «Lag nytt bilde»:
  * - poll (202): laas knappene, poll, hent review paa nytt.
  * - reload (409 status_changed, eller 200): last paa nytt med kort melding.
- * - limit (409 correction_limit): «Du har brukt rundene dine.», Rett forsvinner.
+ * - limit (409 correction_limit): «Du har brukt rundene dine.», «Korriger bildet» forsvinner.
  * - blocked (409 original_missing/action_not_allowed): melding, knappene laases.
  * - retry (422, 503, annen feil): melding, valgene staar.
  */

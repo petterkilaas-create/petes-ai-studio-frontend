@@ -23,37 +23,26 @@ export interface TerminalJobState {
   review: Review | null;
   /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
   reviewerReason: string | null;
-  /** Raa status + HTTP-kode ved ukjent status, for liten debug-tekst. */
-  unknownDetail: string | null;
 }
 
 /**
  * Terminal tilstand for et poll-resultat, eller null naar jobben fortsatt
- * kjoerer (pending — poll videre). `toObjectUrl` kalles kun for "done"
- * med bildebytes; ellers brukes den merkede previewUrl direkte (Lekkasjen
- * L2). null gir plassholder.
+ * kjoerer (pending — poll videre). Bildet er alltid den merkede previewUrl
+ * (Lekkasjen L2/L4); null gir plassholder.
  */
-export function terminalState(
-  result: JobResult,
-  toObjectUrl: (blob: Blob) => string
-): TerminalJobState | null {
+export function terminalState(result: JobResult): TerminalJobState | null {
   const base = {
     imageUrl: null,
     error: null,
     rejection: null,
     review: null,
     reviewerReason: null,
-    unknownDetail: null,
   };
   switch (result.kind) {
     case "pending":
       return null;
     case "done":
-      return {
-        ...base,
-        status: "done",
-        imageUrl: result.imageBlob !== null ? toObjectUrl(result.imageBlob) : result.previewUrl,
-      };
+      return { ...base, status: "done", imageUrl: result.previewUrl };
     case "awaiting_approval":
       return { ...base, status: "awaiting_approval", imageUrl: result.previewUrl };
     case "needs_review":
@@ -61,11 +50,7 @@ export function terminalState(
     case "rejected_by_reviewer":
       return { ...base, status: "rejected_by_reviewer", reviewerReason: result.reason };
     case "unknown":
-      return {
-        ...base,
-        status: "unknown",
-        unknownDetail: `status: ${result.status ?? "(mangler)"}, HTTP ${result.httpStatus}`,
-      };
+      return { ...base, status: "unknown" };
     case "failed":
       return result.rejection
         ? {

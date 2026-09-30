@@ -99,9 +99,9 @@ export function shouldPoll(status: string): boolean {
 export type ImageVariant = "lifted" | "raw" | "previous";
 
 /**
- * Lekkasjen L2: de eneste bildefeltene bildevalget faar se. Typen har ikke
- * resultUrl/rawUrl, saa de umerkede PNG-ene kan ikke velges her, heller
- * ikke ved en feil. JobReviewDetail["images"] passer inn som den er.
+ * Lekkasjen L2: de eneste bildefeltene bildevalget faar se. Bare de
+ * merkede forhaandsvisningene (og originalen) finnes, saa et umerket bilde
+ * kan ikke velges her. JobReviewDetail["images"] passer inn som den er.
  */
 export interface ReviewPreviews {
   previewUrl: string | null;

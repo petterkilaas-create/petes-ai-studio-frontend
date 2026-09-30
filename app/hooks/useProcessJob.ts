@@ -33,8 +33,8 @@ export type { ProcessStatus } from "./processStatus";
 export interface UseProcessJobResult {
   status: ProcessStatus;
   /**
-   * Resultatbildet: object-URL (sync-blob eller poll-bytes), eller den
-   * merkede previewUrl fra poll (Lekkasjen L2). null gir plassholder.
+   * Resultatbildet: object-URL for sync-blob (privacy_blur), eller den
+   * merkede previewUrl fra poll (Lekkasjen L2/L4). null gir plassholder.
    */
   imageUrl: string | null;
   /** Bruker-rettet feilmelding (ValidationError-detail eller poll-feil). */
@@ -43,8 +43,6 @@ export interface UseProcessJobResult {
   rejection: Rejection | null;
   /** needs_review: code + reasons fra port 1, ellers null. */
   review: Review | null;
-  /** Ved ukjent status: raa status og HTTP-kode, ellers null. */
-  unknownDetail: string | null;
   /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
   reviewerReason: string | null;
   /** Async-jobbens id (for lenken til /godkjenning), ellers null. */
@@ -160,7 +158,6 @@ export function useProcessJob(): UseProcessJobResult {
     error: submitError ?? job.error,
     rejection: job.rejection,
     review: job.review,
-    unknownDetail: job.unknownDetail,
     reviewerReason: job.reviewerReason,
     jobId,
     isProcessing: isProcessingStatus(status),
