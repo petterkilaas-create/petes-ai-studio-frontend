@@ -4,15 +4,18 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  COPYWRITER_PATH,
   ENABLED,
   EXPRESS_V2_PATH,
+  ORDERS_PATH,
   STAGING_PATH,
+  VIDEO_PATH,
   expressCategories,
   isPageEnabled,
   isServiceEnabled,
   navLinks,
 } from "./services.ts";
-import { DICTIONARIES } from "./i18n/index.ts";
+import { DICTIONARIES, type UiKey } from "./i18n/index.ts";
 
 // TG-NEW-136 (L0): Klart vaer, Magic Cleanup og Virtual Staging er skjult til
 // de er merket. Privacy Blur og skumring er som foer.
@@ -65,13 +68,12 @@ test("Express har ikke Klart vaer eller Magic Cleanup, men har Privacy Blur og s
   for (const c of expressCategories()) assert.ok(c.items.length > 0, c.id);
 });
 
-test("menyen har ingen lenke til /staging eller /express-v2, men lenkene som ikke er tjenester", () => {
+test("menyen har bare Express og Historikk", () => {
   const hrefs = navLinks().map((l) => l.href);
-  assert.ok(!hrefs.includes(STAGING_PATH));
-  assert.ok(!hrefs.includes(EXPRESS_V2_PATH));
-  for (const h of ["/express", "/video", "/copywriter", "/orders", "/history"]) {
-    assert.ok(hrefs.includes(h), h);
+  for (const h of [STAGING_PATH, EXPRESS_V2_PATH, VIDEO_PATH, COPYWRITER_PATH, ORDERS_PATH]) {
+    assert.ok(!hrefs.includes(h), h);
   }
+  assert.deepEqual(hrefs, ["/express", "/history"]);
 });
 
 test("ingen side har lenke til /staging eller /express-v2 skrevet rett inn", () => {
@@ -124,4 +126,85 @@ test("meldingen paa stengte sider: nb og en har noeklene", () => {
     }
   }
   assert.equal(DICTIONARIES.nb.ui["unavailable.body"], "Denne tjenesten er midlertidig ikke tilgjengelig.");
+});
+
+// ---------------------------------------------------------------------------
+// Dag 33, L0b: Video, Copywriter og Orders er skjult, og forsiden lover bare
+// det som leveres (skumring og Privacy Blur).
+// ---------------------------------------------------------------------------
+
+test("konstanten: video, copywriter og orders er av, Express, Historikk og skumring er paa", () => {
+  for (const id of ["video", "copywriter", "orders"]) {
+    assert.equal(isServiceEnabled(id), false, id);
+  }
+  assert.equal(ENABLED.video, false);
+  assert.equal(ENABLED.copywriter, false);
+  assert.equal(ENABLED.orders, false);
+  assert.equal(isServiceEnabled("skumring"), true);
+  assert.equal(isPageEnabled("/express"), true);
+  assert.equal(isPageEnabled("/history"), true);
+  const hrefs = navLinks().map((l) => l.href);
+  assert.ok(hrefs.includes("/express"));
+  assert.ok(hrefs.includes("/history"));
+});
+
+test("ingen side har lenke til /video, /copywriter eller /orders skrevet rett inn", () => {
+  const pattern = /["'`](\/video|\/copywriter|\/orders)["'`?#/]/;
+  for (const file of sourceFiles().filter((f) => f.endsWith(".tsx"))) {
+    assert.doesNotMatch(readFileSync(file, "utf8"), pattern, file);
+  }
+});
+
+test("/video, /copywriter og /orders: stengt side gir «ikke tilgjengelig» og gjoer ingen kall", () => {
+  for (const [rel, path, value] of [
+    ["video/page.tsx", "VIDEO_PATH", VIDEO_PATH],
+    ["copywriter/page.tsx", "COPYWRITER_PATH", COPYWRITER_PATH],
+    ["orders/page.tsx", "ORDERS_PATH", ORDERS_PATH],
+  ] as const) {
+    assert.equal(isPageEnabled(value), false, rel);
+    const src = read(rel);
+    const start = src.indexOf("export default function");
+    assert.ok(start >= 0, rel);
+    const body = src.slice(start, src.indexOf("\n}\n", start));
+    assert.match(body, new RegExp(`if \\(!isPageEnabled\\(${path}\\)\\) return <ServiceUnavailable />;`), rel);
+    assert.doesNotMatch(body, /\buse[A-Z]\w*\(/, rel);
+    assert.doesNotMatch(body, /fetch\(|supabase|API_BASE/, rel);
+  }
+});
+
+const HOME_KEYS = [
+  "home.titlePrefix",
+  "home.titleHighlight",
+  "home.intro",
+  "home.express.title",
+  "home.express.desc",
+  "home.express.cta",
+  "express.subtitle",
+] as const satisfies readonly UiKey[];
+
+test("forsiden og Express: teksten lover ikke video, Veo, HDR eller aarstider", () => {
+  const forbidden = /video|veo|hdr|season|årstid|film|reel|klart vær|staging|copywrit/i;
+  for (const locale of ["nb", "en"] as const) {
+    for (const key of HOME_KEYS) {
+      const text = DICTIONARIES[locale].ui[key];
+      assert.ok(text.trim().length > 0, `${locale} ${key}`);
+      assert.doesNotMatch(text, forbidden, `${locale} ${key}`);
+    }
+  }
+  // Teksten staar i ordlista, ikke rett inn i sidene.
+  assert.doesNotMatch(read("express/page.tsx"), /seasonal/i);
+  const home = read("page.tsx");
+  for (const key of HOME_KEYS.filter((k) => k.startsWith("home."))) {
+    assert.ok(home.includes(`t(locale, "${key}")`), key);
+  }
+  assert.ok(read("express/page.tsx").includes(`t(locale, "express.subtitle")`));
+});
+
+test("forsiden og Express: nb og en har de samme noeklene", () => {
+  const pick = (locale: "nb" | "en") =>
+    Object.keys(DICTIONARIES[locale].ui)
+      .filter((k) => k.startsWith("home.") || k.startsWith("express."))
+      .sort();
+  assert.deepEqual(pick("nb"), pick("en"));
+  for (const key of HOME_KEYS) assert.ok(pick("nb").includes(key), key);
 });

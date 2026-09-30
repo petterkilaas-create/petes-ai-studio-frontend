@@ -5,11 +5,22 @@ import { useUser, useAuth } from "@clerk/nextjs";
 import { supabase } from "../../supabaseClient"; 
 
 import { API_BASE } from "../lib/api";
+import { ServiceUnavailable } from "../components/ServiceUnavailable";
+import { ORDERS_PATH, isPageEnabled } from "../lib/services";
 
 type OrderArchive = { name: string; address?: string; date: string; status: string; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; raw?: string; edited?: string; approved?: boolean; };
 
+// Stengt (dag 33, L0b): siden kaller backend-ruter som ikke er montert.
+// Innholdet er beholdt i OrdersPageContent, og hookene der kjoerer ikke naar
+// siden er stengt: ingen kall mot backend eller Supabase. Slaa paa i
+// lib/services.ts.
 export default function OrdersPage() {
+  if (!isPageEnabled(ORDERS_PATH)) return <ServiceUnavailable />;
+  return <OrdersPageContent />;
+}
+
+function OrdersPageContent() {
   const { user } = useUser();
   const { getToken } = useAuth(); // VIP Passet hentes inn!
   const isAdmin = user?.primaryEmailAddress?.emailAddress === "petter.kilaas@diakrit.com"; 

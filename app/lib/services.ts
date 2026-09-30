@@ -19,6 +19,13 @@ export const ENABLED = {
   express_v2: false,
   privacy_blur: true,
   skumring: true,
+  /**
+   * Gamle sider uten tjeneste bak (dag 33, L0b): backend-rutene de kaller
+   * (routers/jobs.py, routers/media.py) er ikke montert.
+   */
+  video: false,
+  copywriter: false,
+  orders: false,
 } as const;
 
 /** Ukjent id gir av: en ny tjeneste maa legges inn over foer den vises. */
@@ -34,10 +41,16 @@ export function isServiceEnabled(id: string): boolean {
 
 export const STAGING_PATH = "/staging";
 export const EXPRESS_V2_PATH = "/express-v2";
+export const VIDEO_PATH = "/video";
+export const COPYWRITER_PATH = "/copywriter";
+export const ORDERS_PATH = "/orders";
 
 const PAGE_SERVICE: Record<string, string> = {
   [STAGING_PATH]: "virtual_stage",
   [EXPRESS_V2_PATH]: "express_v2",
+  [VIDEO_PATH]: "video",
+  [COPYWRITER_PATH]: "copywriter",
+  [ORDERS_PATH]: "orders",
 };
 
 /**
@@ -64,9 +77,9 @@ export interface NavLink {
 const ALL_NAV_LINKS: NavLink[] = [
   { href: "/express", label: "⚡ Express", className: "hover:text-[#009183] transition-colors" },
   { href: STAGING_PATH, label: "🛋️ Staging", className: "hover:text-[#00ff83] transition-colors" },
-  { href: "/video", label: "🎬 Video", className: "hover:text-purple-400 transition-colors" },
-  { href: "/copywriter", label: "✍️ Copywriter", className: "..." },
-  { href: "/orders", label: "📁 Orders", className: "hover:text-white transition-colors", dividerBefore: true },
+  { href: VIDEO_PATH, label: "🎬 Video", className: "hover:text-purple-400 transition-colors" },
+  { href: COPYWRITER_PATH, label: "✍️ Copywriter", className: "..." },
+  { href: ORDERS_PATH, label: "📁 Orders", className: "hover:text-white transition-colors", dividerBefore: true },
   { href: "/history", label: "🕘 Historikk", className: "hover:text-white transition-colors" },
 ];
 

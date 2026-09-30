@@ -143,6 +143,14 @@ const nbUi = {
   "unavailable.title": "Midlertidig ikke tilgjengelig",
   "unavailable.body": "Denne tjenesten er midlertidig ikke tilgjengelig.",
   "unavailable.toExpress": "Gå til Express",
+  // Forsiden og Express lover bare det som leveres (dag 33, L0b).
+  "home.titlePrefix": "Velkommen til The",
+  "home.titleHighlight": "Studio",
+  "home.intro": "Velg en tjeneste for å starte. Redigering av boligfoto: kveldsbilde laget med AI fra dagsbilde, og sladding av personlige detaljer.",
+  "home.express.title": "Express",
+  "home.express.desc": "Kveldsbilde laget med AI fra dagsbilde, og sladding av ansikter, familiebilder og bilskilt.",
+  "home.express.cta": "Kom i gang",
+  "express.subtitle": "Kveldsbilde laget med AI fra dagsbilde, og sladding av personlige detaljer.",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -375,6 +383,13 @@ const en: Dictionary = {
     "unavailable.title": "Temporarily unavailable",
     "unavailable.body": "This service is temporarily unavailable.",
     "unavailable.toExpress": "Go to Express",
+    "home.titlePrefix": "Welcome to the",
+    "home.titleHighlight": "Studio",
+    "home.intro": "Select a product below to begin. Real estate photo editing: dusk image made with AI from a daytime photo, and privacy blur.",
+    "home.express.title": "Express",
+    "home.express.desc": "Dusk image made with AI from a daytime photo, and blurring of faces, family photos and license plates.",
+    "home.express.cta": "Get started",
+    "express.subtitle": "Dusk image made with AI from a daytime photo, and privacy blur.",
   },
   codes: {
     reviewCode: {

@@ -6,11 +6,22 @@ import { supabase } from "../../supabaseClient";
 import Autocomplete from "react-google-autocomplete";
 
 import { API_BASE } from "../lib/api";
+import { ServiceUnavailable } from "../components/ServiceUnavailable";
+import { COPYWRITER_PATH, isPageEnabled } from "../lib/services";
 
 type OrderArchive = { name: string; address?: string; date: string; status: string; hasCopy: boolean; };
 type UploadedFile = { id: string; file: File; url: string; };
 
+// Stengt (dag 33, L0b): siden kaller backend-ruter som ikke er montert.
+// Innholdet er beholdt i CopywriterPageContent, og hookene der kjoerer ikke naar
+// siden er stengt: ingen kall mot backend eller Supabase. Slaa paa i
+// lib/services.ts.
 export default function CopywriterPage() {
+  if (!isPageEnabled(COPYWRITER_PATH)) return <ServiceUnavailable />;
+  return <CopywriterPageContent />;
+}
+
+function CopywriterPageContent() {
   const { user } = useUser();
   const { getToken } = useAuth(); // VIP Pass for Clerk!
   
