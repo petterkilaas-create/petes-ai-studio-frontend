@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { pollJob, type Rejection, type Review } from "./api";
 import { terminalState, type JobStatus } from "./jobState";
@@ -24,8 +24,6 @@ export interface UseJobStatusResult {
   rejection: Rejection | null;
   /** needs_review (2c-2): code + reasons fra port 1, ellers null. */
   review: Review | null;
-  /** Ved ukjent status: raa status og HTTP-kode, ellers null. */
-  unknownDetail: string | null;
   /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
   reviewerReason: string | null;
 }
@@ -46,10 +44,7 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
   const [error, setError] = useState<string | null>(null);
   const [rejection, setRejection] = useState<Rejection | null>(null);
   const [review, setReview] = useState<Review | null>(null);
-  const [unknownDetail, setUnknownDetail] = useState<string | null>(null);
   const [reviewerReason, setReviewerReason] = useState<string | null>(null);
-
-  const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!jobId) {
@@ -58,7 +53,6 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
       setError(null);
       setRejection(null);
       setReview(null);
-      setUnknownDetail(null);
       setReviewerReason(null);
       return;
     }
@@ -72,7 +66,6 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
     setError(null);
     setRejection(null);
     setReview(null);
-    setUnknownDetail(null);
     setReviewerReason(null);
 
     // setTimeout-basert scheduling (ikke setInterval) slik at neste poll
@@ -92,20 +85,12 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
 
         // Alt unntatt pending er terminalt (ogsaa ukjent status) — ingen
         // ny schedule, saa pollingen stopper.
-        const next = terminalState(result, (blob) => {
-          const url = URL.createObjectURL(blob);
-          if (objectUrlRef.current) {
-            URL.revokeObjectURL(objectUrlRef.current);
-          }
-          objectUrlRef.current = url;
-          return url;
-        });
+        const next = terminalState(result);
         if (next !== null) {
           setImageUrl(next.imageUrl);
           setError(next.error);
           setRejection(next.rejection);
           setReview(next.review);
-          setUnknownDetail(next.unknownDetail);
           setReviewerReason(next.reviewerReason);
           setStatus(next.status);
           return;
@@ -137,12 +122,8 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
       if (timeoutId !== null) {
         clearTimeout(timeoutId);
       }
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
-        objectUrlRef.current = null;
-      }
     };
   }, [jobId, getToken]);
 
-  return { status, imageUrl, error, rejection, review, unknownDetail, reviewerReason };
+  return { status, imageUrl, error, rejection, review, reviewerReason };
 }

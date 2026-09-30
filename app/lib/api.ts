@@ -15,7 +15,7 @@ export const API_BASE: string = apiBase;
  * Typet speil av backendens ProcessParams (Dag 18, PR #65).
  *
  * Alle felter er valgfrie: backend har defaults (scene_type="auto",
- * force_scene_type=false, model=flux2_flex), og eksisterende sider som
+ * force_scene_type=false), og eksisterende sider som
  * sender tomt params-objekt skal beholde uendret oppfoersel.
  *
  * Kontrakt (POST /v1/process):
@@ -28,7 +28,6 @@ export interface ProcessParams {
   scene_type?: "auto" | "exterior" | "interior";
   force_scene_type?: boolean;
   preset_id?: string;
-  model?: "flux2_flex" | "gpt_image_2" | "nano_banana_pro";
   quality_tier?: string;
   /** Skumringsvalg (2f-b): sendes alltid begge for skumring, ellers aldri. */
   dusk_time?: DuskTime;
@@ -62,10 +61,8 @@ interface JobStatusBody {
   code?: string;
   message?: string;
   classifier?: { verdict?: string; confidence?: number };
-  /** Signert URL til resultatbildet (awaiting_approval, 2c-2). */
-  result_url?: string;
   /**
-   * Lekkasjen L1: merket forhaandsvisning (awaiting_approval, og fra L3
+   * Lekkasjen L1/L3: merket forhaandsvisning (awaiting_approval og
    * succeeded). null naar fila ikke er laget ennaa.
    */
   preview_url?: unknown;
@@ -134,10 +131,10 @@ export type SubmitResult =
  *
  * Kontrakt 2c-2 (godkjent av Petter Dag 29), begge HTTP 200 + JSON:
  * - awaiting_approval: {status, preview_url} — bildet finnes, ikke godkjent.
- *   Lekkasjen L2: bare den merkede `preview_url` brukes, aldri `result_url`;
- *   null gir plassholder.
- * - succeeded: bildebytes (i dag) eller JSON {status, preview_url} (fra L3).
- *   Begge gir "done".
+ *   Lekkasjen L2: bare den merkede `preview_url` brukes; null gir
+ *   plassholder.
+ * - succeeded: JSON {status, preview_url} (Lekkasjen L3) gir "done".
+ *   Et 200-svar som ikke er JSON gir "unknown", aldri et bilde (L4).
  * - needs_review: {status, code, reasons} — port 1 stoppet, intet bilde.
  * Ukjent status (200-JSON eller 202) gir "unknown": aldri evig polling,
  * aldri roed feil.
@@ -148,7 +145,7 @@ export type SubmitResult =
  */
 export type JobResult =
   | { kind: "pending"; status: "queued" | "running"; retryAfterMs?: number }
-  | { kind: "done"; imageBlob: Blob | null; previewUrl: string | null; jobId: string }
+  | { kind: "done"; previewUrl: string | null; jobId: string }
   | { kind: "awaiting_approval"; previewUrl: string | null; jobId: string }
   | { kind: "needs_review"; review: Review }
   | { kind: "unknown"; status: string | null; httpStatus: number }
@@ -181,7 +178,7 @@ export function parseStatusBody(data: JobStatusBody, jobId: string): JobResult {
   }
   if (data.status === "awaiting_approval") {
     // Lekkasjen L2: bare den merkede forhaandsvisningen. Mangler den, viser
-    // siden plassholder; result_url (umerket PNG) brukes aldri.
+    // siden plassholder.
     return {
       kind: "awaiting_approval",
       previewUrl: nonEmptyString(data.preview_url),
@@ -189,10 +186,9 @@ export function parseStatusBody(data: JobStatusBody, jobId: string): JobResult {
     };
   }
   if (data.status === "succeeded") {
-    // Fra L3: JSON i stedet for bytes. Gir "done" med den merkede URL-en.
+    // Lekkasjen L3: "done" med den merkede URL-en, eller null (plassholder).
     return {
       kind: "done",
-      imageBlob: null,
       previewUrl: nonEmptyString(data.preview_url),
       jobId: data.job_id ?? jobId,
     };
@@ -277,6 +273,9 @@ export async function submitJob(opts: {
   });
 
   if (res.status === 200) {
+    // Sync-tjenester (privacy_blur) svarer med bytes. Bildet er ikke
+    // KI-endret (Q1), og denne grenen staar (Lekkasjen L4 fjernet bare
+    // bytes fra poll).
     const imageBlob = await res.blob();
     const requestId = res.headers.get("X-Request-ID") ?? "";
     return { kind: "sync", imageBlob, requestId };
@@ -329,21 +328,15 @@ export async function pollJob(opts: {
   }
 
   if (res.status === 200) {
-    // 200 baerer to terminal-former (TG-NEW-70): et ferdig resultatbilde
-    // (binaert) ELLER en strukturert status-JSON. Gate-avslag kommer naa
-    // som 200 + application/json med status="rejected"; et fullfoert
-    // resultat er bildebytes. Content-Type skiller dem.
+    // 200 er alltid status-JSON (Lekkasjen L3). Et svar som ikke er JSON
+    // (f.eks. bildebytes) gir "unknown" uten at bodyen leses: aldri et
+    // bilde fra poll (L4).
     const contentType = res.headers.get("Content-Type") ?? "";
-    if (contentType.includes("application/json")) {
-      // JSON-bytes tolkes aldri som bilde; ukjent status -> "unknown".
-      const data = ((await res.json()) ?? {}) as JobStatusBody;
-      return parseStatusBody(data, jobId);
+    if (!contentType.includes("application/json")) {
+      return unknownStatus(null, 200);
     }
-
-    // Bytes (til L3). Headeren med den umerkede URL-en leses ikke (L2).
-    const imageBlob = await res.blob();
-    const responseJobId = res.headers.get("X-Job-ID") ?? jobId;
-    return { kind: "done", imageBlob, previewUrl: null, jobId: responseJobId };
+    const data = ((await res.json()) ?? {}) as JobStatusBody;
+    return parseStatusBody(data, jobId);
   }
 
   if (res.status === 202) {
@@ -373,8 +366,6 @@ interface JobSummaryWire {
   service: string;
   status: string;
   created_at: string | null;
-  result_url: string | null;
-  variant_urls: string[] | null;
   /** Lekkasjen L1: merket miniatyr 640x427, eller null. */
   thumb_url?: unknown;
   error: string | null;
@@ -430,22 +421,18 @@ export function normalizeSummaryStatus(raw: unknown): JobSummaryStatus {
  * `code`/`reason`; en jobb avvist av megleren kjennes paa `code`, aldri
  * ved aa tolke `error`-teksten.
  *
- * `resultUrl` er ferskt re-signert og settes for succeeded-rader (og,
- * fra 2c-3b, awaiting_approval-rader). En
- * gammel rad uten lagret bilde har `resultUrl: null` (ingen doed lenke) —
- * vis raden uten thumbnail, det er ikke en feil.
+ * Det eneste bildet er den merkede miniatyren `thumbUrl` (Lekkasjen L2).
+ * En rad uten miniatyr vises uten bilde; det er ikke en feil.
  */
 export interface JobSummary {
   jobId: string;
   service: string;
   status: JobSummaryStatus;
   createdAt: string | null;
-  resultUrl: string | null;
-  variantUrls: string[] | null;
   /**
    * Lekkasjen L2: den merkede miniatyren, det eneste bildet /history viser.
    * null naar den ikke er laget ennaa (hoeyst 4 nye per kall) eller feltet
-   * mangler (eldre backend). `resultUrl`/`variantUrls` vises aldri.
+   * mangler (eldre backend).
    */
   thumbUrl: string | null;
   error: string | null;
@@ -560,8 +547,6 @@ export async function listJobs(opts: {
     service: row.service,
     status: normalizeSummaryStatus(row.status),
     createdAt: row.created_at,
-    resultUrl: row.result_url,
-    variantUrls: row.variant_urls,
     thumbUrl: nonEmptyString(row.thumb_url),
     error: row.error,
     code: nonEmptyString(row.code),
@@ -696,20 +681,15 @@ export interface JobReviewDetail {
   correction: ReviewCorrection;
   images: {
     originalUrl: string | null;
-    resultUrl: string | null;
-    rawUrl: string | null;
     /** Bildet fra forrige runde, eller null foer foerste runde er ferdig. */
     previous: {
       round: number | null;
-      resultUrl: string | null;
-      rawUrl: string | null;
       /** Lekkasjen L1: merket forhaandsvisning av forrige runde, eller null. */
       previewUrl: string | null;
     } | null;
     /**
      * Lekkasjen L2: de merkede forhaandsvisningene er de eneste KI-bildene
-     * siden viser. null (eller feltet mangler) gir plassholder, aldri
-     * resultUrl/rawUrl. Typene for de gamle feltene ryddes i L4.
+     * siden viser. null (eller feltet mangler) gir plassholder.
      */
     previewUrl: string | null;
     /** Merket forhaandsvisning av det raa bildet; bare admin, ellers null. */
@@ -830,15 +810,11 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     },
     images: {
       originalUrl: stringOrNull(images.original_url),
-      resultUrl: stringOrNull(images.result_url),
-      rawUrl: stringOrNull(images.raw_url),
       previous:
         previous === null
           ? null
           : {
               round: numberOrNull(previous.round),
-              resultUrl: stringOrNull(previous.result_url),
-              rawUrl: stringOrNull(previous.raw_url),
               previewUrl: nonEmptyString(previous.preview_url),
             },
       previewUrl: nonEmptyString(images.preview_url),

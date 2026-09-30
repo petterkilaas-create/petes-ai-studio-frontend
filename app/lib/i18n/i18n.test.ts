@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { codeText, DICTIONARIES, pickLocale, t, type CodeGroup } from "./index.ts";
 
 test("pickLocale: nb, no og nn gir norsk, alt annet engelsk", () => {
@@ -142,4 +145,28 @@ test("nedlastingen (merking PR 4): nb og en har noeklene", () => {
   }
   assert.equal(t("nb", "review.download"), "Last ned merket bilde");
   assert.equal(t("nb", "review.downloadBroken"), "Bildet kunne ikke hentes. Kontakt oss.");
+});
+
+test("«Rett» heter «Korriger bildet» (Lekkasjen L4)", () => {
+  assert.equal(t("nb", "action.correct"), "Korriger bildet");
+  assert.equal(t("en", "action.correct"), "Correct image");
+  assert.equal(t("nb", "correct.title"), "Korriger lyskildene");
+  assert.equal(t("en", "correct.title"), "Correct the light sources");
+  const { nb, en } = DICTIONARIES;
+  assert.deepEqual(Object.keys(en.ui).sort(), Object.keys(nb.ui).sort());
+  // Ingen tekst (ui eller koder) er bare «Rett»/«Correct», og siden har
+  // ingen slik tekst skrevet rett inn.
+  for (const dict of [nb, en]) {
+    const texts = [
+      ...Object.values(dict.ui),
+      ...Object.values(dict.codes).flatMap((group) => Object.values(group)),
+    ];
+    for (const text of texts) assert.doesNotMatch(String(text).trim(), /^(Rett|Correct)$/);
+  }
+  const page = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), "..", "..", "godkjenning", "[jobId]", "page.tsx"),
+    "utf8"
+  );
+  assert.doesNotMatch(page, />\s*Rett\s*</);
+  assert.match(page, /t\(locale, "action\.correct"\)/);
 });
