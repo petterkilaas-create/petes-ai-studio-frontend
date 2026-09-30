@@ -6,6 +6,7 @@ import {
   hasResultImage,
   isRejectedByReviewer,
   statusVariant,
+  thumbSrc,
 } from "./statusVariants.ts";
 
 test("nye statuser har egne etiketter", () => {
@@ -57,4 +58,13 @@ test("openLinkKey: Åpne bare paa egne godkjente skumringsjobber, ellers som foe
   for (const s of ["failed", "running", "queued", "rejected", "unknown"]) {
     assert.equal(openLinkKey(job(s)), null, s);
   }
+});
+
+test("/history: miniatyren kommer bare fra thumbUrl (Lekkasjen L2)", () => {
+  const old = { resultUrl: "https://x/a.png", variantUrls: ["https://x/a_v1.png"] };
+  assert.equal(thumbSrc({ ...old, status: "succeeded", thumbUrl: "https://x/a_thumb.jpg" }), "https://x/a_thumb.jpg");
+  assert.equal(thumbSrc({ ...old, status: "awaiting_approval", thumbUrl: "https://x/a_thumb.jpg" }), "https://x/a_thumb.jpg");
+  // null gir kortet uten bilde, aldri resultUrl.
+  assert.equal(thumbSrc({ ...old, status: "succeeded", thumbUrl: null }), null);
+  assert.equal(thumbSrc({ ...old, status: "failed", thumbUrl: "https://x/a_thumb.jpg" }), null);
 });

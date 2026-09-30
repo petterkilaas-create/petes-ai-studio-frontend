@@ -55,6 +55,7 @@ import {
 } from "../../lib/disclosure";
 import { copyText, type CopyResult } from "../../lib/clipboard";
 import { canDownload, downloadMarkedImage } from "../../lib/download";
+import { PreviewPlaceholder } from "../../components/PreviewPlaceholder";
 
 /**
  * Godkjenningssiden (2d-1): megleren avgjoer egne jobber i «Til kontroll»
@@ -86,7 +87,19 @@ const VARIANT_LABEL: Record<ImageVariant, UiKey> = {
 };
 const BTN_DANGER = `px-6 py-3 bg-transparent border border-red-500/40 text-red-300 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-red-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
 
-function ImageBox({ url, alt, locale }: { url: string | null; alt: string; locale: Locale }) {
+function ImageBox({
+  url,
+  alt,
+  locale,
+  preview = false,
+}: {
+  url: string | null;
+  alt: string;
+  locale: Locale;
+  /** KI-bildet (merket forhaandsvisning): mangler det, vises plassholderen (L2). */
+  preview?: boolean;
+}) {
+  if (!url && preview) return <PreviewPlaceholder />;
   if (!url) {
     return (
       <div className="aspect-[3/2] w-full rounded-xl border border-dashed border-slate-700 flex items-center justify-center text-slate-600 text-sm">
@@ -713,6 +726,7 @@ export default function GodkjenningPage({
                       url={resultImageUrl(review.images, shownVariant)}
                       alt={t(locale, shownVariant === "previous" ? "review.previousRound" : "review.result")}
                       locale={locale}
+                      preview
                     />
                   </div>
                 </section>

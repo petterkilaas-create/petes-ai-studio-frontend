@@ -99,29 +99,34 @@ export function shouldPoll(status: string): boolean {
 export type ImageVariant = "lifted" | "raw" | "previous";
 
 /**
- * Resultatbildet for valgt variant. Rått faller tilbake til løftet;
- * «Forrige runde» viser det løftede bildet fra forrige runde (2d-2b).
+ * Lekkasjen L2: de eneste bildefeltene bildevalget faar se. Typen har ikke
+ * resultUrl/rawUrl, saa de umerkede PNG-ene kan ikke velges her, heller
+ * ikke ved en feil. JobReviewDetail["images"] passer inn som den er.
  */
-export function resultImageUrl(
-  images: JobReviewDetail["images"],
-  variant: ImageVariant
-): string | null {
-  if (variant === "previous" && images.previous) {
-    return images.previous.resultUrl ?? images.previous.rawUrl;
-  }
-  if (variant === "raw" && images.rawUrl) return images.rawUrl;
-  return images.resultUrl ?? images.rawUrl;
+export interface ReviewPreviews {
+  previewUrl: string | null;
+  rawPreviewUrl: string | null;
+  previous: { previewUrl: string | null } | null;
 }
 
 /**
- * Knappene i bildebryteren: løftet/rått naar begge bildene finnes, og
- * «Forrige runde» naar images.previous har et bilde. Tom liste = ingen bryter.
+ * Den merkede forhaandsvisningen for valgt variant, eller null (plassholder).
+ * Aldri tilbakefall til en annen variant eller til de gamle feltene.
  */
-export function variantOptions(images: JobReviewDetail["images"]): ImageVariant[] {
-  const options: ImageVariant[] =
-    images.resultUrl !== null && images.rawUrl !== null ? ["lifted", "raw"] : ["lifted"];
-  const prev = images.previous;
-  if (prev && (prev.resultUrl !== null || prev.rawUrl !== null)) options.push("previous");
+export function resultImageUrl(images: ReviewPreviews, variant: ImageVariant): string | null {
+  if (variant === "previous") return images.previous?.previewUrl ?? null;
+  if (variant === "raw") return images.rawPreviewUrl;
+  return images.previewUrl;
+}
+
+/**
+ * Knappene i bildebryteren: «Rått» bare naar rawPreviewUrl finnes (bare
+ * admin), og «Forrige runde» naar det finnes en forrige runde (bildet kan
+ * da vise plassholder). Tom liste = ingen bryter.
+ */
+export function variantOptions(images: ReviewPreviews): ImageVariant[] {
+  const options: ImageVariant[] = images.rawPreviewUrl !== null ? ["lifted", "raw"] : ["lifted"];
+  if (images.previous !== null) options.push("previous");
   return options.length > 1 ? options : [];
 }
 

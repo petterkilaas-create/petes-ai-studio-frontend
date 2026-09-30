@@ -9,6 +9,8 @@ import { RejectionPanel } from "../components/RejectionPanel";
 import { ReviewPanel } from "../components/ReviewPanel";
 import { UnknownStatusPanel } from "../components/UnknownStatusPanel";
 import { ApprovalNotice } from "../components/ApprovalNotice";
+import { PreviewPlaceholder } from "../components/PreviewPlaceholder";
+import { outputView } from "../lib/jobState";
 import { ReviewerRejectedPanel } from "../components/ReviewerRejectedPanel";
 import { OpenReviewLink } from "../components/OpenReviewLink";
 import { DuskChoicePicker } from "../components/DuskChoicePicker";
@@ -44,6 +46,7 @@ export default function ExpressPage() {
     null;
 
   const isProcessing = job.isProcessing;
+  const output = outputView(job.status, job.imageUrl);
   const showSceneControls =
     selectedTool?.kind === "scene" && selectedTool.sceneGate !== false;
   const showDuskControls =
@@ -339,16 +342,16 @@ export default function ExpressPage() {
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
                 Output
               </p>
-              {job.status === "awaiting_approval" && job.resultUrl && (
-                <ApprovalNotice />
-              )}
-              {job.resultUrl ? (
+              {job.status === "awaiting_approval" && <ApprovalNotice />}
+              {output.kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={job.resultUrl}
+                  src={output.url}
                   alt="Output result"
                   className="w-full h-auto rounded-xl border border-slate-800"
                 />
+              ) : output.kind === "placeholder" ? (
+                <PreviewPlaceholder />
               ) : (
                 <div className="aspect-square w-full rounded-xl border border-dashed border-slate-700 flex items-center justify-center text-slate-600 text-sm">
                   {isProcessing ? "Processing..." : "No result yet"}

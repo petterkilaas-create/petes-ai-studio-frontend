@@ -12,7 +12,7 @@ import {
   type JobSummaryStatus,
 } from "../lib/api";
 import {
-  hasResultImage,
+  thumbSrc,
   isRejectedByReviewer,
   openLinkKey,
   REVIEWER_REJECTED_CLS,
@@ -94,7 +94,7 @@ function StatusPill({
 
 function JobCard({ job }: { job: JobSummary }) {
   const locale = useLocale();
-  const hasThumb = hasResultImage(job.status) && job.resultUrl !== null;
+  const thumb = thumbSrc(job);
   const rejectedByYou = isRejectedByReviewer(job);
   const other = ownerBadge(job);
   const openKey = openLinkKey(job);
@@ -105,10 +105,10 @@ function JobCard({ job }: { job: JobSummary }) {
   return (
     <div className="flex flex-col bg-[#0f172a] border border-slate-800 rounded-3xl shadow-xl overflow-hidden">
       <div className="relative aspect-[3/2] bg-[#0B1120] flex items-center justify-center">
-        {hasThumb ? (
+        {thumb !== null ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={job.resultUrl as string}
+            src={thumb}
             alt={serviceLabel(job.service)}
             loading="lazy"
             className="w-full h-full object-cover"

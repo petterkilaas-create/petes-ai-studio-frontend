@@ -26,16 +26,52 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-test("200 awaiting_approval gir resultUrl (terminalt)", async () => {
-  mockFetch(200, { status: "awaiting_approval", result_url: "https://x/signed.png", job_id: "j1" });
+test("200 awaiting_approval gir previewUrl, aldri result_url (L2)", async () => {
+  mockFetch(200, {
+    status: "awaiting_approval",
+    result_url: "https://x/signed.png",
+    preview_url: "https://x/j1_preview_abc.jpg",
+    job_id: "j1",
+  });
   const r = await api.pollJob({ jobId: "j1", getToken });
-  assert.deepEqual(r, { kind: "awaiting_approval", resultUrl: "https://x/signed.png", jobId: "j1" });
+  assert.deepEqual(r, { kind: "awaiting_approval", previewUrl: "https://x/j1_preview_abc.jpg", jobId: "j1" });
 });
 
-test("200 awaiting_approval uten result_url gir unknown", async () => {
-  mockFetch(200, { status: "awaiting_approval" });
+test("200 awaiting_approval uten preview_url gir previewUrl null, ikke result_url (L2)", async () => {
+  for (const body of [
+    { status: "awaiting_approval", result_url: "https://x/signed.png", preview_url: null },
+    { status: "awaiting_approval", result_url: "https://x/signed.png" },
+    { status: "awaiting_approval" },
+  ]) {
+    mockFetch(200, body);
+    const r = await api.pollJob({ jobId: "j1", getToken });
+    assert.deepEqual(r, { kind: "awaiting_approval", previewUrl: null, jobId: "j1" });
+  }
+});
+
+test("200 JSON succeeded med preview_url gir done med URL (L3-formen)", async () => {
+  mockFetch(200, { status: "succeeded", preview_url: "https://x/j1_preview_abc.jpg", job_id: "j1" });
   const r = await api.pollJob({ jobId: "j1", getToken });
-  assert.equal(r.kind, "unknown");
+  assert.deepEqual(r, { kind: "done", imageBlob: null, previewUrl: "https://x/j1_preview_abc.jpg", jobId: "j1" });
+  // Uten preview_url: fortsatt done, men uten bilde (plassholder).
+  mockFetch(200, { status: "succeeded", result_url: "https://x/j1.png" });
+  const bare = await api.pollJob({ jobId: "j1", getToken });
+  assert.deepEqual(bare, { kind: "done", imageBlob: null, previewUrl: null, jobId: "j1" });
+});
+
+test("200 bytes gir fortsatt done med blob, og X-Result-URL leses ikke", async () => {
+  globalThis.fetch = (async () =>
+    new Response(new Uint8Array([137, 80, 78, 71]), {
+      status: 200,
+      headers: { "Content-Type": "image/png", "X-Job-ID": "j2", "X-Result-URL": "https://x/j2.png" },
+    })) as typeof fetch;
+  const r = await api.pollJob({ jobId: "j1", getToken });
+  assert.equal(r.kind, "done");
+  if (r.kind !== "done") return;
+  assert.ok(r.imageBlob instanceof Blob);
+  assert.equal(r.previewUrl, null);
+  assert.equal(r.jobId, "j2");
+  assert.doesNotMatch(JSON.stringify(r), /j2\.png/);
 });
 
 test("200 needs_review gir code og reasons, uten bilde", async () => {
@@ -424,7 +460,7 @@ test("normalizeReview leser Rett-feltene (2d-2a)", () => {
   assert.equal(r.lights.unstable[0].run, 2);
   assert.equal(r.lights.unstable[0].editable, false);
   assert.deepEqual(r.correction, { roundsLeft: 0, lastRoundFailed: true });
-  assert.deepEqual(r.images.previous, { round: 0, resultUrl: "p", rawUrl: "pr" });
+  assert.deepEqual(r.images.previous, { round: 0, resultUrl: "p", rawUrl: "pr", previewUrl: null });
   // Negativt eller oedelagt rundetall blir 0.
   assert.equal(api.normalizeReview({ correction: { rounds_left: -1 } }, "j1").correction.roundsLeft, 0);
   assert.equal(api.normalizeReview({ correction: { rounds_left: "1" } }, "j1").correction.roundsLeft, 0);
@@ -507,4 +543,46 @@ test("normalizeReview: ugyldig edited blir null, aldri filtrert", () => {
     const r = api.normalizeReview({ disclosure: { base: "evening_from_day", edited, status: "ok" } }, "j1");
     assert.equal(r.disclosure?.edited, null, JSON.stringify(edited));
   }
+});
+
+// ---- Lekkasjen L2: merkede forhaandsvisninger og miniatyrer ----------------
+
+test("normalizeReview leser preview_url, raw_preview_url og previous.preview_url", () => {
+  const r = api.normalizeReview(
+    {
+      images: {
+        original_url: "o", result_url: "r", raw_url: "rr",
+        preview_url: "p.jpg", raw_preview_url: "rp.jpg",
+        previous: { round: 0, result_url: "pr", raw_url: "prr", preview_url: "pp.jpg" },
+      },
+    },
+    "j1"
+  );
+  assert.equal(r.images.previewUrl, "p.jpg");
+  assert.equal(r.images.rawPreviewUrl, "rp.jpg");
+  assert.equal(r.images.previous?.previewUrl, "pp.jpg");
+});
+
+test("normalizeReview: nye felt som er null, tomme eller mangler, blir null", () => {
+  for (const images of [
+    { result_url: "r", raw_url: "rr", preview_url: null, raw_preview_url: null, previous: { round: 0, result_url: "pr", preview_url: null } },
+    { result_url: "r", raw_url: "rr", preview_url: "", raw_preview_url: 3, previous: { round: 0, result_url: "pr" } },
+    { result_url: "r", raw_url: "rr", previous: { round: 0, result_url: "pr" } },
+  ]) {
+    const r = api.normalizeReview({ images }, "j1");
+    assert.equal(r.images.previewUrl, null);
+    assert.equal(r.images.rawPreviewUrl, null);
+    assert.equal(r.images.previous?.previewUrl, null);
+  }
+});
+
+test("listJobs leser thumb_url; null eller mangler gir thumbUrl null", async () => {
+  const row = { service: "scene_transform", status: "succeeded", created_at: null, result_url: "https://x/a.png", variant_urls: ["https://x/a_v1.png"], error: null };
+  mockFetch(200, [
+    { ...row, job_id: "a", thumb_url: "https://x/a_thumb_abc.jpg" },
+    { ...row, job_id: "b", thumb_url: null },
+    { ...row, job_id: "c" },
+  ]);
+  const rows = await api.listJobs({ getToken });
+  assert.deepEqual(rows.map((r) => r.thumbUrl), ["https://x/a_thumb_abc.jpg", null, null]);
 });
