@@ -5,6 +5,8 @@ import { useImagePreview } from "../hooks/useImagePreview";
 import { useProcessJob } from "../hooks/useProcessJob";
 import { StatusBadge } from "../components/StatusBadge";
 import { ErrorPanel } from "../components/ErrorPanel";
+import { ServiceUnavailable } from "../components/ServiceUnavailable";
+import { EXPRESS_V2_PATH, isPageEnabled } from "../lib/services";
 
 type ServiceId = "privacy_blur" | "magic_cleanup" | "virtual_stage";
 
@@ -14,7 +16,15 @@ const SERVICES: { id: ServiceId; label: string }[] = [
   { id: "virtual_stage", label: "Virtual Staging Scandi (async, fal/FLUX)" },
 ];
 
+// Stengt mens tjenesten er av (TG-NEW-136, L0). Innholdet er beholdt i
+// ExpressV2PageContent, og hookene der kjoerer ikke naar siden er stengt: ingen
+// jobber og ingen kall mot backend. Slaa paa i lib/services.ts.
 export default function ExpressV2Page() {
+  if (!isPageEnabled(EXPRESS_V2_PATH)) return <ServiceUnavailable />;
+  return <ExpressV2PageContent />;
+}
+
+function ExpressV2PageContent() {
   const [service, setService] = useState<ServiceId>("privacy_blur");
 
   const preview = useImagePreview();

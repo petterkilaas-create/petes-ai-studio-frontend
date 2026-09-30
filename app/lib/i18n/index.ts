@@ -140,6 +140,9 @@ const nbUi = {
   "review.downloadNotAllowed": "Bare eieren av jobben kan laste ned bildet.",
   "review.downloadBroken": "Bildet kunne ikke hentes. Kontakt oss.",
   "history.open": "Åpne",
+  "unavailable.title": "Midlertidig ikke tilgjengelig",
+  "unavailable.body": "Denne tjenesten er midlertidig ikke tilgjengelig.",
+  "unavailable.toExpress": "Gå til Express",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -369,6 +372,9 @@ const en: Dictionary = {
     "review.downloadNotAllowed": "Only the job owner can download the image.",
     "review.downloadBroken": "The image could not be retrieved. Please contact us.",
     "history.open": "Open",
+    "unavailable.title": "Temporarily unavailable",
+    "unavailable.body": "This service is temporarily unavailable.",
+    "unavailable.toExpress": "Go to Express",
   },
   codes: {
     reviewCode: {

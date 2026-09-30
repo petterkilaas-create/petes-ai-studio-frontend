@@ -26,21 +26,24 @@ utover det som staar her.
   gjennom `app/lib/api.ts`.
 - Legacy-sider (bl.a. orders, copywriter, video) kaller Supabase direkte. Ikke
   utvid det moensteret - maalet er at frontend aldri snakker med Supabase (TG-NEW-72).
-- Demo-flyten ligger paa `/scene-transform-debug`. Migrering til `/express`
-  er TG-NEW-86.
+- Demo-flyten (skumring) ligger i `/express`. `/scene-transform-debug` er
+  slettet (L0, 2026-09-30).
+- Tjenester av/paa: `ENABLED` i `app/lib/services.ts`. Klart vaer, Magic
+  Cleanup, Virtual Staging og `/express-v2` er av til de er merket (TG-NEW-136).
 
 ## Kommandoer
 - Ved oppstart av oekt: `git checkout main && git pull`.
 - Installer fra lockfila med `npm ci`. `npm install` kan endre
   `package-lock.json` - commit aldri lockfil-endringer du ikke ble bedt om.
 - Typesjekk (porten lokalt): `npx tsc --noEmit` - forventet rent.
-- `npm test` (node --test) - 130 tester per 2026-09-29, forventet groent.
+- `npm test` (node --test) - 138 tester per 2026-09-30, forventet groent.
 - Dev-server: `npm run dev`, aapne http://localhost:3000 - aldri 127.0.0.1
   (Clerk-cookies og cross-origin oppfoerer seg annerledes).
 - `npm run build` feiler lokalt (verifisert 2026-09-23) under prerender av
   `/express-v2`: `app/lib/api.ts` kaster fordi `NEXT_PUBLIC_API_BASE` ikke er
-  satt i lokal env. Build stopper ved foerste feil, saa senere sider (f.eks.
-  `/copywriter`) er ikke sjekket. Foer-eksisterende, ikke en regresjon;
+  satt i lokal env. Sidene bygges parallelt og build stopper ved foerste
+  feil, saa den kan like gjerne stoppe paa `/copywriter` (Supabase-env
+  mangler, sett 2026-09-30). Foer-eksisterende, ikke en regresjon;
   `tsc --noEmit` er porten.
 
 ## Harde regler (brytes aldri)
