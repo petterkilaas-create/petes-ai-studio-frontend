@@ -8,6 +8,8 @@ import { ErrorPanel } from "../components/ErrorPanel";
 import { RejectionPanel } from "../components/RejectionPanel";
 import type { ProcessParams } from "../lib/api";
 import { nearestAspectRatio, type AspectRatio } from "../lib/aspectRatio";
+import { ServiceUnavailable } from "../components/ServiceUnavailable";
+import { STAGING_PATH, isPageEnabled } from "../lib/services";
 
 // Kun EN tjeneste paa denne siden: Virtual Staging (Scandi).
 const SERVICE = "virtual_stage";
@@ -19,7 +21,15 @@ const SERVICE = "virtual_stage";
 // tilordningsbar til ProcessParams, saa job.run() godtar den.
 type StageParams = ProcessParams & { aspect_ratio: AspectRatio };
 
+// Stengt mens tjenesten er av (TG-NEW-136, L0). Innholdet er beholdt i
+// StagingPageContent, og hookene der kjoerer ikke naar siden er stengt: ingen
+// jobber og ingen kall mot backend. Slaa paa i lib/services.ts.
 export default function StagingPage() {
+  if (!isPageEnabled(STAGING_PATH)) return <ServiceUnavailable />;
+  return <StagingPageContent />;
+}
+
+function StagingPageContent() {
   const preview = useImagePreview();
   const job = useProcessJob();
 

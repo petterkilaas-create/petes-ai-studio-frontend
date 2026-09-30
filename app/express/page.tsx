@@ -15,147 +15,15 @@ import { DuskChoicePicker } from "../components/DuskChoicePicker";
 import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "../lib/dusk";
 import { t } from "../lib/i18n";
 import { useLocale } from "../lib/i18n/useLocale";
+import { expressCategories } from "../lib/services";
 
-// "simple" = service alene (ingen params, backend-defaults gjelder).
-// "scene"  = scene_transform med preset_id + scene-type-gate (TG-NEW-58),
-//            samme param-oppsett som scene-transform-debug i prod.
-type ToolKind = "simple" | "scene";
-
-interface Tool {
-  id: string;
-  service: string;
-  presetId?: string;
-  kind: ToolKind;
-  /**
-   * Scene-type-velger + "Tving eksterioer" for scene-kort. Standard true;
-   * false der backend bestemmer bildetypen selv (skumring, nivaa 2).
-   */
-  sceneGate?: boolean;
-  icon: string;
-  title: string;
-  desc: string;
-}
-
-interface Category {
-  id: string;
-  title: string;
-  icon: string;
-  items: Tool[];
-}
-
-// Fasit fra backendens service-enum. Beskrivelser gjenbrukt fra den gamle
-// express-siden der de fantes (engelsk, ingen spesialtegn).
-const CATEGORIES: Category[] = [
-  {
-    id: "fixit",
-    title: "Fix-It Tools",
-    icon: "🧹",
-    items: [
-      {
-        id: "magic_cleanup",
-        service: "magic_cleanup",
-        kind: "simple",
-        icon: "🧽",
-        title: "Magic Cleanup",
-        desc: "Auto-remove moving boxes, loose cables, and general clutter.",
-      },
-      {
-        id: "privacy_blur",
-        service: "privacy_blur",
-        kind: "simple",
-        icon: "🕵️",
-        title: "Privacy Blur",
-        desc: "Seamlessly blur faces, family photos, and license plates.",
-      },
-      // Skjult inntil lawn_green-pipeline finnes i backend (Dag 21+)
-      // {
-      //   id: "lawn_green",
-      //   service: "lawn_green",
-      //   kind: "simple",
-      //   icon: "🌿",
-      //   title: "Lush Lawn",
-      //   desc: "Turn dead or brown grass into a perfect, manicured green lawn.",
-      // },
-      // Skjult inntil pool_enhance-pipeline finnes i backend (Dag 21+)
-      // {
-      //   id: "pool_enhance",
-      //   service: "pool_enhance",
-      //   kind: "simple",
-      //   icon: "🏊",
-      //   title: "Pool Cleanup",
-      //   desc: "Clean murky pool water into inviting, crystal-clear light blue.",
-      // },
-    ],
-  },
-  // Hele Atmosphere-kategorien skjult: alle kortene er backend-stubber uten
-  // pipeline (lamp_on, fireplace_ignite, sky_replace). Vis igjen naar minst
-  // ett kort har en faktisk pipeline i backend (Dag 21+).
-  // {
-  //   id: "atmosphere",
-  //   title: "Atmosphere",
-  //   icon: "🌌",
-  //   items: [
-  //     // Skjult inntil lamp_on-pipeline finnes i backend (Dag 21+)
-  //     // {
-  //     //   id: "lamp_on",
-  //     //   service: "lamp_on",
-  //     //   kind: "simple",
-  //     //   icon: "💡",
-  //     //   title: "Turn On Lights",
-  //     //   desc: "Ignite interior lamps and fixtures without making it night.",
-  //     // },
-  //     // Skjult inntil fireplace_ignite-pipeline finnes i backend (Dag 21+)
-  //     // {
-  //     //   id: "fireplace_ignite",
-  //     //   service: "fireplace_ignite",
-  //     //   kind: "simple",
-  //     //   icon: "🔥",
-  //     //   title: "Virtual Fireplace",
-  //     //   desc: "Ignite a realistic, cozy fire in an empty fireplace.",
-  //     // },
-  //     // Skjult inntil sky_replace-pipeline finnes i backend (Dag 21+)
-  //     // {
-  //     //   id: "sky_replace",
-  //     //   service: "sky_replace",
-  //     //   kind: "simple",
-  //     //   icon: "🌤️",
-  //     //   title: "Sky Replace",
-  //     //   desc: "Swap a dull or blown-out sky for a clean, natural blue one.",
-  //     // },
-  //   ],
-  // },
-  {
-    id: "timetraveler",
-    title: "Time Traveler",
-    icon: "🍂",
-    items: [
-      {
-        id: "klart_vaer",
-        service: "scene_transform",
-        presetId: "klart_vaer",
-        kind: "scene",
-        icon: "☀️",
-        title: "Klart vær",
-        desc: "Transform the scene to bright, clear daylight.",
-      },
-      {
-        id: "skumring",
-        service: "scene_transform",
-        presetId: "skumring",
-        kind: "scene",
-        sceneGate: false,
-        icon: "🌆",
-        title: "Skumring",
-        desc: "Transform the scene to a warm, inviting dusk.",
-      },
-    ],
-  },
-];
+// Tjenestevalget ligger i lib/services.ts, filtrert paa ENABLED (TG-NEW-136).
+const CATEGORIES = expressCategories();
 
 type SceneType = "auto" | "exterior" | "interior";
 
 export default function ExpressPage() {
-  const [activeCategoryId, setActiveCategoryId] = useState<string>("fixit");
+  const [activeCategoryId, setActiveCategoryId] = useState<string>(CATEGORIES[0]?.id ?? "");
   const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
 
   // Scene-type-gate-kontroller (kun for scene_transform-kort), samme

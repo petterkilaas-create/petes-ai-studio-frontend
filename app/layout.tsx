@@ -1,6 +1,8 @@
 import "./globals.css";
 import { ClerkProvider, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
+import { Fragment } from "react";
+import { navLinks } from "./lib/services";
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
@@ -13,13 +15,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <span className="font-black text-white uppercase tracking-widest hidden md:block text-xs">The Studio</span>
               </Link>
               <nav className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                <Link href="/express" className="hover:text-[#009183] transition-colors">⚡ Express</Link>
-                <Link href="/staging" className="hover:text-[#00ff83] transition-colors">🛋️ Staging</Link>
-                <Link href="/video" className="hover:text-purple-400 transition-colors">🎬 Video</Link>
-                <Link href="/copywriter" className="...">✍️ Copywriter</Link>
-                <div className="w-px h-4 bg-slate-700"></div>
-                <Link href="/orders" className="hover:text-white transition-colors">📁 Orders</Link>
-                <Link href="/history" className="hover:text-white transition-colors">🕘 Historikk</Link>
+                {navLinks().map((l) => (
+                  <Fragment key={l.href}>
+                    {l.dividerBefore && <div className="w-px h-4 bg-slate-700"></div>}
+                    <Link href={l.href} className={l.className}>{l.label}</Link>
+                  </Fragment>
+                ))}
               </nav>
             </div>
             <UserButton />

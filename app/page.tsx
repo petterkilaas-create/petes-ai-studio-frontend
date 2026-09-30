@@ -2,6 +2,7 @@
 
 import { useUser, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
+import { isPageEnabled, STAGING_PATH } from "./lib/services";
 
 export default function Home() {
   const { user } = useUser();
@@ -37,17 +38,20 @@ export default function Home() {
           </Link>
 
           {/* Card 2: Staging */}
-          <Link href="/staging" className="group relative bg-[#0f172a] rounded-3xl p-8 border border-slate-800 hover:border-[#009183]/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(0,145,131,0.2)] flex flex-col h-full overflow-hidden">
-             <div className="absolute top-0 right-0 w-32 h-32 bg-[#009183] rounded-full blur-[100px] opacity-10 group-hover:opacity-30 transition-opacity"></div>
-            <div className="text-4xl mb-6">🛋️</div>
-            <h3 className="text-xl font-black text-white uppercase tracking-widest mb-3">Virtual Staging</h3>
-            <p className="text-slate-400 text-sm leading-relaxed mb-8 flex-1">
-              Transform empty spaces into beautifully furnished, inviting homes with Scandinavian or Luxury styles.
-            </p>
-            <div className="text-[#009183] text-xs font-bold uppercase tracking-widest flex items-center gap-2 group-hover:gap-4 transition-all">
-              Start Staging <span>→</span>
-            </div>
-          </Link>
+          {/* Skjult mens Virtual Staging er av (TG-NEW-136, lib/services.ts). */}
+          {isPageEnabled(STAGING_PATH) && (
+            <Link href={STAGING_PATH} className="group relative bg-[#0f172a] rounded-3xl p-8 border border-slate-800 hover:border-[#009183]/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(0,145,131,0.2)] flex flex-col h-full overflow-hidden">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-[#009183] rounded-full blur-[100px] opacity-10 group-hover:opacity-30 transition-opacity"></div>
+              <div className="text-4xl mb-6">🛋️</div>
+              <h3 className="text-xl font-black text-white uppercase tracking-widest mb-3">Virtual Staging</h3>
+              <p className="text-slate-400 text-sm leading-relaxed mb-8 flex-1">
+                Transform empty spaces into beautifully furnished, inviting homes with Scandinavian or Luxury styles.
+              </p>
+              <div className="text-[#009183] text-xs font-bold uppercase tracking-widest flex items-center gap-2 group-hover:gap-4 transition-all">
+                Start Staging <span>→</span>
+              </div>
+            </Link>
+          )}
 
           {/* Card 3: Video */}
           <Link href="/video" className="group relative bg-[#0f172a] rounded-3xl p-8 border border-purple-900/50 hover:border-purple-500/50 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_-15px_rgba(147,51,234,0.2)] flex flex-col h-full overflow-hidden">
