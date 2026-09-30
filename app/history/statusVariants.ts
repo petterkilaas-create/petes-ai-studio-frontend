@@ -61,6 +61,15 @@ export function hasResultImage(status: string): boolean {
   return status === "succeeded" || status === "awaiting_approval";
 }
 
+/**
+ * Miniatyren kortet viser (Lekkasjen L2): bare den merkede `thumbUrl`, og
+ * bare for statuser med resultatbilde. null gir kortet uten bilde («Ingen
+ * forhåndsvisning»), aldri resultUrl/variantUrls.
+ */
+export function thumbSrc(job: Pick<JobSummary, "status" | "thumbUrl">): string | null {
+  return hasResultImage(job.status) ? job.thumbUrl : null;
+}
+
 /** Farge for «Avvist av deg» (2d-1): noeytral, ikke roed. Teksten kommer fra ordlista. */
 export const REVIEWER_REJECTED_CLS = "bg-slate-800/60 text-slate-300 border-slate-500/30";
 

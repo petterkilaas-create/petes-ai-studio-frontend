@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { terminalState } from "./jobState.ts";
+import { outputView, terminalState } from "./jobState.ts";
 import { deriveProcessStatus, isProcessingStatus } from "../hooks/processStatus.ts";
 
 const noBlob = () => {
@@ -21,14 +21,14 @@ test("pending er ikke terminalt (polling fortsetter)", () => {
   assert.equal(terminalState({ kind: "pending", status: "running" }, noBlob), null);
 });
 
-test("awaiting_approval: bilde fra signert URL, polling stopper, isProcessing false", () => {
+test("awaiting_approval: bilde fra previewUrl, polling stopper, isProcessing false", () => {
   const s = terminalState(
-    { kind: "awaiting_approval", resultUrl: "https://x/signed.png", jobId: "j1" },
+    { kind: "awaiting_approval", previewUrl: "https://x/j1_preview_abc.jpg", jobId: "j1" },
     noBlob
   );
   assert.ok(s);
   assert.equal(s.status, "awaiting_approval");
-  assert.equal(s.imageUrl, "https://x/signed.png");
+  assert.equal(s.imageUrl, "https://x/j1_preview_abc.jpg");
   assert.equal(s.error, null);
   const ps = processStatusFor(s.status);
   assert.equal(ps, "awaiting_approval");
@@ -59,7 +59,7 @@ test("unknown (200 og 202) stopper polling, isProcessing false", () => {
 
 test("done bruker object-URL fra blob", () => {
   const s = terminalState(
-    { kind: "done", imageBlob: new Blob(["x"]), jobId: "j1" },
+    { kind: "done", imageBlob: new Blob(["x"]), previewUrl: null, jobId: "j1" },
     () => "blob:abc"
   );
   assert.equal(s?.status, "done");
@@ -90,4 +90,32 @@ test("rejected_by_reviewer: egen sluttstatus, ikke failed, polling stopper", () 
   const ps = processStatusFor(s.status);
   assert.equal(ps, "rejected_by_reviewer");
   assert.equal(isProcessingStatus(ps), false);
+});
+
+test("done fra JSON (L3) bruker previewUrl, uten object-URL", () => {
+  const s = terminalState(
+    { kind: "done", imageBlob: null, previewUrl: "https://x/j1_preview_abc.jpg", jobId: "j1" },
+    noBlob
+  );
+  assert.equal(s?.status, "done");
+  assert.equal(s?.imageUrl, "https://x/j1_preview_abc.jpg");
+  const none = terminalState({ kind: "done", imageBlob: null, previewUrl: null, jobId: "j1" }, noBlob);
+  assert.equal(none?.imageUrl, null);
+});
+
+test("awaiting_approval uten previewUrl gir imageUrl null (plassholder)", () => {
+  const s = terminalState({ kind: "awaiting_approval", previewUrl: null, jobId: "j1" }, noBlob);
+  assert.equal(s?.status, "awaiting_approval");
+  assert.equal(s?.imageUrl, null);
+});
+
+test("Express Output: previewUrl gir bilde, ellers plassholder ved awaiting_approval/done", () => {
+  assert.deepEqual(outputView("awaiting_approval", "https://x/p.jpg"), { kind: "image", url: "https://x/p.jpg" });
+  assert.deepEqual(outputView("awaiting_approval", null), { kind: "placeholder" });
+  assert.deepEqual(outputView("done", null), { kind: "placeholder" });
+  assert.deepEqual(outputView("running", null), { kind: "empty" });
+  assert.deepEqual(outputView("idle", null), { kind: "empty" });
+  // Hele kjeden: poll med bare result_url gir aldri bilde.
+  const s = terminalState({ kind: "awaiting_approval", previewUrl: null, jobId: "j1" }, noBlob);
+  assert.deepEqual(outputView(s!.status, s!.imageUrl), { kind: "placeholder" });
 });

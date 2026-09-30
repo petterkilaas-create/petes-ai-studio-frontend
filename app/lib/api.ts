@@ -64,6 +64,11 @@ interface JobStatusBody {
   classifier?: { verdict?: string; confidence?: number };
   /** Signert URL til resultatbildet (awaiting_approval, 2c-2). */
   result_url?: string;
+  /**
+   * Lekkasjen L1: merket forhaandsvisning (awaiting_approval, og fra L3
+   * succeeded). null naar fila ikke er laget ennaa.
+   */
+  preview_url?: unknown;
   /** Grunner fra port 1 (needs_review, 2c-2). */
   reasons?: unknown;
   /** Meglerens egen begrunnelse ved rejected_by_reviewer (2d-1). */
@@ -128,7 +133,11 @@ export type SubmitResult =
  * Poll-resultat. Alt unntatt "pending" er terminalt — pollingen stopper.
  *
  * Kontrakt 2c-2 (godkjent av Petter Dag 29), begge HTTP 200 + JSON:
- * - awaiting_approval: {status, result_url} — bildet finnes, ikke godkjent.
+ * - awaiting_approval: {status, preview_url} — bildet finnes, ikke godkjent.
+ *   Lekkasjen L2: bare den merkede `preview_url` brukes, aldri `result_url`;
+ *   null gir plassholder.
+ * - succeeded: bildebytes (i dag) eller JSON {status, preview_url} (fra L3).
+ *   Begge gir "done".
  * - needs_review: {status, code, reasons} — port 1 stoppet, intet bilde.
  * Ukjent status (200-JSON eller 202) gir "unknown": aldri evig polling,
  * aldri roed feil.
@@ -139,8 +148,8 @@ export type SubmitResult =
  */
 export type JobResult =
   | { kind: "pending"; status: "queued" | "running"; retryAfterMs?: number }
-  | { kind: "done"; imageBlob: Blob; resultUrl?: string; jobId: string }
-  | { kind: "awaiting_approval"; resultUrl: string; jobId: string }
+  | { kind: "done"; imageBlob: Blob | null; previewUrl: string | null; jobId: string }
+  | { kind: "awaiting_approval"; previewUrl: string | null; jobId: string }
   | { kind: "needs_review"; review: Review }
   | { kind: "unknown"; status: string | null; httpStatus: number }
   | { kind: "rejected_by_reviewer"; reason: string | null }
@@ -171,14 +180,20 @@ export function parseStatusBody(data: JobStatusBody, jobId: string): JobResult {
       : { kind: "failed", detail };
   }
   if (data.status === "awaiting_approval") {
-    // Uten result_url er svaret et kontraktsbrudd — vis noeytralt, ikke
-    // "Til kontroll" uten bilde.
-    if (typeof data.result_url !== "string" || data.result_url === "") {
-      return unknownStatus(data.status, 200);
-    }
+    // Lekkasjen L2: bare den merkede forhaandsvisningen. Mangler den, viser
+    // siden plassholder; result_url (umerket PNG) brukes aldri.
     return {
       kind: "awaiting_approval",
-      resultUrl: data.result_url,
+      previewUrl: nonEmptyString(data.preview_url),
+      jobId: data.job_id ?? jobId,
+    };
+  }
+  if (data.status === "succeeded") {
+    // Fra L3: JSON i stedet for bytes. Gir "done" med den merkede URL-en.
+    return {
+      kind: "done",
+      imageBlob: null,
+      previewUrl: nonEmptyString(data.preview_url),
       jobId: data.job_id ?? jobId,
     };
   }
@@ -325,10 +340,10 @@ export async function pollJob(opts: {
       return parseStatusBody(data, jobId);
     }
 
+    // Bytes (til L3). Headeren med den umerkede URL-en leses ikke (L2).
     const imageBlob = await res.blob();
-    const resultUrl = res.headers.get("X-Result-URL") ?? undefined;
     const responseJobId = res.headers.get("X-Job-ID") ?? jobId;
-    return { kind: "done", imageBlob, resultUrl, jobId: responseJobId };
+    return { kind: "done", imageBlob, previewUrl: null, jobId: responseJobId };
   }
 
   if (res.status === 202) {
@@ -360,6 +375,8 @@ interface JobSummaryWire {
   created_at: string | null;
   result_url: string | null;
   variant_urls: string[] | null;
+  /** Lekkasjen L1: merket miniatyr 640x427, eller null. */
+  thumb_url?: unknown;
   error: string | null;
   /** 2d-1a: kode for raden (rejected_by_reviewer, needs_review-koden) eller null. */
   code?: string | null;
@@ -425,6 +442,12 @@ export interface JobSummary {
   createdAt: string | null;
   resultUrl: string | null;
   variantUrls: string[] | null;
+  /**
+   * Lekkasjen L2: den merkede miniatyren, det eneste bildet /history viser.
+   * null naar den ikke er laget ennaa (hoeyst 4 nye per kall) eller feltet
+   * mangler (eldre backend). `resultUrl`/`variantUrls` vises aldri.
+   */
+  thumbUrl: string | null;
   error: string | null;
   /**
    * Kode fra backend (2d-1a): "rejected_by_reviewer" for jobb avvist av
@@ -539,6 +562,7 @@ export async function listJobs(opts: {
     createdAt: row.created_at,
     resultUrl: row.result_url,
     variantUrls: row.variant_urls,
+    thumbUrl: nonEmptyString(row.thumb_url),
     error: row.error,
     code: nonEmptyString(row.code),
     reason: nonEmptyString(row.reason),
@@ -675,7 +699,21 @@ export interface JobReviewDetail {
     resultUrl: string | null;
     rawUrl: string | null;
     /** Bildet fra forrige runde, eller null foer foerste runde er ferdig. */
-    previous: { round: number | null; resultUrl: string | null; rawUrl: string | null } | null;
+    previous: {
+      round: number | null;
+      resultUrl: string | null;
+      rawUrl: string | null;
+      /** Lekkasjen L1: merket forhaandsvisning av forrige runde, eller null. */
+      previewUrl: string | null;
+    } | null;
+    /**
+     * Lekkasjen L2: de merkede forhaandsvisningene er de eneste KI-bildene
+     * siden viser. null (eller feltet mangler) gir plassholder, aldri
+     * resultUrl/rawUrl. Typene for de gamle feltene ryddes i L4.
+     */
+    previewUrl: string | null;
+    /** Merket forhaandsvisning av det raa bildet; bare admin, ellers null. */
+    rawPreviewUrl: string | null;
   };
   decisions: { action: string | null; at: string | null; byRole: string | null; reason: string | null }[];
 }
@@ -801,7 +839,10 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
               round: numberOrNull(previous.round),
               resultUrl: stringOrNull(previous.result_url),
               rawUrl: stringOrNull(previous.raw_url),
+              previewUrl: nonEmptyString(previous.preview_url),
             },
+      previewUrl: nonEmptyString(images.preview_url),
+      rawPreviewUrl: nonEmptyString(images.raw_preview_url),
     },
     decisions: records(r.decisions).map((d) => ({
       action: stringOrNull(d.action),

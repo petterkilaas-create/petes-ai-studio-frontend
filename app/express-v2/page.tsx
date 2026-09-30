@@ -147,10 +147,10 @@ function ExpressV2PageContent() {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
               Output
             </p>
-            {job.resultUrl ? (
+            {job.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={job.resultUrl}
+                src={job.imageUrl}
                 alt="Output result"
                 className="w-full h-auto rounded-xl border border-slate-800"
               />

@@ -30,7 +30,8 @@ export interface TerminalJobState {
 /**
  * Terminal tilstand for et poll-resultat, eller null naar jobben fortsatt
  * kjoerer (pending — poll videre). `toObjectUrl` kalles kun for "done"
- * (bildebytes); awaiting_approval bruker den signerte URL-en direkte.
+ * med bildebytes; ellers brukes den merkede previewUrl direkte (Lekkasjen
+ * L2). null gir plassholder.
  */
 export function terminalState(
   result: JobResult,
@@ -48,9 +49,13 @@ export function terminalState(
     case "pending":
       return null;
     case "done":
-      return { ...base, status: "done", imageUrl: toObjectUrl(result.imageBlob) };
+      return {
+        ...base,
+        status: "done",
+        imageUrl: result.imageBlob !== null ? toObjectUrl(result.imageBlob) : result.previewUrl,
+      };
     case "awaiting_approval":
-      return { ...base, status: "awaiting_approval", imageUrl: result.resultUrl };
+      return { ...base, status: "awaiting_approval", imageUrl: result.previewUrl };
     case "needs_review":
       return { ...base, status: "needs_review", review: result.review };
     case "rejected_by_reviewer":
@@ -71,4 +76,18 @@ export function terminalState(
           }
         : { ...base, status: "failed", error: result.detail };
   }
+}
+
+/**
+ * Hva Express viser i Output-ruten (Lekkasjen L2): bildet naar vi har en
+ * URL, plassholder naar jobben er ferdig (done/awaiting_approval) uten
+ * merket forhaandsvisning, ellers den tomme ruten. Tar bare den URL-en
+ * terminalState ga, aldri et umerket felt.
+ */
+export type OutputView = { kind: "image"; url: string } | { kind: "placeholder" } | { kind: "empty" };
+
+export function outputView(status: string, imageUrl: string | null): OutputView {
+  if (imageUrl) return { kind: "image", url: imageUrl };
+  if (status === "done" || status === "awaiting_approval") return { kind: "placeholder" };
+  return { kind: "empty" };
 }

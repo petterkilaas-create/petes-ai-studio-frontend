@@ -85,31 +85,48 @@ test("begrunnelsen telles i tegn etter trimming, grense 500", () => {
   assert.equal(reasonTooLong(` ${"a".repeat(500)} `), false);
 });
 
-test("bryter løftet/rått bare naar begge bildene finnes", () => {
-  const both = { originalUrl: "o", resultUrl: "lifted", rawUrl: "raw", previous: null };
-  assert.deepEqual(variantOptions(both), ["lifted", "raw"]);
-  assert.equal(resultImageUrl(both, "lifted"), "lifted");
-  assert.equal(resultImageUrl(both, "raw"), "raw");
-  const onlyResult = { originalUrl: "o", resultUrl: "lifted", rawUrl: null, previous: null };
-  assert.deepEqual(variantOptions(onlyResult), []);
-  assert.equal(resultImageUrl(onlyResult, "raw"), "lifted");
-  const none = { originalUrl: "o", resultUrl: null, rawUrl: null, previous: null };
-  assert.equal(resultImageUrl(none, "lifted"), null);
+// Lekkasjen L2: de gamle feltene er fylt ut i alle testene under, saa et
+// tilbakefall til resultUrl/rawUrl blir fanget.
+const OLD = { originalUrl: "o", resultUrl: "lifted.png", rawUrl: "raw.png" };
+const OLD_PREV = { round: 0, resultUrl: "prev.png", rawUrl: "prev-raw.png" };
+
+test("bildet kommer fra previewUrl", () => {
+  const images = { ...OLD, previewUrl: "p.jpg", rawPreviewUrl: null, previous: null };
+  assert.equal(resultImageUrl(images, "lifted"), "p.jpg");
 });
 
-test("«Forrige runde» bare naar images.previous har et bilde", () => {
-  const previous = { round: 0, resultUrl: "prev", rawUrl: "prev-raw" };
-  const both = { originalUrl: "o", resultUrl: "lifted", rawUrl: "raw", previous };
-  assert.deepEqual(variantOptions(both), ["lifted", "raw", "previous"]);
-  assert.equal(resultImageUrl(both, "previous"), "prev");
-  const onlyResult = { originalUrl: "o", resultUrl: "lifted", rawUrl: null, previous };
-  assert.deepEqual(variantOptions(onlyResult), ["lifted", "previous"]);
-  const rawOnly = { ...both, previous: { round: 0, resultUrl: null, rawUrl: "prev-raw" } };
-  assert.equal(resultImageUrl(rawOnly, "previous"), "prev-raw");
-  const empty = { ...both, previous: { round: 0, resultUrl: null, rawUrl: null } };
-  assert.deepEqual(variantOptions(empty), ["lifted", "raw"]);
-  // Uten previous faller «Forrige runde» tilbake til gjeldende bilde.
-  assert.equal(resultImageUrl({ ...both, previous: null }, "previous"), "lifted");
+test("previewUrl null gir plassholder (null), aldri resultUrl eller rawUrl", () => {
+  const images = { ...OLD, previewUrl: null, rawPreviewUrl: null, previous: null };
+  for (const v of ["lifted", "raw", "previous"] as const) {
+    assert.equal(resultImageUrl(images, v), null, v);
+  }
+});
+
+test("«Rått» bare naar rawPreviewUrl finnes, og viser da den", () => {
+  const admin = { ...OLD, previewUrl: "p.jpg", rawPreviewUrl: "rp.jpg", previous: null };
+  assert.deepEqual(variantOptions(admin), ["lifted", "raw"]);
+  assert.equal(resultImageUrl(admin, "raw"), "rp.jpg");
+  const owner = { ...OLD, previewUrl: "p.jpg", rawPreviewUrl: null, previous: null };
+  assert.deepEqual(variantOptions(owner), []);
+  assert.equal(resultImageUrl(owner, "raw"), null, "rått faller ikke tilbake til rawUrl");
+});
+
+test("«Forrige runde» vises fra previous.previewUrl", () => {
+  const images = {
+    ...OLD, previewUrl: "p.jpg", rawPreviewUrl: null,
+    previous: { ...OLD_PREV, previewUrl: "pp.jpg" },
+  };
+  assert.deepEqual(variantOptions(images), ["lifted", "previous"]);
+  assert.equal(resultImageUrl(images, "previous"), "pp.jpg");
+  const notReady = { ...images, previous: { ...OLD_PREV, previewUrl: null } };
+  assert.deepEqual(variantOptions(notReady), ["lifted", "previous"]);
+  assert.equal(resultImageUrl(notReady, "previous"), null, "plassholder, aldri previous.resultUrl");
+  const admin = { ...images, rawPreviewUrl: "rp.jpg" };
+  assert.deepEqual(variantOptions(admin), ["lifted", "raw", "previous"]);
+  // Uten forrige runde: ingen knapp, og ikke gjeldende bilde under feil etikett.
+  const first = { ...images, previous: null };
+  assert.deepEqual(variantOptions(first), []);
+  assert.equal(resultImageUrl(first, "previous"), null);
 });
 
 test("outcome: venter gir null, ellers riktig linje", () => {

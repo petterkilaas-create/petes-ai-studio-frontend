@@ -33,10 +33,10 @@ export type { ProcessStatus } from "./processStatus";
 export interface UseProcessJobResult {
   status: ProcessStatus;
   /**
-   * Resultatbildet: object-URL (sync-blob eller poll-bytes), eller signert
-   * URL ved awaiting_approval.
+   * Resultatbildet: object-URL (sync-blob eller poll-bytes), eller den
+   * merkede previewUrl fra poll (Lekkasjen L2). null gir plassholder.
    */
-  resultUrl: string | null;
+  imageUrl: string | null;
   /** Bruker-rettet feilmelding (ValidationError-detail eller poll-feil). */
   error: string | null;
   /** Strukturert scene-gate-avslag (TG-NEW-58), eller null. */
@@ -156,7 +156,7 @@ export function useProcessJob(): UseProcessJobResult {
 
   return {
     status,
-    resultUrl: syncResultUrl ?? job.imageUrl,
+    imageUrl: syncResultUrl ?? job.imageUrl,
     error: submitError ?? job.error,
     rejection: job.rejection,
     review: job.review,
