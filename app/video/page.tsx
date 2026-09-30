@@ -6,11 +6,22 @@ import Autocomplete from "react-google-autocomplete";
 import { supabase } from "../../supabaseClient"; 
 
 import { API_BASE } from "../lib/api";
+import { ServiceUnavailable } from "../components/ServiceUnavailable";
+import { VIDEO_PATH, isPageEnabled } from "../lib/services";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; };
 
+// Stengt (dag 33, L0b): siden kaller backend-ruter som ikke er montert.
+// Innholdet er beholdt i VideoPageContent, og hookene der kjoerer ikke naar
+// siden er stengt: ingen kall mot backend eller Supabase. Slaa paa i
+// lib/services.ts.
 export default function VideoPage() {
+  if (!isPageEnabled(VIDEO_PATH)) return <ServiceUnavailable />;
+  return <VideoPageContent />;
+}
+
+function VideoPageContent() {
   const { user } = useUser();
   const { getToken } = useAuth(); // <-- VIP Pass for Clerk
 

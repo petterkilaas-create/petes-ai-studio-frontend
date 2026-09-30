@@ -114,8 +114,7 @@ export default function ExpressPage() {
               <span className="text-4xl">⚡</span> Express Studio
             </h1>
             <p className="text-slate-400 max-w-2xl text-sm">
-              One-click magic edits, atmospheric lighting, and seasonal
-              transformations.
+              {t(locale, "express.subtitle")}
             </p>
           </div>
           {/* Uten error: den raa teksten skal ikke vises (TG-NEW-121). */}
