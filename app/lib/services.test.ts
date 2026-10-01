@@ -173,8 +173,7 @@ test("/video, /copywriter og /orders: stengt side gir «ikke tilgjengelig» og g
 });
 
 const HOME_KEYS = [
-  "home.titlePrefix",
-  "home.titleHighlight",
+  "home.title",
   "home.intro",
   "home.express.title",
   "home.express.desc",
@@ -195,7 +194,8 @@ test("forsiden og Express: teksten lover ikke video, Veo, HDR eller aarstider", 
   assert.doesNotMatch(read("express/page.tsx"), /seasonal/i);
   const home = read("page.tsx");
   for (const key of HOME_KEYS.filter((k) => k.startsWith("home."))) {
-    assert.ok(home.includes(`t(locale, "${key}")`), key);
+    // home.title faar navnet som variabel: t(locale, "home.title", { name }).
+    assert.ok(home.includes(`t(locale, "${key}"`), key);
   }
   assert.ok(read("express/page.tsx").includes(`t(locale, "express.subtitle")`));
 });

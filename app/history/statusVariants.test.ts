@@ -5,20 +5,48 @@ import {
   openLinkKey,
   hasResultImage,
   isRejectedByReviewer,
+  serviceLabelKey,
   statusVariant,
   thumbSrc,
 } from "./statusVariants.ts";
+import { DICTIONARIES } from "../lib/i18n/index.ts";
 
-test("nye statuser har egne etiketter", () => {
-  assert.equal(statusVariant("awaiting_approval").label, "Til kontroll");
-  assert.equal(statusVariant("needs_review").label, "Til gjennomgang");
+test("statusordene fra ordlista (brief §7, D1): Til godkjenning for begge ventestatusene", () => {
+  for (const status of ["awaiting_approval", "needs_review"]) {
+    const v = statusVariant(status);
+    assert.equal(v.labelKey, "status.awaitingApproval", status);
+    assert.equal(v.tone, "amber", status);
+    assert.equal(DICTIONARIES.nb.ui[v.labelKey], "Til godkjenning");
+  }
+  assert.equal(DICTIONARIES.nb.ui[statusVariant("running").labelKey], "Lages");
+  assert.equal(DICTIONARIES.nb.ui[statusVariant("queued").labelKey], "I kø");
+  assert.equal(statusVariant("failed").tone, "red");
+});
+
+test("succeeded: «Godkjent» for kveldsbildet, «Ferdig» for andre tjenester (Petter 01.10)", () => {
+  const nb = (status: string, service?: string) => DICTIONARIES.nb.ui[statusVariant(status, service).labelKey];
+  assert.equal(nb("succeeded", "scene_transform"), "Godkjent");
+  assert.equal(nb("succeeded", "privacy_blur"), "Ferdig");
+  assert.equal(nb("succeeded"), "Ferdig");
+  // Tjenesten endrer bare ordet for succeeded.
+  assert.equal(nb("failed", "scene_transform"), "Feilet");
+  assert.equal(statusVariant("succeeded", "scene_transform").tone, "green");
+});
+
+test("tjenestenavnene kommer fra ordlista (brief §7)", () => {
+  assert.equal(DICTIONARIES.nb.ui[serviceLabelKey("scene_transform")!], "Kveldsbilde");
+  assert.equal(DICTIONARIES.nb.ui[serviceLabelKey("privacy_blur")!], "Skjul ansikter og skilt");
+  assert.equal(DICTIONARIES.nb.ui[serviceLabelKey("virtual_stage")!], "Digital styling");
+  assert.equal(DICTIONARIES.en.ui[serviceLabelKey("scene_transform")!], "Dusk image");
+  assert.equal(serviceLabelKey("lawn_green"), null);
+  assert.equal(serviceLabelKey("toString"), null);
 });
 
 test("ukjente verdier gir standardvarianten, ingen krasj", () => {
   for (const raw of ["cancelled", "teleported", "", "__proto__", "toString"]) {
     const v = statusVariant(raw);
-    assert.equal(v.label, "Ukjent status", raw);
-    assert.equal(typeof v.cls, "string");
+    assert.equal(v.labelKey, "status.unknown", raw);
+    assert.equal(v.tone, "neutral", raw);
   }
 });
 
@@ -36,7 +64,7 @@ test("avvist av megleren kjennes paa code, ikke paa error-teksten", () => {
   assert.equal(isRejectedByReviewer({ status: "succeeded", code: "rejected_by_reviewer" }), false);
 });
 
-test("Åpne kontroll bare for Til kontroll og Til gjennomgang", () => {
+test("Åpne godkjenning bare for awaiting_approval og needs_review", () => {
   assert.equal(canOpenReview("awaiting_approval"), true);
   assert.equal(canOpenReview("needs_review"), true);
   for (const s of ["succeeded", "failed", "running", "unknown", "rejected"]) {
@@ -52,7 +80,7 @@ test("openLinkKey: Åpne bare paa egne godkjente skumringsjobber, ellers som foe
   assert.equal(openLinkKey(job("succeeded", "scene_transform", false)), null);
   // Andre tjenester har ingen godkjenningsside.
   assert.equal(openLinkKey(job("succeeded", "magic_cleanup")), null);
-  // Som foer: Åpne kontroll ogsaa paa andres jobber (bare lesing).
+  // Som foer: Åpne godkjenning ogsaa paa andres jobber (bare lesing).
   assert.equal(openLinkKey(job("awaiting_approval")), "history.openReview");
   assert.equal(openLinkKey(job("needs_review", "scene_transform", false)), "history.openReview");
   for (const s of ["failed", "running", "queued", "rejected", "unknown"]) {
