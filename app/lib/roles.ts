@@ -78,3 +78,12 @@ export function scopeFallback(
   }
   return null;
 }
+
+/**
+ * «Detaljer» (analysen) og rått bilde paa godkjenningssiden (D2a/D2b, brief
+ * §3 punkt 6): bare naar /me gir view_all, i dag bare admin. Redaktoeren
+ * trenger et eget signal fra backend (Petter 01.10). Mangler svaret: false.
+ */
+export function showDetails(caps: Capabilities | null): boolean {
+  return caps?.viewAll === true;
+}
