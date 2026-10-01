@@ -4,10 +4,12 @@ import { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import {
-  fetchJobDownload,
+  getCapabilities,
   getReview,
+  NO_CAPABILITIES,
   postDecision,
   REASON_MAX_LEN,
+  type Capabilities,
   type DecisionAction,
   type ReviewFetchResult,
   type ReviewLight,
@@ -26,9 +28,7 @@ import {
   reasonTooLong,
   resultImageUrl,
   shouldPoll,
-  variantOptions,
   type FireplaceAnswer,
-  type ImageVariant,
 } from "../../lib/review";
 import { isReadOnlyOther } from "../../lib/roles";
 import {
@@ -47,17 +47,16 @@ import {
 } from "../../lib/correction";
 import { runDecision } from "../../lib/decide";
 import { duskFacts, type ReviewDusk } from "../../lib/dusk";
-import {
-  DISCLOSURE_DETAIL,
-  DISCLOSURE_LOCALE,
-  disclosureText,
-  type ReviewDisclosure,
-} from "../../lib/disclosure";
-import { copyText, type CopyResult } from "../../lib/clipboard";
-import { canDownload, downloadMarkedImage } from "../../lib/download";
+import { canDownload } from "../../lib/download";
+import { compareVariants, selectedVariant, variantLabel } from "../../lib/compare";
 import { PreviewPlaceholder } from "../../components/PreviewPlaceholder";
 import { buttonClass } from "../../components/ui/Button";
 import { cardClass } from "../../components/ui/Card";
+import { CompareViewer } from "../../components/godkjenning/CompareViewer";
+import { VariantPicker } from "../../components/godkjenning/VariantPicker";
+import { DisclosureBlock } from "../../components/godkjenning/DisclosureBlock";
+import { DownloadButton } from "../../components/godkjenning/DownloadButton";
+import { FOCUS, LABEL } from "../../components/godkjenning/classes";
 
 /**
  * Godkjenningssiden (2d-1): megleren avgjoer egne jobber i «Til kontroll»
@@ -77,43 +76,9 @@ type LoadState = { kind: "loading" } | ReviewFetchResult;
 type Message = { key: UiKey } | { group: CodeGroup; code: string | null };
 
 const CARD = cardClass("md");
-const LABEL = "text-sm font-medium text-ink-2 mb-4";
-const FOCUS =
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
 const BTN_PRIMARY = buttonClass("primary");
 const BTN_SECONDARY = buttonClass("secondary");
-const VARIANT_LABEL: Record<ImageVariant, UiKey> = {
-  lifted: "review.variantLifted",
-  raw: "review.variantRaw",
-  previous: "review.previousRound",
-};
 const BTN_DANGER = buttonClass("danger");
-
-function ImageBox({
-  url,
-  alt,
-  locale,
-  preview = false,
-}: {
-  url: string | null;
-  alt: string;
-  locale: Locale;
-  /** KI-bildet (merket forhaandsvisning): mangler det, vises plassholderen (L2). */
-  preview?: boolean;
-}) {
-  if (!url && preview) return <PreviewPlaceholder />;
-  if (!url) {
-    return (
-      <div className="aspect-[3/2] w-full rounded-button border border-dashed border-line-strong bg-surface-2 flex items-center justify-center text-ink-2 text-sm">
-        {t(locale, "review.noImage")}
-      </div>
-    );
-  }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt={alt} className="w-full h-auto rounded-button border border-line" />
-  );
-}
 
 /**
  * Peisspoersmaalet med Tent/Ikke tent (2d-2d). Brukes baade for «Send
@@ -298,113 +263,6 @@ function DuskFactsBlock({ dusk, locale }: { dusk: ReviewDusk | null; locale: Loc
   );
 }
 
-/**
- * «Last ned merket bilde» (merking PR 4) i done-kortet. Vises bare for
- * eieren (canDownload); backend avviser admin paa andres jobb. Ved feil vises
- * en kort melding ut fra koden, aldri raa tekst.
- */
-function DownloadButton({ jobId, locale }: { jobId: string; locale: Locale }) {
-  const { getToken } = useAuth();
-  const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState<UiKey | null>(null);
-  // Synkront vern mot dobbeltklikk, som inFlight paa siden.
-  const inFlight = useRef(false);
-
-  const onDownload = async () => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setDownloading(true);
-    setError(null);
-    try {
-      const result = await downloadMarkedImage({
-        jobId,
-        fetchFile: () => fetchJobDownload({ jobId, getToken }),
-      });
-      if (result.kind === "error") setError(result.key);
-    } finally {
-      inFlight.current = false;
-      setDownloading(false);
-    }
-  };
-
-  return (
-    <div className="mt-6 flex flex-col gap-2 items-start">
-      <button onClick={onDownload} disabled={downloading} className={BTN_PRIMARY}>
-        {t(locale, downloading ? "review.downloading" : "review.download")}
-      </button>
-      <span className="text-xs text-amber-fg" role="status">
-        {error ? t(locale, error) : ""}
-      </span>
-    </div>
-  );
-}
-
-/**
- * «Tekst til annonsen» (merking PR 2) i done-kortet for godkjente jobber.
- * Teksten er alltid norsk (annonsens spraak) inntil TG-NEW-129; overskrift
- * og knapper foelger nettleseren. Kopiering endrer ingenting i backend, saa
- * admin paa andres jobb ser og kan kopiere det samme.
- */
-function DisclosureBlock({ disclosure, locale }: { disclosure: ReviewDisclosure | null; locale: Locale }) {
-  const [copy, setCopy] = useState<CopyResult | null>(null);
-  const boxRef = useRef<HTMLTextAreaElement>(null);
-  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (resetTimer.current) clearTimeout(resetTimer.current);
-  }, []);
-
-  const result = disclosureText(DISCLOSURE_LOCALE, disclosure, DISCLOSURE_DETAIL);
-  if (result === null) return null;
-
-  const onCopy = async (text: string) => {
-    if (resetTimer.current) clearTimeout(resetTimer.current);
-    const outcome = await copyText(text);
-    setCopy(outcome);
-    if (outcome === "copied") {
-      resetTimer.current = setTimeout(() => setCopy(null), 2000);
-    } else {
-      // Reserve: marker teksten, saa megleren kan trykke Cmd+C.
-      boxRef.current?.focus();
-      boxRef.current?.select();
-    }
-  };
-
-  return (
-    <div className="mt-6 flex flex-col gap-3">
-      <p className={`${LABEL} mb-0`}>{t(locale, "review.disclosureTitle")}</p>
-      {result.kind === "missing" ? (
-        <p
-          className="text-sm text-amber-fg bg-amber-bg rounded-button p-3"
-          role="status"
-        >
-          {t(locale, "review.disclosureMissing")}
-        </p>
-      ) : (
-        <>
-          <textarea
-            ref={boxRef}
-            readOnly
-            value={result.text}
-            rows={3}
-            lang={DISCLOSURE_LOCALE}
-            aria-label={t(locale, "review.disclosureTitle")}
-            className={`w-full resize-none bg-surface border border-ink-2 rounded-button p-3 text-sm text-ink ${FOCUS}`}
-          />
-          <p className="text-xs text-ink-2">{t(locale, "review.disclosureHelp")}</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <button onClick={() => onCopy(result.text)} className={BTN_SECONDARY}>
-              {t(locale, copy === "copied" ? "review.copied" : "action.copy")}
-            </button>
-            <span className="text-xs text-amber-fg" role="status">
-              {copy === "failed" ? t(locale, "review.copyFailed") : ""}
-            </span>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 export default function GodkjenningPage({
   params,
 }: {
@@ -415,7 +273,10 @@ export default function GodkjenningPage({
   const locale = useLocale();
 
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
-  const [variant, setVariant] = useState<ImageVariant>("lifted");
+  // Valgt variant i «Sammenlign originalen med»; null gir gjeldende runde.
+  const [variantId, setVariantId] = useState<string | null>(null);
+  // Admin (view_all fra /me) ser rått. Feil eller manglende svar: ikke admin.
+  const [caps, setCaps] = useState<Capabilities>(NO_CAPABILITIES);
   const [answer, setAnswer] = useState<FireplaceAnswer>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reasonText, setReasonText] = useState("");
@@ -448,7 +309,19 @@ export default function GodkjenningPage({
     }
     setLoad(result);
     setPollJobId(null);
+    // Etter en ny runde eller avgjoerelse vises gjeldende runde igjen.
+    setVariantId(null);
   }, [jobId, getToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getCapabilities({ getToken }).then((c) => {
+      if (!cancelled) setCaps(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [getToken]);
 
   useEffect(() => {
     // setLoad kjoerer foerst etter await i fetchReview, ikke synkront i effekten.
@@ -651,8 +524,16 @@ export default function GodkjenningPage({
             const review = load.review;
             const controls = decisionControls(review, answer);
             const done = outcome(review);
-            const options = variantOptions(review.images);
-            const shownVariant: ImageVariant = options.includes(variant) ? variant : "lifted";
+            const variants = compareVariants(review.images, { isAdmin: caps.viewAll });
+            const shown = selectedVariant(variants, variantId);
+            // Gamle jobber uten rounds: lenken velges fra de merkede feltene som foer.
+            // Runder: lenken som den er, null gir plassholder (ingen tilbakefall).
+            const shownUrl =
+              shown === null
+                ? null
+                : shown.source.kind === "legacy"
+                  ? resultImageUrl(review.images, shown.source.variant)
+                  : shown.source.url;
             const tooLong = reasonTooLong(reasonText);
             const correction = correctionControls(review);
             const canCorrect = correction.show && !limitReached && done === null;
@@ -692,45 +573,20 @@ export default function GodkjenningPage({
                   </p>
                 )}
 
-                {/* Original og resultat: side om side paa skjerm, under hverandre paa mobil. */}
-                <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className={CARD}>
-                    <p className={LABEL}>{t(locale, "review.original")}</p>
-                    <ImageBox
-                      url={review.images.originalUrl}
-                      alt={t(locale, "review.original")}
-                      locale={locale}
-                    />
-                  </div>
-                  <div className={CARD}>
-                    <div className="flex items-center justify-between gap-3 mb-4">
-                      <p className={`${LABEL} mb-0`}>{t(locale, "review.result")}</p>
-                      {options.length > 0 && (
-                        <div className="flex flex-wrap justify-end gap-1" role="group">
-                          {options.map((v) => (
-                            <button
-                              key={v}
-                              onClick={() => setVariant(v)}
-                              aria-pressed={shownVariant === v}
-                              className={`min-h-11 px-4 rounded-pill text-sm border transition-colors ${FOCUS} ${
-                                shownVariant === v
-                                  ? "bg-primary border-primary text-on-primary font-medium"
-                                  : "bg-surface border-line-strong text-ink-2 hover:text-ink hover:bg-surface-2"
-                              }`}
-                            >
-                              {t(locale, VARIANT_LABEL[v])}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <ImageBox
-                      url={resultImageUrl(review.images, shownVariant)}
-                      alt={t(locale, shownVariant === "previous" ? "review.previousRound" : "review.result")}
-                      locale={locale}
-                      preview
-                    />
-                  </div>
+                {/* Stort bilde mot originalen, og valget av variant (D2a). */}
+                <section className={`${CARD} flex flex-col gap-6`}>
+                  <VariantPicker
+                    variants={variants}
+                    selectedId={shown?.id ?? null}
+                    onSelect={setVariantId}
+                    locale={locale}
+                  />
+                  <CompareViewer
+                    originalUrl={review.images.originalUrl}
+                    result={shown === null ? null : { url: shownUrl, label: variantLabel(locale, shown) }}
+                    placeholder={<PreviewPlaceholder />}
+                    locale={locale}
+                  />
                 </section>
 
                 {done !== null && (

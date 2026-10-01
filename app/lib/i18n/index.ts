@@ -28,6 +28,8 @@ export type CodeGroup =
   | "overrideCode"
   | "duskTime"
   | "duskSky"
+  | "roundTime"
+  | "roundSky"
   | "disclosureBase"
   | "disclosureTime"
   | "disclosureEdited";
@@ -119,6 +121,24 @@ const nbUi = {
   "review.analysisTitle": "Analyse",
   "review.readOnlyOther": "Du ser en annen brukers jobb. Bare lesing.",
   "review.statusRejectedByOwner": "Avvist av eieren",
+  // D2a: slideren og variantene (brief §4 og §8, KONTRAKT_RUNDER).
+  "compare.with": "Sammenlign originalen med",
+  "compare.mode": "Visning",
+  "compare.mode.slider": "Slider",
+  "compare.mode.side": "Side ved side",
+  "compare.mode.result": "Kun resultat",
+  "compare.ai": "AI",
+  "compare.round": "Runde {n}",
+  "compare.now": "nå",
+  "compare.raw": "rått fra modellen",
+  "compare.noSky": "uten himmel",
+  "compare.fireLit": "peis tent",
+  "compare.fireNotLit": "peis ikke tent",
+  "compare.lightsChanged": "lys justert",
+  "compare.sliderLabel": "Skillet mellom originalen og AI-bildet",
+  "compare.sliderValue": "{n} % original",
+  "compare.altOriginal": "Originalbildet",
+  "compare.altResult": "AI-bildet: {label}",
   "history.subtitle": "Alle jobbene dine, nyeste først.",
   "history.subtitleAll": "Alle brukeres jobber, nyeste først.",
   "history.scope.mine": "Mine jobber",
@@ -297,6 +317,18 @@ const nb: Dictionary = {
       dark: "Mørk kveldshimmel",
       starry: "Stjernehimmel",
     },
+    // D2a: tidspunkt og himmel i etiketten til en runde, med liten forbokstav.
+    roundTime: {
+      early: "tidlig",
+      late: "sen",
+    },
+    roundSky: {
+      clear: "klar blå time",
+      light_clouds: "lette skyer",
+      pink_clouds: "rosa skyer",
+      dark: "mørk kveldshimmel",
+      starry: "stjernehimmel",
+    },
     // Merketeksten (merking PR 2). Settes sammen i app/lib/disclosure.ts,
     // som aldri bruker den generiske teksten: ukjent kode gir ingen tekst.
     disclosureBase: {
@@ -328,6 +360,8 @@ const nb: Dictionary = {
     overrideCode: "Valgene kunne ikke brukes. Last siden på nytt og prøv igjen.",
     duskTime: "Ukjent tidspunkt",
     duskSky: "Ukjent himmel",
+    roundTime: "ukjent tidspunkt",
+    roundSky: "ukjent himmel",
     disclosureBase: "Merketeksten kunne ikke lages.",
     disclosureTime: "Merketeksten kunne ikke lages.",
     disclosureEdited: "Merketeksten kunne ikke lages.",
@@ -422,6 +456,24 @@ const en: Dictionary = {
     "review.analysisTitle": "Analysis",
     "review.readOnlyOther": "You are viewing another user's job. Read only.",
     "review.statusRejectedByOwner": "Rejected by the owner",
+    // D2a: slideren og variantene (brief §4 og §8, KONTRAKT_RUNDER).
+    "compare.with": "Compare the original with",
+    "compare.mode": "View",
+    "compare.mode.slider": "Slider",
+    "compare.mode.side": "Side by side",
+    "compare.mode.result": "Result only",
+    "compare.ai": "AI",
+    "compare.round": "Round {n}",
+    "compare.now": "now",
+    "compare.raw": "raw from the model",
+    "compare.noSky": "no sky",
+    "compare.fireLit": "fire lit",
+    "compare.fireNotLit": "fire not lit",
+    "compare.lightsChanged": "lights adjusted",
+    "compare.sliderLabel": "Divider between the original and the AI image",
+    "compare.sliderValue": "{n}% original",
+    "compare.altOriginal": "The original image",
+    "compare.altResult": "The AI image: {label}",
     "history.subtitle": "All your jobs, newest first.",
     "history.subtitleAll": "All users' jobs, newest first.",
     "history.scope.mine": "My jobs",
@@ -584,6 +636,18 @@ const en: Dictionary = {
       dark: "Dark evening sky",
       starry: "Starry sky",
     },
+    // D2a: tidspunkt og himmel i etiketten til en runde, med liten forbokstav.
+    roundTime: {
+      early: "early",
+      late: "late",
+    },
+    roundSky: {
+      clear: "clear blue hour",
+      light_clouds: "light clouds",
+      pink_clouds: "pink clouds",
+      dark: "dark evening sky",
+      starry: "starry sky",
+    },
     disclosureBase: {
       evening_from_day: "Evening image created with AI from a daytime photo.",
     },
@@ -613,6 +677,8 @@ const en: Dictionary = {
     overrideCode: "Your choices could not be used. Reload the page and try again.",
     duskTime: "Unknown time",
     duskSky: "Unknown sky",
+    roundTime: "unknown time",
+    roundSky: "unknown sky",
     disclosureBase: "The disclosure text could not be created.",
     disclosureTime: "The disclosure text could not be created.",
     disclosureEdited: "The disclosure text could not be created.",

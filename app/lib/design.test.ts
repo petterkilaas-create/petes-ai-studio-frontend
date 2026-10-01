@@ -215,8 +215,11 @@ test("D1: skallet bruker merket fra brand.ts, og metadata har fanetittelen", () 
   }
 });
 
+/** D2a: komponentene til godkjenningssiden. Nye filer i mappa kommer med av seg selv. */
+const GODKJENNING_COMPONENTS = activeFiles().filter((f) => f.startsWith("components/godkjenning/"));
+
 test("D1b: godkjenningssiden og PreviewPlaceholder bruker bare tokenene", () => {
-  for (const f of ["godkjenning/[jobId]/page.tsx", "components/PreviewPlaceholder.tsx"]) {
+  for (const f of ["godkjenning/[jobId]/page.tsx", "components/PreviewPlaceholder.tsx", ...GODKJENNING_COMPONENTS]) {
     const src = read(f);
     assert.doesNotMatch(src, /#[0-9a-f]{3,8}\b/i, f);
     assert.doesNotMatch(src, /-\[(#|rgb)/, f);
@@ -428,4 +431,83 @@ test("D1c: Kveldsbilde sender det samme som foer (id, service, preset, ingen bil
   assert.equal(tool.sceneGate, false);
   assert.equal(tool.titleKey, "service.scene_transform");
   assert.equal(DICTIONARIES.nb.ui[tool.titleKey], "Kveldsbilde");
+});
+
+// ---------------------------------------------------------------------------
+// D2a: slideren og variantene paa godkjenningssiden (brief §4, KONTRAKT_RUNDER).
+// ---------------------------------------------------------------------------
+
+test("D2a: komponentene finnes og er med i D1-sjekkene over", () => {
+  for (const f of [
+    "components/godkjenning/CompareViewer.tsx",
+    "components/godkjenning/VariantPicker.tsx",
+    "components/godkjenning/DisclosureBlock.tsx",
+    "components/godkjenning/DownloadButton.tsx",
+    "components/godkjenning/classes.ts",
+  ]) {
+    assert.ok(GODKJENNING_COMPONENTS.includes(f), f);
+  }
+});
+
+test("D2a: slideren kan styres uten aa dra (WCAG 2.5.7) og har rolle og verdier", () => {
+  const src = withoutComments(read("components/godkjenning/CompareViewer.tsx"));
+  // Rolle og verdier for skjermlesere.
+  for (const attr of ['role="slider"', "tabIndex={0}", "aria-valuemin={0}", "aria-valuemax={100}", "aria-valuenow={value}", "aria-valuetext=", "aria-label="]) {
+    assert.ok(src.includes(attr), attr);
+  }
+  // Tastaturet: paa haandtaket, via sliderKey.
+  assert.match(src, /onKeyDown=\{onKeyDown\}/);
+  assert.match(src, /const next = sliderKey\(value, e\.key, e\.shiftKey\);/);
+  // Klikk eller trykk paa sporet: pointerdown paa sporet flytter skillet dit.
+  assert.match(src, /ref=\{trackRef\}[\s\S]*?onPointerDown=\{onPointerDown\}/);
+  const down = src.slice(src.indexOf("const onPointerDown"), src.indexOf("const onPointerMove"));
+  assert.match(down, /moveTo\(e\.clientX\)/);
+  assert.match(src, /setValue\(valueFromPointer\(/);
+  // Mobil: siden ruller fortsatt loddrett.
+  assert.ok(src.includes("touch-pan-y"));
+  // Begge bildene har alt-tekst, og resultatsiden har «AI»-merkelappen.
+  assert.match(src, /alt=\{t\(locale, "compare\.altOriginal"\)\}/);
+  assert.match(src, /alt=\{aiAlt\}|alt=\{resultAlt\}/);
+  assert.match(src, /t\(locale, "compare\.ai"\)/);
+});
+
+/** Alle JSX-blokkene i en fil: `return ( … );` over flere linjer og `return <…>;` paa en linje. */
+function jsxBlocks(src: string): string[] {
+  const multi = [...src.matchAll(/return \(\n([\s\S]*?)\n\s*\);/g)].map((m) => m[1]);
+  const single = [...src.matchAll(/return (<[^\n]*>);/g)].map((m) => m[1]);
+  return [...multi, ...single];
+}
+
+test("D2a: komponentene har ingen synlig tekst skrevet rett inn", () => {
+  const files = GODKJENNING_COMPONENTS.filter((f) => f.endsWith(".tsx"));
+  assert.ok(files.length >= 4);
+  for (const f of files) {
+    const blocks = jsxBlocks(withoutComments(read(f)));
+    assert.ok(blocks.length > 0, f);
+    assert.deepEqual(blocks.flatMap((b) => literalTexts(`${b}<`)), [], f);
+  }
+});
+
+test("D2a: siden bygger variantene fra rundene, med admin fra /me", () => {
+  const page = read("godkjenning/[jobId]/page.tsx");
+  assert.match(page, /compareVariants\(review\.images, \{ isAdmin: caps\.viewAll \}\)/);
+  assert.match(page, /getCapabilities\(\{ getToken \}\)/);
+  assert.match(page, /useState<Capabilities>\(NO_CAPABILITIES\)/);
+  // Rundene: lenken som den er. De gamle feltene bare for jobber uten rounds.
+  assert.match(page, /shown\.source\.kind === "legacy"\s*\? resultImageUrl\(review\.images, shown\.source\.variant\)\s*: shown\.source\.url;/);
+  assert.doesNotMatch(page, /variantOptions\(/);
+  assert.match(page, /<CompareViewer[\s\S]*?placeholder=\{<PreviewPlaceholder \/>\}/);
+});
+
+test("D2a: ordlista har ordene til slideren og variantene paa nb og en", () => {
+  const nb = DICTIONARIES.nb.ui;
+  const en = DICTIONARIES.en.ui;
+  assert.equal(nb["compare.with"], "Sammenlign originalen med");
+  assert.equal(nb["compare.mode.slider"], "Slider");
+  assert.equal(nb["compare.mode.side"], "Side ved side");
+  assert.equal(nb["compare.mode.result"], "Kun resultat");
+  assert.equal(nb["compare.ai"], "AI");
+  assert.equal(en["compare.with"], "Compare the original with");
+  assert.equal(en["compare.mode.side"], "Side by side");
+  assert.equal(en["compare.mode.result"], "Result only");
 });
