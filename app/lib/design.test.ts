@@ -229,11 +229,15 @@ test("D1b: godkjenningssiden og PreviewPlaceholder bruker bare tokenene", () => 
   }
   const page = read("godkjenning/[jobId]/page.tsx");
   // Knappene og kortene er de felles komponentene (primary, ikke turkis).
+  // D2b: handlingsknappene ligger i handlingskortet.
   assert.match(page, /const BTN_PRIMARY = buttonClass\("primary"\);/);
-  assert.match(page, /const BTN_SECONDARY = buttonClass\("secondary"\);/);
-  assert.match(page, /const BTN_DANGER = buttonClass\("danger"\);/);
   assert.match(page, /const CARD = cardClass\(/);
   assert.match(page, /<h1 className="font-display /);
+  const card = read("components/godkjenning/DecisionCard.tsx");
+  assert.match(card, /const BTN_PRIMARY = buttonClass\("primary"\);/);
+  assert.match(card, /const BTN_SECONDARY = buttonClass\("secondary"\);/);
+  assert.match(card, /const BTN_DANGER = buttonClass\("danger"\);/);
+  assert.match(card, /const CARD = cardClass\(/);
 });
 
 const EMOJI = /\p{Extended_Pictographic}/u;
@@ -510,4 +514,84 @@ test("D2a: ordlista har ordene til slideren og variantene paa nb og en", () => {
   assert.equal(en["compare.with"], "Compare the original with");
   assert.equal(en["compare.mode.side"], "Side by side");
   assert.equal(en["compare.mode.result"], "Result only");
+});
+
+// ---------------------------------------------------------------------------
+// D2b: handlingskortet, rettingen, stemning og lys, og «Detaljer» (brief §3 punkt 5 og 6).
+// ---------------------------------------------------------------------------
+
+test("D2b: komponentene finnes og er med i D1-sjekkene", () => {
+  for (const f of [
+    "components/godkjenning/DecisionCard.tsx",
+    "components/godkjenning/CorrectionPanel.tsx",
+    "components/godkjenning/MoodPanel.tsx",
+    "components/godkjenning/DetailsPanel.tsx",
+    "components/godkjenning/FireplaceChoice.tsx",
+    "components/godkjenning/LightLabel.tsx",
+  ]) {
+    assert.ok(GODKJENNING_COMPONENTS.includes(f), f);
+  }
+});
+
+test("D2b: «Detaljer» vises bare naar showDetails(caps) er sann", () => {
+  const page = read("godkjenning/[jobId]/page.tsx");
+  assert.match(page, /\{showDetails\(caps\) && <DetailsPanel /);
+  assert.equal(page.match(/<DetailsPanel /g)?.length, 1);
+});
+
+/** Ord og koder fra analysen som bare hoerer hjemme i «Detaljer». */
+const ANALYSIS = /review\.lightsUnstable|review\.lightsRejected|review\.lightsApproved|"lightReason"|"reasonCode"|"flagCode"|review\.runValues|review\.analysisTitle|review\.noValidRuns|(?<![.\w])reason(?=[\s/>])/;
+
+test("D2b: analysen staar bare i DetailsPanel (megleren ser den ikke)", () => {
+  const files = ["godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("DetailsPanel.tsx") && !f.endsWith("LightLabel.tsx"))];
+  for (const f of files) {
+    assert.doesNotMatch(withoutComments(read(f)), ANALYSIS, f);
+  }
+  const details = read("components/godkjenning/DetailsPanel.tsx");
+  for (const key of ["review.lightsUnstable", "review.lightsRejected", '"reasonCode"', '"flagCode"']) {
+    assert.ok(details.includes(key), key);
+  }
+});
+
+test("D2b: rettingen er én flat liste med «Usikker», uten grunner, tidspunkt eller himmel", () => {
+  const panel = withoutComments(read("components/godkjenning/CorrectionPanel.tsx"));
+  assert.match(panel, /const rows = flatLights\(lights\);/);
+  assert.match(panel, /<LightLabel light=\{light\} locale=\{locale\} uncertain=\{uncertain\} state \/>/);
+  assert.match(panel, /onToggle\(light, uncertain, e\.target\.checked\)/);
+  // Ingen grunn fra analysen, og ingen valg av tidspunkt eller himmel (TG-NEW-145).
+  assert.doesNotMatch(panel, /\breason\b|lightReason/);
+  assert.doesNotMatch(panel, /dusk|DuskChoice|roundTime|roundSky|"time"|"sky"/i);
+  // Siden sender kandidat-flagget videre til setToggle, og body bygges som foer.
+  const page = read("godkjenning/[jobId]/page.tsx");
+  assert.match(page, /setToggles\(\(prev\) => setToggle\(prev, light, uncertain, on\)\)/);
+  assert.match(page, /buildCorrection\(\s*review,\s*toggles,\s*correctionFireplaceShown\(review\.fireplace\),\s*correctAnswer\s*\)/);
+  // LightLabel viser grunnen bare naar `reason` er satt, og «Usikker» bare med `uncertain`.
+  const label = withoutComments(read("components/godkjenning/LightLabel.tsx"));
+  assert.match(label, /\{reason && light\.reasonCode !== null && \(/);
+  assert.match(label, /\{uncertain && <span className=\{BADGE\}>\{t\(locale, "correct\.uncertain"\)\}<\/span>\}/);
+});
+
+test("D2b: handlingene i ett kort, i rekkefoelgen Godkjenn · Korriger bildet · Avvis", () => {
+  const card = withoutComments(read("components/godkjenning/DecisionCard.tsx"));
+  const approve = card.indexOf('t(locale, "action.approve")');
+  const correct = card.indexOf('t(locale, "action.correct")');
+  const reject = card.indexOf('t(locale, "action.reject")');
+  assert.ok(approve > 0 && approve < correct && correct < reject, "rekkefoelgen");
+  assert.match(card, /onClick=\{onStartCorrection\} disabled=\{locked\} className=\{BTN_SECONDARY\}/);
+  assert.match(card, /onClick=\{\(\) => onRejectOpen\(true\)\} disabled=\{locked\} className=\{BTN_DANGER\}/);
+  // Knappene styres bare av allowed_actions (decisionControls), ikke av status.
+  assert.doesNotMatch(card, /status ===|awaiting_approval|needs_review/);
+  // Rettingen aapnes i samme kort.
+  assert.match(card, /\{correction !== null \? \(\s*correction\s*\) :/);
+});
+
+test("D2b: ordlista har de nye ordene paa nb og en", () => {
+  const nb = DICTIONARIES.nb.ui;
+  const en = DICTIONARIES.en.ui;
+  assert.equal(nb["correct.uncertain"], "Usikker");
+  assert.equal(en["correct.uncertain"], "Uncertain");
+  assert.equal(nb["review.details"], "Detaljer");
+  assert.equal(en["review.details"], "Details");
+  assert.equal(nb["review.moodTitle"], "Stemning og lys");
+  assert.equal(nb["correct.lightsTitle"], "Lys i bildet");
 });

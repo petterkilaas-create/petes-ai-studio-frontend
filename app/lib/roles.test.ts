@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  showDetails,
   effectiveScope,
   emptyWaitingKey,
   isReadOnlyOther,
@@ -117,4 +118,10 @@ test("nb og en har tekst for alle TG-NEW-127-noeklene", () => {
   assert.equal(t("nb", "history.scope.all"), "Alle brukere");
   assert.equal(t("en", "history.scope.all"), "All users");
   assert.equal(t("nb", "review.readOnlyOther"), "Du ser en annen brukers jobb. Bare lesing.");
+});
+
+test("«Detaljer» og rått bare naar view_all er true (D2a/D2b)", () => {
+  assert.equal(showDetails({ viewAll: true }), true);
+  assert.equal(showDetails({ viewAll: false }), false);
+  assert.equal(showDetails(null), false);
 });

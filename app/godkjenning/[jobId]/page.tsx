@@ -8,45 +8,35 @@ import {
   getReview,
   NO_CAPABILITIES,
   postDecision,
-  REASON_MAX_LEN,
   type Capabilities,
   type DecisionAction,
   type ReviewFetchResult,
-  type ReviewLight,
-  type RunValue,
 } from "../../lib/api";
 import { useJobStatus } from "../../lib/useJobStatus";
-import { codeText, t, type CodeGroup, type Locale, type UiKey } from "../../lib/i18n";
+import { codeText, t, type CodeGroup, type UiKey } from "../../lib/i18n";
 import { useLocale } from "../../lib/i18n/useLocale";
 import {
   buildDecision,
   decisionControls,
-  FIREPLACE_OPTIONS,
-  fireplaceAnswerKey,
   outcome,
-  reasonLength,
-  reasonTooLong,
   resultImageUrl,
   shouldPoll,
   type FireplaceAnswer,
 } from "../../lib/review";
-import { isReadOnlyOther } from "../../lib/roles";
+import { isReadOnlyOther, showDetails } from "../../lib/roles";
 import {
   buildCorrection,
   canSubmitCorrection,
-  canToggle,
   correctionControls,
   correctionFireplaceShown,
   correctionResult,
   initialToggles,
-  isOn,
   needsConfirmation,
   previousFireplaceAnswer,
   setToggle,
   type Toggles,
 } from "../../lib/correction";
 import { runDecision } from "../../lib/decide";
-import { duskFacts, type ReviewDusk } from "../../lib/dusk";
 import { canDownload } from "../../lib/download";
 import { compareVariants, selectedVariant, variantLabel } from "../../lib/compare";
 import { PreviewPlaceholder } from "../../components/PreviewPlaceholder";
@@ -54,9 +44,13 @@ import { buttonClass } from "../../components/ui/Button";
 import { cardClass } from "../../components/ui/Card";
 import { CompareViewer } from "../../components/godkjenning/CompareViewer";
 import { VariantPicker } from "../../components/godkjenning/VariantPicker";
+import { DecisionCard } from "../../components/godkjenning/DecisionCard";
+import { CorrectionPanel } from "../../components/godkjenning/CorrectionPanel";
+import { MoodPanel } from "../../components/godkjenning/MoodPanel";
+import { DetailsPanel } from "../../components/godkjenning/DetailsPanel";
 import { DisclosureBlock } from "../../components/godkjenning/DisclosureBlock";
 import { DownloadButton } from "../../components/godkjenning/DownloadButton";
-import { FOCUS, LABEL } from "../../components/godkjenning/classes";
+import { FOCUS } from "../../components/godkjenning/classes";
 
 /**
  * Godkjenningssiden (2d-1): megleren avgjoer egne jobber i «Til kontroll»
@@ -68,6 +62,10 @@ import { FOCUS, LABEL } from "../../components/godkjenning/classes";
  *
  * «Rett» (2d-2b): megleren slaar kandidater paa og godkjente av, og lager
  * et nytt bilde fra originalen. Antall runder kommer fra backend.
+ *
+ * D2 (brief §4): stort bilde med slider og varianter (D2a), og ved siden av
+ * handlingene i ett kort, stemning og lys, og «Detaljer» bare for admin
+ * (D2b). Siden holder tilstanden og alle kall; komponentene viser.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -77,191 +75,6 @@ type Message = { key: UiKey } | { group: CodeGroup; code: string | null };
 
 const CARD = cardClass("md");
 const BTN_PRIMARY = buttonClass("primary");
-const BTN_SECONDARY = buttonClass("secondary");
-const BTN_DANGER = buttonClass("danger");
-
-/**
- * Peisspoersmaalet med Tent/Ikke tent (2d-2d). Brukes baade for «Send
- * videre» og i Rett-modus. Linja under knappene sier at «Ikke tent» slukker
- * ild i originalen; den staar utenfor knappene saa de holder seg korte paa mobil.
- */
-function FireplaceChoice({
-  answer,
-  onChange,
-  disabled,
-  locale,
-}: {
-  answer: FireplaceAnswer;
-  onChange: (answer: "yes" | "no") => void;
-  disabled: boolean;
-  locale: Locale;
-}) {
-  return (
-    <div>
-      <p className="text-sm text-ink font-bold mb-2">{t(locale, "action.fireplaceQuestion")}</p>
-      <div className="flex gap-2" role="group">
-        {FIREPLACE_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            onClick={() => onChange(option.value)}
-            disabled={disabled}
-            aria-pressed={answer === option.value}
-            className={answer === option.value ? BTN_PRIMARY : BTN_SECONDARY}
-          >
-            {t(locale, option.key)}
-          </button>
-        ))}
-      </div>
-      <p className="text-xs text-ink-2 mt-2">{t(locale, "action.fireplaceNotLitHint")}</p>
-    </div>
-  );
-}
-
-/** Rett-modus for en liste: null naar brukeren ikke retter. */
-interface LightEditing {
-  toggles: Toggles;
-  /** Ustabile og avviste er kandidater (promote); godkjente kan slaas av. */
-  candidate: boolean;
-  disabled: boolean;
-  onToggle: (light: ReviewLight, on: boolean) => void;
-}
-
-function LightLabel({ light, locale }: { light: ReviewLight; locale: Locale }) {
-  return (
-    <>
-      <span className="font-bold">{codeText(locale, "lightType", light.type)}</span>
-      {/* location er fritekst fra analysen; React escaper den. */}
-      {light.location && <span className="text-ink-2"> · {light.location}</span>}
-      {light.reasonCode !== null && (
-        <span className="text-ink-2">
-          {" "}
-          ({codeText(locale, "lightReason", light.reasonCode)})
-        </span>
-      )}
-      {(light.state === "promoted" || light.state === "disabled") && (
-        <span className="ml-2 inline-block px-2 py-0.5 rounded-pill bg-neutral-bg text-neutral-fg text-[13px] font-medium">
-          {t(locale, light.state === "promoted" ? "review.lightPromoted" : "review.lightDisabled")}
-        </span>
-      )}
-    </>
-  );
-}
-
-function LightList({
-  title,
-  lights,
-  locale,
-  editing,
-}: {
-  title: string;
-  lights: ReviewLight[];
-  locale: Locale;
-  editing: LightEditing | null;
-}) {
-  return (
-    <div>
-      <p className="text-xs font-bold text-ink mb-2">
-        {title} ({lights.length})
-      </p>
-      {lights.length === 0 ? (
-        <p className="text-xs text-ink-2">{t(locale, "review.lightsEmpty")}</p>
-      ) : (
-        <ul className={`${editing ? "space-y-2" : "space-y-1"} text-xs text-ink`}>
-          {lights.map((light, i) => {
-            const rowKey = `${light.key ?? light.id ?? "x"}-${i}`;
-            if (editing === null) {
-              return (
-                <li key={rowKey}>
-                  <LightLabel light={light} locale={locale} />
-                </li>
-              );
-            }
-            const editable = canToggle(light, editing.candidate);
-            const on = isOn(light, editing.toggles);
-            // Ekte bryter (checkbox med role=switch) med hele raden som
-            // etikett, minst 44 px hoey for tommel paa mobil.
-            return (
-              <li key={rowKey}>
-                <label
-                  className={`flex items-center gap-3 min-h-11 px-3 py-2 rounded-button border ${
-                    editable ? "border-line-strong cursor-pointer" : "border-line opacity-60"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    role="switch"
-                    checked={on}
-                    disabled={!editable || editing.disabled}
-                    onChange={(e) => editing.onToggle(light, e.target.checked)}
-                    className={`w-5 h-5 shrink-0 accent-primary ${FOCUS}`}
-                  />
-                  <span className="flex-1">
-                    <LightLabel light={light} locale={locale} />
-                  </span>
-                  <span className="text-[13px] text-ink-2">
-                    {editable
-                      ? t(locale, on ? "correct.lightOn" : "correct.lightOff")
-                      : t(locale, "correct.locked")}
-                  </span>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function RunValueLine({
-  label,
-  value,
-  group,
-  locale,
-}: {
-  label: string;
-  value: RunValue;
-  group: "imageType" | "skyVisibility";
-  locale: Locale;
-}) {
-  const distinct = [...new Set(value.runValues)];
-  return (
-    <div>
-      <p className="text-xs text-ink-2">{label}</p>
-      <p className="text-sm text-ink">{codeText(locale, group, value.value)}</p>
-      {distinct.length > 1 && (
-        <p className="text-xs text-amber-fg">
-          {t(locale, "review.runValues", {
-            values: distinct.map((v) => codeText(locale, group, v)).join(" / "),
-          })}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
- * Skumringsvalgene (2f-b, valg A): egen undertittel, saa de ikke blandes med
- * analysens himmel-linje. Himmelen vises ikke som valg naar den ikke ble
- * brukt (sky_applied false). Uten dusk fra backend vises ingenting.
- */
-function DuskFactsBlock({ dusk, locale }: { dusk: ReviewDusk | null; locale: Locale }) {
-  const facts = duskFacts(dusk);
-  if (facts === null) return null;
-  return (
-    <div>
-      <p className={LABEL}>{t(locale, "review.duskTitle")}</p>
-      <p className="text-xs text-ink-2">{t(locale, "dusk.time")}</p>
-      <p className="text-sm text-ink mb-2">{codeText(locale, "duskTime", facts.time)}</p>
-      <p className="text-xs text-ink-2">{t(locale, "dusk.sky")}</p>
-      <p className="text-sm text-ink">
-        {facts.sky.kind === "not_applied"
-          ? t(locale, "review.duskSkyNotApplied")
-          : codeText(locale, "duskSky", facts.sky.code)}
-      </p>
-    </div>
-  );
-}
 
 export default function GodkjenningPage({
   params,
@@ -534,7 +347,6 @@ export default function GodkjenningPage({
                 : shown.source.kind === "legacy"
                   ? resultImageUrl(review.images, shown.source.variant)
                   : shown.source.url;
-            const tooLong = reasonTooLong(reasonText);
             const correction = correctionControls(review);
             const canCorrect = correction.show && !limitReached && done === null;
             const isEditing = editing && canCorrect;
@@ -548,15 +360,6 @@ export default function GodkjenningPage({
               fireplaceShown,
               answer: correctAnswer,
             });
-            const lightEditing = (candidate: boolean): LightEditing | null =>
-              isEditing
-                ? {
-                    toggles,
-                    candidate,
-                    disabled: locked,
-                    onToggle: (light, on) => setToggles((prev) => setToggle(prev, light, candidate, on)),
-                  }
-                : null;
 
             const readOnly = isReadOnlyOther(review);
 
@@ -573,318 +376,98 @@ export default function GodkjenningPage({
                   </p>
                 )}
 
-                {/* Stort bilde mot originalen, og valget av variant (D2a). */}
-                <section className={`${CARD} flex flex-col gap-6`}>
-                  <VariantPicker
-                    variants={variants}
-                    selectedId={shown?.id ?? null}
-                    onSelect={setVariantId}
-                    locale={locale}
-                  />
-                  <CompareViewer
-                    originalUrl={review.images.originalUrl}
-                    result={shown === null ? null : { url: shownUrl, label: variantLabel(locale, shown) }}
-                    placeholder={<PreviewPlaceholder />}
-                    locale={locale}
-                  />
-                </section>
-
-                {done !== null && (
-                  <section className={CARD}>
-                    <p className="text-ink font-bold">{t(locale, done.key)}</p>
-                    {done.reason && (
-                      <p className="text-sm text-ink mt-2 break-words">
-                        {t(locale, "review.reasonLabel")}: {done.reason}
-                      </p>
-                    )}
-                    {canDownload(review) && <DownloadButton jobId={review.jobId} locale={locale} />}
-                    {review.status === "succeeded" && (
-                      <DisclosureBlock disclosure={review.disclosure} locale={locale} />
-                    )}
+                {/* Stort bilde til venstre, handlinger og stemning ved siden av. Paa mobil under hverandre. */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                  <section className={`${CARD} lg:col-span-2 flex flex-col gap-6 min-w-0`}>
+                    <VariantPicker
+                      variants={variants}
+                      selectedId={shown?.id ?? null}
+                      onSelect={setVariantId}
+                      locale={locale}
+                    />
+                    <CompareViewer
+                      originalUrl={review.images.originalUrl}
+                      result={shown === null ? null : { url: shownUrl, label: variantLabel(locale, shown) }}
+                      placeholder={<PreviewPlaceholder />}
+                      locale={locale}
+                    />
                   </section>
-                )}
 
-                {done === null && (
-                  <section className={`${CARD} flex flex-col gap-4`}>
-                    {correction.roundFailed && (
-                      <p
-                        className="text-sm text-amber-fg bg-amber-bg rounded-button p-3"
-                        role="status"
-                      >
-                        {t(locale, "correct.roundFailed")}
-                      </p>
-                    )}
-
-                    {isEditing ? (
-                      <div className="flex flex-col gap-3">
-                        <p className="text-sm text-ink font-bold">{t(locale, "correct.title")}</p>
-                        <p className="text-xs text-ink-2">{t(locale, "correct.hint")}</p>
-                        <div>
-                          <button onClick={cancelCorrection} disabled={locked} className={BTN_SECONDARY}>
-                            {t(locale, "action.cancel")}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {controls.fireplaceQuestion && (
-                          <FireplaceChoice
-                            answer={answer}
-                            onChange={setAnswer}
-                            disabled={locked}
-                            locale={locale}
-                          />
-                        )}
-
-                        {controls.none ? (
-                          // Linja om bare lesing sier det samme lenger opp.
-                          !readOnly && (
-                            <p className="text-sm text-ink-2">{t(locale, "action.noneAllowed")}</p>
-                          )
-                        ) : (
-                          <div className="flex flex-wrap gap-3">
-                            {controls.approve && (
-                              <button
-                                onClick={() => void decide("approve")}
-                                disabled={locked}
-                                className={BTN_PRIMARY}
-                              >
-                                {t(locale, "action.approve")}
-                              </button>
-                            )}
-                            {controls.continue && (
-                              <button
-                                onClick={() => void decide("continue")}
-                                disabled={locked || !controls.continueEnabled}
-                                className={BTN_PRIMARY}
-                              >
-                                {t(locale, "action.continue")}
-                              </button>
-                            )}
-                            {canCorrect && (
-                              <button onClick={startCorrection} disabled={locked} className={BTN_SECONDARY}>
-                                {t(locale, "action.correct")}
-                              </button>
-                            )}
-                            {controls.reject && !rejectOpen && (
-                              <button
-                                onClick={() => setRejectOpen(true)}
-                                disabled={locked}
-                                className={BTN_DANGER}
-                              >
-                                {t(locale, "action.reject")}
-                              </button>
-                            )}
-                          </div>
-                        )}
-
-                        {controls.continue && (
-                          <p className="text-xs text-ink-2">{t(locale, "action.newImage")}</p>
-                        )}
-
-                        {controls.reject && rejectOpen && (
-                          <div className="flex flex-col gap-2">
-                            <textarea
-                              value={reasonText}
-                              onChange={(e) => setReasonText(e.target.value)}
-                              placeholder={t(locale, "action.reasonPlaceholder")}
-                              aria-label={t(locale, "action.reasonPlaceholder")}
-                              rows={3}
-                              disabled={locked}
-                              className={`w-full bg-surface border border-ink-2 rounded-button p-3 text-sm text-ink ${FOCUS}`}
-                            />
-                            <p className={`text-xs ${tooLong ? "text-red-fg" : "text-ink-2"}`}>
-                              {tooLong
-                                ? t(locale, "action.reasonTooLong", { max: REASON_MAX_LEN })
-                                : t(locale, "action.reasonCount", {
-                                    n: reasonLength(reasonText),
-                                    max: REASON_MAX_LEN,
-                                  })}
-                            </p>
-                            <div className="flex flex-wrap gap-3">
-                              <button
-                                onClick={() => void decide("reject")}
-                                disabled={locked || tooLong}
-                                className={BTN_DANGER}
-                              >
-                                {t(locale, "action.confirmReject")}
-                              </button>
-                              <button
-                                onClick={() => setRejectOpen(false)}
-                                disabled={locked}
-                                className={BTN_SECONDARY}
-                              >
-                                {t(locale, "action.cancel")}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    {(busy || polling) && (
-                      <p className="text-xs text-ink-2" role="status">
-                        {polling
-                          ? t(locale, "review.statusRunning")
-                          : t(locale, "action.working")}
-                      </p>
-                    )}
-                  </section>
-                )}
-
-                {messageText !== null && !isEditing && (
-                  <p
-                    className="text-sm text-amber-fg bg-amber-bg rounded-button p-3"
-                    role="status"
-                  >
-                    {messageText}
-                  </p>
-                )}
-
-                <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className={`${CARD} flex flex-col gap-4`}>
-                    {(review.code !== null || review.reasonCodes.length > 0) && (
-                      <div>
-                        <p className={LABEL}>{t(locale, "review.reasons")}</p>
-                        {review.code !== null && (
-                          <p className="text-sm text-ink mb-2">
-                            {codeText(locale, "reviewCode", review.code)}
+                  <div className="flex flex-col gap-6 min-w-0">
+                    {done !== null ? (
+                      // Nedlasting og tekst til annonsen der resultatet vises (etter godkjenning).
+                      <section className={CARD}>
+                        <p className="text-ink font-bold">{t(locale, done.key)}</p>
+                        {done.reason && (
+                          <p className="text-sm text-ink mt-2 break-words">
+                            {t(locale, "review.reasonLabel")}: {done.reason}
                           </p>
                         )}
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-ink">
-                          {review.reasonCodes.map((c, i) => (
-                            <li key={`${c}-${i}`}>{codeText(locale, "reasonCode", c)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {review.flagCodes.length > 0 && (
-                      <div>
-                        <p className={LABEL}>{t(locale, "review.notes")}</p>
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-ink">
-                          {review.flagCodes.map((c, i) => (
-                            <li key={`${c}-${i}`}>{codeText(locale, "flagCode", c)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    <DuskFactsBlock dusk={review.dusk} locale={locale} />
-                    {/* Analysen har egen undertittel, saa «Valgt stemning» bare gjelder valgene. */}
-                    <div className="flex flex-col gap-4">
-                      <p className={`${LABEL} mb-0`}>{t(locale, "review.analysisTitle")}</p>
-                      <RunValueLine
-                        label={t(locale, "review.imageType")}
-                        value={review.imageType}
-                        group="imageType"
-                        locale={locale}
-                      />
-                      <RunValueLine
-                        label={t(locale, "review.sky")}
-                        value={review.skyVisibility}
-                        group="skyVisibility"
-                        locale={locale}
-                      />
-                      <div>
-                        <p className="text-xs text-ink-2">{t(locale, "review.fireplace")}</p>
-                        <p className="text-sm text-ink">
-                          {review.fireplace.disagreement
-                            ? t(locale, "review.fireplaceDisagreement")
-                            : review.fireplace.present
-                              ? t(locale, "review.fireplacePresent")
-                              : t(locale, "review.fireplaceNone")}
-                        </p>
-                        {(review.fireplace.answer === "yes" || review.fireplace.answer === "no") && (
-                          <p className="text-xs text-ink-2">
-                            {t(locale, "review.fireplaceAnswered", {
-                              answer: t(locale, fireplaceAnswerKey(review.fireplace.answer)),
-                            })}
-                          </p>
+                        {canDownload(review) && <DownloadButton jobId={review.jobId} locale={locale} />}
+                        {review.status === "succeeded" && (
+                          <DisclosureBlock disclosure={review.disclosure} locale={locale} />
                         )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={`${CARD} flex flex-col gap-4`}>
-                    <p className={`${LABEL} mb-0`}>{t(locale, "review.lights")}</p>
-                    {review.validRuns === 0 && (
-                      <p className="text-xs text-amber-fg">{t(locale, "review.noValidRuns")}</p>
-                    )}
-                    <LightList
-                      title={t(locale, "review.lightsApproved")}
-                      lights={review.lights.approved}
-                      locale={locale}
-                      editing={lightEditing(false)}
-                    />
-                    <LightList
-                      title={t(locale, "review.lightsUnstable")}
-                      lights={review.lights.unstable}
-                      locale={locale}
-                      editing={lightEditing(true)}
-                    />
-                    <LightList
-                      title={t(locale, "review.lightsRejected")}
-                      lights={review.lights.rejected}
-                      locale={locale}
-                      editing={lightEditing(true)}
-                    />
-
-                    {isEditing && (
-                      <div className="flex flex-col gap-4 border-t border-line pt-4">
-                        {fireplaceShown && (
-                          <FireplaceChoice
-                            answer={correctAnswer}
-                            onChange={setCorrectAnswer}
-                            disabled={locked}
-                            locale={locale}
-                          />
-                        )}
-
-                        {confirmNeeded && (
-                          <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-ink">
-                            <input
-                              type="checkbox"
-                              checked={confirmed}
-                              disabled={locked}
-                              onChange={(e) => setConfirmed(e.target.checked)}
-                              className={`w-5 h-5 mt-0.5 shrink-0 accent-primary ${FOCUS}`}
-                            />
-                            <span>{t(locale, "correct.confirmExists")}</span>
-                          </label>
-                        )}
-
-                        <p className="text-xs text-ink-2">
-                          {t(locale, "correct.roundsLeft", { n: correction.roundsLeft })}
-                        </p>
-                        <div className="flex flex-wrap gap-3">
-                          <button
-                            onClick={() => void submitCorrection()}
-                            disabled={locked || !submitEnabled}
-                            className={BTN_PRIMARY}
-                          >
-                            {t(locale, "action.makeNewImage")}
-                          </button>
-                          <button onClick={cancelCorrection} disabled={locked} className={BTN_SECONDARY}>
-                            {t(locale, "action.cancel")}
-                          </button>
-                        </div>
-                        <p className="text-xs text-ink-2">{t(locale, "correct.newImageFromOriginal")}</p>
                         {messageText !== null && (
                           <p
-                            className="text-sm text-amber-fg bg-amber-bg rounded-button p-3"
+                            className="mt-6 text-sm text-amber-fg bg-amber-bg rounded-button p-3"
                             role="status"
                           >
                             {messageText}
                           </p>
                         )}
-                        {busy && (
-                          <p className="text-xs text-ink-2" role="status">
-                            {t(locale, "action.working")}
-                          </p>
-                        )}
-                      </div>
+                      </section>
+                    ) : (
+                      <DecisionCard
+                        reviewCode={review.code}
+                        controls={controls}
+                        canCorrect={canCorrect}
+                        roundFailed={correction.roundFailed}
+                        readOnly={readOnly}
+                        locked={locked}
+                        busy={busy}
+                        polling={polling}
+                        answer={answer}
+                        onAnswer={setAnswer}
+                        rejectOpen={rejectOpen}
+                        onRejectOpen={setRejectOpen}
+                        reasonText={reasonText}
+                        onReasonText={setReasonText}
+                        onDecide={decide}
+                        onStartCorrection={startCorrection}
+                        correction={
+                          isEditing ? (
+                            <CorrectionPanel
+                              lights={review.lights}
+                              toggles={toggles}
+                              onToggle={(light, uncertain, on) =>
+                                setToggles((prev) => setToggle(prev, light, uncertain, on))
+                              }
+                              fireplaceShown={fireplaceShown}
+                              answer={correctAnswer}
+                              onAnswer={setCorrectAnswer}
+                              confirmNeeded={confirmNeeded}
+                              confirmed={confirmed}
+                              onConfirmed={setConfirmed}
+                              roundsLeft={correction.roundsLeft}
+                              submitEnabled={submitEnabled}
+                              onSubmit={submitCorrection}
+                              onCancel={cancelCorrection}
+                              locked={locked}
+                              locale={locale}
+                            />
+                          ) : null
+                        }
+                        message={messageText}
+                        locale={locale}
+                      />
                     )}
+
+                    <MoodPanel review={review} locale={locale} />
+
+                    {/* Analysen bare for admin (brief §3 punkt 6). */}
+                    {showDetails(caps) && <DetailsPanel review={review} locale={locale} />}
                   </div>
-                </section>
+                </div>
               </>
             );
           })()}
