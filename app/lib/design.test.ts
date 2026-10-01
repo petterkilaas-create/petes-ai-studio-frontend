@@ -10,6 +10,7 @@ import { brandCssVars, DEFAULT_BRAND } from "./brand.ts";
 // globals.css og layout.tsx sjekkes som tekst (som i L0).
 
 const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
+const REPO_DIR = fileURLToPath(new URL("../..", import.meta.url));
 const read = (rel: string) => readFileSync(join(APP_DIR, rel), "utf8");
 const css = read("globals.css");
 const layout = read("layout.tsx");
@@ -97,11 +98,13 @@ test("visningsnavnet staar ikke skrevet rett inn i .tsx (kommer fra brand.ts)", 
 });
 
 test("«Gavl» finnes ingen steder i repoet", () => {
-  // git grep -i: exit 1 betyr ingen treff. Denne fila unntas (den maa nevne ordet).
+  // git grep -i fra repo-roten, ogsaa filer som ikke er committet ennaa
+  // (--untracked, .gitignore gjelder). Exit 1 betyr ingen treff. Denne fila
+  // unntas (den maa nevne ordet).
   let out = "";
   try {
-    out = execFileSync("git", ["grep", "-il", "gavl", "--", ".", ":!app/lib/design.test.ts"], {
-      cwd: APP_DIR,
+    out = execFileSync("git", ["grep", "--untracked", "-il", "gavl", "--", ".", ":!app/lib/design.test.ts"], {
+      cwd: REPO_DIR,
       encoding: "utf8",
     });
   } catch (e) {
