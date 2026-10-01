@@ -56,6 +56,8 @@ import {
 import { copyText, type CopyResult } from "../../lib/clipboard";
 import { canDownload, downloadMarkedImage } from "../../lib/download";
 import { PreviewPlaceholder } from "../../components/PreviewPlaceholder";
+import { buttonClass } from "../../components/ui/Button";
+import { cardClass } from "../../components/ui/Card";
 
 /**
  * Godkjenningssiden (2d-1): megleren avgjoer egne jobber i «Til kontroll»
@@ -74,18 +76,18 @@ type LoadState = { kind: "loading" } | ReviewFetchResult;
 /** Melding etter en avgjoerelse: ui-tekst eller kode fra backend. */
 type Message = { key: UiKey } | { group: CodeGroup; code: string | null };
 
-const CARD = "bg-[#0f172a] border border-slate-800 rounded-3xl p-6";
-const LABEL = "text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4";
+const CARD = cardClass("md");
+const LABEL = "text-sm font-medium text-ink-2 mb-4";
 const FOCUS =
-  "focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120]";
-const BTN_PRIMARY = `px-6 py-3 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
-const BTN_SECONDARY = `px-6 py-3 bg-transparent border border-slate-700 text-slate-300 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
+const BTN_PRIMARY = buttonClass("primary");
+const BTN_SECONDARY = buttonClass("secondary");
 const VARIANT_LABEL: Record<ImageVariant, UiKey> = {
   lifted: "review.variantLifted",
   raw: "review.variantRaw",
   previous: "review.previousRound",
 };
-const BTN_DANGER = `px-6 py-3 bg-transparent border border-red-500/40 text-red-300 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-red-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`;
+const BTN_DANGER = buttonClass("danger");
 
 function ImageBox({
   url,
@@ -102,14 +104,14 @@ function ImageBox({
   if (!url && preview) return <PreviewPlaceholder />;
   if (!url) {
     return (
-      <div className="aspect-[3/2] w-full rounded-xl border border-dashed border-slate-700 flex items-center justify-center text-slate-600 text-sm">
+      <div className="aspect-[3/2] w-full rounded-button border border-dashed border-line-strong bg-surface-2 flex items-center justify-center text-ink-2 text-sm">
         {t(locale, "review.noImage")}
       </div>
     );
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={url} alt={alt} className="w-full h-auto rounded-xl border border-slate-800" />
+    <img src={url} alt={alt} className="w-full h-auto rounded-button border border-line" />
   );
 }
 
@@ -131,7 +133,7 @@ function FireplaceChoice({
 }) {
   return (
     <div>
-      <p className="text-sm text-white font-bold mb-2">{t(locale, "action.fireplaceQuestion")}</p>
+      <p className="text-sm text-ink font-bold mb-2">{t(locale, "action.fireplaceQuestion")}</p>
       <div className="flex gap-2" role="group">
         {FIREPLACE_OPTIONS.map((option) => (
           <button
@@ -145,7 +147,7 @@ function FireplaceChoice({
           </button>
         ))}
       </div>
-      <p className="text-xs text-slate-400 mt-2">{t(locale, "action.fireplaceNotLitHint")}</p>
+      <p className="text-xs text-ink-2 mt-2">{t(locale, "action.fireplaceNotLitHint")}</p>
     </div>
   );
 }
@@ -164,15 +166,15 @@ function LightLabel({ light, locale }: { light: ReviewLight; locale: Locale }) {
     <>
       <span className="font-bold">{codeText(locale, "lightType", light.type)}</span>
       {/* location er fritekst fra analysen; React escaper den. */}
-      {light.location && <span className="text-slate-400"> · {light.location}</span>}
+      {light.location && <span className="text-ink-2"> · {light.location}</span>}
       {light.reasonCode !== null && (
-        <span className="text-slate-500">
+        <span className="text-ink-2">
           {" "}
           ({codeText(locale, "lightReason", light.reasonCode)})
         </span>
       )}
       {(light.state === "promoted" || light.state === "disabled") && (
-        <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-[#009183]/20 text-[#5eead4] text-[10px] font-bold">
+        <span className="ml-2 inline-block px-2 py-0.5 rounded-pill bg-neutral-bg text-neutral-fg text-[13px] font-medium">
           {t(locale, light.state === "promoted" ? "review.lightPromoted" : "review.lightDisabled")}
         </span>
       )}
@@ -193,13 +195,13 @@ function LightList({
 }) {
   return (
     <div>
-      <p className="text-xs font-bold text-slate-300 mb-2">
+      <p className="text-xs font-bold text-ink mb-2">
         {title} ({lights.length})
       </p>
       {lights.length === 0 ? (
-        <p className="text-xs text-slate-500">{t(locale, "review.lightsEmpty")}</p>
+        <p className="text-xs text-ink-2">{t(locale, "review.lightsEmpty")}</p>
       ) : (
-        <ul className={`${editing ? "space-y-2" : "space-y-1"} text-xs text-slate-300`}>
+        <ul className={`${editing ? "space-y-2" : "space-y-1"} text-xs text-ink`}>
           {lights.map((light, i) => {
             const rowKey = `${light.key ?? light.id ?? "x"}-${i}`;
             if (editing === null) {
@@ -216,8 +218,8 @@ function LightList({
             return (
               <li key={rowKey}>
                 <label
-                  className={`flex items-center gap-3 min-h-11 px-3 py-2 rounded-xl border ${
-                    editable ? "border-slate-700 cursor-pointer" : "border-slate-800 opacity-60"
+                  className={`flex items-center gap-3 min-h-11 px-3 py-2 rounded-button border ${
+                    editable ? "border-line-strong cursor-pointer" : "border-line opacity-60"
                   }`}
                 >
                   <input
@@ -226,12 +228,12 @@ function LightList({
                     checked={on}
                     disabled={!editable || editing.disabled}
                     onChange={(e) => editing.onToggle(light, e.target.checked)}
-                    className={`w-5 h-5 shrink-0 accent-[#009183] ${FOCUS}`}
+                    className={`w-5 h-5 shrink-0 accent-primary ${FOCUS}`}
                   />
                   <span className="flex-1">
                     <LightLabel light={light} locale={locale} />
                   </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <span className="text-[13px] text-ink-2">
                     {editable
                       ? t(locale, on ? "correct.lightOn" : "correct.lightOff")
                       : t(locale, "correct.locked")}
@@ -260,10 +262,10 @@ function RunValueLine({
   const distinct = [...new Set(value.runValues)];
   return (
     <div>
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className="text-sm text-white">{codeText(locale, group, value.value)}</p>
+      <p className="text-xs text-ink-2">{label}</p>
+      <p className="text-sm text-ink">{codeText(locale, group, value.value)}</p>
       {distinct.length > 1 && (
-        <p className="text-xs text-amber-300">
+        <p className="text-xs text-amber-fg">
           {t(locale, "review.runValues", {
             values: distinct.map((v) => codeText(locale, group, v)).join(" / "),
           })}
@@ -284,10 +286,10 @@ function DuskFactsBlock({ dusk, locale }: { dusk: ReviewDusk | null; locale: Loc
   return (
     <div>
       <p className={LABEL}>{t(locale, "review.duskTitle")}</p>
-      <p className="text-xs text-slate-400">{t(locale, "dusk.time")}</p>
-      <p className="text-sm text-white mb-2">{codeText(locale, "duskTime", facts.time)}</p>
-      <p className="text-xs text-slate-400">{t(locale, "dusk.sky")}</p>
-      <p className="text-sm text-white">
+      <p className="text-xs text-ink-2">{t(locale, "dusk.time")}</p>
+      <p className="text-sm text-ink mb-2">{codeText(locale, "duskTime", facts.time)}</p>
+      <p className="text-xs text-ink-2">{t(locale, "dusk.sky")}</p>
+      <p className="text-sm text-ink">
         {facts.sky.kind === "not_applied"
           ? t(locale, "review.duskSkyNotApplied")
           : codeText(locale, "duskSky", facts.sky.code)}
@@ -330,7 +332,7 @@ function DownloadButton({ jobId, locale }: { jobId: string; locale: Locale }) {
       <button onClick={onDownload} disabled={downloading} className={BTN_PRIMARY}>
         {t(locale, downloading ? "review.downloading" : "review.download")}
       </button>
-      <span className="text-xs text-amber-200" role="status">
+      <span className="text-xs text-amber-fg" role="status">
         {error ? t(locale, error) : ""}
       </span>
     </div>
@@ -372,7 +374,7 @@ function DisclosureBlock({ disclosure, locale }: { disclosure: ReviewDisclosure 
       <p className={`${LABEL} mb-0`}>{t(locale, "review.disclosureTitle")}</p>
       {result.kind === "missing" ? (
         <p
-          className="text-sm text-amber-200 bg-amber-900/30 border border-amber-500/40 rounded-xl p-3"
+          className="text-sm text-amber-fg bg-amber-bg rounded-button p-3"
           role="status"
         >
           {t(locale, "review.disclosureMissing")}
@@ -386,14 +388,14 @@ function DisclosureBlock({ disclosure, locale }: { disclosure: ReviewDisclosure 
             rows={3}
             lang={DISCLOSURE_LOCALE}
             aria-label={t(locale, "review.disclosureTitle")}
-            className={`w-full resize-none bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-sm text-white ${FOCUS}`}
+            className={`w-full resize-none bg-surface border border-ink-2 rounded-button p-3 text-sm text-ink ${FOCUS}`}
           />
-          <p className="text-xs text-slate-400">{t(locale, "review.disclosureHelp")}</p>
+          <p className="text-xs text-ink-2">{t(locale, "review.disclosureHelp")}</p>
           <div className="flex flex-wrap items-center gap-3">
             <button onClick={() => onCopy(result.text)} className={BTN_SECONDARY}>
               {t(locale, copy === "copied" ? "review.copied" : "action.copy")}
             </button>
-            <span className="text-xs text-amber-200" role="status">
+            <span className="text-xs text-amber-fg" role="status">
               {copy === "failed" ? t(locale, "review.copyFailed") : ""}
             </span>
           </div>
@@ -600,25 +602,25 @@ export default function GodkjenningPage({
         : codeText(locale, message.group, message.code);
 
   return (
-    <div className="flex flex-col bg-[#0B1120] text-white min-h-screen font-sans">
+    <div className="flex flex-col">
       <main className="max-w-6xl mx-auto w-full p-4 sm:p-8 flex-1 flex flex-col gap-6">
         <div>
           <Link
             href="/history"
-            className={`text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-white ${FOCUS}`}
+            className={`inline-flex min-h-11 items-center rounded-button text-sm text-ink-2 hover:text-ink ${FOCUS}`}
           >
             ← {t(locale, "review.back")}
           </Link>
-          <h1 className="text-3xl font-black text-white uppercase tracking-widest mt-4 mb-1">
+          <h1 className="font-display text-[32px] md:text-[40px] leading-tight text-ink mt-2 mb-1">
             {t(locale, "review.title")}
           </h1>
-          <p className="text-slate-500 text-xs font-mono break-all">{jobId}</p>
+          <p className="text-ink-2 text-xs font-mono break-all">{jobId}</p>
         </div>
 
         {load.kind === "loading" && (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="w-8 h-8 border-4 border-[#009183]/30 border-t-[#009183] rounded-full animate-spin motion-reduce:animate-none" />
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+            <div className="w-8 h-8 border-4 border-line border-t-ink rounded-full animate-spin motion-reduce:animate-none" />
+            <p className="text-ink-2 text-sm">
               {t(locale, "review.loading")}
             </p>
           </div>
@@ -626,14 +628,14 @@ export default function GodkjenningPage({
 
         {load.kind === "not_found" && (
           <div className={`${CARD} text-center max-w-lg mx-auto`}>
-            <p className="text-white font-bold text-lg mb-2">{t(locale, "review.notFound")}</p>
-            <p className="text-slate-400 text-sm">{t(locale, "review.notFoundHint")}</p>
+            <p className="text-ink font-bold text-lg mb-2">{t(locale, "review.notFound")}</p>
+            <p className="text-ink-2 text-sm">{t(locale, "review.notFoundHint")}</p>
           </div>
         )}
 
         {(load.kind === "unavailable" || load.kind === "error") && (
           <div className={`${CARD} text-center max-w-lg mx-auto`}>
-            <p className="text-slate-300 text-sm mb-6">
+            <p className="text-ink text-sm mb-6">
               {load.kind === "unavailable"
                 ? t(locale, "review.unavailable")
                 : t(locale, "review.loadError")}
@@ -683,7 +685,7 @@ export default function GodkjenningPage({
                   // TG-NEW-127: admin paa en annen brukers jobb. Knappene styres
                   // fortsatt bare av allowed_actions, som da er tom.
                   <p
-                    className="text-sm text-indigo-100 bg-indigo-900/30 border border-indigo-500/40 rounded-xl p-3"
+                    className="text-sm text-neutral-fg bg-neutral-bg rounded-button p-3"
                     role="status"
                   >
                     {t(locale, "review.readOnlyOther")}
@@ -710,10 +712,10 @@ export default function GodkjenningPage({
                               key={v}
                               onClick={() => setVariant(v)}
                               aria-pressed={shownVariant === v}
-                              className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${FOCUS} ${
+                              className={`min-h-11 px-4 rounded-pill text-sm border transition-colors ${FOCUS} ${
                                 shownVariant === v
-                                  ? "bg-[#009183] border-[#009183] text-white"
-                                  : "border-slate-700 text-slate-400 hover:text-white"
+                                  ? "bg-primary border-primary text-on-primary font-medium"
+                                  : "bg-surface border-line-strong text-ink-2 hover:text-ink hover:bg-surface-2"
                               }`}
                             >
                               {t(locale, VARIANT_LABEL[v])}
@@ -733,9 +735,9 @@ export default function GodkjenningPage({
 
                 {done !== null && (
                   <section className={CARD}>
-                    <p className="text-white font-bold">{t(locale, done.key)}</p>
+                    <p className="text-ink font-bold">{t(locale, done.key)}</p>
                     {done.reason && (
-                      <p className="text-sm text-slate-300 mt-2 break-words">
+                      <p className="text-sm text-ink mt-2 break-words">
                         {t(locale, "review.reasonLabel")}: {done.reason}
                       </p>
                     )}
@@ -750,7 +752,7 @@ export default function GodkjenningPage({
                   <section className={`${CARD} flex flex-col gap-4`}>
                     {correction.roundFailed && (
                       <p
-                        className="text-sm text-amber-200 bg-amber-900/30 border border-amber-500/40 rounded-xl p-3"
+                        className="text-sm text-amber-fg bg-amber-bg rounded-button p-3"
                         role="status"
                       >
                         {t(locale, "correct.roundFailed")}
@@ -759,8 +761,8 @@ export default function GodkjenningPage({
 
                     {isEditing ? (
                       <div className="flex flex-col gap-3">
-                        <p className="text-sm text-white font-bold">{t(locale, "correct.title")}</p>
-                        <p className="text-xs text-slate-400">{t(locale, "correct.hint")}</p>
+                        <p className="text-sm text-ink font-bold">{t(locale, "correct.title")}</p>
+                        <p className="text-xs text-ink-2">{t(locale, "correct.hint")}</p>
                         <div>
                           <button onClick={cancelCorrection} disabled={locked} className={BTN_SECONDARY}>
                             {t(locale, "action.cancel")}
@@ -781,7 +783,7 @@ export default function GodkjenningPage({
                         {controls.none ? (
                           // Linja om bare lesing sier det samme lenger opp.
                           !readOnly && (
-                            <p className="text-sm text-slate-400">{t(locale, "action.noneAllowed")}</p>
+                            <p className="text-sm text-ink-2">{t(locale, "action.noneAllowed")}</p>
                           )
                         ) : (
                           <div className="flex flex-wrap gap-3">
@@ -821,7 +823,7 @@ export default function GodkjenningPage({
                         )}
 
                         {controls.continue && (
-                          <p className="text-xs text-slate-400">{t(locale, "action.newImage")}</p>
+                          <p className="text-xs text-ink-2">{t(locale, "action.newImage")}</p>
                         )}
 
                         {controls.reject && rejectOpen && (
@@ -833,9 +835,9 @@ export default function GodkjenningPage({
                               aria-label={t(locale, "action.reasonPlaceholder")}
                               rows={3}
                               disabled={locked}
-                              className={`w-full bg-[#0B1120] border border-slate-700 rounded-xl p-3 text-sm text-white ${FOCUS}`}
+                              className={`w-full bg-surface border border-ink-2 rounded-button p-3 text-sm text-ink ${FOCUS}`}
                             />
-                            <p className={`text-xs ${tooLong ? "text-red-400" : "text-slate-500"}`}>
+                            <p className={`text-xs ${tooLong ? "text-red-fg" : "text-ink-2"}`}>
                               {tooLong
                                 ? t(locale, "action.reasonTooLong", { max: REASON_MAX_LEN })
                                 : t(locale, "action.reasonCount", {
@@ -865,7 +867,7 @@ export default function GodkjenningPage({
                     )}
 
                     {(busy || polling) && (
-                      <p className="text-xs text-slate-400" role="status">
+                      <p className="text-xs text-ink-2" role="status">
                         {polling
                           ? t(locale, "review.statusRunning")
                           : t(locale, "action.working")}
@@ -876,7 +878,7 @@ export default function GodkjenningPage({
 
                 {messageText !== null && !isEditing && (
                   <p
-                    className="text-sm text-amber-300 bg-amber-900/20 border border-amber-500/20 rounded-xl p-3"
+                    className="text-sm text-amber-fg bg-amber-bg rounded-button p-3"
                     role="status"
                   >
                     {messageText}
@@ -889,11 +891,11 @@ export default function GodkjenningPage({
                       <div>
                         <p className={LABEL}>{t(locale, "review.reasons")}</p>
                         {review.code !== null && (
-                          <p className="text-sm text-white mb-2">
+                          <p className="text-sm text-ink mb-2">
                             {codeText(locale, "reviewCode", review.code)}
                           </p>
                         )}
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-slate-300">
+                        <ul className="list-disc pl-5 space-y-1 text-sm text-ink">
                           {review.reasonCodes.map((c, i) => (
                             <li key={`${c}-${i}`}>{codeText(locale, "reasonCode", c)}</li>
                           ))}
@@ -903,7 +905,7 @@ export default function GodkjenningPage({
                     {review.flagCodes.length > 0 && (
                       <div>
                         <p className={LABEL}>{t(locale, "review.notes")}</p>
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-slate-300">
+                        <ul className="list-disc pl-5 space-y-1 text-sm text-ink">
                           {review.flagCodes.map((c, i) => (
                             <li key={`${c}-${i}`}>{codeText(locale, "flagCode", c)}</li>
                           ))}
@@ -927,8 +929,8 @@ export default function GodkjenningPage({
                         locale={locale}
                       />
                       <div>
-                        <p className="text-xs text-slate-400">{t(locale, "review.fireplace")}</p>
-                        <p className="text-sm text-white">
+                        <p className="text-xs text-ink-2">{t(locale, "review.fireplace")}</p>
+                        <p className="text-sm text-ink">
                           {review.fireplace.disagreement
                             ? t(locale, "review.fireplaceDisagreement")
                             : review.fireplace.present
@@ -936,7 +938,7 @@ export default function GodkjenningPage({
                               : t(locale, "review.fireplaceNone")}
                         </p>
                         {(review.fireplace.answer === "yes" || review.fireplace.answer === "no") && (
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-ink-2">
                             {t(locale, "review.fireplaceAnswered", {
                               answer: t(locale, fireplaceAnswerKey(review.fireplace.answer)),
                             })}
@@ -949,7 +951,7 @@ export default function GodkjenningPage({
                   <div className={`${CARD} flex flex-col gap-4`}>
                     <p className={`${LABEL} mb-0`}>{t(locale, "review.lights")}</p>
                     {review.validRuns === 0 && (
-                      <p className="text-xs text-amber-300">{t(locale, "review.noValidRuns")}</p>
+                      <p className="text-xs text-amber-fg">{t(locale, "review.noValidRuns")}</p>
                     )}
                     <LightList
                       title={t(locale, "review.lightsApproved")}
@@ -971,7 +973,7 @@ export default function GodkjenningPage({
                     />
 
                     {isEditing && (
-                      <div className="flex flex-col gap-4 border-t border-slate-800 pt-4">
+                      <div className="flex flex-col gap-4 border-t border-line pt-4">
                         {fireplaceShown && (
                           <FireplaceChoice
                             answer={correctAnswer}
@@ -982,19 +984,19 @@ export default function GodkjenningPage({
                         )}
 
                         {confirmNeeded && (
-                          <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-white">
+                          <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-ink">
                             <input
                               type="checkbox"
                               checked={confirmed}
                               disabled={locked}
                               onChange={(e) => setConfirmed(e.target.checked)}
-                              className={`w-5 h-5 mt-0.5 shrink-0 accent-[#009183] ${FOCUS}`}
+                              className={`w-5 h-5 mt-0.5 shrink-0 accent-primary ${FOCUS}`}
                             />
                             <span>{t(locale, "correct.confirmExists")}</span>
                           </label>
                         )}
 
-                        <p className="text-xs text-slate-400">
+                        <p className="text-xs text-ink-2">
                           {t(locale, "correct.roundsLeft", { n: correction.roundsLeft })}
                         </p>
                         <div className="flex flex-wrap gap-3">
@@ -1009,17 +1011,17 @@ export default function GodkjenningPage({
                             {t(locale, "action.cancel")}
                           </button>
                         </div>
-                        <p className="text-xs text-slate-400">{t(locale, "correct.newImageFromOriginal")}</p>
+                        <p className="text-xs text-ink-2">{t(locale, "correct.newImageFromOriginal")}</p>
                         {messageText !== null && (
                           <p
-                            className="text-sm text-amber-300 bg-amber-900/20 border border-amber-500/20 rounded-xl p-3"
+                            className="text-sm text-amber-fg bg-amber-bg rounded-button p-3"
                             role="status"
                           >
                             {messageText}
                           </p>
                         )}
                         {busy && (
-                          <p className="text-xs text-slate-400" role="status">
+                          <p className="text-xs text-ink-2" role="status">
                             {t(locale, "action.working")}
                           </p>
                         )}

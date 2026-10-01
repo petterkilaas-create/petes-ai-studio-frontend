@@ -117,13 +117,11 @@ test("«Gavl» finnes ingen steder i repoet", () => {
 });
 
 // ---------------------------------------------------------------------------
-// D1 (D1a): skallet og de aktive sidene i retning A. Tekstsjekker, som over.
+// D1 (D1a og D1b): skallet og de aktive sidene i retning A. Tekstsjekker, som over.
 // ---------------------------------------------------------------------------
 
 /** Skjulte sider: viser bare ServiceUnavailable og ryddes i D5. */
 const HIDDEN_DIRS = ["staging", "express-v2", "video", "copywriter", "orders"];
-/** Faar nye farger i D1b. Fjernes fra lista da, saa sjekkene gjelder dem ogsaa. */
-const D1B_PENDING = ["godkjenning/[jobId]/page.tsx", "components/PreviewPlaceholder.tsx"];
 
 /** Aktive filer (.ts/.tsx/.css under app/, uten tester), relativt til app/. Nye filer kommer med av seg selv. */
 function activeFiles(dir = APP_DIR): string[] {
@@ -133,7 +131,7 @@ function activeFiles(dir = APP_DIR): string[] {
     const rel = relative(APP_DIR, path);
     if (entry.isDirectory()) {
       if (!HIDDEN_DIRS.includes(rel)) out.push(...activeFiles(path));
-    } else if (/\.(tsx?|css)$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name) && !D1B_PENDING.includes(rel)) {
+    } else if (/\.(tsx?|css)$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
       out.push(rel);
     }
   }
@@ -153,6 +151,8 @@ test("D1: listen over aktive filer har skallet, sidene og komponentene", () => {
     "components/AppNav.tsx",
     "components/ServiceUnavailable.tsx",
     "components/ui/Button.tsx",
+    "godkjenning/[jobId]/page.tsx",
+    "components/PreviewPlaceholder.tsx",
   ]) {
     assert.ok(files.includes(f), f);
   }
@@ -213,6 +213,24 @@ test("D1: skallet bruker merket fra brand.ts, og metadata har fanetittelen", () 
   for (const [dir, title] of [["express", "Express"], ["history", "Historikk"], ["godkjenning", "Godkjenning"]]) {
     assert.match(read(`${dir}/layout.tsx`), new RegExp(`title: "${title}"`), dir);
   }
+});
+
+test("D1b: godkjenningssiden og PreviewPlaceholder bruker bare tokenene", () => {
+  for (const f of ["godkjenning/[jobId]/page.tsx", "components/PreviewPlaceholder.tsx"]) {
+    const src = read(f);
+    assert.doesNotMatch(src, /#[0-9a-f]{3,8}\b/i, f);
+    assert.doesNotMatch(src, /-\[(#|rgb)/, f);
+    assert.doesNotMatch(src, /\b(slate|gray|zinc|sky|indigo|purple|emerald|teal)-\d/, f);
+    assert.doesNotMatch(src, /\b(text|bg|border)-(white|black)\b/, f);
+    assert.doesNotMatch(src, /\b(red|amber)-\d/, f);
+  }
+  const page = read("godkjenning/[jobId]/page.tsx");
+  // Knappene og kortene er de felles komponentene (primary, ikke turkis).
+  assert.match(page, /const BTN_PRIMARY = buttonClass\("primary"\);/);
+  assert.match(page, /const BTN_SECONDARY = buttonClass\("secondary"\);/);
+  assert.match(page, /const BTN_DANGER = buttonClass\("danger"\);/);
+  assert.match(page, /const CARD = cardClass\(/);
+  assert.match(page, /<h1 className="font-display /);
 });
 
 const EMOJI = /\p{Extended_Pictographic}/u;

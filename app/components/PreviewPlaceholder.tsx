@@ -12,7 +12,7 @@ export function PreviewPlaceholder() {
   const locale = useLocale();
   return (
     <div
-      className="aspect-[3/2] w-full rounded-xl border border-dashed border-slate-700 flex items-center justify-center p-6 text-center text-slate-500 text-sm"
+      className="aspect-[3/2] w-full rounded-button border border-dashed border-line-strong bg-surface-2 flex items-center justify-center p-6 text-center text-ink-2 text-sm"
       role="status"
     >
       {t(locale, "preview.notReady")}
