@@ -556,7 +556,7 @@ test("D2b: analysen staar bare i DetailsPanel (megleren ser den ikke)", () => {
 test("D2b: rettingen er én flat liste med «Usikker», uten grunner, tidspunkt eller himmel", () => {
   const panel = withoutComments(read("components/godkjenning/CorrectionPanel.tsx"));
   assert.match(panel, /const rows = flatLights\(lights\);/);
-  assert.match(panel, /<LightLabel light=\{light\} locale=\{locale\} uncertain=\{uncertain\} state \/>/);
+  assert.match(panel, /<LightLabel light=\{light\} locale=\{locale\} location uncertain=\{uncertain\} state \/>/);
   assert.match(panel, /onToggle\(light, uncertain, e\.target\.checked\)/);
   // Ingen grunn fra analysen, og ingen valg av tidspunkt eller himmel (TG-NEW-145).
   assert.doesNotMatch(panel, /\breason\b|lightReason/);
@@ -594,4 +594,44 @@ test("D2b: ordlista har de nye ordene paa nb og en", () => {
   assert.equal(en["review.details"], "Details");
   assert.equal(nb["review.moodTitle"], "Stemning og lys");
   assert.equal(nb["correct.lightsTitle"], "Lys i bildet");
+});
+
+// ---------------------------------------------------------------------------
+// D2c: plasseringen av lysene og overskriften i «Stemning og lys» (Petter 01.10, valg B).
+// ---------------------------------------------------------------------------
+
+test("D2c: plasseringen (fritekst fra analysen) vises bare naar location er satt", () => {
+  const label = withoutComments(read("components/godkjenning/LightLabel.tsx"));
+  assert.match(label, /location = false,/);
+  assert.match(label, /\{location && light\.location && /);
+  // Plasseringen leses bare i den ene linja som krever `location`.
+  const lines = label.split("\n").filter((l) => l.includes("light.location"));
+  assert.equal(lines.length, 1, "plasseringen leses ett sted");
+  assert.match(lines[0], /^\s*\{location && light\.location && /);
+});
+
+test("D2c: «Stemning og lys» viser bare lampetypen; Detaljer og rettingen viser plasseringen", () => {
+  const usesOf = (f: string) =>
+    [...withoutComments(read(f)).matchAll(/<LightLabel\b[^>]*\/>/g)].map((m) => m[0]);
+  const mood = usesOf("components/godkjenning/MoodPanel.tsx");
+  assert.equal(mood.length, 1);
+  for (const use of mood) assert.doesNotMatch(use, /\blocation\b/, use);
+  assert.doesNotMatch(withoutComments(read("components/godkjenning/MoodPanel.tsx")), /\.location\b/);
+  for (const f of ["components/godkjenning/DetailsPanel.tsx", "components/godkjenning/CorrectionPanel.tsx"]) {
+    const uses = usesOf(f);
+    assert.ok(uses.length > 0 && uses.every((u) => /\blocation\b/.test(u)), f);
+  }
+  // Ingen andre steder leser plasseringen direkte.
+  for (const f of ["godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("LightLabel.tsx"))]) {
+    assert.doesNotMatch(withoutComments(read(f)), /\.location\b/, f);
+  }
+});
+
+test("D2c: overskriften heter «Lys som tennes» i alle tilstander", () => {
+  assert.equal(DICTIONARIES.nb.ui["review.lightsLit"], "Lys som tennes");
+  assert.equal(DICTIONARIES.en.ui["review.lightsLit"], "Lights turned on");
+  // Samme overskrift uansett status: MoodPanel tar ikke status inn.
+  const mood = withoutComments(read("components/godkjenning/MoodPanel.tsx"));
+  assert.match(mood, /t\(locale, "review\.lightsLit"\)/);
+  assert.doesNotMatch(mood, /status/);
 });

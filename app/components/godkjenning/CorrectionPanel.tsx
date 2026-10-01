@@ -89,7 +89,7 @@ export function CorrectionPanel({
                       className={`w-5 h-5 shrink-0 accent-primary ${FOCUS}`}
                     />
                     <span className="flex-1">
-                      <LightLabel light={light} locale={locale} uncertain={uncertain} state />
+                      <LightLabel light={light} locale={locale} location uncertain={uncertain} state />
                     </span>
                     <span className="text-[13px] text-ink-2">
                       {editable

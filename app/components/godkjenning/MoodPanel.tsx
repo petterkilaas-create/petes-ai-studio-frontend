@@ -13,8 +13,9 @@ const CARD = cardClass("md");
 
 /**
  * Stemning og lys i sidepanelet (D2b, brief §4): valgene megleren gjorde
- * (tidspunkt, himmel, peis) og lysene som er tent i gjeldende bilde. Ingen
- * analyse her (brief §3 punkt 6); den ligger i «Detaljer». Himmelen vises
+ * (tidspunkt, himmel, peis) og lysene som tennes, bare med lampetypen. Ingen
+ * analyse her (brief §3 punkt 6), og ingen plassering (fritekst fra
+ * analysen, D2c); den ligger i «Detaljer». Himmelen vises
  * ikke som valg naar den ikke ble brukt (sky_applied false).
  */
 export function MoodPanel({

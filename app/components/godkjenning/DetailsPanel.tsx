@@ -48,7 +48,7 @@ function LightList({ title, lights, locale }: { title: string; lights: ReviewLig
         <ul className="space-y-1 text-xs text-ink">
           {lights.map((light, i) => (
             <li key={`${light.key ?? light.id ?? "x"}-${i}`}>
-              <LightLabel light={light} locale={locale} reason state />
+              <LightLabel light={light} locale={locale} location reason state />
             </li>
           ))}
         </ul>
