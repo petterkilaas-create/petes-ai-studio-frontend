@@ -610,6 +610,8 @@ test("normalizeReview: de gamle feltene ignoreres, objektet har bare de nye (L4)
     previous: { round: 1, previewUrl: "pp.jpg" },
     previewUrl: "p.jpg",
     rawPreviewUrl: null,
+    // D2a: rounds mangler i svaret (gammel backend).
+    rounds: null,
   });
   assert.doesNotMatch(JSON.stringify(r), /resultUrl|rawUrl|"r"|"rr"|"pr"|"prr"/);
 });
@@ -652,4 +654,51 @@ test("listJobs leser thumb_url; null eller mangler gir thumbUrl null", async () 
   ]);
   const rows = await api.listJobs({ getToken });
   assert.deepEqual(rows.map((r) => r.thumbUrl), ["https://x/a_thumb_abc.jpg", null, null]);
+});
+
+test("normalizeReview: images.rounds (D2a, KONTRAKT_RUNDER)", () => {
+  const rounds = (value: unknown) =>
+    api.normalizeReview({ images: { rounds: value } }, "j").images.rounds;
+  // Mangler feltet eller er det ikke en liste: gammel backend (null), ikke [].
+  assert.equal(api.normalizeReview({ images: {} }, "j").images.rounds, null);
+  assert.equal(rounds("x"), null);
+  assert.deepEqual(rounds([]), []);
+  const parsed = rounds([
+    {
+      round: 1,
+      current: true,
+      preview_url: "https://x/j_preview_9f1c2a7b3d4e.jpg?token=t",
+      raw_preview_url: "",
+      result_url: "https://x/j.png",
+      choices: {
+        time: "early",
+        sky: "clear",
+        sky_applied: false,
+        fireplace_fire: "maybe",
+        lights_changed: "yes",
+        prompt: "hemmelig",
+      },
+    },
+    { round: 0 },
+    { round: "2" },
+    { round: 1.5 },
+    { round: -1 },
+    "x",
+  ]);
+  assert.deepEqual(parsed, [
+    {
+      round: 1,
+      current: true,
+      previewUrl: "https://x/j_preview_9f1c2a7b3d4e.jpg?token=t",
+      rawPreviewUrl: null,
+      choices: {
+        time: "early",
+        sky: "clear",
+        skyApplied: false,
+        fireplaceFire: null,
+        lightsChanged: false,
+      },
+    },
+    { round: 0, current: false, previewUrl: null, rawPreviewUrl: null, choices: null },
+  ]);
 });

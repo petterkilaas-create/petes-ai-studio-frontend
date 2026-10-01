@@ -102,12 +102,15 @@ test("previewUrl null gir plassholder (null), aldri resultUrl eller rawUrl", () 
   }
 });
 
-test("«Rått» bare naar rawPreviewUrl finnes, og viser da den", () => {
+test("«Rått» bare for admin og bare naar rawPreviewUrl finnes, og viser da den (D2a)", () => {
   const admin = { ...OLD, previewUrl: "p.jpg", rawPreviewUrl: "rp.jpg", previous: null };
-  assert.deepEqual(variantOptions(admin), ["lifted", "raw"]);
+  assert.deepEqual(variantOptions(admin, true), ["lifted", "raw"]);
   assert.equal(resultImageUrl(admin, "raw"), "rp.jpg");
+  // En lenke alene viser aldri rått for megler.
+  assert.deepEqual(variantOptions(admin, false), []);
   const owner = { ...OLD, previewUrl: "p.jpg", rawPreviewUrl: null, previous: null };
-  assert.deepEqual(variantOptions(owner), []);
+  assert.deepEqual(variantOptions(owner, false), []);
+  assert.deepEqual(variantOptions(owner, true), []);
   assert.equal(resultImageUrl(owner, "raw"), null, "rått faller ikke tilbake til rawUrl");
 });
 
@@ -116,16 +119,16 @@ test("«Forrige runde» vises fra previous.previewUrl", () => {
     ...OLD, previewUrl: "p.jpg", rawPreviewUrl: null,
     previous: { ...OLD_PREV, previewUrl: "pp.jpg" },
   };
-  assert.deepEqual(variantOptions(images), ["lifted", "previous"]);
+  assert.deepEqual(variantOptions(images, false), ["lifted", "previous"]);
   assert.equal(resultImageUrl(images, "previous"), "pp.jpg");
   const notReady = { ...images, previous: { ...OLD_PREV, previewUrl: null } };
-  assert.deepEqual(variantOptions(notReady), ["lifted", "previous"]);
+  assert.deepEqual(variantOptions(notReady, false), ["lifted", "previous"]);
   assert.equal(resultImageUrl(notReady, "previous"), null, "plassholder, aldri previous.resultUrl");
   const admin = { ...images, rawPreviewUrl: "rp.jpg" };
-  assert.deepEqual(variantOptions(admin), ["lifted", "raw", "previous"]);
+  assert.deepEqual(variantOptions(admin, true), ["lifted", "raw", "previous"]);
   // Uten forrige runde: ingen knapp, og ikke gjeldende bilde under feil etikett.
   const first = { ...images, previous: null };
-  assert.deepEqual(variantOptions(first), []);
+  assert.deepEqual(variantOptions(first, false), []);
   assert.equal(resultImageUrl(first, "previous"), null);
 });
 

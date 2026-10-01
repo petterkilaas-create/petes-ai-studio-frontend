@@ -120,12 +120,14 @@ export function resultImageUrl(images: ReviewPreviews, variant: ImageVariant): s
 }
 
 /**
- * Knappene i bildebryteren: «Rått» bare naar rawPreviewUrl finnes (bare
- * admin), og «Forrige runde» naar det finnes en forrige runde (bildet kan
- * da vise plassholder). Tom liste = ingen bryter.
+ * Knappene i bildebryteren for jobber uten `rounds`: «Rått» bare for admin
+ * og bare naar rawPreviewUrl finnes (D2a: begge kreves, saa en lenke alene
+ * aldri viser rått for megler), og «Forrige runde» naar det finnes en
+ * forrige runde (bildet kan da vise plassholder). Tom liste = ingen bryter.
  */
-export function variantOptions(images: ReviewPreviews): ImageVariant[] {
-  const options: ImageVariant[] = images.rawPreviewUrl !== null ? ["lifted", "raw"] : ["lifted"];
+export function variantOptions(images: ReviewPreviews, isAdmin: boolean): ImageVariant[] {
+  const options: ImageVariant[] =
+    isAdmin && images.rawPreviewUrl !== null ? ["lifted", "raw"] : ["lifted"];
   if (images.previous !== null) options.push("previous");
   return options.length > 1 ? options : [];
 }

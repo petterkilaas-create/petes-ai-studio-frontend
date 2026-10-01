@@ -641,6 +641,27 @@ export interface CorrectionOverrides {
   add: never[];
 }
 
+/** Valgene en runde ble laget med (bare koder; etiketten lages i compare.ts). */
+export interface RoundChoices {
+  time: string | null;
+  sky: string | null;
+  /** false: himmelvalget ble ikke brukt (ingen himmel i bildet). null: ukjent. */
+  skyApplied: boolean | null;
+  fireplaceFire: "yes" | "no" | null;
+  /** Runden ble laget med lysene justert i forhold til analysen. */
+  lightsChanged: boolean;
+}
+
+/** En runde i `images.rounds`. Lenkene er merkede forhaandsvisninger eller null. */
+export interface ReviewRound {
+  round: number;
+  current: boolean;
+  previewUrl: string | null;
+  /** Bare admin; alle andre: alltid null. */
+  rawPreviewUrl: string | null;
+  choices: RoundChoices | null;
+}
+
 export interface RunValue {
   value: string | null;
   runValues: string[];
@@ -694,6 +715,11 @@ export interface JobReviewDetail {
     previewUrl: string | null;
     /** Merket forhaandsvisning av det raa bildet; bare admin, ellers null. */
     rawPreviewUrl: string | null;
+    /**
+     * Alle runder med et resultat (TG-NEW-141, KONTRAKT_RUNDER). null naar
+     * backend ikke sender feltet (gammel backend): siden bruker da feltene over.
+     */
+    rounds: ReviewRound[] | null;
   };
   decisions: { action: string | null; at: string | null; byRole: string | null; reason: string | null }[];
 }
@@ -761,6 +787,40 @@ function toDisclosure(raw: unknown): ReviewDisclosure | null {
   };
 }
 
+function toRoundChoices(raw: unknown): RoundChoices | null {
+  if (!isRecord(raw)) return null;
+  const fire = raw.fireplace_fire;
+  return {
+    time: stringOrNull(raw.time),
+    sky: stringOrNull(raw.sky),
+    skyApplied: typeof raw.sky_applied === "boolean" ? raw.sky_applied : null,
+    fireplaceFire: fire === "yes" || fire === "no" ? fire : null,
+    lightsChanged: raw.lights_changed === true,
+  };
+}
+
+/**
+ * `images.rounds`: null naar feltet mangler eller ikke er en liste (gammel
+ * backend). Rader uten heltallig `round` hoppes over. Bare de to merkede
+ * lenkene leses (KONTRAKT_LEKKASJE §8).
+ */
+function toRounds(raw: unknown): ReviewRound[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter(isRecord).flatMap((r) =>
+    typeof r.round === "number" && Number.isInteger(r.round) && r.round >= 0
+      ? [
+          {
+            round: r.round,
+            current: r.current === true,
+            previewUrl: nonEmptyString(r.preview_url),
+            rawPreviewUrl: nonEmptyString(r.raw_preview_url),
+            choices: toRoundChoices(r.choices),
+          },
+        ]
+      : []
+  );
+}
+
 function toRunValue(raw: unknown): RunValue {
   const r = isRecord(raw) ? raw : {};
   return { value: stringOrNull(r.value), runValues: stringList(r.run_values) };
@@ -819,6 +879,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
             },
       previewUrl: nonEmptyString(images.preview_url),
       rawPreviewUrl: nonEmptyString(images.raw_preview_url),
+      rounds: toRounds(images.rounds),
     },
     decisions: records(r.decisions).map((d) => ({
       action: stringOrNull(d.action),
