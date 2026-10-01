@@ -1,48 +1,46 @@
 "use client";
 
 import type { ProcessStatus } from "../hooks/useProcessJob";
-import { t } from "../lib/i18n";
+import { t, type UiKey } from "../lib/i18n";
 import { useLocale } from "../lib/i18n/useLocale";
+import { Pill, type PillTone } from "./ui/Pill";
 
 /**
  * Liten status-indikator (Idle/Uploading/Running/Done/Failed, pluss
- * sluttstatusene fra 2c-2).
- * Visuelt moenster trukket ut av express-v2 sin status-boks i headeren.
+ * sluttstatusene fra 2c-2). Ordene kommer fra ordlista (D1, brief §7).
  */
-const LABELS: Record<ProcessStatus, string> = {
-  idle: "Idle",
-  uploading: "Uploading...",
-  running: "Running...",
-  done: "Done",
-  awaiting_approval: "Til kontroll",
-  needs_review: "Til gjennomgang",
-  // Ny tekst (2d-1) gaar via ordlista; se label under.
-  rejected_by_reviewer: "Avvist av deg",
-  unknown: "Ukjent status",
-  failed: "Failed",
+const VARIANTS: Record<ProcessStatus, { key: UiKey; tone: PillTone; pulse?: boolean }> = {
+  idle: { key: "status.idle", tone: "neutral" },
+  uploading: { key: "status.uploading", tone: "neutral", pulse: true },
+  running: { key: "status.running", tone: "neutral", pulse: true },
+  done: { key: "status.done", tone: "green" },
+  awaiting_approval: { key: "status.awaitingApproval", tone: "amber" },
+  needs_review: { key: "status.awaitingApproval", tone: "amber" },
+  rejected_by_reviewer: { key: "status.rejectedByYou", tone: "neutral" },
+  unknown: { key: "status.unknown", tone: "neutral" },
+  failed: { key: "status.failed", tone: "red" },
 };
 
 export interface StatusBadgeProps {
   status: ProcessStatus;
-  /** Vises etter "Failed" naar status er failed. */
+  /** Vises etter «Feilet» naar status er failed. */
   error?: string | null;
+  /** «Godkjent» i stedet for «Ferdig» for kveldsbildet (som i Historikk). */
+  service?: string | null;
 }
 
-export function StatusBadge({ status, error }: StatusBadgeProps) {
+export function StatusBadge({ status, error, service }: StatusBadgeProps) {
   const locale = useLocale();
-  const label =
-    status === "failed" && error
-      ? `Failed: ${error}`
-      : status === "rejected_by_reviewer"
-        ? t(locale, "status.rejectedByYou")
-        : LABELS[status];
+  const v = VARIANTS[status];
+  const key: UiKey = status === "done" && service === "scene_transform" ? "status.approved" : v.key;
+  const label = status === "failed" && error ? `${t(locale, key)}: ${error}` : t(locale, key);
 
   return (
-    <div className="text-right border border-white/10 px-4 py-2 rounded-xl bg-white/5">
-      <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">
-        Status
-      </p>
-      <p className="text-sm text-white font-black">{label}</p>
+    <div className="flex flex-col items-start gap-1 md:items-end">
+      <p className="text-[13px] text-ink-2">{t(locale, "status.label")}</p>
+      <Pill tone={v.tone} pulse={v.pulse}>
+        {label}
+      </Pill>
     </div>
   );
 }

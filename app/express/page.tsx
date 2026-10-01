@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check, Clock, Eraser, ScanFace, Sun, Sunset, Zap, type LucideIcon } from "lucide-react";
 import { useImagePreview } from "../hooks/useImagePreview";
 import { useProcessJob } from "../hooks/useProcessJob";
 import { StatusBadge } from "../components/StatusBadge";
@@ -18,9 +19,33 @@ import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "../lib/d
 import { t } from "../lib/i18n";
 import { useLocale } from "../lib/i18n/useLocale";
 import { expressCategories } from "../lib/services";
+import { Button } from "../components/ui/Button";
+import { Card, cardClass } from "../components/ui/Card";
+import { PageHeader } from "../components/ui/PageHeader";
 
 // Tjenestevalget ligger i lib/services.ts, filtrert paa ENABLED (TG-NEW-136).
 const CATEGORIES = expressCategories();
+
+// Lucide i stedet for emojiene i services.ts (D1). Ukjent id: ingen ikon.
+const CATEGORY_ICONS: Record<string, LucideIcon> = { fixit: Eraser, timetraveler: Clock };
+const TOOL_ICONS: Record<string, LucideIcon> = {
+  magic_cleanup: Eraser,
+  privacy_blur: ScanFace,
+  klart_vaer: Sun,
+  skumring: Sunset,
+};
+
+const FOCUS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
+const STEP_LABEL = "text-sm font-medium text-ink block mb-3";
+
+function chipClass(selected: boolean): string {
+  return `inline-flex min-h-11 items-center gap-2 px-4 rounded-pill text-sm border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS} ${
+    selected
+      ? "bg-primary border-primary text-on-primary font-medium"
+      : "bg-surface border-line-strong text-ink-2 hover:bg-surface-2 hover:text-ink"
+  }`;
+}
 
 type SceneType = "auto" | "exterior" | "interior";
 
@@ -106,259 +131,249 @@ export default function ExpressPage() {
     void job.resubmitForced();
   };
 
+  const SelectedIcon = selectedTool ? TOOL_ICONS[selectedTool.id] : undefined;
+
   return (
-    <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans text-white">
-      <main className="flex-1 flex flex-col max-w-6xl mx-auto w-full p-8 gap-8">
-        <header className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-black uppercase tracking-widest mb-2 flex items-center gap-4">
-              <span className="text-4xl">⚡</span> Express Studio
-            </h1>
-            <p className="text-slate-400 max-w-2xl text-sm">
-              {t(locale, "express.subtitle")}
-            </p>
-          </div>
-          {/* Uten error: den raa teksten skal ikke vises (TG-NEW-121). */}
-          <StatusBadge status={job.status} />
-        </header>
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 md:px-8 md:py-12">
+      <PageHeader
+        title={
+          <span className="flex items-center gap-3">
+            <Zap aria-hidden className="size-7" strokeWidth={1.5} /> Express Studio
+          </span>
+        }
+        subtitle={t(locale, "express.subtitle")}
+        actions={
+          /* Uten error: den raa teksten skal ikke vises (TG-NEW-121). */
+          <StatusBadge status={job.status} service={selectedTool?.service} />
+        }
+      />
 
-        {/* --- STEP 1: VELG VERKTOY --- */}
-        <section className="space-y-6">
-          <h2 className="text-xs font-black text-[#009183] uppercase tracking-widest">
-            Step 1: Choose your tool
-          </h2>
+      {/* --- STEP 1: VELG VERKTOY --- */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium text-ink">Step 1: Choose your tool</h2>
 
-          <div className="flex flex-wrap gap-4">
-            {CATEGORIES.map((cat) => (
+        <div className="flex flex-wrap gap-2">
+          {CATEGORIES.map((cat) => {
+            const Icon = CATEGORY_ICONS[cat.id];
+            return (
               <button
                 key={cat.id}
+                type="button"
                 onClick={() => setActiveCategoryId(cat.id)}
                 disabled={isProcessing}
-                className={`px-6 py-3 rounded-full font-black uppercase tracking-widest text-[10px] transition-all border disabled:opacity-50 disabled:cursor-not-allowed ${
-                  activeCategoryId === cat.id
-                    ? "bg-[#009183] border-[#009183] text-white shadow-[0_0_20px_rgba(0,145,131,0.4)]"
-                    : "bg-transparent border-slate-700 text-slate-400 hover:text-white hover:border-slate-500"
-                }`}
+                aria-pressed={activeCategoryId === cat.id}
+                className={chipClass(activeCategoryId === cat.id)}
               >
-                {cat.icon} {cat.title}
+                {Icon && <Icon aria-hidden className="size-4" strokeWidth={1.75} />}
+                {cat.title}
               </button>
-            ))}
-          </div>
+            );
+          })}
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {activeCategory.items.map((tool) => {
-              const selected = tool.id === selectedToolId;
-              return (
-                <button
-                  key={tool.id}
-                  onClick={() => selectTool(tool.id)}
-                  disabled={isProcessing}
-                  className={`text-left bg-[#0f172a] border rounded-2xl p-6 transition-all flex flex-col h-full shadow-lg disabled:cursor-not-allowed ${
-                    selected
-                      ? "border-[#009183] bg-[#1e293b] shadow-[0_10px_30px_-15px_rgba(0,145,131,0.4)] -translate-y-1"
-                      : "border-slate-800 hover:border-[#009183]/50 hover:bg-[#1e293b] hover:-translate-y-1"
-                  }`}
-                >
-                  <div className="text-4xl mb-4">{tool.icon}</div>
-                  <h3 className="text-sm font-black text-white uppercase tracking-wider mb-2">
-                    {tool.title}
-                  </h3>
-                  <p className="text-slate-400 text-xs leading-relaxed flex-1">
-                    {tool.desc}
-                  </p>
-                  {selected && (
-                    <span className="mt-4 text-[#009183] text-[10px] font-black uppercase tracking-widest">
-                      Selected ✓
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* --- STEP 2+: OPPLASTING + KJOERING (naar et verktoy er valgt) --- */}
-        {selectedTool && (
-          <section className="bg-[#0f172a] border border-slate-800 rounded-3xl p-8 space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="text-3xl">{selectedTool.icon}</div>
-              <div>
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
-                  Selected Tool
-                </p>
-                <p className="text-white font-black uppercase tracking-widest">
-                  {selectedTool.title}
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-black text-[#009183] uppercase tracking-[0.2em] block mb-3">
-                Step 2: Image
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={preview.onInputChange}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {activeCategory.items.map((tool) => {
+            const selected = tool.id === selectedToolId;
+            const Icon = TOOL_ICONS[tool.id];
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                onClick={() => selectTool(tool.id)}
                 disabled={isProcessing}
-                className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-widest file:bg-[#009183] file:text-white hover:file:bg-[#00a89a] file:cursor-pointer"
-              />
-            </div>
-
-            {/* Step 3: scene-type-kontroller KUN for scene_transform-kort med sceneGate */}
-            {showSceneControls && (
-              <div className="flex flex-wrap gap-6 items-end border-t border-slate-800 pt-6">
-                <div>
-                  <label
-                    htmlFor="scene-type-select"
-                    className="text-[10px] font-black text-[#009183] uppercase tracking-[0.2em] block mb-3"
-                  >
-                    Scene type
-                  </label>
-                  <select
-                    id="scene-type-select"
-                    value={sceneType}
-                    onChange={(e) =>
-                      handleSceneTypeChange(e.target.value as SceneType)
-                    }
-                    disabled={isProcessing}
-                    className="bg-[#0B1120] border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:border-[#009183] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="auto">Auto (classifier avgjør)</option>
-                    <option value="exterior">Eksteriør</option>
-                    <option value="interior">Interiør</option>
-                  </select>
-                </div>
-
-                <label
-                  className={`flex items-center gap-3 pb-2.5 text-sm select-none ${
-                    sceneType === "exterior" && !isProcessing
-                      ? "text-slate-300 cursor-pointer"
-                      : "text-slate-600 cursor-not-allowed"
-                  }`}
-                  title={
-                    sceneType === "exterior"
-                      ? "Hopper over classifier og kjører som eksteriør"
-                      : "Kun tilgjengelig når scene type er Eksteriør"
-                  }
-                >
-                  <input
-                    type="checkbox"
-                    checked={forceSceneType}
-                    onChange={(e) => setForceSceneType(e.target.checked)}
-                    disabled={sceneType !== "exterior" || isProcessing}
-                    className="w-4 h-4 accent-[#009183] disabled:cursor-not-allowed"
-                  />
-                  <span>
-                    Tving eksteriør{" "}
-                    <span className="text-slate-500">(hopp over classifier)</span>
+                aria-pressed={selected}
+                className={cardClass(
+                  "md",
+                  `text-left flex flex-col h-full transition-colors disabled:cursor-not-allowed ${FOCUS} ${
+                    selected ? "border-ink ring-1 ring-ink" : "hover:border-line-strong"
+                  }`
+                )}
+              >
+                {Icon && (
+                  <span aria-hidden className="mb-4 flex size-11 items-center justify-center rounded-button bg-surface-2 text-ink">
+                    <Icon className="size-5" strokeWidth={1.75} />
                   </span>
+                )}
+                <h3 className="text-[15px] font-medium text-ink mb-1">{tool.title}</h3>
+                <p className="text-ink-2 text-[13px] leading-relaxed flex-1">{tool.desc}</p>
+                {selected && (
+                  <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink">
+                    <Check aria-hidden className="size-4" /> Selected
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* --- STEP 2+: OPPLASTING + KJOERING (naar et verktoy er valgt) --- */}
+      {selectedTool && (
+        <Card padding="lg" className="space-y-6">
+          <div className="flex items-center gap-4">
+            {SelectedIcon && (
+              <span aria-hidden className="flex size-11 items-center justify-center rounded-button bg-surface-2 text-ink">
+                <SelectedIcon className="size-5" strokeWidth={1.75} />
+              </span>
+            )}
+            <div>
+              <p className="text-[13px] text-ink-2">Selected Tool</p>
+              <p className="text-ink font-medium">{selectedTool.title}</p>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="express-file" className={STEP_LABEL}>
+              Step 2: Image
+            </label>
+            <input
+              id="express-file"
+              type="file"
+              accept="image/*"
+              onChange={preview.onInputChange}
+              disabled={isProcessing}
+              className={`block w-full rounded-button text-sm text-ink-2 file:mr-4 file:min-h-11 file:px-4 file:rounded-button file:border-0 file:text-sm file:font-medium file:bg-primary file:text-on-primary hover:file:opacity-90 file:cursor-pointer ${FOCUS}`}
+            />
+          </div>
+
+          {/* Step 3: scene-type-kontroller KUN for scene_transform-kort med sceneGate */}
+          {showSceneControls && (
+            <div className="flex flex-wrap gap-6 items-end border-t border-line pt-6">
+              <div>
+                <label htmlFor="scene-type-select" className={STEP_LABEL}>
+                  Scene type
                 </label>
+                <select
+                  id="scene-type-select"
+                  value={sceneType}
+                  onChange={(e) =>
+                    handleSceneTypeChange(e.target.value as SceneType)
+                  }
+                  disabled={isProcessing}
+                  className={`min-h-11 bg-surface border border-ink-2 rounded-button px-4 text-sm text-ink disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`}
+                >
+                  <option value="auto">Auto (classifier avgjør)</option>
+                  <option value="exterior">Eksteriør</option>
+                  <option value="interior">Interiør</option>
+                </select>
+              </div>
+
+              <label
+                className={`flex min-h-11 items-center gap-3 text-sm select-none ${
+                  sceneType === "exterior" && !isProcessing
+                    ? "text-ink cursor-pointer"
+                    : "text-ink-2 opacity-60 cursor-not-allowed"
+                }`}
+                title={
+                  sceneType === "exterior"
+                    ? "Hopper over classifier og kjører som eksteriør"
+                    : "Kun tilgjengelig når scene type er Eksteriør"
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={forceSceneType}
+                  onChange={(e) => setForceSceneType(e.target.checked)}
+                  disabled={sceneType !== "exterior" || isProcessing}
+                  className={`size-5 accent-primary disabled:cursor-not-allowed ${FOCUS}`}
+                />
+                <span>
+                  Tving eksteriør{" "}
+                  <span className="text-ink-2">(hopp over classifier)</span>
+                </span>
+              </label>
+            </div>
+          )}
+
+          {showDuskControls && (
+            <DuskChoicePicker
+              value={dusk}
+              onChange={setDusk}
+              disabled={isProcessing}
+              locale={locale}
+            />
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleRun} disabled={runDisabled}>
+              {isProcessing ? "Running..." : "Run"}
+            </Button>
+            <Button variant="secondary" onClick={handleReset} disabled={isProcessing}>
+              Reset
+            </Button>
+          </div>
+
+          {job.rejection && (
+            <RejectionPanel
+              rejection={job.rejection}
+              onForceExterior={handleForceExterior}
+              disabled={runDisabled}
+            />
+          )}
+
+          {/* Teknisk feil har ingen kode: alltid den generiske meldingen,
+              aldri job.error (TG-NEW-121). */}
+          {job.status === "failed" && !job.rejection && (
+            <ErrorPanel message={t(locale, "job.failed")} />
+          )}
+
+          {job.status === "needs_review" && job.review && (
+            <ReviewPanel review={job.review} />
+          )}
+
+          {(job.status === "awaiting_approval" ||
+            job.status === "needs_review") &&
+            job.jobId && <OpenReviewLink jobId={job.jobId} />}
+
+          {job.status === "rejected_by_reviewer" && (
+            <ReviewerRejectedPanel reason={job.reviewerReason} />
+          )}
+
+          {job.status === "unknown" && (
+            <UnknownStatusPanel />
+          )}
+        </Card>
+      )}
+
+      {/* --- RESULTAT: input/output side om side --- */}
+      {selectedTool && (
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <p className="text-sm font-medium text-ink-2 mb-4">Input</p>
+            {preview.previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={preview.previewUrl}
+                alt="Input preview"
+                className="w-full h-auto rounded-button border border-line"
+              />
+            ) : (
+              <div className="aspect-square w-full rounded-button border border-dashed border-line-strong flex items-center justify-center text-ink-2 text-sm">
+                No image selected
               </div>
             )}
+          </Card>
 
-            {showDuskControls && (
-              <DuskChoicePicker
-                value={dusk}
-                onChange={setDusk}
-                disabled={isProcessing}
-                locale={locale}
+          <Card>
+            <p className="text-sm font-medium text-ink-2 mb-4">Output</p>
+            {job.status === "awaiting_approval" && <ApprovalNotice />}
+            {output.kind === "image" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={output.url}
+                alt="Output result"
+                className="w-full h-auto rounded-button border border-line"
               />
+            ) : output.kind === "placeholder" ? (
+              <PreviewPlaceholder />
+            ) : (
+              <div className="aspect-square w-full rounded-button border border-dashed border-line-strong flex items-center justify-center text-ink-2 text-sm">
+                {isProcessing ? "Processing..." : "No result yet"}
+              </div>
             )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleRun}
-                disabled={runDisabled}
-                className="px-8 py-3 rounded-full bg-[#009183] hover:bg-[#00a89a] disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-black uppercase tracking-widest text-[10px] transition-colors shadow-[0_0_20px_rgba(0,145,131,0.4)] disabled:shadow-none"
-              >
-                {isProcessing ? "Running..." : "Run"}
-              </button>
-              <button
-                onClick={handleReset}
-                disabled={isProcessing}
-                className="px-8 py-3 rounded-full border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed font-black uppercase tracking-widest text-[10px] transition-colors"
-              >
-                Reset
-              </button>
-            </div>
-
-            {job.rejection && (
-              <RejectionPanel
-                rejection={job.rejection}
-                onForceExterior={handleForceExterior}
-                disabled={runDisabled}
-              />
-            )}
-
-            {/* Teknisk feil har ingen kode: alltid den generiske meldingen,
-                aldri job.error (TG-NEW-121). */}
-            {job.status === "failed" && !job.rejection && (
-              <ErrorPanel message={t(locale, "job.failed")} />
-            )}
-
-            {job.status === "needs_review" && job.review && (
-              <ReviewPanel review={job.review} />
-            )}
-
-            {(job.status === "awaiting_approval" ||
-              job.status === "needs_review") &&
-              job.jobId && <OpenReviewLink jobId={job.jobId} />}
-
-            {job.status === "rejected_by_reviewer" && (
-              <ReviewerRejectedPanel reason={job.reviewerReason} />
-            )}
-
-            {job.status === "unknown" && (
-              <UnknownStatusPanel />
-            )}
-          </section>
-        )}
-
-        {/* --- RESULTAT: input/output side om side --- */}
-        {selectedTool && (
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-6">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-                Input
-              </p>
-              {preview.previewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={preview.previewUrl}
-                  alt="Input preview"
-                  className="w-full h-auto rounded-xl border border-slate-800"
-                />
-              ) : (
-                <div className="aspect-square w-full rounded-xl border border-dashed border-slate-700 flex items-center justify-center text-slate-600 text-sm">
-                  No image selected
-                </div>
-              )}
-            </div>
-
-            <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-6">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
-                Output
-              </p>
-              {job.status === "awaiting_approval" && <ApprovalNotice />}
-              {output.kind === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={output.url}
-                  alt="Output result"
-                  className="w-full h-auto rounded-xl border border-slate-800"
-                />
-              ) : output.kind === "placeholder" ? (
-                <PreviewPlaceholder />
-              ) : (
-                <div className="aspect-square w-full rounded-xl border border-dashed border-slate-700 flex items-center justify-center text-slate-600 text-sm">
-                  {isProcessing ? "Processing..." : "No result yet"}
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-      </main>
-    </div>
+          </Card>
+        </section>
+      )}
+    </main>
   );
 }

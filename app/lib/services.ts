@@ -66,21 +66,24 @@ export function isPageEnabled(path: string): boolean {
 // Menyen
 // ---------------------------------------------------------------------------
 
+/** Id-en gir teksten (`nav.<id>` i ordlista) og ikonet (AppNav). */
+export type NavId = "express" | "staging" | "video" | "copywriter" | "orders" | "history";
+
 export interface NavLink {
+  id: NavId;
   href: string;
-  label: string;
-  className: string;
   /** Skillelinje foer lenken. */
   dividerBefore?: boolean;
 }
 
+// Tekst, ikon og farger ligger i AppNav og ordlista (D1), ikke her.
 const ALL_NAV_LINKS: NavLink[] = [
-  { href: "/express", label: "⚡ Express", className: "hover:text-[#009183] transition-colors" },
-  { href: STAGING_PATH, label: "🛋️ Staging", className: "hover:text-[#00ff83] transition-colors" },
-  { href: VIDEO_PATH, label: "🎬 Video", className: "hover:text-purple-400 transition-colors" },
-  { href: COPYWRITER_PATH, label: "✍️ Copywriter", className: "..." },
-  { href: ORDERS_PATH, label: "📁 Orders", className: "hover:text-white transition-colors", dividerBefore: true },
-  { href: "/history", label: "🕘 Historikk", className: "hover:text-white transition-colors" },
+  { id: "express", href: "/express" },
+  { id: "staging", href: STAGING_PATH },
+  { id: "video", href: VIDEO_PATH },
+  { id: "copywriter", href: COPYWRITER_PATH },
+  { id: "orders", href: ORDERS_PATH, dividerBefore: true },
+  { id: "history", href: "/history" },
 ];
 
 /** Lenkene i menyen. Lenker som ikke er tjenester, vises alltid. */

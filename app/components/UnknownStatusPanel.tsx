@@ -6,8 +6,8 @@
  */
 export function UnknownStatusPanel() {
   return (
-    <div className="border border-slate-600 bg-slate-800/40 rounded-xl p-4 text-sm text-slate-200 space-y-2">
-      <p className="font-black uppercase tracking-widest text-[10px]">
+    <div className="bg-neutral-bg text-neutral-fg rounded-button p-4 text-sm space-y-2">
+      <p className="font-medium">
         Ukjent status fra serveren
       </p>
     </div>

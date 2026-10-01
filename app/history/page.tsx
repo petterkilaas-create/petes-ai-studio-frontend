@@ -15,11 +15,16 @@ import {
   thumbSrc,
   isRejectedByReviewer,
   openLinkKey,
-  REVIEWER_REJECTED_CLS,
+  REVIEWER_REJECTED_TONE,
+  serviceLabelKey,
   statusVariant,
 } from "./statusVariants";
 import { OpenReviewLink } from "../components/OpenReviewLink";
-import { messageText, t, type UiKey } from "../lib/i18n";
+import { Button, ButtonLink } from "../components/ui/Button";
+import { Card, cardClass } from "../components/ui/Card";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Pill } from "../components/ui/Pill";
+import { messageText, t, type Locale, type UiKey } from "../lib/i18n";
 import { jobMessage } from "../lib/jobMessage";
 import { useLocale } from "../lib/i18n/useLocale";
 import {
@@ -37,19 +42,12 @@ import {
 // siste rad (backendens kontrakt) — se loadMore().
 const PAGE_SIZE = 20;
 
-// Bruker-rettede tjenestenavn. Ukjente faller tilbake til en prettifisert
-// utgave av den raa enum-verdien, saa nye tjenester rendres lesbart uten
-// kode-endring her.
-const SERVICE_LABELS: Record<string, string> = {
-  scene_transform: "Scene-transformasjon",
-  magic_cleanup: "Magic cleanup",
-  privacy_blur: "Personvern-sløring",
-  virtual_stage: "Virtuell staging",
-};
-
-function serviceLabel(service: string): string {
-  const known = SERVICE_LABELS[service];
-  if (known) return known;
+// Tjenestenavnene staar i ordlista (brief §7). Ukjente faller tilbake til en
+// prettifisert utgave av den raa enum-verdien, saa nye tjenester rendres
+// lesbart uten kode-endring her.
+function serviceLabel(locale: Locale, service: string): string {
+  const key = serviceLabelKey(service);
+  if (key !== null) return t(locale, key);
   const pretty = service.replace(/_/g, " ");
   return pretty.charAt(0).toUpperCase() + pretty.slice(1);
 }
@@ -67,29 +65,35 @@ function formatDate(iso: string | null): string {
   });
 }
 
-// Status-pill: visuelt identisk med husets badge-moenster, men frikoblet fra
-// StatusBadge (som tar en annen status-union — se PR-notat).
+// Status-pill: frikoblet fra StatusBadge (som tar en annen status-union).
 function StatusPill({
   status,
+  service,
   rejectedKey = null,
 }: {
   status: JobSummaryStatus;
+  service: string;
   /** Avvist ved godkjenning: «av deg» eller «av eieren» (TG-NEW-127). */
   rejectedKey?: UiKey | null;
 }) {
   const locale = useLocale();
   const v = rejectedKey !== null
-    ? { label: t(locale, rejectedKey), cls: REVIEWER_REJECTED_CLS, pulse: false }
-    : statusVariant(status);
+    ? { labelKey: rejectedKey, tone: REVIEWER_REJECTED_TONE, pulse: false }
+    : statusVariant(status, service);
   return (
-    <span
-      className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${v.cls} ${
-        v.pulse ? "animate-pulse motion-reduce:animate-none" : ""
-      }`}
-    >
-      {v.label}
-    </span>
+    <Pill tone={v.tone} pulse={v.pulse}>
+      {t(locale, v.labelKey)}
+    </Pill>
   );
+}
+
+// Filterknapp (segment): valgt = primary, saa valget ikke bare vises med farge.
+function segmentClass(selected: boolean): string {
+  return `min-h-11 px-4 rounded-pill text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper ${
+    selected
+      ? "bg-primary border-primary text-on-primary font-medium"
+      : "bg-surface border-line-strong text-ink-2 hover:text-ink hover:bg-surface-2"
+  }`;
 }
 
 function JobCard({ job }: { job: JobSummary }) {
@@ -103,43 +107,42 @@ function JobCard({ job }: { job: JobSummary }) {
   const message = rejectedByYou ? null : jobMessage(job.status, job.code);
 
   return (
-    <div className="flex flex-col bg-[#0f172a] border border-slate-800 rounded-3xl shadow-xl overflow-hidden">
-      <div className="relative aspect-[3/2] bg-[#0B1120] flex items-center justify-center">
+    <div className={cardClass("none", "flex flex-col overflow-hidden")}>
+      <div className="relative aspect-[3/2] bg-surface-2 flex items-center justify-center">
         {thumb !== null ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumb}
-            alt={serviceLabel(job.service)}
+            alt={serviceLabel(locale, job.service)}
             loading="lazy"
             className="w-full h-full object-cover"
           />
         ) : (
-          <span className="text-slate-600 text-[10px] font-bold uppercase tracking-widest">
-            Ingen forhåndsvisning
+          <span className="text-ink-2 text-[13px]">
+            {t(locale, "history.noPreview")}
           </span>
         )}
       </div>
 
       <div className="p-5 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <span className="font-bold text-white text-sm truncate">
-            {serviceLabel(job.service)}
+          <span className="font-medium text-ink text-[15px] truncate">
+            {serviceLabel(locale, job.service)}
           </span>
           <StatusPill
             status={job.status}
+            service={job.service}
             rejectedKey={rejectedByYou ? rejectedLabelKey(job) : null}
           />
         </div>
-        <span className="text-slate-400 text-xs">
+        <span className="text-ink-2 text-[13px]">
           {formatDate(job.createdAt)}
         </span>
         {other && (
           // TG-NEW-127: en annen brukers jobb (scope=all). Bare de 6 siste
           // tegnene i eierens id; navn og e-post krever Clerk secret key.
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border border-indigo-500/40 bg-indigo-900/30 text-indigo-200">
-              {t(locale, "history.notYours")}
-            </span>
+          <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
+            <Pill tone="neutral">{t(locale, "history.notYours")}</Pill>
             {other.ownerShort && (
               <span>
                 {t(locale, "history.owner")}: <span className="font-mono">{other.ownerShort}</span>
@@ -148,12 +151,12 @@ function JobCard({ job }: { job: JobSummary }) {
           </div>
         )}
         {message && (
-          <p className="text-xs text-slate-300 bg-[#0B1120] border border-slate-800 rounded-xl p-3 leading-relaxed">
+          <p className="text-[13px] text-ink bg-surface-2 rounded-button p-3 leading-relaxed">
             {messageText(locale, message)}
           </p>
         )}
         {rejectedByYou && job.reason && (
-          <p className="text-xs text-slate-300 bg-[#0B1120] border border-slate-800 rounded-xl p-3 leading-relaxed break-words">
+          <p className="text-[13px] text-ink bg-surface-2 rounded-button p-3 leading-relaxed break-words">
             {t(locale, "review.reasonLabel")}: {job.reason}
           </p>
         )}
@@ -272,140 +275,102 @@ export default function HistoryPage() {
   }, [jobs, getToken, statuses, scope]);
 
   return (
-    <div className="flex flex-col bg-[#0B1120] text-white min-h-screen font-sans">
-      <main className="max-w-6xl mx-auto w-full p-8 flex-1">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
-          <div>
-            <h1 className="text-3xl font-black text-white uppercase tracking-widest mb-2">
-              Historikk
-            </h1>
-            <p className="text-slate-400 text-sm">
-              {t(locale, subtitleKey(scope))}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {showScopeToggle(caps) && (
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8 md:py-12">
+      <div className="mb-8">
+        <PageHeader
+          title={t(locale, "history.title")}
+          subtitle={t(locale, subtitleKey(scope))}
+          actions={
+            <>
+              {showScopeToggle(caps) && (
+                <div className="flex gap-1" role="group">
+                  {(["mine", "all"] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        setChosenScope(s);
+                        setScopeNotice(null);
+                      }}
+                      aria-pressed={scope === s}
+                      className={segmentClass(scope === s)}
+                    >
+                      {t(locale, s === "all" ? "history.scope.all" : "history.scope.mine")}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="flex gap-1" role="group">
-                {(["mine", "all"] as const).map((s) => (
+                {([false, true] as const).map((waiting) => (
                   <button
-                    key={s}
-                    onClick={() => {
-                      setChosenScope(s);
-                      setScopeNotice(null);
-                    }}
-                    aria-pressed={scope === s}
-                    className={`px-4 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120] ${
-                      scope === s
-                        ? "bg-slate-800 border-slate-500 text-white"
-                        : "border-slate-700 text-slate-400 hover:text-white"
-                    }`}
+                    key={String(waiting)}
+                    type="button"
+                    onClick={() => setWaitingOnly(waiting)}
+                    aria-pressed={waitingOnly === waiting}
+                    className={segmentClass(waitingOnly === waiting)}
                   >
-                    {t(locale, s === "all" ? "history.scope.all" : "history.scope.mine")}
+                    {t(locale, waiting ? waitingLabelKey(scope) : "history.all")}
                   </button>
                 ))}
               </div>
-            )}
-            <div className="flex gap-1" role="group">
-              {([false, true] as const).map((waiting) => (
-                <button
-                  key={String(waiting)}
-                  onClick={() => setWaitingOnly(waiting)}
-                  aria-pressed={waitingOnly === waiting}
-                  className={`px-4 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120] ${
-                    waitingOnly === waiting
-                      ? "bg-slate-800 border-slate-500 text-white"
-                      : "border-slate-700 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {t(locale, waiting ? waitingLabelKey(scope) : "history.all")}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => void loadInitial()}
-              disabled={loading}
-              className="px-5 py-2.5 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-colors shadow-[0_0_15px_rgba(0,145,131,0.3)] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120]"
-            >
-              Oppdater
-            </button>
-          </div>
+              <Button variant="secondary" onClick={() => void loadInitial()} disabled={loading}>
+                {t(locale, "action.refresh")}
+              </Button>
+            </>
+          }
+        />
+      </div>
+
+      {scopeNotice && (
+        <p className="text-sm text-amber-fg bg-amber-bg rounded-button p-3 mb-6" role="status">
+          {t(locale, scopeNotice)}
+        </p>
+      )}
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4" role="status">
+          <div className="w-8 h-8 border-4 border-line border-t-ink rounded-full animate-spin motion-reduce:animate-none" />
+          <p className="text-ink-2 text-sm">{t(locale, "history.loading")}</p>
         </div>
-
-        {scopeNotice && (
-          <p className="text-xs text-amber-200 bg-amber-900/30 border border-amber-500/40 rounded-xl p-3 mb-6" role="status">
-            {t(locale, scopeNotice)}
-          </p>
-        )}
-
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="w-8 h-8 border-4 border-[#009183]/30 border-t-[#009183] rounded-full animate-spin motion-reduce:animate-none" />
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
-              Laster historikk…
-            </p>
+      ) : error && jobs.length === 0 ? (
+        <Card padding="lg" className="text-center max-w-lg mx-auto">
+          <p className="text-red-fg font-medium mb-2">{t(locale, "history.loadErrorTitle")}</p>
+          <p className="text-ink-2 text-sm mb-6 break-words">{t(locale, "history.loadError")}</p>
+          <Button onClick={() => void loadInitial()}>{t(locale, "review.retry")}</Button>
+        </Card>
+      ) : jobs.length === 0 && waitingOnly ? (
+        <Card padding="lg" className="text-center max-w-lg mx-auto">
+          <p className="text-ink font-medium text-lg">{t(locale, emptyWaitingKey(scope))}</p>
+        </Card>
+      ) : jobs.length === 0 ? (
+        <Card padding="lg" className="text-center max-w-lg mx-auto">
+          <p className="text-ink font-medium text-lg mb-2">{t(locale, "history.emptyTitle")}</p>
+          <p className="text-ink-2 text-sm mb-8">{t(locale, "history.emptyBody")}</p>
+          <ButtonLink href="/express">{t(locale, "history.toExpress")}</ButtonLink>
+        </Card>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+            {jobs.map((job) => (
+              <JobCard key={job.jobId} job={job} />
+            ))}
           </div>
-        ) : error && jobs.length === 0 ? (
-          <div className="bg-[#0f172a] border border-red-900/40 rounded-3xl p-10 text-center max-w-lg mx-auto">
-            <p className="text-red-400 font-bold text-sm mb-2 uppercase tracking-widest">
-              Kunne ikke hente historikk
-            </p>
-            <p className="text-slate-400 text-xs mb-6 break-words">
+
+          {error && (
+            <p className="text-center text-sm text-red-fg mb-6 break-words">
               {t(locale, "history.loadError")}
             </p>
-            <button
-              onClick={() => void loadInitial()}
-              className="px-6 py-3 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-colors focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120]"
-            >
-              Prøv igjen
-            </button>
-          </div>
-        ) : jobs.length === 0 && waitingOnly ? (
-          <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-16 text-center max-w-lg mx-auto">
-            <p className="text-white font-bold text-lg">
-              {t(locale, emptyWaitingKey(scope))}
-            </p>
-          </div>
-        ) : jobs.length === 0 ? (
-          <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-16 text-center max-w-lg mx-auto">
-            <p className="text-white font-bold text-lg mb-2">Ingen jobber enda</p>
-            <p className="text-slate-400 text-sm mb-8">
-              Kjør din første transformasjon, så dukker den opp her.
-            </p>
-            <a
-              href="/express"
-              className="inline-block px-6 py-3 bg-[#009183] hover:bg-[#00b09f] text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-colors shadow-[0_0_15px_rgba(0,145,131,0.3)] focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120]"
-            >
-              Gå til Express
-            </a>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-              {jobs.map((job) => (
-                <JobCard key={job.jobId} job={job} />
-              ))}
+          )}
+
+          {hasMore && (
+            <div className="flex justify-center pb-20">
+              <Button variant="secondary" onClick={() => void loadMore()} disabled={loadingMore}>
+                {t(locale, loadingMore ? "history.loadingMore" : "history.loadMore")}
+              </Button>
             </div>
-
-            {error && (
-              <p className="text-center text-xs text-red-400 mb-6 break-words">
-                {t(locale, "history.loadError")}
-              </p>
-            )}
-
-            {hasMore && (
-              <div className="flex justify-center pb-20">
-                <button
-                  onClick={() => void loadMore()}
-                  disabled={loadingMore}
-                  className="px-8 py-3 bg-transparent border border-slate-700 text-slate-300 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#009183] focus:ring-offset-2 focus:ring-offset-[#0B1120]"
-                >
-                  {loadingMore ? "Laster…" : "Last inn flere"}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </main>
-    </div>
+          )}
+        </>
+      )}
+    </main>
   );
 }

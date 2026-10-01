@@ -1,59 +1,63 @@
 import type { JobSummary, JobSummaryStatus } from "../lib/api";
 import type { UiKey } from "../lib/i18n";
 
+/** Fargen paa statuspillen (samme navn som tonene i components/ui/Pill). */
+export type StatusTone = "amber" | "green" | "neutral" | "red";
+
 export interface StatusVariant {
-  label: string;
-  cls: string;
+  /** Ordet fra ordlista (brief §7): ett ord per status. */
+  labelKey: UiKey;
+  tone: StatusTone;
   pulse?: boolean;
 }
 
 const VARIANTS: Record<JobSummaryStatus, StatusVariant> = {
-  succeeded: {
-    label: "Fullført",
-    cls: "bg-green-900/30 text-green-400 border-green-500/20",
-  },
-  failed: {
-    label: "Feilet",
-    cls: "bg-red-900/30 text-red-400 border-red-500/20",
-  },
-  rejected: {
-    label: "Avvist",
-    cls: "bg-amber-900/30 text-amber-400 border-amber-500/20",
-  },
-  queued: {
-    label: "I kø",
-    cls: "bg-yellow-900/30 text-yellow-400 border-yellow-500/20",
-    pulse: true,
-  },
-  running: {
-    label: "Kjører",
-    cls: "bg-yellow-900/30 text-yellow-400 border-yellow-500/20",
-    pulse: true,
-  },
-  awaiting_approval: {
-    label: "Til kontroll",
-    cls: "bg-sky-900/30 text-sky-300 border-sky-500/20",
-  },
-  needs_review: {
-    label: "Til gjennomgang",
-    cls: "bg-slate-800/60 text-slate-300 border-slate-500/30",
-  },
-  unknown: {
-    label: "Ukjent status",
-    cls: "bg-slate-800/60 text-slate-400 border-slate-500/30",
-  },
+  // «Ferdig» for tjenester uten godkjenning; kveldsbildet: se statusVariant.
+  succeeded: { labelKey: "status.done", tone: "green" },
+  failed: { labelKey: "status.failed", tone: "red" },
+  rejected: { labelKey: "status.rejected", tone: "neutral" },
+  queued: { labelKey: "status.queued", tone: "neutral", pulse: true },
+  running: { labelKey: "status.running", tone: "neutral", pulse: true },
+  awaiting_approval: { labelKey: "status.awaitingApproval", tone: "amber" },
+  // Samme ord som awaiting_approval (Petter 01.10): samme filter og samme side.
+  needs_review: { labelKey: "status.awaitingApproval", tone: "amber" },
+  unknown: { labelKey: "status.unknown", tone: "neutral" },
 };
 
 /**
  * Pill-variant for en status. listJobs normaliserer allerede ukjente
  * verdier til "unknown"; oppslaget faller i tillegg tilbake ved kjoeretid,
  * saa /history aldri krasjer paa en verdi backend legger til senere.
+ *
+ * succeeded heter «Godkjent» for kveldsbildet (scene_transform), som bare
+ * blir ferdig ved godkjenning, og «Ferdig» for andre tjenester (Skjul
+ * ansikter og skilt har ingen godkjenning). Petter 01.10.
  */
-export function statusVariant(status: string): StatusVariant {
+export function statusVariant(status: string, service?: string): StatusVariant {
   // hasOwn: "toString"/"__proto__" skal ikke treffe prototypen.
-  return Object.hasOwn(VARIANTS, status)
+  const v = Object.hasOwn(VARIANTS, status)
     ? VARIANTS[status as JobSummaryStatus]
     : VARIANTS.unknown;
+  if (status === "succeeded" && service === "scene_transform") {
+    return { ...v, labelKey: "status.approved" };
+  }
+  return v;
+}
+
+/** Tjenestenavnet fra ordlista (brief §7), eller null for ukjent tjeneste. */
+export function serviceLabelKey(service: string): UiKey | null {
+  switch (service) {
+    case "scene_transform":
+      return "service.scene_transform";
+    case "privacy_blur":
+      return "service.privacy_blur";
+    case "magic_cleanup":
+      return "service.magic_cleanup";
+    case "virtual_stage":
+      return "service.virtual_stage";
+    default:
+      return null;
+  }
 }
 
 /** Statuser der resultatbildet finnes og kan vises som thumbnail. */
@@ -71,7 +75,7 @@ export function thumbSrc(job: Pick<JobSummary, "status" | "thumbUrl">): string |
 }
 
 /** Farge for «Avvist av deg» (2d-1): noeytral, ikke roed. Teksten kommer fra ordlista. */
-export const REVIEWER_REJECTED_CLS = "bg-slate-800/60 text-slate-300 border-slate-500/30";
+export const REVIEWER_REJECTED_TONE: StatusTone = "neutral";
 
 /**
  * Jobb avvist av megleren selv (2d-1a): kjennes paa `code` fra listingen,
@@ -81,14 +85,14 @@ export function isRejectedByReviewer(job: { status: string; code: string | null 
   return job.status === "failed" && job.code === "rejected_by_reviewer";
 }
 
-/** Statuser der kortet lenker til godkjenningssiden («Åpne kontroll»). */
+/** Statuser der kortet lenker til godkjenningssiden («Åpne godkjenning»). */
 export function canOpenReview(status: string): boolean {
   return status === "awaiting_approval" || status === "needs_review";
 }
 
 /**
  * Lenken til godkjenningssiden paa et kort, eller null:
- * - «Åpne kontroll» for awaiting_approval/needs_review (som foer).
+ * - «Åpne godkjenning» for awaiting_approval/needs_review (som foer).
  * - «Åpne» for egne godkjente skumringsjobber (merking PR 4), der
  *   «Last ned merket bilde» og «Tekst til annonsen» ligger. Andre tjenester
  *   har ingen godkjenningsside (backend gir 404), og admin kan ikke laste
