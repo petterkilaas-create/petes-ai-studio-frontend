@@ -138,7 +138,7 @@ export default function ExpressPage() {
       <PageHeader
         title={
           <span className="flex items-center gap-3">
-            <Zap aria-hidden className="size-7" strokeWidth={1.5} /> Express Studio
+            <Zap aria-hidden className="size-7" strokeWidth={1.5} /> {t(locale, "express.title")}
           </span>
         }
         subtitle={t(locale, "express.subtitle")}
@@ -148,9 +148,9 @@ export default function ExpressPage() {
         }
       />
 
-      {/* --- STEP 1: VELG VERKTOY --- */}
+      {/* --- VELG TJENESTE --- */}
       <section className="space-y-4">
-        <h2 className="text-sm font-medium text-ink">Step 1: Choose your tool</h2>
+        <h2 className="text-sm font-medium text-ink">{t(locale, "express.chooseService")}</h2>
 
         <div className="flex flex-wrap gap-2">
           {CATEGORIES.map((cat) => {
@@ -165,7 +165,7 @@ export default function ExpressPage() {
                 className={chipClass(activeCategoryId === cat.id)}
               >
                 {Icon && <Icon aria-hidden className="size-4" strokeWidth={1.75} />}
-                {cat.title}
+                {t(locale, cat.titleKey)}
               </button>
             );
           })}
@@ -194,11 +194,11 @@ export default function ExpressPage() {
                     <Icon className="size-5" strokeWidth={1.75} />
                   </span>
                 )}
-                <h3 className="text-[15px] font-medium text-ink mb-1">{tool.title}</h3>
-                <p className="text-ink-2 text-[13px] leading-relaxed flex-1">{tool.desc}</p>
+                <h3 className="text-[15px] font-medium text-ink mb-1">{t(locale, tool.titleKey)}</h3>
+                <p className="text-ink-2 text-[13px] leading-relaxed flex-1">{t(locale, tool.descKey)}</p>
                 {selected && (
                   <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink">
-                    <Check aria-hidden className="size-4" /> Selected
+                    <Check aria-hidden className="size-4" /> {t(locale, "express.selected")}
                   </span>
                 )}
               </button>
@@ -207,7 +207,7 @@ export default function ExpressPage() {
         </div>
       </section>
 
-      {/* --- STEP 2+: OPPLASTING + KJOERING (naar et verktoy er valgt) --- */}
+      {/* --- OPPLASTING + KJOERING (naar en tjeneste er valgt) --- */}
       {selectedTool && (
         <Card padding="lg" className="space-y-6">
           <div className="flex items-center gap-4">
@@ -217,14 +217,14 @@ export default function ExpressPage() {
               </span>
             )}
             <div>
-              <p className="text-[13px] text-ink-2">Selected Tool</p>
-              <p className="text-ink font-medium">{selectedTool.title}</p>
+              <p className="text-[13px] text-ink-2">{t(locale, "express.selectedService")}</p>
+              <p className="text-ink font-medium">{t(locale, selectedTool.titleKey)}</p>
             </div>
           </div>
 
           <div>
             <label htmlFor="express-file" className={STEP_LABEL}>
-              Step 2: Image
+              {t(locale, "express.chooseImage")}
             </label>
             <input
               id="express-file"
@@ -236,12 +236,12 @@ export default function ExpressPage() {
             />
           </div>
 
-          {/* Step 3: scene-type-kontroller KUN for scene_transform-kort med sceneGate */}
+          {/* Bildetype-kontroller KUN for scene_transform-kort med sceneGate */}
           {showSceneControls && (
             <div className="flex flex-wrap gap-6 items-end border-t border-line pt-6">
               <div>
                 <label htmlFor="scene-type-select" className={STEP_LABEL}>
-                  Scene type
+                  {t(locale, "express.imageType")}
                 </label>
                 <select
                   id="scene-type-select"
@@ -252,9 +252,9 @@ export default function ExpressPage() {
                   disabled={isProcessing}
                   className={`min-h-11 bg-surface border border-ink-2 rounded-button px-4 text-sm text-ink disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`}
                 >
-                  <option value="auto">Auto (classifier avgjør)</option>
-                  <option value="exterior">Eksteriør</option>
-                  <option value="interior">Interiør</option>
+                  <option value="auto">{t(locale, "express.imageTypeAuto")}</option>
+                  <option value="exterior">{t(locale, "express.imageTypeExterior")}</option>
+                  <option value="interior">{t(locale, "express.imageTypeInterior")}</option>
                 </select>
               </div>
 
@@ -266,8 +266,8 @@ export default function ExpressPage() {
                 }`}
                 title={
                   sceneType === "exterior"
-                    ? "Hopper over classifier og kjører som eksteriør"
-                    : "Kun tilgjengelig når scene type er Eksteriør"
+                    ? t(locale, "express.forceExteriorTitle")
+                    : t(locale, "express.forceExteriorLocked")
                 }
               >
                 <input
@@ -278,8 +278,8 @@ export default function ExpressPage() {
                   className={`size-5 accent-primary disabled:cursor-not-allowed ${FOCUS}`}
                 />
                 <span>
-                  Tving eksteriør{" "}
-                  <span className="text-ink-2">(hopp over classifier)</span>
+                  {t(locale, "express.forceExterior")}{" "}
+                  <span className="text-ink-2">{t(locale, "express.forceExteriorHint")}</span>
                 </span>
               </label>
             </div>
@@ -296,10 +296,10 @@ export default function ExpressPage() {
 
           <div className="flex flex-wrap gap-3">
             <Button onClick={handleRun} disabled={runDisabled}>
-              {isProcessing ? "Running..." : "Run"}
+              {t(locale, isProcessing ? "express.running" : "express.run")}
             </Button>
             <Button variant="secondary" onClick={handleReset} disabled={isProcessing}>
-              Reset
+              {t(locale, "express.reset")}
             </Button>
           </div>
 
@@ -339,36 +339,36 @@ export default function ExpressPage() {
       {selectedTool && (
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
-            <p className="text-sm font-medium text-ink-2 mb-4">Input</p>
+            <p className="text-sm font-medium text-ink-2 mb-4">{t(locale, "review.original")}</p>
             {preview.previewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={preview.previewUrl}
-                alt="Input preview"
+                alt={t(locale, "review.original")}
                 className="w-full h-auto rounded-button border border-line"
               />
             ) : (
               <div className="aspect-square w-full rounded-button border border-dashed border-line-strong flex items-center justify-center text-ink-2 text-sm">
-                No image selected
+                {t(locale, "express.noImage")}
               </div>
             )}
           </Card>
 
           <Card>
-            <p className="text-sm font-medium text-ink-2 mb-4">Output</p>
+            <p className="text-sm font-medium text-ink-2 mb-4">{t(locale, "review.result")}</p>
             {job.status === "awaiting_approval" && <ApprovalNotice />}
             {output.kind === "image" ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={output.url}
-                alt="Output result"
+                alt={t(locale, "review.result")}
                 className="w-full h-auto rounded-button border border-line"
               />
             ) : output.kind === "placeholder" ? (
               <PreviewPlaceholder />
             ) : (
               <div className="aspect-square w-full rounded-button border border-dashed border-line-strong flex items-center justify-center text-ink-2 text-sm">
-                {isProcessing ? "Processing..." : "No result yet"}
+                {t(locale, isProcessing ? "express.processing" : "express.noResult")}
               </div>
             )}
           </Card>

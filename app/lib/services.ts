@@ -8,8 +8,11 @@
  * Slaa en tjeneste paa igjen ved aa endre EN linje i ENABLED. Koden for
  * tjenestene og sidene er beholdt. Backend er uendret og sperrer ingenting.
  *
- * Rene data og funksjoner uten import, saa modulen kan testes med node --test.
+ * Rene data og funksjoner (bare en type-import), saa modulen kan testes med
+ * node --test.
  */
+
+import type { UiKey } from "./i18n";
 
 export const ENABLED = {
   klart_vaer: false,
@@ -110,42 +113,38 @@ export interface Tool {
    * false der backend bestemmer bildetypen selv (skumring, nivaa 2).
    */
   sceneGate?: boolean;
-  icon: string;
-  title: string;
-  desc: string;
+  /** Tekstene staar i ordlista (D1c, brief §7); ikonet i express/page.tsx. */
+  titleKey: UiKey;
+  descKey: UiKey;
 }
 
 export interface Category {
   id: string;
-  title: string;
-  icon: string;
+  titleKey: UiKey;
   items: Tool[];
 }
 
-// Fasit fra backendens service-enum. Beskrivelser gjenbrukt fra den gamle
-// express-siden der de fantes (engelsk, ingen spesialtegn). Flyttet hit fra
-// app/express/page.tsx (L0) saa filtreringen kan testes.
+// Fasit fra backendens service-enum. Flyttet hit fra app/express/page.tsx
+// (L0) saa filtreringen kan testes. Tekstene ligger i ordlista (D1c); id,
+// service og presetId sendes til backend og er uendret.
 const CATEGORIES: Category[] = [
   {
     id: "fixit",
-    title: "Fix-It Tools",
-    icon: "🧹",
+    titleKey: "express.category.fixit",
     items: [
       {
         id: "magic_cleanup",
         service: "magic_cleanup",
         kind: "simple",
-        icon: "🧽",
-        title: "Magic Cleanup",
-        desc: "Auto-remove moving boxes, loose cables, and general clutter.",
+        titleKey: "service.magic_cleanup",
+        descKey: "express.tool.magic_cleanup.desc",
       },
       {
         id: "privacy_blur",
         service: "privacy_blur",
         kind: "simple",
-        icon: "🕵️",
-        title: "Privacy Blur",
-        desc: "Seamlessly blur faces, family photos, and license plates.",
+        titleKey: "service.privacy_blur",
+        descKey: "express.tool.privacy_blur.desc",
       },
       // Skjult inntil lawn_green-pipeline finnes i backend (Dag 21+)
       // {
@@ -206,17 +205,15 @@ const CATEGORIES: Category[] = [
   // },
   {
     id: "timetraveler",
-    title: "Time Traveler",
-    icon: "🍂",
+    titleKey: "express.category.timetraveler",
     items: [
       {
         id: "klart_vaer",
         service: "scene_transform",
         presetId: "klart_vaer",
         kind: "scene",
-        icon: "☀️",
-        title: "Klart vær",
-        desc: "Transform the scene to bright, clear daylight.",
+        titleKey: "express.tool.klart_vaer.title",
+        descKey: "express.tool.klart_vaer.desc",
       },
       {
         id: "skumring",
@@ -224,9 +221,8 @@ const CATEGORIES: Category[] = [
         presetId: "skumring",
         kind: "scene",
         sceneGate: false,
-        icon: "🌆",
-        title: "Skumring",
-        desc: "Transform the scene to a warm, inviting dusk.",
+        titleKey: "service.scene_transform",
+        descKey: "express.tool.skumring.desc",
       },
     ],
   },

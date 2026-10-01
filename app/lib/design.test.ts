@@ -7,7 +7,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { brandCssVars, DEFAULT_BRAND } from "./brand.ts";
 import { DICTIONARIES } from "./i18n/index.ts";
-import type { NavId } from "./services.ts";
+import { expressCategories, type NavId } from "./services.ts";
 
 // Redesign D0 (brief v4 §8, §13). node --test kan ikke laste .tsx, saa
 // globals.css og layout.tsx sjekkes som tekst (som i L0).
@@ -309,4 +309,123 @@ test("D1: testene for annonseteksten og lekkasjevernet er uendret", () => {
   for (const [rel, hash] of Object.entries(expected)) {
     assert.equal(createHash("sha256").update(readFileSync(join(APP_DIR, rel))).digest("hex"), hash, rel);
   }
+});
+
+// ---------------------------------------------------------------------------
+// D1c: Express-tekstene via ordlista (brief §7), uten metaforer og steg-nummer.
+// ---------------------------------------------------------------------------
+
+/** Kildekoden uten kommentarer (kommentarer og parameternavn er ikke synlig tekst). */
+function withoutComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
+/** JSX-delen av komponenten: fra `return (` i default-eksporten/komponenten. */
+function jsxOf(rel: string, fn: string): string {
+  const src = withoutComments(read(rel));
+  const start = src.indexOf("return (", src.indexOf(fn));
+  assert.ok(start >= 0, rel);
+  return src.slice(start);
+}
+
+/** Synlig tekst skrevet rett inn: tekst mellom tagger og tekst-attributter. */
+function literalTexts(jsx: string): string[] {
+  const between = [...jsx.matchAll(/(?<!=)>([^<>{}]*)(?=<|\{)/g)]
+    .map((m) => m[1].trim())
+    // Kode etter en selvlukkende tag (f.eks. `/>) : x === "y" ? (`) er ikke tekst.
+    .filter((text) => /\p{L}/u.test(text) && !/^[)}:?&|]|===/.test(text));
+  const attrs = [...jsx.matchAll(/\b(?:alt|title|placeholder|aria-label)="([^"]*)"/g)].map((m) => m[1]);
+  // Strenger i uttrykk som ser ut som tekst (stor forbokstav), f.eks. {busy ? "Running..." : "Run"}.
+  // Klasser, statuser og noekler i ordlista starter med liten bokstav.
+  const strings = [...jsx.matchAll(/"(\p{Lu}[^"]*)"/gu)].map((m) => m[1]);
+  return [...between, ...attrs, ...strings];
+}
+
+const EXPRESS_JSX: [string, string][] = [
+  ["express/page.tsx", "export default function ExpressPage"],
+  ["components/DuskChoicePicker.tsx", "export function DuskChoicePicker"],
+];
+
+test("D1c: Express og DuskChoicePicker har ingen synlig tekst skrevet rett inn", () => {
+  for (const [rel, fn] of EXPRESS_JSX) {
+    assert.deepEqual(literalTexts(jsxOf(rel, fn)), [], rel);
+  }
+});
+
+// Store og smaa bokstaver teller: id-en og parameteren «skumring» (TG-138) er ikke synlig tekst.
+const OLD_EXPRESS_WORDS = /Time Traveler|Fix-It|Step \d|Studio|Magic Cleanup|Privacy Blur|Skumring|Klart vær|[Cc]lassifier/;
+
+test("D1c: de gamle Express-ordene finnes ikke i synlig tekst", () => {
+  for (const locale of ["nb", "en"] as const) {
+    for (const [key, text] of Object.entries(DICTIONARIES[locale].ui)) {
+      assert.doesNotMatch(text, OLD_EXPRESS_WORDS, `${locale} ${key}`);
+    }
+  }
+  for (const [rel] of EXPRESS_JSX) {
+    // Hele koden uten kommentarer: ogsaa strenger i uttrykk (f.eks. title={...}).
+    assert.doesNotMatch(withoutComments(read(rel)), OLD_EXPRESS_WORDS, rel);
+  }
+});
+
+test("D1c: services.ts har bare noekler til ordlista, ingen tekst eller emoji", () => {
+  const code = withoutComments(read("lib/services.ts"));
+  assert.doesNotMatch(code, /^\s*(title|desc|icon):/m);
+  assert.doesNotMatch(code, EMOJI);
+  const count = (re: RegExp) => code.match(re)?.length ?? 0;
+  const tools = count(/^\s*kind: "(simple|scene)",/gm);
+  assert.ok(tools >= 4);
+  assert.equal(count(/^\s*titleKey: "/gm), tools + 2, "hvert verktoey og begge kategoriene");
+  assert.equal(count(/^\s*descKey: "/gm), tools);
+});
+
+test("D1c: ordlista har Express-ordene paa nb og en", () => {
+  const keys = [
+    "express.title",
+    "express.chooseService",
+    "express.category.fixit",
+    "express.category.timetraveler",
+    "express.tool.klart_vaer.title",
+    "express.tool.klart_vaer.desc",
+    "express.tool.skumring.desc",
+    "express.tool.privacy_blur.desc",
+    "express.tool.magic_cleanup.desc",
+    "express.selected",
+    "express.selectedService",
+    "express.chooseImage",
+    "express.run",
+    "express.running",
+    "express.reset",
+    "express.noImage",
+    "express.processing",
+    "express.noResult",
+    "express.imageType",
+    "express.imageTypeAuto",
+    "express.imageTypeExterior",
+    "express.imageTypeInterior",
+    "express.forceExterior",
+    "express.forceExteriorHint",
+    "express.forceExteriorTitle",
+    "express.forceExteriorLocked",
+  ];
+  for (const locale of ["nb", "en"] as const) {
+    const ui = DICTIONARIES[locale].ui as Record<string, string>;
+    for (const key of keys) {
+      assert.ok(typeof ui[key] === "string" && ui[key].trim().length > 0, `${locale} ${key}`);
+    }
+  }
+  const nb = DICTIONARIES.nb.ui;
+  assert.equal(nb["express.category.fixit"], "Rydd og skjul");
+  assert.equal(nb["express.category.timetraveler"], "Lys og himmel");
+  assert.equal(nb["express.noImage"], "Ikke noe bilde valgt");
+});
+
+test("D1c: Kveldsbilde sender det samme som foer (id, service, preset, ingen bildetype-valg)", () => {
+  const tool = expressCategories().flatMap((c) => c.items).find((t) => t.id === "skumring");
+  assert.ok(tool);
+  assert.equal(tool.service, "scene_transform");
+  assert.equal(tool.presetId, "skumring");
+  assert.equal(tool.kind, "scene");
+  assert.equal(tool.sceneGate, false);
+  assert.equal(tool.titleKey, "service.scene_transform");
+  assert.equal(DICTIONARIES.nb.ui[tool.titleKey], "Kveldsbilde");
 });
