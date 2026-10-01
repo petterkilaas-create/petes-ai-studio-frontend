@@ -33,7 +33,7 @@ export function DuskChoicePicker({
 }) {
   return (
     <div className="border-t border-line pt-6 space-y-5">
-      <p className={LABEL}>Step 3: {t(locale, "dusk.title")}</p>
+      <p className={LABEL}>{t(locale, "dusk.title")}</p>
       <div>
         <p className="text-[13px] text-ink-2 mb-2">{t(locale, "dusk.time")}</p>
         <div className="flex flex-wrap gap-2" role="group" aria-label={t(locale, "dusk.time")}>
