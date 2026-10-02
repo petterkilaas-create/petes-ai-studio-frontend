@@ -5,7 +5,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_BRAND } from "../../app/lib/brand.ts";
 import { MARKETING_HOME, MARKETING_PAGES, MARKETING_PUBLIC, SITE_URL } from "../../app/lib/marketingAccess.ts";
-import { robotsFor, sitemapFor } from "../../app/lib/seo.ts";
+import { ogText, robotsFor, sitemapFor } from "../../app/lib/seo.ts";
 import { literalTextsInFile } from "../../app/lib/testing/jsxText.ts";
 import { fill } from "./fill.ts";
 import { getFaq, getHome, getSite } from "./index.ts";
@@ -155,16 +155,44 @@ test("MS4: delingsbildet er 1200x630 med alt-tekst fra innholdet og ingen tekst 
   assert.match(og, /export const contentType = "image\/png";/);
   assert.match(og, /export const alt = fill\(site\.seo\.ogImageAlt, \{ brand: brand\.displayName, title: hero\.title \}\);/);
   assert.match(og, /new ImageResponse\(<Card brand=\{brand\} hero=\{hero\} \/>, size\)/);
-  assert.match(og, /\{hero\.eyebrow\}/);
-  assert.match(og, /\{hero\.title\}/);
-  assert.match(og, /\{brand\.displayName\}/);
+  assert.match(og, /\{ogText\(hero\.eyebrow\)\}/);
+  assert.match(og, /\{ogText\(hero\.title\)\}/);
+  assert.match(og, /\{ogText\(brand\.displayName\)\}/);
   assert.deepEqual(literalTextsInFile(og), []);
   assert.ok(site.seo.ogImageAlt.includes("{brand}"));
   const alt = fill(site.seo.ogImageAlt, { brand, title: home.hero.title });
   assert.equal(alt, "Husvy: Kveldsbilder av dagsbildene dine.");
   assert.doesNotMatch(alt, /[[\]{}]/);
   // Uten foto (bildene venter) og uten egen fontfil (A1: Geist fra next/og).
-  assert.doesNotMatch(og, /readFile|fonts:|images\.ts|\.jpe?g|\.png"/);
+  assert.doesNotMatch(og, /readFile|fonts:|fetch\(|images\.ts|\.jpe?g|\.png"/);
+});
+
+test("MS4: teksten i delingsbildet har bare tegn Geist har (ellers henter next/og en font uten tidsgrense)", () => {
+  // Verifisert 02.10: bokstavene, æøå, – ’ og «» gir ingen nettkall; symboler som → og ✓ gjoer det.
+  // U+200B (usynlig bruddpunkt) mangler ogsaa. Sjekket paa teksten slik den tegnes (etter ogText).
+  const geist = /^[\p{Script=Latin}0-9 \u00a0.,:;!?'’\-–«»()%]+$/u;
+  for (const text of [brand, home.hero.eyebrow, home.hero.title]) {
+    assert.match(text, geist, text);
+    assert.match(ogText(text), geist, text);
+  }
+  assert.doesNotMatch("Kveldsbilder ✓", geist);
+  assert.doesNotMatch("Kveldsbilder\u200bav", geist);
+});
+
+test("MS4: ogText gir riktige mellomrom, og teksten faar plass paa en linje", () => {
+  assert.equal(ogText("Kveldsbilder av dagsbildene"), "Kveldsbilder\u00a0av\u00a0dagsbildene");
+  for (const text of [brand, home.hero.eyebrow, home.hero.title]) {
+    const out = ogText(text);
+    assert.ok(!out.includes(" "), out);
+    assert.equal(out.replace(/\u00a0/g, " "), text);
+  }
+  // ogText bryter ikke linja, saa teksten maa faa plass paa en linje (1040 px):
+  // overskriften er 33 tegn og ca. 900 px ved 64 px (verifisert 02.10).
+  assert.match(og, /fontSize: 64, lineHeight: 1\.05, letterSpacing: -2/);
+  assert.ok(home.hero.title.length <= 36, `overskriften er ${home.hero.title.length} tegn, maks 36 paa en linje i delingsbildet`);
+  assert.ok(home.hero.eyebrow.length <= 60, `linja over er ${home.hero.eyebrow.length} tegn, maks 60`);
+  // Alt-teksten er vanlig tekst.
+  assert.match(og, /export const alt = fill\(site\.seo\.ogImageAlt/);
 });
 
 // ---------------------------------------------------------------------------
@@ -201,7 +229,9 @@ test("MS4: ved lansering er robots, sitemap og delingsbildet utenfor innlogginge
   const block = proxy.slice(proxy.indexOf("matcher: ["), proxy.indexOf("],", proxy.indexOf("matcher: [")));
   const matchers = [...block.matchAll(/^\s*'([^']+)',$/gm)].map((m) => new RegExp(`^${m[1].replace(/\\\\/g, "\\")}$`));
   const runs = (path: string) => matchers.some((r) => r.test(path));
-  const paths = ["/robots.txt", "/sitemap.xml", `${MARKETING_HOME}/opengraph-image`];
+  // Next 16 legger et suffiks paa bildeadressen (/no/opengraph-image-1pnh5h);
+  // adressen uten suffiks gir 404. Begge maa vaere aapne.
+  const paths = ["/robots.txt", "/sitemap.xml", `${MARKETING_HOME}/opengraph-image`, `${MARKETING_HOME}/opengraph-image-1pnh5h`];
   if (MARKETING_PUBLIC) {
     for (const p of paths) assert.ok(!runs(p), `MARKETING_PUBLIC er true, men ${p} krever innlogging`);
   } else {

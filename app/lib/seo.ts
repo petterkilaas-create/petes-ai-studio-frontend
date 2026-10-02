@@ -19,6 +19,18 @@ export function robotsFor(marketingPublic: boolean = MARKETING_PUBLIC): Metadata
   };
 }
 
+/**
+ * Tekst i delingsbildet (MS4). Satori i next/og maaler hvert ord for bredt,
+ * saa mellomrommet etter lange ord blir synlig bredere. Med hardt mellomrom
+ * (U+00A0) blir linja ett ord og avstanden riktig, men den brytes ikke; derfor
+ * er overskriften paa en linje (testen har en lengdegrense). Ikke U+200B:
+ * Geist mangler tegnet, og da henter next/og en font fra Google (verifisert
+ * 02.10). Bare for bildet; alt-teksten og siden bruker teksten som den er.
+ */
+export function ogText(text: string): string {
+  return text.replace(/ /g, "\u00a0");
+}
+
 /** Bare de offentlige markedssidene, med full adresse. Tom til lansering. */
 export function sitemapFor(marketingPublic: boolean = MARKETING_PUBLIC): MetadataRoute.Sitemap {
   if (!marketingPublic) return [];

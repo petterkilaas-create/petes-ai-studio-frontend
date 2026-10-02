@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { DEFAULT_BRAND, PAPER, type Brand } from "@/app/lib/brand";
+import { ogText } from "@/app/lib/seo";
 import { fill } from "@/content/marketing/fill";
 import { getHome, getSite } from "@/content/marketing";
 import type { Hero } from "@/content/marketing/schema";
@@ -7,7 +8,11 @@ import type { Hero } from "@/content/marketing/schema";
 // Delingsbildet for /no (MS4): merket, linja over overskriften og
 // overskriften fra innholdet, i fargene fra merket. Uten foto til
 // eksempelbildene er klare (originalen er laget med AI). Fonten er Geist,
-// som next/og har med seg (Petter 02.10, valg A1). Bygges statisk.
+// som next/og har med seg (Petter 02.10, valg A1). Bygges statisk. Teksten
+// gaar gjennom ogText, ellers blir mellomrommene for brede (seo.ts), og
+// overskriften staar paa en linje (64 px, ogText bryter ikke linja). Bare
+// latinske tegn: et tegn Geist mangler, faar next/og til aa hente en font
+// fra Google uten tidsgrense (testen sjekker det).
 const site = getSite("no");
 const { hero } = getHome("no");
 const brand = DEFAULT_BRAND;
@@ -52,11 +57,11 @@ function Card({ brand, hero }: { brand: Brand; hero: Hero }) {
             ))}
           </svg>
         )}
-        {brand.displayName}
+        {ogText(brand.displayName)}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        <div style={{ display: "flex", fontSize: 32, opacity: 0.7 }}>{hero.eyebrow}</div>
-        <div style={{ display: "flex", fontSize: 84, lineHeight: 1.05, letterSpacing: -2 }}>{hero.title}</div>
+        <div style={{ display: "flex", fontSize: 32, opacity: 0.7 }}>{ogText(hero.eyebrow)}</div>
+        <div style={{ display: "flex", fontSize: 64, lineHeight: 1.05, letterSpacing: -2 }}>{ogText(hero.title)}</div>
       </div>
     </div>
   );
