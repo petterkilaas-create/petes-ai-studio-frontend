@@ -2,6 +2,7 @@ import { BrandMark } from "../BrandMark";
 import type { Brand } from "../../lib/brand";
 import { fill } from "../../../content/marketing/fill";
 import type { Link, Site } from "../../../content/marketing/schema";
+import { MobileMenu } from "./MobileMenu";
 import { CONTAINER, FOCUS } from "./classes";
 
 /**
@@ -11,10 +12,13 @@ import { CONTAINER, FOCUS } from "./classes";
  * bare menylenkene; «Logg inn» og «Prøv gratis» vises alltid (Petter
  * 02.10). Vanlige <a>: lenkene gaar til ankre eller til appen (annen
  * rot-layout, full sidelast uansett).
+ *
+ * MS3: `links` er bare lenkene til seksjoner som finnes (visibleLinks i
+ * content/marketing/links.ts), og under 820 px ligger de i MobileMenu.
  */
 const NAV_LINK = `flex h-11 items-center rounded-[8px] px-3.5 text-[15px] font-medium text-ink no-underline hover:text-ink-2 ${FOCUS}`;
 
-export function MarketingTopBar({ site, brand }: { site: Site; brand: Brand }) {
+export function MarketingTopBar({ site, brand, links }: { site: Site; brand: Brand; links: Link[] }) {
   const { topBar, cta } = site;
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur">
@@ -27,13 +31,14 @@ export function MarketingTopBar({ site, brand }: { site: Site; brand: Brand }) {
           <BrandMark brand={brand} />
         </a>
         <nav aria-label={topBar.navLabel} className="hidden items-center gap-0.5 min-[820px]:flex">
-          {topBar.links.map((l: Link) => (
+          {links.map((l: Link) => (
             <a key={l.href} href={l.href} className={NAV_LINK}>
               {l.label}
             </a>
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <MobileMenu label={topBar.menuLabel} navLabel={topBar.navLabel} links={links} />
           <a href={topBar.login.href} className={`${NAV_LINK} rounded-button`}>
             {topBar.login.label}
           </a>

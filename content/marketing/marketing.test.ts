@@ -13,8 +13,13 @@ import {
   START_PATH,
 } from "../../app/lib/marketingAccess.ts";
 import { literalTextsInFile, withoutComments } from "../../app/lib/testing/jsxText.ts";
+import { DUSK_SKY_BY_TIME, DEFAULT_DUSK } from "../../app/lib/dusk.ts";
+import { DICTIONARIES } from "../../app/lib/i18n/index.ts";
+import { tabKey } from "../../app/lib/tabs.ts";
 import { fill } from "./fill.ts";
 import { getHome, getSite } from "./index.ts";
+import { contentAnchors, visibleLinks } from "./links.ts";
+import { pendingItems } from "./pending.ts";
 
 // MS2: markedssiden (skall, innholdsfil og toppen), /start, proxyen og 404.
 // node --test kan ikke laste .tsx, saa komponentene og proxy.ts sjekkes som
@@ -354,4 +359,255 @@ test("MS2: 404-siden har merket, lenkene og ingen tekst skrevet rett inn", () =>
   assert.deepEqual(site.notFound.toHome, { label: "Til forsiden", href: MARKETING_HOME });
   assert.equal(site.notFound.pageTitle, "Fant ikke siden · {brand}");
   assert.deepEqual(literalTextsInFile(src), []);
+});
+
+// ---------------------------------------------------------------------------
+// MS3a: tillitsstripen, eksemplene, stemningene, tre steg, tjenestene og
+// mobilmenyen, med det som venter og lenkene (regel 3-6).
+// ---------------------------------------------------------------------------
+
+const MS3A_TSX = [
+  "TrustStrip",
+  "Examples",
+  "ExampleTabs",
+  "Moods",
+  "MoodPicker",
+  "Steps",
+  "Services",
+  "MobileMenu",
+  "MarketingPicture",
+  "PendingMark",
+].map((n) => `app/components/marketing/${n}.tsx`);
+
+test("MS3a: de nye komponentene er med i teksttesten (ingen synlig tekst i JSX)", () => {
+  for (const f of MS3A_TSX) {
+    assert.ok(MARKETING_TSX.includes(f), f);
+    assert.deepEqual(literalTextsInFile(read(f)), [], f);
+  }
+});
+
+test("MS3a: seksjonene finnes i utkastets rekkefoelge, med tekst og riktig _type", () => {
+  assert.deepEqual(Object.keys(home), ["_type", "hero", "trustStrip", "examples", "moods", "steps", "services"]);
+  for (const key of ["trustStrip", "examples", "moods", "steps", "services"] as const) {
+    assert.equal(home[key]._type, key, key);
+  }
+  const page = withoutComments(read("app/(marketing)/no/page.tsx"));
+  const order = ["<Hero ", "<TrustStrip ", "<Examples ", "<Moods ", "<Steps ", "<Services "].map((tag) =>
+    page.indexOf(tag)
+  );
+  assert.ok(order.every((i, n) => i > 0 && (n === 0 || i > order[n - 1])), `rekkefoelgen: ${order}`);
+  assert.deepEqual(home.trustStrip.items.map((i) => i.text), [
+    "Synlig AI-merke på hvert bilde",
+    "Originalen røres aldri",
+    "Du godkjenner hvert bilde før levering",
+    "Data lagret i EU",
+  ]);
+  assert.deepEqual(home.examples.tabs.map((t) => t.label), ["Stue", "Kjøkken", "Soverom", "Balkong", "Hage", "Fasade", "Hytte"]);
+  assert.deepEqual(home.steps.items.map((s) => s.title), ["Last opp", "Velg stemning", "Godkjenn og last ned"]);
+  assert.deepEqual(
+    home.services.items.map((s) => [s.title, s.status]),
+    [
+      ["Kveldsbilde", "available"],
+      ["Skjul ansikter og skilt", "available"],
+      ["Digital styling", "soon"],
+      ["Video", "soon"],
+      ["Annonsetekst", "soon"],
+    ]
+  );
+  // Ingen «Ekte eksempel» under en plassholder.
+  for (const [path, text] of strings(home.moods, "moods")) assert.doesNotMatch(text, /Ekte eksempel/, path);
+});
+
+/** Alle bilder og plassholdere i innholdet, med stien. */
+function pictures(value: unknown, path = ""): [string, { alt: string; image?: string; placeholder?: string }][] {
+  if (Array.isArray(value)) return value.flatMap((v, i) => pictures(v, `${path}[${i}]`));
+  if (value === null || typeof value !== "object") return [];
+  const r = value as Record<string, unknown>;
+  if (typeof r.alt === "string") return [[path, r as { alt: string }]];
+  return Object.entries(r).flatMap(([k, v]) => pictures(v, path ? `${path}.${k}` : k));
+}
+
+test("MS3a: alle bilder og plassholdere har alt-tekst, og plassholderne har tekst og pending «image»", () => {
+  const all = pictures(home, "home");
+  assert.ok(all.length >= 2 + 14 + 5 + 2, `fant ${all.length}`);
+  const images = read("content/marketing/images.ts");
+  for (const [path, pic] of all) {
+    assert.ok(pic.alt.trim().length > 10, path);
+    if ("placeholder" in pic) {
+      assert.ok(pic.placeholder!.trim().length > 0, path);
+      assert.equal((pic as { pending?: string }).pending, "image", path);
+    } else {
+      assert.match(images, new RegExp(`^  ${pic.image},$`, "m"), path);
+    }
+  }
+  // Stue bruker bildene fra toppen.
+  assert.deepEqual(home.examples.tabs[0].before, home.hero.before);
+  assert.deepEqual(home.examples.tabs[0].after, home.hero.after);
+  // Plassholderen viser tekst og merkelapp, og bildet har alt fra innholdet.
+  const pic = withoutComments(read("app/components/marketing/MarketingPicture.tsx"));
+  assert.match(pic, /if \("placeholder" in picture\)/);
+  assert.match(pic, /alt=\{picture\.alt\}/);
+  assert.match(pic, /\{picture\.placeholder\}/);
+  assert.match(pic, /aspect-\[3\/2\]/);
+});
+
+test("MS3a: stemningene har appens koder, navn, grupper og startvalg", () => {
+  const codes = DICTIONARIES.nb.codes;
+  assert.deepEqual(home.moods.groups.map((g) => g.time), ["early", "late"]);
+  for (const g of home.moods.groups) {
+    assert.equal(g.label, codes.duskTime[g.time], g.time);
+    assert.deepEqual(g.items.map((i) => i.sky), [...DUSK_SKY_BY_TIME[g.time as "early" | "late"]], g.time);
+    for (const item of g.items) assert.equal(item.name, codes.duskSky[item.sky], item.sky);
+  }
+  assert.match(withoutComments(read("app/components/marketing/Moods.tsx")), /defaultSky=\{DEFAULT_DUSK\.sky\}/);
+  assert.equal(DEFAULT_DUSK.sky, "clear");
+  const picker = withoutComments(read("app/components/marketing/MoodPicker.tsx"));
+  assert.match(picker, /role="group" aria-label=\{g\.groupLabel\}/);
+  assert.match(picker, /aria-pressed=\{m\.sky === mood\.sky\}/);
+  assert.match(picker, /type="button"/);
+});
+
+test("MS3a: tjenestene heter det samme som i appen", () => {
+  const ui = DICTIONARIES.nb.ui as Record<string, string>;
+  for (const s of home.services.items) {
+    const key = `service.${s.id}`;
+    if (Object.hasOwn(ui, key)) assert.equal(s.title, ui[key], s.id);
+  }
+  // «Mer om …» har ingen side ennaa (MS5): ingen href, og vises som tekst.
+  for (const s of home.services.items) {
+    if ("more" in s) assert.equal((s.more as { href?: string }).href, undefined, s.id);
+  }
+  assert.match(
+    withoutComments(read("app/components/marketing/Services.tsx")),
+    /if \(link\.href === undefined\) return <span/
+  );
+});
+
+// --- Det som venter (regel 3 og 4) --------------------------------------------
+
+const PENDING_NOW = [
+  ["home.hero.before", "image"],
+  ["home.hero.after", "image"],
+  ["home.trustStrip.items[3]", "dataRegion"],
+];
+
+test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () => {
+  const items = pendingItems({ site, home });
+  if (MARKETING_PUBLIC) {
+    assert.deepEqual(items, [], "MARKETING_PUBLIC er true, men noe i innholdet venter fortsatt");
+  }
+  // Lista i dag (oppdateres bevisst etter hvert som ting avklares). Alle
+  // eksempelbildene er plassholdere eller midlertidige.
+  const notPictures = items.filter((i) => i.key !== "image" || i.path.startsWith("home.hero"));
+  assert.deepEqual(notPictures.map((i) => [i.path, i.key]), PENDING_NOW);
+  assert.ok(items.filter((i) => i.key === "image").length >= 2 + 14 + 5 + 2);
+  // Hver noekkel har en merkelapp.
+  for (const i of items) assert.ok(site.pendingLabels[i.key].startsWith("["), i.key);
+});
+
+test("MS3a: det som venter, vises med merkelapp der det staar", () => {
+  assert.match(read("app/components/marketing/TrustStrip.tsx"), /item\.pending && <PendingMark label=\{site\.pendingLabels\[item\.pending\]\} \/>/);
+  assert.match(read("app/components/marketing/Hero.tsx"), /\(hero\.before\.pending \|\| hero\.after\.pending\) && <PendingMark label=\{site\.pendingLabels\.image\} \/>/);
+  const pic = withoutComments(read("app/components/marketing/MarketingPicture.tsx"));
+  assert.match(pic, /<PendingMark label=\{pendingLabel\} \/>/);
+  assert.match(pic, /\{picture\.pending && \(/);
+  assert.match(read("app/components/marketing/PendingMark.tsx"), /bg-amber-bg[^"]*text-amber-fg/);
+});
+
+// --- Lenkene (regel 5) -----------------------------------------------------------
+
+/** Om en intern rute har en side: app/(gruppe)/<sti>/page.tsx. */
+function routeExists(href: string): boolean {
+  const path = href.replace(/^\//, "");
+  return readdirSync(join(REPO_DIR, "app"), { withFileTypes: true })
+    .filter((e) => e.isDirectory() && /^\(.+\)$/.test(e.name))
+    .some((g) => existsSync(join(REPO_DIR, "app", g.name, path, "page.tsx")));
+}
+
+test("MS3a: alle lenker som vises, peker paa et anker paa siden eller en rute som finnes", () => {
+  const anchors = contentAnchors(home);
+  assert.deepEqual([...anchors].sort(), ["eksempler", "tjenester", "topp"]);
+  const shown = [
+    ...strings(home, "home").filter(([p]) => p.endsWith(".href")),
+    ...strings({ cta: site.cta, login: site.topBar.login, logo: { href: site.topBar.logoHref } }, "site").filter(([p]) =>
+      p.endsWith(".href")
+    ),
+    ...visibleLinks(site.topBar.links, anchors).map((l, i): [string, string] => [`topBar.links[${i}]`, l.href]),
+  ];
+  assert.ok(shown.length >= 5);
+  for (const [path, href] of shown) {
+    if (href.startsWith("#")) assert.ok(anchors.has(href.slice(1)), `${path}: ${href} finnes ikke paa siden`);
+    else assert.ok(href.startsWith("/") && routeExists(href), `${path}: ${href} finnes ikke`);
+  }
+  // MS3a lenker ikke til #priser eller #kjeder foer MS3b.
+  assert.deepEqual(visibleLinks(site.topBar.links, anchors).map((l) => l.href), ["#tjenester", "#eksempler"]);
+  assert.ok(routeExists("/start") && routeExists("/no") && !routeExists("/personvern"));
+});
+
+test("MS3a: toppmenyen og mobilmenyen viser bare lenkene siden sender (visibleLinks)", () => {
+  const page = withoutComments(read("app/(marketing)/no/page.tsx"));
+  assert.match(page, /const anchors = contentAnchors\(home\);/);
+  assert.match(page, /links=\{visibleLinks\(site\.topBar\.links, anchors\)\}/);
+  for (const f of ["app/components/marketing/MarketingTopBar.tsx", "app/components/marketing/MobileMenu.tsx"]) {
+    assert.doesNotMatch(withoutComments(read(f)), /topBar\.links/, f);
+  }
+  assert.match(read("app/components/marketing/MarketingTopBar.tsx"), /<MobileMenu label=\{topBar\.menuLabel\} navLabel=\{topBar\.navLabel\} links=\{links\} \/>/);
+  // Seksjonene har id fra ankeret.
+  assert.match(read("app/components/marketing/Examples.tsx"), /<section id=\{examples\.anchor\}/);
+  assert.match(read("app/components/marketing/Services.tsx"), /<section id=\{services\.anchor\}/);
+  // Ingen spraakvelger foer det finnes mer enn ett spraak.
+  for (const f of MARKETING_TSX) assert.doesNotMatch(read(f), /hrefLang|Svenska|English \(UK\)/, f);
+});
+
+// --- Tastatur og ytelse ------------------------------------------------------------
+
+test("MS3a: fanene foelger WAI-ARIA (tablist, roving tabindex, piltaster, Home og End)", () => {
+  assert.deepEqual([0, 1, 6].map((i) => tabKey(i, "ArrowRight", 7)), [1, 2, 0]);
+  assert.deepEqual([0, 1, 6].map((i) => tabKey(i, "ArrowLeft", 7)), [6, 0, 5]);
+  assert.equal(tabKey(3, "Home", 7), 0);
+  assert.equal(tabKey(3, "End", 7), 6);
+  assert.equal(tabKey(3, "Tab", 7), null);
+  assert.equal(tabKey(0, "ArrowRight", 0), null);
+  const src = withoutComments(read("app/components/marketing/ExampleTabs.tsx"));
+  for (const attr of [
+    'role="tablist"',
+    "aria-label={labels.tabList}",
+    'role="tab"',
+    "aria-selected={i === active}",
+    "aria-controls={panelId}",
+    "tabIndex={i === active ? 0 : -1}",
+    'role="tabpanel"',
+    "aria-labelledby={`${baseId}-tab-${tab.id}`}",
+  ]) {
+    assert.ok(src.includes(attr), attr);
+  }
+  assert.match(src, /const next = tabKey\(active, e\.key, tabs\.length\);/);
+  assert.match(src, /refs\.current\[next\]\?\.focus\(\);/);
+});
+
+test("MS3a: mobilmenyen har aria-expanded og aria-controls, lukkes med Escape og vises bare under 820 px", () => {
+  const src = withoutComments(read("app/components/marketing/MobileMenu.tsx"));
+  assert.match(src, /aria-expanded=\{open\}/);
+  assert.match(src, /aria-controls=\{panelId\}/);
+  assert.match(src, /<nav\s+id=\{panelId\}/);
+  assert.match(src, /hidden=\{!open\}/);
+  assert.match(src, /if \(e\.key !== "Escape"\) return;\s*setOpen\(false\);\s*buttonRef\.current\?\.focus\(\);/);
+  assert.match(src, /onClick=\{\(\) => setOpen\(false\)\}/);
+  assert.match(src, /className="min-\[820px\]:hidden"/);
+  assert.equal(site.topBar.menuLabel, "Meny");
+});
+
+test("MS3a: bare toppbildet har hoey prioritet; alle andre bilder lastes lat", () => {
+  for (const f of filesIn("app/components/marketing", /\.tsx$/).filter((f) => !f.endsWith("HeroSlider.tsx"))) {
+    const src = withoutComments(read(f));
+    assert.doesNotMatch(src, /fetchPriority|loading="eager"|\bpriority\b|\bpreload\b/, f);
+  }
+  // Seksjonene er serverkomponenter; bare fanene, stemningene og mobilmenyen (og slideren) er klientdeler.
+  const client = filesIn("app/components/marketing", /\.tsx$/).filter((f) => /^"use client";/.test(read(f)));
+  assert.deepEqual(client.map((f) => f.split("/").pop()).sort(), [
+    "ExampleTabs.tsx",
+    "HeroSlider.tsx",
+    "MobileMenu.tsx",
+    "MoodPicker.tsx",
+  ]);
 });
