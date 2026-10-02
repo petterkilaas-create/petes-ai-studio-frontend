@@ -37,11 +37,11 @@ test("ingen .ts- eller .tsx-fil nevner de gamle bildefeltene (Lekkasjen L4)", ()
 
 test("sidene henter KI-bildet fra de merkede feltene", () => {
   const read = (rel: string) => readFileSync(join(APP_DIR, rel), "utf8");
-  assert.match(read("history/page.tsx"), /thumbSrc\(job\)/);
-  assert.match(read("godkjenning/[jobId]/page.tsx"), /resultImageUrl\(review\.images/);
-  assert.match(read("express/page.tsx"), /outputView\(job\.status, job\.imageUrl\)/);
-  assert.match(read("express/page.tsx"), /<PreviewPlaceholder \/>/);
-  assert.match(read("godkjenning/[jobId]/page.tsx"), /<PreviewPlaceholder \/>/);
+  assert.match(read("(app)/history/page.tsx"), /thumbSrc\(job\)/);
+  assert.match(read("(app)/godkjenning/[jobId]/page.tsx"), /resultImageUrl\(review\.images/);
+  assert.match(read("(app)/express/page.tsx"), /outputView\(job\.status, job\.imageUrl\)/);
+  assert.match(read("(app)/express/page.tsx"), /<PreviewPlaceholder \/>/);
+  assert.match(read("(app)/godkjenning/[jobId]/page.tsx"), /<PreviewPlaceholder \/>/);
 });
 
 test("pollJob har ingen gren for bytes; sync privacy_blur beholder sin (L4)", () => {

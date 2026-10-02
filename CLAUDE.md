@@ -30,13 +30,19 @@ utover det som staar her.
   slettet (L0, 2026-09-30).
 - Tjenester av/paa: `ENABLED` i `app/lib/services.ts`. Klart vaer, Magic
   Cleanup, Virtual Staging og `/express-v2` er av til de er merket (TG-NEW-136).
+- Mappestruktur (MS1, 2026-10-02): app-sidene og rot-layouten (ClerkProvider)
+  ligger i route group `app/(app)/`; URL-ene er uten `(app)`. Felles kode
+  (`lib/`, `components/`, `hooks/`, `globals.css`, `icon.svg`,
+  `apple-icon.png`) ligger i `app/`. Det finnes ingen `app/layout.tsx`.
+  Markedssiden kommer i `app/(marketing)/` (MS2). Importer fra sidene bruker
+  `@/app/...`; filer som `node --test` laster, bruker relative stier.
 
 ## Kommandoer
 - Ved oppstart av oekt: `git checkout main && git pull`.
 - Installer fra lockfila med `npm ci`. `npm install` kan endre
   `package-lock.json` - commit aldri lockfil-endringer du ikke ble bedt om.
 - Typesjekk (porten lokalt): `npx tsc --noEmit` - forventet rent.
-- `npm test` (node --test) - 236 tester per 2026-10-02, forventet groent.
+- `npm test` (node --test) - 237 tester per 2026-10-02, forventet groent.
 - Dev-server: `npm run dev`, aapne http://localhost:3000 - aldri 127.0.0.1
   (Clerk-cookies og cross-origin oppfoerer seg annerledes).
 - `npm run build` feiler lokalt (verifisert 2026-09-23) under prerender av

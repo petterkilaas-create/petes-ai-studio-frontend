@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { brandCssVars, DEFAULT_BRAND, HOUSE_ICON, resolveBrand } from "./brand.ts";
@@ -16,7 +16,7 @@ const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
 const REPO_DIR = fileURLToPath(new URL("../..", import.meta.url));
 const read = (rel: string) => readFileSync(join(APP_DIR, rel), "utf8");
 const css = read("globals.css");
-const layout = read("layout.tsx");
+const layout = read("(app)/layout.tsx");
 
 /** Innholdet i blokken som starter med `head {`, uten nestede blokker. */
 function block(source: string, head: string): string {
@@ -90,6 +90,8 @@ function sourceFiles(dir = APP_DIR): string[] {
     if (entry.isDirectory()) out.push(...sourceFiles(path));
     else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) out.push(path);
   }
+  // Vakt: finner den ingen filer (feil sti), skal testene feile, ikke gaa groent.
+  if (dir === APP_DIR) assert.ok(out.length > 0, "fant ingen .ts/.tsx under app/");
   return out;
 }
 
@@ -129,8 +131,8 @@ test("«Gavl» finnes ingen steder i repoet", () => {
 // D1 (D1a og D1b): skallet og de aktive sidene i retning A. Tekstsjekker, som over.
 // ---------------------------------------------------------------------------
 
-/** Skjulte sider: viser bare ServiceUnavailable og ryddes i D5. */
-const HIDDEN_DIRS = ["staging", "express-v2", "video", "copywriter", "orders"];
+/** Skjulte sider: viser bare ServiceUnavailable og ryddes i D5. Sidene ligger i route group (app) (MS1). */
+const HIDDEN_DIRS = ["staging", "express-v2", "video", "copywriter", "orders"].map((d) => `(app)/${d}`);
 
 /** Aktive filer (.ts/.tsx/.css under app/, uten tester), relativt til app/. Nye filer kommer med av seg selv. */
 function activeFiles(dir = APP_DIR): string[] {
@@ -144,28 +146,33 @@ function activeFiles(dir = APP_DIR): string[] {
       out.push(rel);
     }
   }
+  if (dir === APP_DIR) assert.ok(out.length > 0, "fant ingen aktive filer under app/");
   return out;
 }
+
+test("D1: hver mappe i HIDDEN_DIRS finnes, saa lista ikke unntar noe som er flyttet", () => {
+  for (const d of HIDDEN_DIRS) assert.ok(existsSync(join(APP_DIR, d)), d);
+});
 
 test("D1: listen over aktive filer har skallet, sidene og komponentene", () => {
   const files = activeFiles();
   for (const f of [
-    "layout.tsx",
-    "page.tsx",
+    "(app)/layout.tsx",
+    "(app)/page.tsx",
     "globals.css",
-    "express/page.tsx",
-    "history/page.tsx",
-    "history/statusVariants.ts",
+    "(app)/express/page.tsx",
+    "(app)/history/page.tsx",
+    "(app)/history/statusVariants.ts",
     "lib/services.ts",
     "components/AppNav.tsx",
     "components/ServiceUnavailable.tsx",
     "components/ui/Button.tsx",
-    "godkjenning/[jobId]/page.tsx",
+    "(app)/godkjenning/[jobId]/page.tsx",
     "components/PreviewPlaceholder.tsx",
   ]) {
     assert.ok(files.includes(f), f);
   }
-  assert.ok(!files.some((f) => f.startsWith("video/") || f.startsWith("orders/")));
+  assert.ok(!files.some((f) => f.startsWith("(app)/video/") || f.startsWith("(app)/orders/")));
 });
 
 test("D1: ingen #009183 (turkis, under WCAG AA) og ingen #0B1120 i de aktive filene", () => {
@@ -218,7 +225,7 @@ test("D1: skallet bruker merket fra brand.ts, og metadata har fanetittelen", () 
   assert.match(body, /color:\s*var\(--color-ink\);/);
   assert.match(body, /font-family:\s*var\(--font-ui\);/);
   for (const [dir, title] of [["express", "Express"], ["history", "Historikk"], ["godkjenning", "Godkjenning"]]) {
-    assert.match(read(`${dir}/layout.tsx`), new RegExp(`title: "${title}"`), dir);
+    assert.match(read(`(app)/${dir}/layout.tsx`), new RegExp(`title: "${title}"`), dir);
   }
 });
 
@@ -226,7 +233,7 @@ test("D1: skallet bruker merket fra brand.ts, og metadata har fanetittelen", () 
 const GODKJENNING_COMPONENTS = activeFiles().filter((f) => f.startsWith("components/godkjenning/"));
 
 test("D1b: godkjenningssiden og PreviewPlaceholder bruker bare tokenene", () => {
-  for (const f of ["godkjenning/[jobId]/page.tsx", "components/PreviewPlaceholder.tsx", ...GODKJENNING_COMPONENTS]) {
+  for (const f of ["(app)/godkjenning/[jobId]/page.tsx", "components/PreviewPlaceholder.tsx", ...GODKJENNING_COMPONENTS]) {
     const src = read(f);
     assert.doesNotMatch(src, /#[0-9a-f]{3,8}\b/i, f);
     assert.doesNotMatch(src, /-\[(#|rgb)/, f);
@@ -234,7 +241,7 @@ test("D1b: godkjenningssiden og PreviewPlaceholder bruker bare tokenene", () => 
     assert.doesNotMatch(src, /\b(text|bg|border)-(white|black)\b/, f);
     assert.doesNotMatch(src, /\b(red|amber)-\d/, f);
   }
-  const page = read("godkjenning/[jobId]/page.tsx");
+  const page = read("(app)/godkjenning/[jobId]/page.tsx");
   // Knappene og kortene er de felles komponentene (primary, ikke turkis).
   // D2b: handlingsknappene ligger i handlingskortet.
   assert.match(page, /const BTN_PRIMARY = buttonClass\("primary"\);/);
@@ -312,14 +319,15 @@ test("D1: produktnavnet staar ikke i ordlista (kommer fra brand.ts)", () => {
       }
     }
   }
-  assert.match(read("page.tsx"), /t\(locale, "home\.title", \{ brand: brand\.displayName \}\)/);
+  assert.match(read("(app)/page.tsx"), /t\(locale, "home\.title", \{ brand: brand\.displayName \}\)/);
 });
 
 test("D1: testene for annonseteksten og lekkasjevernet er uendret", () => {
   // sha256 fra main foer D1 (249cee3). Endres de, maa det vaere et eget valg.
+  // MS1 (dag 35): previews.test.ts fikk nye stier til sidene i (app)/, ellers uendret.
   const expected: Record<string, string> = {
     "lib/disclosure.test.ts": "8acedaed814203b88c6395209b43ffe7798734b58d888b63985f9126937769ce",
-    "lib/previews.test.ts": "c0b012e49efa3483912d61301aeac1c4ca78a526a5e0ced406beb0e15f7a13b0",
+    "lib/previews.test.ts": "f00f42d77f98755c2052cb61b81c646a03c1b90e506338c6a00e8b8bd94bce33",
     "lib/jobState.test.ts": "cac4d79a9ed60e6307f4cdd0118fcba43c22b8aa8ba7a783ba4c0e1522a818c5",
   };
   for (const [rel, hash] of Object.entries(expected)) {
@@ -358,7 +366,7 @@ function literalTexts(jsx: string): string[] {
 }
 
 const EXPRESS_JSX: [string, string][] = [
-  ["express/page.tsx", "export default function ExpressPage"],
+  ["(app)/express/page.tsx", "export default function ExpressPage"],
   ["components/DuskChoicePicker.tsx", "export function DuskChoicePicker"],
 ];
 
@@ -502,7 +510,7 @@ test("D2a: komponentene har ingen synlig tekst skrevet rett inn", () => {
 });
 
 test("D2a: siden bygger variantene fra rundene, med admin fra /me", () => {
-  const page = read("godkjenning/[jobId]/page.tsx");
+  const page = read("(app)/godkjenning/[jobId]/page.tsx");
   assert.match(page, /compareVariants\(review\.images, \{ isAdmin: caps\.viewAll \}\)/);
   assert.match(page, /getCapabilities\(\{ getToken \}\)/);
   assert.match(page, /useState<Capabilities>\(NO_CAPABILITIES\)/);
@@ -543,7 +551,7 @@ test("D2b: komponentene finnes og er med i D1-sjekkene", () => {
 });
 
 test("D2b: «Detaljer» vises bare naar showDetails(caps) er sann", () => {
-  const page = read("godkjenning/[jobId]/page.tsx");
+  const page = read("(app)/godkjenning/[jobId]/page.tsx");
   assert.match(page, /\{showDetails\(caps\) && <DetailsPanel /);
   assert.equal(page.match(/<DetailsPanel /g)?.length, 1);
 });
@@ -552,7 +560,7 @@ test("D2b: «Detaljer» vises bare naar showDetails(caps) er sann", () => {
 const ANALYSIS = /review\.lightsUnstable|review\.lightsRejected|review\.lightsApproved|"lightReason"|"reasonCode"|"flagCode"|review\.runValues|review\.analysisTitle|review\.noValidRuns|(?<![.\w])reason(?=[\s/>])/;
 
 test("D2b: analysen staar bare i DetailsPanel (megleren ser den ikke)", () => {
-  const files = ["godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("DetailsPanel.tsx") && !f.endsWith("LightLabel.tsx"))];
+  const files = ["(app)/godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("DetailsPanel.tsx") && !f.endsWith("LightLabel.tsx"))];
   for (const f of files) {
     assert.doesNotMatch(withoutComments(read(f)), ANALYSIS, f);
   }
@@ -571,7 +579,7 @@ test("D2b: rettingen er én flat liste med «Usikker», uten grunner, tidspunkt 
   assert.doesNotMatch(panel, /\breason\b|lightReason/);
   assert.doesNotMatch(panel, /dusk|DuskChoice|roundTime|roundSky|"time"|"sky"/i);
   // Siden sender kandidat-flagget videre til setToggle, og body bygges som foer.
-  const page = read("godkjenning/[jobId]/page.tsx");
+  const page = read("(app)/godkjenning/[jobId]/page.tsx");
   assert.match(page, /setToggles\(\(prev\) => setToggle\(prev, light, uncertain, on\)\)/);
   assert.match(page, /buildCorrection\(\s*review,\s*toggles,\s*correctionFireplaceShown\(review\.fireplace\),\s*correctAnswer\s*\)/);
   // LightLabel viser grunnen bare naar `reason` er satt, og «Usikker» bare med `uncertain`.
@@ -631,7 +639,7 @@ test("D2c: «Stemning og lys» viser bare lampetypen; Detaljer og rettingen vise
     assert.ok(uses.length > 0 && uses.every((u) => /\blocation\b/.test(u)), f);
   }
   // Ingen andre steder leser plasseringen direkte.
-  for (const f of ["godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("LightLabel.tsx"))]) {
+  for (const f of ["(app)/godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("LightLabel.tsx"))]) {
     assert.doesNotMatch(withoutComments(read(f)), /\.location\b/, f);
   }
 });

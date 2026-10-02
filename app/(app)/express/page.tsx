@@ -2,26 +2,26 @@
 
 import { useState } from "react";
 import { Check, Clock, Eraser, ScanFace, Sun, Sunset, Zap, type LucideIcon } from "lucide-react";
-import { useImagePreview } from "../hooks/useImagePreview";
-import { useProcessJob } from "../hooks/useProcessJob";
-import { StatusBadge } from "../components/StatusBadge";
-import { ErrorPanel } from "../components/ErrorPanel";
-import { RejectionPanel } from "../components/RejectionPanel";
-import { ReviewPanel } from "../components/ReviewPanel";
-import { UnknownStatusPanel } from "../components/UnknownStatusPanel";
-import { ApprovalNotice } from "../components/ApprovalNotice";
-import { PreviewPlaceholder } from "../components/PreviewPlaceholder";
-import { outputView } from "../lib/jobState";
-import { ReviewerRejectedPanel } from "../components/ReviewerRejectedPanel";
-import { OpenReviewLink } from "../components/OpenReviewLink";
-import { DuskChoicePicker } from "../components/DuskChoicePicker";
-import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "../lib/dusk";
-import { t } from "../lib/i18n";
-import { useLocale } from "../lib/i18n/useLocale";
-import { expressCategories } from "../lib/services";
-import { Button } from "../components/ui/Button";
-import { Card, cardClass } from "../components/ui/Card";
-import { PageHeader } from "../components/ui/PageHeader";
+import { useImagePreview } from "@/app/hooks/useImagePreview";
+import { useProcessJob } from "@/app/hooks/useProcessJob";
+import { StatusBadge } from "@/app/components/StatusBadge";
+import { ErrorPanel } from "@/app/components/ErrorPanel";
+import { RejectionPanel } from "@/app/components/RejectionPanel";
+import { ReviewPanel } from "@/app/components/ReviewPanel";
+import { UnknownStatusPanel } from "@/app/components/UnknownStatusPanel";
+import { ApprovalNotice } from "@/app/components/ApprovalNotice";
+import { PreviewPlaceholder } from "@/app/components/PreviewPlaceholder";
+import { outputView } from "@/app/lib/jobState";
+import { ReviewerRejectedPanel } from "@/app/components/ReviewerRejectedPanel";
+import { OpenReviewLink } from "@/app/components/OpenReviewLink";
+import { DuskChoicePicker } from "@/app/components/DuskChoicePicker";
+import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "@/app/lib/dusk";
+import { t } from "@/app/lib/i18n";
+import { useLocale } from "@/app/lib/i18n/useLocale";
+import { expressCategories } from "@/app/lib/services";
+import { Button } from "@/app/components/ui/Button";
+import { Card, cardClass } from "@/app/components/ui/Card";
+import { PageHeader } from "@/app/components/ui/PageHeader";
 
 // Tjenestevalget ligger i lib/services.ts, filtrert paa ENABLED (TG-NEW-136).
 const CATEGORIES = expressCategories();

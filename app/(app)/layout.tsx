@@ -1,11 +1,11 @@
-import "./globals.css";
+import "@/app/globals.css";
 import type { Metadata } from "next";
 import { ClerkProvider, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { Geist, Instrument_Serif } from "next/font/google";
-import { AppNav } from "./components/AppNav";
-import { BrandMark } from "./components/BrandMark";
-import { brandCssVars, DEFAULT_BRAND } from "./lib/brand";
+import { AppNav } from "@/app/components/AppNav";
+import { BrandMark } from "@/app/components/BrandMark";
+import { brandCssVars, DEFAULT_BRAND } from "@/app/lib/brand";
 
 // Fontene lastes ned ved bygg og serveres fra oss (D0), og er i bruk fra D1:
 // font-ui paa body (globals.css), font-display paa titler fra 28 px. Bare

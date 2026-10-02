@@ -11,10 +11,10 @@ import {
   type Capabilities,
   type DecisionAction,
   type ReviewFetchResult,
-} from "../../lib/api";
-import { useJobStatus } from "../../lib/useJobStatus";
-import { codeText, t, type CodeGroup, type UiKey } from "../../lib/i18n";
-import { useLocale } from "../../lib/i18n/useLocale";
+} from "@/app/lib/api";
+import { useJobStatus } from "@/app/lib/useJobStatus";
+import { codeText, t, type CodeGroup, type UiKey } from "@/app/lib/i18n";
+import { useLocale } from "@/app/lib/i18n/useLocale";
 import {
   buildDecision,
   decisionControls,
@@ -22,8 +22,8 @@ import {
   resultImageUrl,
   shouldPoll,
   type FireplaceAnswer,
-} from "../../lib/review";
-import { isReadOnlyOther, showDetails } from "../../lib/roles";
+} from "@/app/lib/review";
+import { isReadOnlyOther, showDetails } from "@/app/lib/roles";
 import {
   buildCorrection,
   canSubmitCorrection,
@@ -35,22 +35,22 @@ import {
   previousFireplaceAnswer,
   setToggle,
   type Toggles,
-} from "../../lib/correction";
-import { runDecision } from "../../lib/decide";
-import { canDownload } from "../../lib/download";
-import { compareVariants, selectedVariant, variantLabel } from "../../lib/compare";
-import { PreviewPlaceholder } from "../../components/PreviewPlaceholder";
-import { buttonClass } from "../../components/ui/Button";
-import { cardClass } from "../../components/ui/Card";
-import { CompareViewer } from "../../components/godkjenning/CompareViewer";
-import { VariantPicker } from "../../components/godkjenning/VariantPicker";
-import { DecisionCard } from "../../components/godkjenning/DecisionCard";
-import { CorrectionPanel } from "../../components/godkjenning/CorrectionPanel";
-import { MoodPanel } from "../../components/godkjenning/MoodPanel";
-import { DetailsPanel } from "../../components/godkjenning/DetailsPanel";
-import { DisclosureBlock } from "../../components/godkjenning/DisclosureBlock";
-import { DownloadButton } from "../../components/godkjenning/DownloadButton";
-import { FOCUS } from "../../components/godkjenning/classes";
+} from "@/app/lib/correction";
+import { runDecision } from "@/app/lib/decide";
+import { canDownload } from "@/app/lib/download";
+import { compareVariants, selectedVariant, variantLabel } from "@/app/lib/compare";
+import { PreviewPlaceholder } from "@/app/components/PreviewPlaceholder";
+import { buttonClass } from "@/app/components/ui/Button";
+import { cardClass } from "@/app/components/ui/Card";
+import { CompareViewer } from "@/app/components/godkjenning/CompareViewer";
+import { VariantPicker } from "@/app/components/godkjenning/VariantPicker";
+import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
+import { CorrectionPanel } from "@/app/components/godkjenning/CorrectionPanel";
+import { MoodPanel } from "@/app/components/godkjenning/MoodPanel";
+import { DetailsPanel } from "@/app/components/godkjenning/DetailsPanel";
+import { DisclosureBlock } from "@/app/components/godkjenning/DisclosureBlock";
+import { DownloadButton } from "@/app/components/godkjenning/DownloadButton";
+import { FOCUS } from "@/app/components/godkjenning/classes";
 
 /**
  * Godkjenningssiden (2d-1): megleren avgjoer egne jobber i «Til kontroll»

@@ -30,6 +30,8 @@ function sourceFiles(dir = APP_DIR): string[] {
     if (entry.isDirectory()) out.push(...sourceFiles(path));
     else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) out.push(path);
   }
+  // Vakt: finner den ingen filer (feil sti), skal testene feile, ikke gaa groent.
+  if (dir === APP_DIR) assert.ok(out.length > 0, "fant ingen .ts/.tsx under app/");
   return out;
 }
 
@@ -92,8 +94,8 @@ test("/staging og /express-v2: sidelogikken gir «ikke tilgjengelig» og starter
   assert.equal(isPageEnabled("/history"), true);
 
   for (const [rel, path] of [
-    ["staging/page.tsx", "STAGING_PATH"],
-    ["express-v2/page.tsx", "EXPRESS_V2_PATH"],
+    ["(app)/staging/page.tsx", "STAGING_PATH"],
+    ["(app)/express-v2/page.tsx", "EXPRESS_V2_PATH"],
   ] as const) {
     const src = read(rel);
     const start = src.indexOf("export default function");
@@ -112,6 +114,7 @@ test("/staging og /express-v2: sidelogikken gir «ikke tilgjengelig» og starter
 
 test("debug-siden er slettet, og ingen lenke peker dit", () => {
   assert.equal(existsSync(join(APP_DIR, "scene-transform-debug")), false);
+  assert.equal(existsSync(join(APP_DIR, "(app)", "scene-transform-debug")), false);
   const pattern = /["'`]\/scene-transform-debug/;
   for (const file of sourceFiles()) {
     assert.doesNotMatch(readFileSync(file, "utf8"), pattern, file);
@@ -157,9 +160,9 @@ test("ingen side har lenke til /video, /copywriter eller /orders skrevet rett in
 
 test("/video, /copywriter og /orders: stengt side gir «ikke tilgjengelig» og gjoer ingen kall", () => {
   for (const [rel, path, value] of [
-    ["video/page.tsx", "VIDEO_PATH", VIDEO_PATH],
-    ["copywriter/page.tsx", "COPYWRITER_PATH", COPYWRITER_PATH],
-    ["orders/page.tsx", "ORDERS_PATH", ORDERS_PATH],
+    ["(app)/video/page.tsx", "VIDEO_PATH", VIDEO_PATH],
+    ["(app)/copywriter/page.tsx", "COPYWRITER_PATH", COPYWRITER_PATH],
+    ["(app)/orders/page.tsx", "ORDERS_PATH", ORDERS_PATH],
   ] as const) {
     assert.equal(isPageEnabled(value), false, rel);
     const src = read(rel);
@@ -191,13 +194,13 @@ test("forsiden og Express: teksten lover ikke video, Veo, HDR eller aarstider", 
     }
   }
   // Teksten staar i ordlista, ikke rett inn i sidene.
-  assert.doesNotMatch(read("express/page.tsx"), /seasonal/i);
-  const home = read("page.tsx");
+  assert.doesNotMatch(read("(app)/express/page.tsx"), /seasonal/i);
+  const home = read("(app)/page.tsx");
   for (const key of HOME_KEYS.filter((k) => k.startsWith("home."))) {
     // home.title faar navnet som variabel: t(locale, "home.title", { brand }).
     assert.ok(home.includes(`t(locale, "${key}"`), key);
   }
-  assert.ok(read("express/page.tsx").includes(`t(locale, "express.subtitle")`));
+  assert.ok(read("(app)/express/page.tsx").includes(`t(locale, "express.subtitle")`));
 });
 
 test("forsiden og Express: nb og en har de samme noeklene", () => {
