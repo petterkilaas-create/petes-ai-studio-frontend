@@ -722,3 +722,83 @@ test("merke: icon.svg er husikonet fra brand.ts, og apple-icon.png er 180 px", (
   // Bare ett ikon i fanen: standard-favicon fra create-next-app er fjernet.
   assert.ok(!readdirSync(APP_DIR).includes("favicon.ico"));
 });
+
+// ---------------------------------------------------------------------------
+// TG-NEW-147: lysstyrke med fem trinn paa godkjenningssiden (KONTRAKT_LYSSTYRKE).
+// Reglene er testet i brightness.test.ts; her sjekkes at siden og
+// komponentene bruker dem.
+// ---------------------------------------------------------------------------
+
+/** CSS som endrer lysstyrken i nettleseren: filter, brightness() og Tailwind-klassene. */
+const CSS_BRIGHTNESS = /brightness\(|\bfilter\s*:|filter:\s*`|(^|[\s"'`])(filter|brightness-[\w[]+|backdrop-[\w[-]+)(?=[\s"'`])/;
+
+test("TG147: ingen CSS-filter paa resultatbildet; bildet er trinnets lenke fra backend", () => {
+  for (const f of [
+    "(app)/godkjenning/[jobId]/page.tsx",
+    "components/godkjenning/CompareViewer.tsx",
+    "components/godkjenning/BrightnessControl.tsx",
+  ]) {
+    assert.doesNotMatch(withoutComments(read(f)), CSS_BRIGHTNESS, f);
+  }
+  const page = withoutComments(read("(app)/godkjenning/[jobId]/page.tsx"));
+  assert.match(page, /const stepShown = brightness\.kind === "control" && !brightness\.locked \? step : null;/);
+  assert.match(page, /const shownUrl = stepShown !== null \? brightnessResultUrl\(review\.brightness, stepShown\) : roundUrl;/);
+  assert.match(page, /result=\{shown === null \? null : \{ url: shownUrl, label: shownLabel \}\}/);
+  assert.match(page, /onResultLoad=\{\(\) => setResultLoaded\(true\)\}/);
+});
+
+test("TG147: kontrollen er en innebygd range med fem trinn, navn fra ordlista og laas", () => {
+  const src = withoutComments(read("components/godkjenning/BrightnessControl.tsx"));
+  for (const attr of [
+    'type="range"',
+    "min={BRIGHTNESS_MIN}",
+    "max={BRIGHTNESS_MAX}",
+    "step={1}",
+    "value={step}",
+    "aria-labelledby={headingId}",
+    "aria-valuetext={name}",
+    "disabled={view.locked || locked}",
+  ]) {
+    assert.ok(src.includes(attr), attr);
+  }
+  assert.match(src, /const name = stepName\(locale, step\);/);
+  assert.match(src, /t\(locale, "brightness\.title"\)/);
+  assert.match(src, /\{view\.locked && <p[^>]*>\{t\(locale, "brightness\.currentRoundOnly"\)\}<\/p>\}/);
+  assert.match(src, /t\(locale, "brightness\.approved", \{ step: stepName\(locale, step\) \}\)/);
+  // Forhaandslasting foerst naar hovedbildet er lastet.
+  assert.match(src, /if \(!ready \|\| preloadKey === ""\) return;/);
+  // Trefflate 44 px og fokus (brief §3 punkt 8).
+  assert.match(src, /className=\{`h-11 w-full[^`]*\$\{FOCUS\}`\}/);
+  // Navnene lages bare i brightness.ts fra step, aldri skrevet inn i komponenten.
+  assert.doesNotMatch(src, /Mørk|Lys"|Standard|Ekstra|Darker|Light"/);
+});
+
+test("TG147: siden skjuler «Rått», viser kontrollen under bildet og sender trinnet ved godkjenning", () => {
+  const page = withoutComments(read("(app)/godkjenning/[jobId]/page.tsx"));
+  assert.match(
+    page,
+    /const variants = visibleVariants\(\s*compareVariants\(review\.images, \{ isAdmin: caps\.viewAll \}\),\s*review\.brightness\s*\);/
+  );
+  // Kontrollen rett under CompareViewer i bildekortet.
+  assert.match(page, /<CompareViewer[\s\S]*?\/>\s*\{brightness\.kind === "control" && step !== null && \(\s*<BrightnessControl/);
+  assert.match(page, /\{brightness\.kind === "approved" && <BrightnessApproved step=\{brightness\.step\} locale=\{locale\} \/>\}/);
+  assert.match(page, /locked=\{locked\}\s*preload=\{preloadUrls\(brightness\.steps, step\)\}/);
+  // Godkjenningen: trinnet med, gjennom runDecision (vern mot dobbeltklikk).
+  assert.match(page, /onDecide=\{\(action\) => decide\(action, step\)\}/);
+  assert.match(page, /buildDecision\(action, reasonText, answer, review, brightnessStep\)/);
+  assert.match(page, /void runDecision\(\{\s*inFlight,/);
+  assert.match(page, /approving=\{isApproving\(pending\)\}/);
+  // Ny henting (ny runde) starter paa default_step igjen.
+  const fetch = page.slice(page.indexOf("const fetchReview"), page.indexOf("useEffect("));
+  assert.match(fetch, /setChosenStep\(null\);/);
+  // Feilkodene via blockedResult.
+  assert.match(page, /const result = blockedResult\(out\);/);
+});
+
+test("TG147: Godkjenn-knappen viser «Godkjenner …» og er laast mens kallet pågår", () => {
+  const card = withoutComments(read("components/godkjenning/DecisionCard.tsx"));
+  assert.match(
+    card,
+    /onClick=\{\(\) => onDecide\("approve"\)\}\s*disabled=\{locked\}\s*aria-busy=\{approving\}[\s\S]*?\{approving \? t\(locale, "action\.approving"\) : t\(locale, "action\.approve"\)\}/
+  );
+});

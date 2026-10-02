@@ -34,6 +34,7 @@ export function DecisionCard({
   readOnly,
   locked,
   busy,
+  approving,
   polling,
   answer,
   onAnswer,
@@ -55,6 +56,8 @@ export function DecisionCard({
   readOnly: boolean;
   locked: boolean;
   busy: boolean;
+  /** Et approve-kall pågår (TG-NEW-147: kan ta noen sekunder). */
+  approving: boolean;
   polling: boolean;
   answer: FireplaceAnswer;
   onAnswer: (answer: "yes" | "no") => void;
@@ -94,8 +97,13 @@ export function DecisionCard({
           ) : (
             <div className="flex flex-wrap gap-3">
               {controls.approve && (
-                <button onClick={() => onDecide("approve")} disabled={locked} className={BTN_PRIMARY}>
-                  {t(locale, "action.approve")}
+                <button
+                  onClick={() => onDecide("approve")}
+                  disabled={locked}
+                  aria-busy={approving}
+                  className={BTN_PRIMARY}
+                >
+                  {approving ? t(locale, "action.approving") : t(locale, "action.approve")}
                 </button>
               )}
               {controls.continue && (
@@ -157,7 +165,8 @@ export function DecisionCard({
         </p>
       )}
 
-      {(busy || polling) && (
+      {/* Under approve sier knappen selv «Godkjenner …». */}
+      {(polling || (busy && !approving)) && (
         <p className="text-xs text-ink-2" role="status">
           {polling ? t(locale, "review.statusRunning") : t(locale, "action.working")}
         </p>

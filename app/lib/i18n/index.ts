@@ -79,7 +79,7 @@ const nbUi = {
   "action.continue": "Send videre",
   "action.cancel": "Avbryt",
   "action.confirmReject": "Bekreft avvisning",
-  "action.working": "Sender…",
+  "action.working": "Sender …",
   "action.newImage": "Dette lager et nytt bilde.",
   "action.fireplaceQuestion": "Skal peisen være tent?",
   "action.fireplaceLit": "Tent",
@@ -240,6 +240,18 @@ const nbUi = {
   "history.loadMore": "Last inn flere",
   "history.loadingMore": "Laster …",
   "action.refresh": "Oppdater",
+  // TG-NEW-147: lysstyrke med fem trinn. Navnene lages fra `step` (brightness.ts).
+  "brightness.title": "Lysstyrke",
+  "brightness.step.m2": "Mørkere",
+  "brightness.step.m1": "Mørk",
+  "brightness.step.0": "Standard",
+  "brightness.step.p1": "Lys",
+  "brightness.step.p2": "Ekstra lys",
+  "brightness.approved": "Lysstyrke: {step}",
+  "brightness.altStep": "lysstyrke: {step}",
+  "brightness.currentRoundOnly": "Lysstyrken kan bare velges for gjeldende runde.",
+  "brightness.invalid": "Lysstyrken var ugyldig. Velg et trinn og prøv igjen.",
+  "action.approving": "Godkjenner …",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -308,6 +320,11 @@ const nb: Dictionary = {
       original_missing: "Originalbildet mangler, så vi kan ikke lage et nytt bilde.",
       correction_limit: "Du har brukt rundene dine.",
       archive_failed: "Det nye bildet kunne ikke startes. Prøv igjen.",
+      // TG-NEW-147 (KONTRAKT_LYSSTYRKE §3).
+      brightness_unavailable: "Lysstyrken kan ikke velges for jobben nå. Siden er oppdatert.",
+      raw_missing: "Dette trinnet kan ikke lages nå. Velg trinnet bildet startet på, eller prøv igjen senere.",
+      raw_mismatch: "Dette trinnet kan ikke lages nå. Velg trinnet bildet startet på, eller prøv igjen senere.",
+      brightness_failed: "Bildet med valgt lysstyrke kunne ikke lages. Ingenting er endret. Prøv igjen.",
     },
     overrideCode: {
       too_many_lights: "For mange lyskilder er slått på. Slå av noen og prøv igjen.",
@@ -420,7 +437,7 @@ const en: Dictionary = {
     "action.continue": "Continue",
     "action.cancel": "Cancel",
     "action.confirmReject": "Confirm rejection",
-    "action.working": "Sending…",
+    "action.working": "Sending …",
     "action.newImage": "This creates a new image.",
     "action.fireplaceQuestion": "Should the fireplace be lit?",
     "action.fireplaceLit": "Lit",
@@ -577,6 +594,17 @@ const en: Dictionary = {
     "history.loadMore": "Load more",
     "history.loadingMore": "Loading …",
     "action.refresh": "Refresh",
+    "brightness.title": "Brightness",
+    "brightness.step.m2": "Darker",
+    "brightness.step.m1": "Dark",
+    "brightness.step.0": "Standard",
+    "brightness.step.p1": "Light",
+    "brightness.step.p2": "Extra light",
+    "brightness.approved": "Brightness: {step}",
+    "brightness.altStep": "brightness: {step}",
+    "brightness.currentRoundOnly": "Brightness can only be chosen for the current round.",
+    "brightness.invalid": "The brightness was invalid. Choose a step and try again.",
+    "action.approving": "Approving …",
   },
   codes: {
     reviewCode: {
@@ -633,6 +661,10 @@ const en: Dictionary = {
       original_missing: "The original image is missing, so we cannot create a new image.",
       correction_limit: "You have used your rounds.",
       archive_failed: "The new image could not be started. Please try again.",
+      brightness_unavailable: "Brightness cannot be chosen for this job right now. The page has been updated.",
+      raw_missing: "This step cannot be created right now. Choose the step the image started on, or try again later.",
+      raw_mismatch: "This step cannot be created right now. Choose the step the image started on, or try again later.",
+      brightness_failed: "The image with the chosen brightness could not be created. Nothing was changed. Please try again.",
     },
     overrideCode: {
       too_many_lights: "Too many light sources are turned on. Turn some off and try again.",

@@ -41,21 +41,33 @@ function OriginalImage({ url, locale }: { url: string | null; locale: Locale }) 
   return <img src={url} alt={t(locale, "compare.altOriginal")} className={FRAME} />;
 }
 
-function ResultImage({ url, alt, placeholder }: { url: string | null; alt: string; placeholder: ReactNode }) {
+function ResultImage({
+  url,
+  alt,
+  placeholder,
+  onLoad,
+}: {
+  url: string | null;
+  alt: string;
+  placeholder: ReactNode;
+  onLoad?: () => void;
+}) {
   if (url === null) return <>{placeholder}</>;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={url} alt={alt} className={FRAME} />;
+  return <img src={url} alt={alt} className={FRAME} onLoad={onLoad} />;
 }
 
 function Slider({
   originalUrl,
   aiUrl,
   resultAlt,
+  onResultLoad,
   locale,
 }: {
   originalUrl: string;
   aiUrl: string;
   resultAlt: string;
+  onResultLoad?: () => void;
   locale: Locale;
 }) {
   const [value, setValue] = useState(SLIDER_START);
@@ -100,7 +112,7 @@ function Slider({
       onPointerCancel={stopDrag}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={aiUrl} alt={resultAlt} draggable={false} className="block w-full h-auto" />
+      <img src={aiUrl} alt={resultAlt} draggable={false} className="block w-full h-auto" onLoad={onResultLoad} />
       <span className={`${CHIP} right-3`}>{t(locale, "compare.ai")}</span>
       <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - value}% 0 0)` }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -140,6 +152,7 @@ export function CompareViewer({
   originalUrl,
   result,
   placeholder,
+  onResultLoad,
   locale,
 }: {
   originalUrl: string | null;
@@ -147,6 +160,8 @@ export function CompareViewer({
   result: { url: string | null; label: string } | null;
   /** Vises naar den merkede forhaandsvisningen mangler (Lekkasjen L2). */
   placeholder: ReactNode;
+  /** Resultatbildet er lastet (TG-NEW-147: da forhaandslastes de andre trinnene). */
+  onResultLoad?: () => void;
   locale: Locale;
 }) {
   const [mode, setMode] = useState<Mode>("slider");
@@ -176,7 +191,13 @@ export function CompareViewer({
       </div>
 
       {shown === "slider" && originalUrl !== null && result.url !== null && (
-        <Slider originalUrl={originalUrl} aiUrl={result.url} resultAlt={resultAlt} locale={locale} />
+        <Slider
+          originalUrl={originalUrl}
+          aiUrl={result.url}
+          resultAlt={resultAlt}
+          onResultLoad={onResultLoad}
+          locale={locale}
+        />
       )}
 
       {shown === "side" && (
@@ -187,12 +208,14 @@ export function CompareViewer({
           </div>
           <div>
             <p className={`${LABEL} mb-2`}>{t(locale, "review.result")}</p>
-            <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} />
+            <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} onLoad={onResultLoad} />
           </div>
         </div>
       )}
 
-      {shown === "result" && <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} />}
+      {shown === "result" && (
+        <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} onLoad={onResultLoad} />
+      )}
     </div>
   );
 }
