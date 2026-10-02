@@ -10,7 +10,9 @@ import { t, type Locale } from "../lib/i18n";
  * Historikk og Express, og senere under «Pågår» paa /start.
  *
  * Fast boks (3:2, eller kvadrat i Express), saa kortet ikke hopper naar
- * bildet kommer. Dagsbildet faar aldri AI-merkelappen. Symbolet snurrer
+ * bildet kommer. Tekst oppå bildet bare mens jobben lages og ved
+ * peisspoersmaalet; ellers staar statusen i merket ved tittelen. Dagsbildet
+ * faar aldri AI-merkelappen. Symbolet snurrer
  * rolig bare med CSS, og staar stille ved redusert bevegelse; statusen staar
  * alltid som tekst.
  */
@@ -54,10 +56,10 @@ export function JobMedia({
         />
       )}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
-        {view.kind === "placeholder" && !view.overlay.working && (
+        {view.kind === "placeholder" && !view.overlay?.working && (
           <ImageIcon aria-hidden="true" className="h-8 w-8 text-ink-2" />
         )}
-        <StatusChip overlay={view.overlay} locale={locale} />
+        {view.overlay !== null && <StatusChip overlay={view.overlay} locale={locale} />}
       </div>
     </div>
   );

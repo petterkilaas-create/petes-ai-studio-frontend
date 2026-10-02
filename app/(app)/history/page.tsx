@@ -18,7 +18,7 @@ import {
   REVIEWER_REJECTED_TONE,
   serviceLabelKey,
   statusVariant,
-} from "./statusVariants";
+} from "@/app/lib/statusVariants";
 import { OpenReviewLink } from "@/app/components/OpenReviewLink";
 import { JobMedia } from "@/app/components/JobMedia";
 import { isWorking, mediaView, mergeRefresh } from "@/app/lib/jobMedia";

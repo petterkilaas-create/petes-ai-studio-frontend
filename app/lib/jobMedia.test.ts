@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 process.env.NEXT_PUBLIC_API_BASE = "http://api.test";
 const api = await import("./api.ts");
 const { isWorking, mediaView, mergeRefresh, overlayFor, workingKey, workingView } = await import("./jobMedia.ts");
-const { thumbSrc } = await import("../(app)/history/statusVariants.ts");
+const { thumbSrc } = await import("./statusVariants.ts");
 const { DICTIONARIES, t } = await import("./i18n/index.ts");
 
 import type { JobSummary } from "./api.ts";
@@ -88,10 +88,11 @@ test("ventebilde: dagsbildet vises aldri naar resultatet finnes, og aldri for st
   }
 });
 
-test("ventebilde: riktig tekst og symbol for hver status og kode", () => {
+test("ventebilde: tekst oppå bildet bare mens jobben lages og ved peisspoersmaalet", () => {
   const text = (j: JobSummary) => {
     const v = cardView(j);
-    return v.kind === "result" ? null : [nb(v.overlay.key), v.overlay.working];
+    if (v.kind === "result") return "result";
+    return v.overlay === null ? null : [nb(v.overlay.key), v.overlay.working];
   };
   assert.deepEqual(text(job({ status: "queued", originalThumbUrl: null })), ["Lager kveldsbilde …", true]);
   assert.deepEqual(text(job({ status: "running" })), ["Lager kveldsbilde …", true]);
@@ -100,21 +101,31 @@ test("ventebilde: riktig tekst og symbol for hver status og kode", () => {
   for (const code of ["fireplace_present", "fireplace_disagreement", "fireplace_answer_missing"]) {
     assert.deepEqual(text(job({ status: "needs_review", code })), ["Svar på spørsmålet om peisen", false], code);
   }
-  assert.deepEqual(text(job({ status: "needs_review", code: "gate_review" })), ["Til godkjenning", false]);
-  assert.deepEqual(text(job({ status: "failed", code: "rejected_by_reviewer", reason: "For mørkt" })), [
-    "Avvist av deg",
-    false,
-  ]);
-  assert.deepEqual(text(job({ status: "failed", code: "rejected_by_reviewer", isOwner: false })), [
-    "Avvist av eieren",
-    false,
-  ]);
-  assert.deepEqual(text(job({ status: "failed" })), ["Feilet", false]);
-  assert.deepEqual(text(job({ status: "rejected" })), ["Avvist", false]);
-  assert.deepEqual(text(job({ status: "succeeded", originalThumbUrl: null })), ["Godkjent", false]);
-  assert.deepEqual(text(job({ status: "awaiting_approval", originalThumbUrl: null })), ["Til godkjenning", false]);
+  // Ingen dobbel status: avvist, feilet og de andre staar bare i merket ved tittelen.
+  const silent: Partial<JobSummary>[] = [
+    { status: "needs_review", code: "gate_review" },
+    { status: "needs_review", code: null },
+    { status: "failed", code: "rejected_by_reviewer", reason: "For mørkt" },
+    { status: "failed", code: "rejected_by_reviewer", isOwner: false },
+    { status: "failed" },
+    { status: "rejected" },
+    { status: "unknown" },
+    { status: "succeeded", originalThumbUrl: null },
+    { status: "awaiting_approval", originalThumbUrl: null },
+  ];
+  for (const o of silent) {
+    assert.equal(text(job(o)), null, JSON.stringify(o));
+    // Med og uten dagsbildet.
+    assert.equal(text(job({ ...o, originalThumbUrl: null })), null, JSON.stringify(o));
+  }
+  // Avvist: dagsbildet dempet, uten tekst.
+  assert.deepEqual(cardView(job({ status: "failed", code: "rejected_by_reviewer" })), {
+    kind: "original",
+    url: ORIGINAL,
+    overlay: null,
+  });
   // Peis-teksten bare for needs_review.
-  assert.equal(overlayFor(job({ status: "failed", code: "fireplace_present" })).key, "status.failed");
+  assert.equal(overlayFor(job({ status: "failed", code: "fireplace_present" })), null);
 });
 
 test("ventebilde: tekstene finnes paa nb og en, og «Ingen forhåndsvisning» er borte", () => {
