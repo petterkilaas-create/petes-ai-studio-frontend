@@ -195,7 +195,7 @@ test("forsiden og Express: teksten lover ikke video, Veo, HDR eller aarstider", 
   }
   // Teksten staar i ordlista, ikke rett inn i sidene.
   assert.doesNotMatch(read("(app)/express/page.tsx"), /seasonal/i);
-  const home = read("(app)/page.tsx");
+  const home = read("(app)/start/page.tsx");
   for (const key of HOME_KEYS.filter((k) => k.startsWith("home."))) {
     // home.title faar navnet som variabel: t(locale, "home.title", { brand }).
     assert.ok(home.includes(`t(locale, "${key}"`), key);

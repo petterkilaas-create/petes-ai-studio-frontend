@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { brandCssVars, DEFAULT_BRAND, HOUSE_ICON, resolveBrand } from "./brand.ts";
 import { DICTIONARIES, t } from "./i18n/index.ts";
 import { expressCategories, type NavId } from "./services.ts";
+import { jsxBlocks, literalTexts, withoutComments } from "./testing/jsxText.ts";
 
 // Redesign D0 (brief v4 §8, §13). node --test kan ikke laste .tsx, saa
 // globals.css og layout.tsx sjekkes som tekst (som i L0).
@@ -71,15 +72,24 @@ test("globals.css: standardverdiene paa :root er de samme som DEFAULT_BRAND", ()
   }
 });
 
-test("layout.tsx laster begge fontene med next/font, bare som variabler", () => {
-  assert.match(layout, /import\s*\{[^}]*\bGeist\b[^}]*\}\s*from\s*"next\/font\/google"/);
-  assert.match(layout, /import\s*\{[^}]*\bInstrument_Serif\b[^}]*\}\s*from\s*"next\/font\/google"/);
-  assert.match(layout, /variable:\s*"--font-instrument-serif"/);
-  assert.match(layout, /variable:\s*"--font-geist"/);
-  assert.match(layout, /instrumentSerif\.variable/);
-  assert.match(layout, /geist\.variable/);
-  assert.doesNotMatch(layout, /(instrumentSerif|geist)\.className/, ".className bytter font (synlig)");
-  assert.match(layout, /brandCssVars\(/);
+test("fontene lastes med next/font i lib/fonts.ts, bare som variabler, og alle rot-layoutene bruker dem", () => {
+  // MS2: én definisjon (font.md «Using a font definitions file»), delt av
+  // appen, markedssiden og 404-siden.
+  const fonts = read("lib/fonts.ts");
+  assert.match(fonts, /import\s*\{[^}]*\bGeist\b[^}]*\}\s*from\s*"next\/font\/google"/);
+  assert.match(fonts, /import\s*\{[^}]*\bInstrument_Serif\b[^}]*\}\s*from\s*"next\/font\/google"/);
+  assert.match(fonts, /variable:\s*"--font-instrument-serif"/);
+  assert.match(fonts, /variable:\s*"--font-geist"/);
+  assert.match(fonts, /export const fontVariables = `\$\{instrumentSerif\.variable\} \$\{geist\.variable\}`;/);
+  assert.doesNotMatch(fonts, /(instrumentSerif|geist)\.className/, ".className bytter font (synlig)");
+  for (const rel of ["(app)/layout.tsx", "(marketing)/layout.tsx", "global-not-found.tsx"]) {
+    const src = read(rel);
+    assert.match(src, /<html lang="(no|nb)" className=\{fontVariables\}/, rel);
+    assert.match(src, /brandCssVars\(/, rel);
+    assert.match(src, /import "(@\/app\/|\.\/)globals\.css";/, rel);
+    assert.doesNotMatch(src, /next\/font/, `${rel}: fontene lastes bare i lib/fonts.ts`);
+  }
+  assert.match(layout, /import \{ fontVariables \} from "@\/app\/lib\/fonts";/);
 });
 
 /** Alle .ts/.tsx under app/, uten testfilene. */
@@ -99,14 +109,16 @@ function sourceFiles(dir = APP_DIR): string[] {
 // bare i brand.ts, saa et foretak kan bytte navnet uten kodeendring.
 const BRAND_NAMES = [...new Set([DEFAULT_BRAND.displayName, "Husvy", "The Studio"])];
 
-test("merkenavnet staar bare i brand.ts, ikke i .ts eller .tsx under app/", () => {
-  // Hele fila, ogsaa kommentarer. Testfilene er unntatt.
+test("merkenavnet staar bare i brand.ts, ikke i .ts eller .tsx under app/ eller content/", () => {
+  // Hele fila, ogsaa kommentarer. Testfilene er unntatt. content/ (MS2):
+  // innholdet paa markedssiden bruker {brand}.
   const brandFile = join(APP_DIR, "lib", "brand.ts");
+  const contentDir = join(REPO_DIR, "content");
   for (const name of BRAND_NAMES) {
-    const hits = sourceFiles()
+    const hits = [...sourceFiles(), ...sourceFiles(contentDir)]
       .filter((f) => f !== brandFile)
       .filter((f) => readFileSync(f, "utf8").toLowerCase().includes(name.toLowerCase()))
-      .map((f) => relative(APP_DIR, f));
+      .map((f) => relative(REPO_DIR, f));
     assert.deepEqual(hits, [], name);
   }
 });
@@ -159,6 +171,7 @@ test("D1: listen over aktive filer har skallet, sidene og komponentene", () => {
   for (const f of [
     "(app)/layout.tsx",
     "(app)/page.tsx",
+    "(app)/start/page.tsx",
     "globals.css",
     "(app)/express/page.tsx",
     "(app)/history/page.tsx",
@@ -319,7 +332,7 @@ test("D1: produktnavnet staar ikke i ordlista (kommer fra brand.ts)", () => {
       }
     }
   }
-  assert.match(read("(app)/page.tsx"), /t\(locale, "home\.title", \{ brand: brand\.displayName \}\)/);
+  assert.match(read("(app)/start/page.tsx"), /t\(locale, "home\.title", \{ brand: brand\.displayName \}\)/);
 });
 
 test("D1: testene for annonseteksten og lekkasjevernet er uendret", () => {
@@ -339,30 +352,12 @@ test("D1: testene for annonseteksten og lekkasjevernet er uendret", () => {
 // D1c: Express-tekstene via ordlista (brief §7), uten metaforer og steg-nummer.
 // ---------------------------------------------------------------------------
 
-/** Kildekoden uten kommentarer (kommentarer og parameternavn er ikke synlig tekst). */
-function withoutComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-}
-
 /** JSX-delen av komponenten: fra `return (` i default-eksporten/komponenten. */
 function jsxOf(rel: string, fn: string): string {
   const src = withoutComments(read(rel));
   const start = src.indexOf("return (", src.indexOf(fn));
   assert.ok(start >= 0, rel);
   return src.slice(start);
-}
-
-/** Synlig tekst skrevet rett inn: tekst mellom tagger og tekst-attributter. */
-function literalTexts(jsx: string): string[] {
-  const between = [...jsx.matchAll(/(?<!=)>([^<>{}]*)(?=<|\{)/g)]
-    .map((m) => m[1].trim())
-    // Kode etter en selvlukkende tag (f.eks. `/>) : x === "y" ? (`) er ikke tekst.
-    .filter((text) => /\p{L}/u.test(text) && !/^[)}:?&|]|===/.test(text));
-  const attrs = [...jsx.matchAll(/\b(?:alt|title|placeholder|aria-label)="([^"]*)"/g)].map((m) => m[1]);
-  // Strenger i uttrykk som ser ut som tekst (stor forbokstav), f.eks. {busy ? "Running..." : "Run"}.
-  // Klasser, statuser og noekler i ordlista starter med liten bokstav.
-  const strings = [...jsx.matchAll(/"(\p{Lu}[^"]*)"/gu)].map((m) => m[1]);
-  return [...between, ...attrs, ...strings];
 }
 
 const EXPRESS_JSX: [string, string][] = [
@@ -491,13 +486,6 @@ test("D2a: slideren kan styres uten aa dra (WCAG 2.5.7) og har rolle og verdier"
   assert.match(src, /alt=\{aiAlt\}|alt=\{resultAlt\}/);
   assert.match(src, /t\(locale, "compare\.ai"\)/);
 });
-
-/** Alle JSX-blokkene i en fil: `return ( … );` over flere linjer og `return <…>;` paa en linje. */
-function jsxBlocks(src: string): string[] {
-  const multi = [...src.matchAll(/return \(\n([\s\S]*?)\n\s*\);/g)].map((m) => m[1]);
-  const single = [...src.matchAll(/return (<[^\n]*>);/g)].map((m) => m[1]);
-  return [...multi, ...single];
-}
 
 test("D2a: komponentene har ingen synlig tekst skrevet rett inn", () => {
   const files = GODKJENNING_COMPONENTS.filter((f) => f.endsWith(".tsx"));
