@@ -52,7 +52,7 @@ export default function Home() {
     <main className="mx-auto w-full max-w-6xl px-4 py-12 md:px-8 md:py-20">
       <div className="mb-12 max-w-2xl">
         <h1 className="font-display text-[40px] leading-[1.05] text-ink md:text-[56px]">
-          {t(locale, "home.title", { name: brand.displayName })}
+          {t(locale, "home.title", { brand: brand.displayName })}
         </h1>
         <p className="mt-4 text-base leading-relaxed text-ink-2">{t(locale, "home.intro")}</p>
       </div>

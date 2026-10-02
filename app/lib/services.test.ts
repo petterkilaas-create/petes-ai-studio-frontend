@@ -194,7 +194,7 @@ test("forsiden og Express: teksten lover ikke video, Veo, HDR eller aarstider", 
   assert.doesNotMatch(read("express/page.tsx"), /seasonal/i);
   const home = read("page.tsx");
   for (const key of HOME_KEYS.filter((k) => k.startsWith("home."))) {
-    // home.title faar navnet som variabel: t(locale, "home.title", { name }).
+    // home.title faar navnet som variabel: t(locale, "home.title", { brand }).
     assert.ok(home.includes(`t(locale, "${key}"`), key);
   }
   assert.ok(read("express/page.tsx").includes(`t(locale, "express.subtitle")`));

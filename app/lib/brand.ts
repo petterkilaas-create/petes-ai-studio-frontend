@@ -18,10 +18,21 @@ export type BrandColors = {
   accent: string;
 };
 
+/** Strek-ikon i en 24x24-rute, tegnet med currentColor (BrandMark, app/icon.svg). */
+export type BrandIcon = {
+  viewBox: string;
+  strokeWidth: number;
+  paths: readonly string[];
+  circles: readonly { cx: number; cy: number; r: number }[];
+};
+
 export type Brand = {
   displayName: string;
-  /** url null: vis monogrammet i en rute. */
-  logo: { url: string | null; monogram: string };
+  /**
+   * url: foretakets logo. icon: standardmerkets ikon, bare naar navnet og
+   * logoen er standard. Begge null: bare navnet vises.
+   */
+  logo: { url: string | null; icon: BrandIcon | null };
   colors: BrandColors;
 };
 
@@ -31,9 +42,17 @@ export const PAPER = "#F4F2ED";
 /** WCAG AA for vanlig tekst (brief §3 punkt 8). */
 export const MIN_CONTRAST = 4.5;
 
+/** Husikonet fra designutkastet (MARKEDSSIDE_UTKAST, linje 28-31). */
+export const HOUSE_ICON: BrandIcon = {
+  viewBox: "0 0 24 24",
+  strokeWidth: 1.8,
+  paths: ["M4 20.5V10.5L12 3.5L20 10.5V20.5", "M4 20.5H20"],
+  circles: [{ cx: 12, cy: 12, r: 2.2 }],
+};
+
 export const DEFAULT_BRAND: Brand = {
-  displayName: "The Studio",
-  logo: { url: null, monogram: "P" },
+  displayName: "Husvy",
+  logo: { url: null, icon: HOUSE_ICON },
   colors: { primary: "#1D1C1A", onPrimary: "#FFFFFF", accent: "#1D1C1A" },
 };
 
@@ -74,6 +93,8 @@ export type BrandInput = {
 /**
  * Et foretaks merke, validert. Ugyldige verdier gir standardverdien, aldri
  * en feil i UI:
+ * - ikonet hoerer til standardmerket: et foretak med eget navn eller egen
+ *   logo faar ikke ikonet (uten logo vises bare navnet).
  * - primary og onPrimary er et par: ugyldig hex, under 4,5:1 seg imellom
  *   eller primary under 4,5:1 mot paper gir standardparet.
  * - accent under 4,5:1 mot paper gir standard-accent.
@@ -100,7 +121,7 @@ export function resolveBrand(input: BrandInput | null | undefined): Brand {
 
   return {
     displayName: name ? name : d.displayName,
-    logo: logoUrl ? { url: logoUrl, monogram: d.logo.monogram } : d.logo,
+    logo: logoUrl ? { url: logoUrl, icon: null } : name ? { url: null, icon: null } : d.logo,
     colors: { primary: pair.primary, onPrimary: pair.onPrimary, accent },
   };
 }

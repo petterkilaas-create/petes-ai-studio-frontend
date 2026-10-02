@@ -5,8 +5,8 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { brandCssVars, DEFAULT_BRAND } from "./brand.ts";
-import { DICTIONARIES } from "./i18n/index.ts";
+import { brandCssVars, DEFAULT_BRAND, HOUSE_ICON, resolveBrand } from "./brand.ts";
+import { DICTIONARIES, t } from "./i18n/index.ts";
 import { expressCategories, type NavId } from "./services.ts";
 
 // Redesign D0 (brief v4 §8, §13). node --test kan ikke laste .tsx, saa
@@ -93,11 +93,20 @@ function sourceFiles(dir = APP_DIR): string[] {
   return out;
 }
 
-test("visningsnavnet staar ikke skrevet rett inn i .tsx (kommer fra brand.ts)", () => {
-  const hits = sourceFiles()
-    .filter((f) => f.endsWith(".tsx"))
-    .filter((f) => readFileSync(f, "utf8").includes(DEFAULT_BRAND.displayName));
-  assert.deepEqual(hits, []);
+// Dagens og tidligere merkenavn. Ingen av dem staar i koden eller ordlista,
+// bare i brand.ts, saa et foretak kan bytte navnet uten kodeendring.
+const BRAND_NAMES = [...new Set([DEFAULT_BRAND.displayName, "Husvy", "The Studio"])];
+
+test("merkenavnet staar bare i brand.ts, ikke i .ts eller .tsx under app/", () => {
+  // Hele fila, ogsaa kommentarer. Testfilene er unntatt.
+  const brandFile = join(APP_DIR, "lib", "brand.ts");
+  for (const name of BRAND_NAMES) {
+    const hits = sourceFiles()
+      .filter((f) => f !== brandFile)
+      .filter((f) => readFileSync(f, "utf8").toLowerCase().includes(name.toLowerCase()))
+      .map((f) => relative(APP_DIR, f));
+    assert.deepEqual(hits, [], name);
+  }
 });
 
 test("«Gavl» finnes ingen steder i repoet", () => {
@@ -196,9 +205,7 @@ test("D1: komponentene bruker tokenene, ikke hex eller vilkaarlige farger", () =
 
 test("D1: skallet bruker merket fra brand.ts, og metadata har fanetittelen", () => {
   assert.match(layout, /const brand = DEFAULT_BRAND;/);
-  assert.match(layout, /\{brand\.displayName\}/);
-  assert.match(layout, /brand\.logo\.url/);
-  assert.match(layout, /brand\.logo\.monogram/);
+  assert.match(layout, /<BrandMark brand=\{brand\} \/>/);
   assert.match(layout, /export const metadata: Metadata = \{/);
   assert.match(layout, /title: \{ default: brand\.displayName, template: `%s · \$\{brand\.displayName\}` \}/);
   assert.match(layout, /<AppNav \/>/);
@@ -285,7 +292,7 @@ test("D1: ordlista har de nye ordene paa nb og en", () => {
       assert.ok(typeof ui[key] === "string" && ui[key].trim().length > 0, `${locale} ${key}`);
       assert.doesNotMatch(ui[key], EMOJI, `${locale} ${key}`);
     }
-    assert.match(ui["home.title"], /\{name\}/, locale);
+    assert.match(ui["home.title"], /\{brand\}/, locale);
   }
   const nb = DICTIONARIES.nb.ui;
   assert.equal(nb["service.scene_transform"], "Kveldsbilde");
@@ -300,10 +307,12 @@ test("D1: ordlista har de nye ordene paa nb og en", () => {
 test("D1: produktnavnet staar ikke i ordlista (kommer fra brand.ts)", () => {
   for (const locale of ["nb", "en"] as const) {
     for (const [key, text] of Object.entries(DICTIONARIES[locale].ui)) {
-      assert.ok(!text.includes(DEFAULT_BRAND.displayName), `${locale} ${key}`);
+      for (const name of BRAND_NAMES) {
+        assert.ok(!text.toLowerCase().includes(name.toLowerCase()), `${locale} ${key}: ${name}`);
+      }
     }
   }
-  assert.match(read("page.tsx"), /t\(locale, "home\.title", \{ name: brand\.displayName \}\)/);
+  assert.match(read("page.tsx"), /t\(locale, "home\.title", \{ brand: brand\.displayName \}\)/);
 });
 
 test("D1: testene for annonseteksten og lekkasjevernet er uendret", () => {
@@ -634,4 +643,86 @@ test("D2c: overskriften heter «Lys som tennes» i alle tilstander", () => {
   const mood = withoutComments(read("components/godkjenning/MoodPanel.tsx"));
   assert.match(mood, /t\(locale, "review\.lightsLit"\)/);
   assert.doesNotMatch(mood, /status/);
+});
+
+// ---------------------------------------------------------------------------
+// Dag 35: merket (white label, brief §13). Navn, logo og ikon kommer bare fra
+// brand.ts. Et foretak bytter dem uten kodeendring.
+// ---------------------------------------------------------------------------
+
+test("merke: ingen synlig «Studio» i ordlista eller i .tsx", () => {
+  for (const locale of ["nb", "en"] as const) {
+    for (const [key, text] of Object.entries(DICTIONARIES[locale].ui)) {
+      assert.doesNotMatch(text, /\bstudio\b/i, `${locale} ${key}`);
+    }
+  }
+  // Uten kommentarer. Navn som openCanvasStudio er ikke et eget ord.
+  for (const f of sourceFiles().filter((f) => f.endsWith(".tsx"))) {
+    assert.doesNotMatch(withoutComments(readFileSync(f, "utf8")), /\bstudio\b/i, relative(APP_DIR, f));
+  }
+});
+
+test("merke: tekster som nevner merket, bruker {brand}", () => {
+  for (const locale of ["nb", "en"] as const) {
+    const ui = DICTIONARIES[locale].ui;
+    assert.match(ui["home.title"], /\{brand\}/, locale);
+    // Ingen tekst har navnet som annen plassholder.
+    for (const [key, text] of Object.entries(ui)) assert.doesNotMatch(text, /\{name\}/, `${locale} ${key}`);
+  }
+});
+
+test("merke: et foretak med eget navn faar det i tittelen, i toppen og i tekstene", () => {
+  const brand = resolveBrand({ displayName: "Kjeden Bolig" });
+  assert.equal(brand.displayName, "Kjeden Bolig");
+  for (const locale of ["nb", "en"] as const) {
+    const title = t(locale, "home.title", { brand: brand.displayName });
+    assert.ok(title.includes("Kjeden Bolig"), title);
+    assert.ok(!title.includes(DEFAULT_BRAND.displayName), title);
+  }
+  // Tittelen og toppen leser bare fra merket (sjekkes som tekst, som i D1).
+  assert.match(layout, /title: \{ default: brand\.displayName, template: `%s · \$\{brand\.displayName\}` \}/);
+  assert.match(layout, /<BrandMark brand=\{brand\} \/>/);
+  const mark = withoutComments(read("components/BrandMark.tsx"));
+  assert.match(mark, /\{brand\.displayName\}/);
+  assert.match(mark, /const \{ url, icon \} = brand\.logo;/);
+  // alt="" paa logoen er riktig: navnet staar ved siden av.
+  assert.deepEqual(literalTexts(mark).filter(Boolean), []);
+});
+
+test("merke: husikonet staar bare i brand.ts, og BrandMark tegner det fra merket", () => {
+  const mark = withoutComments(read("components/BrandMark.tsx"));
+  // Ingen stier eller sirkler skrevet rett inn.
+  assert.doesNotMatch(mark, /\bd="|\b(?:cx|cy|r)="/);
+  assert.match(mark, /icon\.paths\.map/);
+  assert.match(mark, /icon\.circles\.map/);
+  assert.match(mark, /stroke="currentColor"/);
+  for (const d of HOUSE_ICON.paths) {
+    const hits = sourceFiles()
+      .filter((f) => readFileSync(f, "utf8").includes(d))
+      .map((f) => relative(APP_DIR, f));
+    assert.deepEqual(hits, ["lib/brand.ts"], d);
+  }
+});
+
+test("merke: uten logo og ikon vises navnet ogsaa paa smal skjerm", () => {
+  const mark = withoutComments(read("components/BrandMark.tsx"));
+  assert.match(mark, /const hasMark = Boolean\(url \|\| icon\);/);
+  assert.match(mark, /\$\{hasMark \? "sr-only sm:not-sr-only " : ""\}/);
+});
+
+test("merke: icon.svg er husikonet fra brand.ts, og apple-icon.png er 180 px", () => {
+  const svg = read("icon.svg");
+  assert.deepEqual([...svg.matchAll(/<path d="([^"]+)"/g)].map((m) => m[1]), [...HOUSE_ICON.paths]);
+  assert.deepEqual(
+    [...svg.matchAll(/<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)].map((m) => ({ cx: +m[1], cy: +m[2], r: +m[3] })),
+    [...HOUSE_ICON.circles]
+  );
+  assert.match(svg, new RegExp(`viewBox="${HOUSE_ICON.viewBox}"`));
+  assert.match(svg, new RegExp(`stroke-width="${HOUSE_ICON.strokeWidth}"`));
+  // PNG: bredde og hoeyde staar i IHDR, byte 16-23.
+  const png = readFileSync(join(APP_DIR, "apple-icon.png"));
+  assert.equal(png.readUInt32BE(16), 180);
+  assert.equal(png.readUInt32BE(20), 180);
+  // Bare ett ikon i fanen: standard-favicon fra create-next-app er fjernet.
+  assert.ok(!readdirSync(APP_DIR).includes("favicon.ico"));
 });

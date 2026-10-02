@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { brandCssVars, contrastRatio, DEFAULT_BRAND, MIN_CONTRAST, PAPER, resolveBrand } from "./brand.ts";
+import { brandCssVars, contrastRatio, DEFAULT_BRAND, HOUSE_ICON, MIN_CONTRAST, PAPER, resolveBrand } from "./brand.ts";
 
 // Redesign D0 (brief v4 §13, §3 punkt 8): merket fra ett sted, med
 // kontrastsjekk paa fargene et foretak kan overstyre.
@@ -35,12 +35,12 @@ test("DEFAULT_BRAND bestaar selv valideringen", () => {
 
 test("resolveBrand godtar et merke med god kontrast", () => {
   const b = resolveBrand({
-    displayName: "Kjeden Studio",
+    displayName: "Kjeden Bolig",
     logoUrl: "https://example.com/logo.svg",
     colors: { primary: "#0b3d91", onPrimary: "#fff", accent: "#7A1F5C" },
   });
-  assert.equal(b.displayName, "Kjeden Studio");
-  assert.equal(b.logo.url, "https://example.com/logo.svg");
+  assert.equal(b.displayName, "Kjeden Bolig");
+  assert.deepEqual(b.logo, { url: "https://example.com/logo.svg", icon: null });
   assert.deepEqual(b.colors, { primary: "#0B3D91", onPrimary: "#FFFFFF", accent: "#7A1F5C" });
 });
 
@@ -70,4 +70,17 @@ test("brandCssVars gir de tre overstyrbare variablene", () => {
     "--brand-on-primary": "#FFFFFF",
     "--brand-accent": "#1D1C1A",
   });
+});
+
+test("husikonet hoerer til standardmerket, ikke til et foretak", () => {
+  assert.equal(DEFAULT_BRAND.logo.icon, HOUSE_ICON);
+  assert.equal(DEFAULT_BRAND.logo.url, null);
+  // Uten eget navn og logo (ogsaa med egne farger): standardmerket med ikonet.
+  assert.equal(resolveBrand(null).logo.icon, HOUSE_ICON);
+  assert.equal(resolveBrand({ colors: { accent: "#7A1F5C" } }).logo.icon, HOUSE_ICON);
+  assert.equal(resolveBrand({ displayName: "  ", logoUrl: "" }).logo.icon, HOUSE_ICON);
+  // Eget navn uten logo: bare navnet.
+  assert.deepEqual(resolveBrand({ displayName: "Kjeden Bolig" }).logo, { url: null, icon: null });
+  // Egen logo, med eller uten eget navn: logoen, aldri ikonet.
+  assert.deepEqual(resolveBrand({ logoUrl: "https://example.com/l.svg" }).logo, { url: "https://example.com/l.svg", icon: null });
 });

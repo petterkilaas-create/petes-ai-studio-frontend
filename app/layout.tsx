@@ -4,6 +4,7 @@ import { ClerkProvider, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { Geist, Instrument_Serif } from "next/font/google";
 import { AppNav } from "./components/AppNav";
+import { BrandMark } from "./components/BrandMark";
 import { brandCssVars, DEFAULT_BRAND } from "./lib/brand";
 
 // Fontene lastes ned ved bygg og serveres fra oss (D0), og er i bruk fra D1:
@@ -27,7 +28,8 @@ const geist = Geist({
 const brand = DEFAULT_BRAND;
 
 // Fanetittel: visningsnavnet, og «Side · navn» der ruten har egen tittel
-// (express/, history/ og godkjenning/ har en liten layout.tsx).
+// (express/, history/ og godkjenning/ har en liten layout.tsx). Ikonene er
+// filene icon.svg og apple-icon.png i app/ (husikonet fra brand.ts).
 export const metadata: Metadata = {
   title: { default: brand.displayName, template: `%s · ${brand.displayName}` },
 };
@@ -44,15 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   href="/"
                   className="flex min-h-11 shrink-0 items-center gap-3 rounded-button focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                 >
-                  {brand.logo.url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={brand.logo.url} alt="" className="h-9 w-auto" />
-                  ) : (
-                    <span aria-hidden className="flex size-9 items-center justify-center rounded-button bg-primary font-display text-xl text-on-primary">
-                      {brand.logo.monogram}
-                    </span>
-                  )}
-                  <span className="sr-only sm:not-sr-only text-[15px] font-medium text-ink">{brand.displayName}</span>
+                  <BrandMark brand={brand} />
                 </Link>
                 <AppNav />
               </div>
