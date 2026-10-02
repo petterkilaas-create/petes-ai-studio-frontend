@@ -42,6 +42,8 @@ const TOKENS_8: Record<string, string> = {
   "neutral-fg": "#4F4A43",
   "red-bg": "#F6DEDB",
   "red-fg": "#8A1F17",
+  // MS3b (Petter 02.10): kveldsblaatt fra utkastet, fast og ikke en merkefarge.
+  night: "#101A2C",
 };
 
 test("globals.css: alle tokenene i §8 finnes i @theme med riktig verdi", () => {
@@ -702,7 +704,12 @@ test("merke: husikonet staar bare i brand.ts, og BrandMark tegner det fra merket
 test("merke: uten logo og ikon vises navnet ogsaa paa smal skjerm", () => {
   const mark = withoutComments(read("components/BrandMark.tsx"));
   assert.match(mark, /const hasMark = Boolean\(url \|\| icon\);/);
-  assert.match(mark, /\$\{hasMark \? "sr-only sm:not-sr-only " : ""\}/);
+  // MS3b: markedssiden viser navnet alltid (alwaysShowName); appen og 404 som foer.
+  assert.match(mark, /alwaysShowName = false/);
+  assert.match(mark, /const hideNameOnSmall = hasMark && !alwaysShowName;/);
+  assert.match(mark, /\$\{hideNameOnSmall \? "sr-only sm:not-sr-only " : ""\}/);
+  assert.match(read("(app)/layout.tsx"), /<BrandMark brand=\{brand\} \/>/);
+  assert.match(read("global-not-found.tsx"), /<BrandMark brand=\{brand\} \/>/);
 });
 
 test("merke: icon.svg er husikonet fra brand.ts, og apple-icon.png er 180 px", () => {

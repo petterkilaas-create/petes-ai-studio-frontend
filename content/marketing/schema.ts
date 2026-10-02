@@ -36,6 +36,9 @@ export type ImagePlaceholder = { placeholder: string; alt: string; pending: "ima
 
 export type Picture = ImageRef | ImagePlaceholder;
 
+/** En verdi vi ikke har ennaa, for eksempel e-posten ([E-POST]) eller tiden ([TID]). */
+export type PendingValue = { pending: PendingKey };
+
 /** En tekst som kan vente paa avklaring (merkelappen vises etter teksten). */
 export type Claim = { text: string; pending?: PendingKey };
 
@@ -65,10 +68,24 @@ export type Site = {
   };
   /** «Prøv gratis»: ett sted, brukt i topplinjen og toppen (senere priser og siste knapp). */
   cta: Link;
+  /**
+   * Alle tall paa markedssiden staar her og bare her (MS3, regel 1). Tekstene
+   * er maler; «ca. 116 kr per bilde» og svaret om pris regnes ut i offer.ts.
+   */
   offer: {
-    /** Antall gratis kveldsbilder ved registrering. Tallet staar bare her. */
+    /** Antall gratis kveldsbilder ved registrering. */
     freeImages: number;
+    /** Antall kveldsbilder i pakken. */
+    bundleCount: number;
+    /** Priser i kroner eks. mva. */
+    prices: { free: number; single: number; bundle: number; privacyBlur: number };
+    copyrightYear: number;
   };
+  contact: {
+    email: string | PendingValue;
+  };
+  /** Bunnen (MS3b, utkastet linje 405-444). Ankeret er maalet for «Snakk med oss». */
+  footer: Footer;
   /** Merkelappene for det som venter (MS3). Vises bare mens siden er bak innlogging. */
   pendingLabels: Record<PendingKey, string>;
   /** Teksten i en bildeplassholder, over beskrivelsen. */
@@ -170,6 +187,120 @@ export type Services = {
   }[];
 };
 
+/**
+ * Merkingen (MS3b, utkastet linje 247-266). Eksempelet paa teksten til
+ * annonsen lagres som koder og lages med produktets funksjon
+ * (app/lib/disclosure.ts), saa siden aldri viser en annen tekst enn den
+ * megleren faar.
+ */
+export type Labeling = {
+  _type: "labeling";
+  anchor: string;
+  eyebrow: string;
+  title: string;
+  lead: string;
+  points: readonly Claim[];
+  /** Guiden finnes ikke ennaa (MS5): uten href. */
+  guide: MaybeLink;
+  picture: Picture;
+  example: {
+    title: string;
+    /** Kodene i review.disclosure (KONTRAKT_MERKING). */
+    base: string;
+    time: string;
+    edited: readonly string[];
+    note: string;
+  };
+};
+
+/** Den aerlige versjonen (MS3b, utkastet linje 272-282). */
+export type Honest = {
+  _type: "honest";
+  title: string;
+  lead: string;
+  points: readonly string[];
+};
+
+/**
+ * Prisene (MS3b, utkastet linje 287-339). Ingen tall i tekstene: {price},
+ * {n} og {perImage} fylles fra site.offer (offer.ts).
+ */
+export type Pricing = {
+  _type: "pricing";
+  anchor: string;
+  title: string;
+  note: string;
+  /** Mal med {price}. */
+  priceFormat: string;
+  free: { name: string; text: string; features: readonly string[] };
+  single: { name: string; unit: string; text: string; features: readonly string[]; ctaLabel: string };
+  bundle: {
+    /** Mal med {n}. */
+    name: string;
+    badge: string;
+    unit: string;
+    /** Mal med {perImage}. */
+    text: string;
+    features: readonly string[];
+    ctaLabel: string;
+  };
+  /** Mal med {price}. */
+  addOn: string;
+  chains: {
+    anchor: string;
+    eyebrow: string;
+    title: string;
+    text: string;
+    points: readonly string[];
+    cta: Link;
+  };
+};
+
+/** Spoersmaal og svar paa forsiden (MS3b). Spoersmaalene ligger i faq.ts. */
+export type FaqBlock = {
+  _type: "faq";
+  anchor: string;
+  title: string;
+  /** Mal med {email}. */
+  lead: string;
+};
+
+/**
+ * Ett spoersmaal (faq.ts, Sanity: egen dokumenttype). `a` er null naar
+ * svaret venter (pending). Plassene i svaret ({time}) fylles fra `slots`
+ * eller fra prisene (offer.ts).
+ */
+export type FaqItem = {
+  id: string;
+  q: string;
+  a: string | null;
+  pending?: PendingKey;
+  slots?: Record<string, PendingValue>;
+  showOnHome: boolean;
+};
+
+/** Siste knapp (MS3b, utkastet linje 392-398). */
+export type FinalCta = {
+  _type: "finalCta";
+  title: string;
+  /** Mal med {n}. */
+  text: string;
+  secondary: Link;
+};
+
+/** Bunnen (MS3b, utkastet linje 405-444). */
+export type Footer = {
+  _type: "footer";
+  anchor: string;
+  tagline: string;
+  columns: readonly { title: string; links: readonly MaybeLink[] }[];
+  contact: { title: string; links: readonly Link[] };
+  /** Mal med {year} og {companyName}. */
+  copyright: string;
+  companyName: string | PendingValue;
+  note: string;
+};
+
 export type Home = {
   _type: "home";
   hero: Hero;
@@ -178,4 +309,9 @@ export type Home = {
   moods: Moods;
   steps: Steps;
   services: Services;
+  labeling: Labeling;
+  honest: Honest;
+  pricing: Pricing;
+  faq: FaqBlock;
+  finalCta: FinalCta;
 };

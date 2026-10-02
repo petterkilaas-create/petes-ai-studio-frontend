@@ -15,10 +15,12 @@ import {
 import { literalTextsInFile, withoutComments } from "../../app/lib/testing/jsxText.ts";
 import { DUSK_SKY_BY_TIME, DEFAULT_DUSK } from "../../app/lib/dusk.ts";
 import { DICTIONARIES } from "../../app/lib/i18n/index.ts";
+import { DISCLOSURE_DETAIL, DISCLOSURE_LOCALE, disclosureText } from "../../app/lib/disclosure.ts";
 import { tabKey } from "../../app/lib/tabs.ts";
-import { fill } from "./fill.ts";
-import { getHome, getSite } from "./index.ts";
+import { fill, fillParts } from "./fill.ts";
+import { getFaq, getHome, getSite } from "./index.ts";
 import { contentAnchors, visibleLinks } from "./links.ts";
+import { formatNok, perImage, priceVars } from "./offer.ts";
 import { pendingItems } from "./pending.ts";
 
 // MS2: markedssiden (skall, innholdsfil og toppen), /start, proxyen og 404.
@@ -31,6 +33,7 @@ const read = (rel: string) => readFileSync(join(REPO_DIR, rel), "utf8");
 
 const site = getSite("no");
 const home = getHome("no");
+const faq = getFaq("no");
 
 /** Alle .ts/.tsx i en mappe (rekursivt), uten testfilene. Relativt til repoet. */
 function filesIn(rel: string, ext = /\.tsx?$/): string[] {
@@ -61,6 +64,25 @@ function strings(value: unknown, path = ""): [string, string][] {
   }
   return [];
 }
+
+/**
+ * Plassene malene i innholdet kan ha. MS3b: prisene og antallene (offer.ts),
+ * e-posten, tiden, aarstallet og selskapsnavnet (de tre siste venter).
+ */
+const TEMPLATE_KEYS = [
+  "brand",
+  "n",
+  "price",
+  "perImage",
+  "single",
+  "bundle",
+  "bundleCount",
+  "privacyBlur",
+  "email",
+  "time",
+  "year",
+  "companyName",
+];
 
 // ---------------------------------------------------------------------------
 // Ingen tekst i JSX
@@ -126,7 +148,7 @@ test("MS2: innholdet har alle feltene, og alle har tekst", () => {
   for (const [path, text] of all) assert.ok(text.trim().length > 0, path);
   // Bare kjente plassholdere, saa ingen {x} blir staaende paa siden.
   for (const [path, text] of all) {
-    for (const m of text.matchAll(/\{(\w+)\}/g)) assert.ok(["brand", "n"].includes(m[1]), `${path}: {${m[1]}}`);
+    for (const m of text.matchAll(/\{(\w+)\}/g)) assert.ok(TEMPLATE_KEYS.includes(m[1]), `${path}: {${m[1]}}`);
   }
 });
 
@@ -215,7 +237,8 @@ test("MS2: markedssiden og 404 bruker standardmerket via BrandMark, aldri resolv
     assert.match(src, /const brand = DEFAULT_BRAND;/, f);
     assert.doesNotMatch(src, /resolveBrand/, f);
   }
-  assert.match(read("app/components/marketing/MarketingTopBar.tsx"), /<BrandMark brand=\{brand\} \/>/);
+  // MS3b: navnet vises alltid paa markedssiden, ogsaa i smalt vindu (Petter 02.10).
+  assert.match(read("app/components/marketing/MarketingTopBar.tsx"), /<BrandMark brand=\{brand\} alwaysShowName \/>/);
   assert.match(read("app/global-not-found.tsx"), /<BrandMark brand=\{brand\} \/>/);
   for (const f of MARKETING_TSX) assert.doesNotMatch(withoutComments(read(f)), /resolveBrand/, f);
   // Tekster som nevner merket, bruker {brand}.
@@ -387,14 +410,26 @@ test("MS3a: de nye komponentene er med i teksttesten (ingen synlig tekst i JSX)"
 });
 
 test("MS3a: seksjonene finnes i utkastets rekkefoelge, med tekst og riktig _type", () => {
-  assert.deepEqual(Object.keys(home), ["_type", "hero", "trustStrip", "examples", "moods", "steps", "services"]);
-  for (const key of ["trustStrip", "examples", "moods", "steps", "services"] as const) {
-    assert.equal(home[key]._type, key, key);
-  }
+  const blocks = ["trustStrip", "examples", "moods", "steps", "services", "labeling", "honest", "pricing", "faq", "finalCta"] as const;
+  assert.deepEqual(Object.keys(home), ["_type", "hero", ...blocks]);
+  for (const key of blocks) assert.equal(home[key]._type, key, key);
+  assert.equal(site.footer._type, "footer");
   const page = withoutComments(read("app/(marketing)/no/page.tsx"));
-  const order = ["<Hero ", "<TrustStrip ", "<Examples ", "<Moods ", "<Steps ", "<Services "].map((tag) =>
-    page.indexOf(tag)
-  );
+  const order = [
+    "<Hero ",
+    "<TrustStrip ",
+    "<Examples ",
+    "<Moods ",
+    "<Steps ",
+    "<Services ",
+    "<Labeling ",
+    "<Honest ",
+    "<Pricing ",
+    "<Faq ",
+    "<FinalCta ",
+    "</main>",
+    "<Footer ",
+  ].map((tag) => page.indexOf(tag));
   assert.ok(order.every((i, n) => i > 0 && (n === 0 || i > order[n - 1])), `rekkefoelgen: ${order}`);
   assert.deepEqual(home.trustStrip.items.map((i) => i.text), [
     "Synlig AI-merke på hvert bilde",
@@ -486,13 +521,20 @@ test("MS3a: tjenestene heter det samme som i appen", () => {
 // --- Det som venter (regel 3 og 4) --------------------------------------------
 
 const PENDING_NOW = [
+  ["site.contact.email", "email"],
+  ["site.footer.companyName", "companyName"],
   ["home.hero.before", "image"],
   ["home.hero.after", "image"],
   ["home.trustStrip.items[3]", "dataRegion"],
+  ["home.labeling.points[3]", "legal"],
+  ["faq[0]", "legal"],
+  ["faq[3].slots.time", "time"],
+  ["faq[6]", "trainingAnswer"],
+  ["faq[7]", "storageAnswer"],
 ];
 
 test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () => {
-  const items = pendingItems({ site, home });
+  const items = pendingItems({ site, home, faq });
   if (MARKETING_PUBLIC) {
     assert.deepEqual(items, [], "MARKETING_PUBLIC er true, men noe i innholdet venter fortsatt");
   }
@@ -500,7 +542,7 @@ test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () =>
   // eksempelbildene er plassholdere eller midlertidige.
   const notPictures = items.filter((i) => i.key !== "image" || i.path.startsWith("home.hero"));
   assert.deepEqual(notPictures.map((i) => [i.path, i.key]), PENDING_NOW);
-  assert.ok(items.filter((i) => i.key === "image").length >= 2 + 14 + 5 + 2);
+  assert.ok(items.filter((i) => i.key === "image").length >= 2 + 14 + 5 + 2 + 1);
   // Hver noekkel har en merkelapp.
   for (const i of items) assert.ok(site.pendingLabels[i.key].startsWith("["), i.key);
 });
@@ -525,10 +567,11 @@ function routeExists(href: string): boolean {
 }
 
 test("MS3a: alle lenker som vises, peker paa et anker paa siden eller en rute som finnes", () => {
-  const anchors = contentAnchors(home);
-  assert.deepEqual([...anchors].sort(), ["eksempler", "tjenester", "topp"]);
+  const anchors = contentAnchors({ home, footer: site.footer });
+  assert.deepEqual([...anchors].sort(), ["eksempler", "kjeder", "kontakt", "merking", "priser", "sporsmal", "tjenester", "topp"]);
   const shown = [
     ...strings(home, "home").filter(([p]) => p.endsWith(".href")),
+    ...strings(site.footer, "footer").filter(([p]) => p.endsWith(".href")),
     ...strings({ cta: site.cta, login: site.topBar.login, logo: { href: site.topBar.logoHref } }, "site").filter(([p]) =>
       p.endsWith(".href")
     ),
@@ -539,14 +582,23 @@ test("MS3a: alle lenker som vises, peker paa et anker paa siden eller en rute so
     if (href.startsWith("#")) assert.ok(anchors.has(href.slice(1)), `${path}: ${href} finnes ikke paa siden`);
     else assert.ok(href.startsWith("/") && routeExists(href), `${path}: ${href} finnes ikke`);
   }
-  // MS3a lenker ikke til #priser eller #kjeder foer MS3b.
-  assert.deepEqual(visibleLinks(site.topBar.links, anchors).map((l) => l.href), ["#tjenester", "#eksempler"]);
+  // MS3b: alle seksjonene finnes, saa alle fire lenkene vises. Uten seksjonen vises ikke lenken.
+  assert.deepEqual(visibleLinks(site.topBar.links, anchors).map((l) => l.href), ["#tjenester", "#eksempler", "#priser", "#kjeder"]);
+  assert.deepEqual(
+    visibleLinks(site.topBar.links, contentAnchors({ hero: home.hero, examples: home.examples, services: home.services })).map((l) => l.href),
+    ["#tjenester", "#eksempler"]
+  );
+  // Sidene som ikke finnes ennaa (MS5), har ingen href.
+  for (const col of site.footer.columns) {
+    for (const l of col.links) if (!("href" in l)) assert.ok(!routeExists(`/${l.label.toLowerCase()}`), l.label);
+  }
+  assert.equal((home.labeling.guide as { href?: string }).href, undefined);
   assert.ok(routeExists("/start") && routeExists("/no") && !routeExists("/personvern"));
 });
 
 test("MS3a: toppmenyen og mobilmenyen viser bare lenkene siden sender (visibleLinks)", () => {
   const page = withoutComments(read("app/(marketing)/no/page.tsx"));
-  assert.match(page, /const anchors = contentAnchors\(home\);/);
+  assert.match(page, /const anchors = contentAnchors\(\{ home, footer: site\.footer \}\);/);
   assert.match(page, /links=\{visibleLinks\(site\.topBar\.links, anchors\)\}/);
   for (const f of ["app/components/marketing/MarketingTopBar.tsx", "app/components/marketing/MobileMenu.tsx"]) {
     assert.doesNotMatch(withoutComments(read(f)), /topBar\.links/, f);
@@ -610,4 +662,146 @@ test("MS3a: bare toppbildet har hoey prioritet; alle andre bilder lastes lat", (
     "MobileMenu.tsx",
     "MoodPicker.tsx",
   ]);
+});
+
+// ---------------------------------------------------------------------------
+// MS3b: merkingen, den aerlige versjonen, prisene, spoersmaal og svar, siste
+// knapp og bunnen, pluss rettelsene fra den lokale sjekken.
+// ---------------------------------------------------------------------------
+
+const MS3B_TSX = ["Labeling", "Honest", "Pricing", "Faq", "FinalCta", "Footer", "TemplateText"].map(
+  (n) => `app/components/marketing/${n}.tsx`
+);
+
+test("MS3b: de nye komponentene er med i teksttesten, og ingen markedskomponent har hex-farger", () => {
+  for (const f of MS3B_TSX) {
+    assert.ok(MARKETING_TSX.includes(f), f);
+    assert.deepEqual(literalTextsInFile(read(f)), [], f);
+  }
+  for (const f of filesIn("app/components/marketing", /\.tsx?$/)) {
+    assert.doesNotMatch(read(f), /#[0-9a-f]{3,8}\b/i, f);
+  }
+  // Kveldsblaatt er tokenet night (Petter 02.10), brukt i merkingen og kjedekortet.
+  assert.match(read("app/globals.css"), /--color-night: #101A2C;/);
+  assert.match(read("app/components/marketing/Labeling.tsx"), /bg-night/);
+  assert.match(read("app/components/marketing/Pricing.tsx"), /id=\{chains\.anchor\}[\s\S]*?bg-night/);
+});
+
+test("MS3b: prisene og antallene staar ett sted, og «ca. 116» og svaret om pris er regnet ut", () => {
+  assert.deepEqual(site.offer, {
+    freeImages: 3,
+    bundleCount: 3,
+    prices: { free: 0, single: 149, bundle: 349, privacyBlur: 29 },
+    copyrightYear: 2026,
+  });
+  assert.equal(perImage(site.offer), 116);
+  assert.equal(
+    fill(home.pricing.bundle.text, priceVars(site.offer)),
+    "Fasade og to rom i samme annonse, for eksempel. Ca. 116 kr per bilde."
+  );
+  assert.equal(fill(home.pricing.bundle.name, { n: site.offer.bundleCount }), "3 kveldsbilder");
+  assert.equal(fill(home.pricing.addOn, { price: formatNok(29) }), "Skjul ansikter og skilt: 29 kr per bilde.");
+  const price = faq.find((i) => i.id === "pris")!;
+  assert.equal(
+    fill(price.a!, priceVars(site.offer)),
+    "Et kveldsbilde koster 149 kr eks. mva., og 3 kveldsbilder i samme oppdrag koster 349 kr. Skjul ansikter og skilt koster 29 kr per bilde. Kjeder og partnere får pris etter volum."
+  );
+  // Ingen tall i tekstene, heller ikke i spoersmaalene, og ingen tall skrevet inn i komponentene.
+  for (const [path, text] of strings(faq, "faq")) assert.doesNotMatch(text, /\d/, path);
+  for (const f of [...MS3B_TSX, "app/components/marketing/Pricing.tsx"]) {
+    assert.doesNotMatch(withoutComments(read(f)), /\b(149|349|116|2026)\b|"29"|\{29\}/, f);
+  }
+  const pricing = withoutComments(read("app/components/marketing/Pricing.tsx"));
+  assert.match(pricing, /const vars = priceVars\(offer\);/);
+  assert.match(pricing, /price\(offer\.prices\.single\)/);
+  assert.match(pricing, /price\(offer\.prices\.bundle\)/);
+  assert.match(read("app/components/marketing/Faq.tsx"), /const vars = priceVars\(site\.offer\);/);
+  // «Prøv gratis» og «Prøv gratis først» gaar dit site.cta gaar.
+  assert.equal((pricing.match(/href=\{cta\.href\}/g) ?? []).length, 3);
+  assert.match(read("app/components/marketing/FinalCta.tsx"), /href=\{site\.cta\.href\}/);
+});
+
+test("MS3b: eksempelet paa annonseteksten lages med produktets funksjon og er likt utkastet", () => {
+  const { example } = home.labeling;
+  const result = disclosureText(
+    DISCLOSURE_LOCALE,
+    { version: null, base: example.base, time: example.time, scope: null, edited: [...example.edited], source: null, status: "ok" },
+    DISCLOSURE_DETAIL
+  );
+  assert.deepEqual(result, {
+    kind: "text",
+    text: "Kveldsbilde laget med AI fra dagsbilde. Himmel og lamper i rommet er redigert.",
+  });
+  const src = withoutComments(read("app/components/marketing/Labeling.tsx"));
+  assert.match(src, /const disclosure = disclosureText\(\s*DISCLOSURE_LOCALE,/);
+  assert.match(src, /DISCLOSURE_DETAIL\s*\);/);
+  assert.match(src, /\{disclosure\.text\}/);
+  // Teksten staar ikke i innholdet, bare kodene.
+  for (const [path, text] of strings(home.labeling, "labeling")) assert.doesNotMatch(text, /redigert|laget med AI fra/, path);
+});
+
+test("MS3b: spoersmaal og svar har alle spoersmaalene fra utkastet, med <details>", () => {
+  assert.deepEqual(faq.map((i) => i.q), [
+    "Er det lov å bruke AI-redigerte bilder i boligannonser?",
+    "Hvordan merkes bildene?",
+    "Hva koster det?",
+    "Hvor lang tid tar det?",
+    "Hva om jeg ikke er fornøyd?",
+    "Hvilke bilder passer?",
+    "Brukes bildene til å trene AI?",
+    "Hvor lagres bildene?",
+    "Kan kjeden få sin egen løsning?",
+  ]);
+  assert.equal(new Set(faq.map((i) => i.id)).size, faq.length);
+  for (const i of faq) {
+    assert.ok(i.showOnHome, i.id);
+    assert.ok(i.a !== null || i.pending !== undefined, `${i.id}: svaret mangler og venter ikke`);
+    for (const m of (i.a ?? "").matchAll(/\{(\w+)\}/g)) assert.ok(TEMPLATE_KEYS.includes(m[1]), `${i.id}: {${m[1]}}`);
+  }
+  assert.match(read("app/(marketing)/no/page.tsx"), /getFaq\("no"\)\.filter\(\(item\) => item\.showOnHome\)/);
+  const src = withoutComments(read("app/components/marketing/Faq.tsx"));
+  assert.match(src, /<details key=\{item\.id\}/);
+  assert.match(src, /<summary/);
+  assert.match(src, /vars=\{\{ email: site\.contact\.email \}\}/);
+  assert.match(src, /item\.pending && <PendingMark label=\{site\.pendingLabels\[item\.pending\]\} \/>/);
+});
+
+test("MS3b: fillParts setter merkelappen der verdien som venter skal staa", () => {
+  assert.deepEqual(fillParts("Skriv til {email}.", { email: { pending: "email" } }), [
+    "Skriv til ",
+    { pending: "email" },
+    ".",
+  ]);
+  assert.deepEqual(fillParts("© {year} {companyName}", { year: 2026, companyName: { pending: "companyName" } }), [
+    "© 2026 ",
+    { pending: "companyName" },
+  ]);
+  assert.deepEqual(fillParts("Vanligvis {time} fra", { time: "to minutter" }), ["Vanligvis to minutter fra"]);
+  assert.deepEqual(fillParts("{ukjent} blir staaende", {}), ["{ukjent} blir staaende"]);
+});
+
+test("MS3b: bunnen har merket med navn, lenker bare til det som finnes, og ingen spraakvelger", () => {
+  const src = withoutComments(read("app/components/marketing/Footer.tsx"));
+  assert.match(src, /<footer id=\{footer\.anchor\}/);
+  assert.match(src, /<BrandMark brand=\{brand\} alwaysShowName \/>/);
+  assert.match(src, /if \(link\.href === undefined\) return <span/);
+  assert.match(src, /vars=\{\{ year: offer\.copyrightYear, companyName: footer\.companyName \}\}/);
+  assert.doesNotMatch(src, /Språk|lang=|hrefLang/);
+  assert.deepEqual(site.footer.columns.map((c) => c.title), ["Tjenester", "Trygghet"]);
+  assert.deepEqual(site.footer.columns[1].links.map((l) => "href" in l), [false, false, false, false]);
+});
+
+test("MS3b: rettelsene fra den lokale sjekken (rullefeltet under fanene og navnet i smalt vindu)", () => {
+  // Fanene kan fortsatt rulles, men uten det graa rullefeltet.
+  const tabs = withoutComments(read("app/components/marketing/ExampleTabs.tsx"));
+  assert.match(tabs, /role="tablist"[\s\S]*?overflow-x-auto[^"]*\[scrollbar-width:none\] \[&::-webkit-scrollbar\]:hidden/);
+  // Navnet vises alltid paa markedssiden; «Meny» er bare ikonet, med teksten for skjermlesere.
+  assert.match(read("app/components/marketing/MarketingTopBar.tsx"), /<BrandMark brand=\{brand\} alwaysShowName \/>/);
+  const menu = withoutComments(read("app/components/marketing/MobileMenu.tsx"));
+  assert.match(menu, /<span className="sr-only">\{label\}<\/span>/);
+  assert.match(menu, /className=\{`flex size-11 /);
+  // Appen og 404 er uendret (navnet skjules under 640 px naar merket har ikon).
+  for (const f of ["app/(app)/layout.tsx", "app/global-not-found.tsx"]) {
+    assert.match(read(f), /<BrandMark brand=\{brand\} \/>/, f);
+  }
 });

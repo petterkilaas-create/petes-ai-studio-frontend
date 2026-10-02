@@ -18,17 +18,20 @@ import { CONTAINER, FOCUS } from "./classes";
  */
 const NAV_LINK = `flex h-11 items-center rounded-[8px] px-3.5 text-[15px] font-medium text-ink no-underline hover:text-ink-2 ${FOCUS}`;
 
+/** «Logg inn» ved siden av «Prøv gratis»: smalere under 420 px, saa navnet ved ikonet faar plass (MS3b). */
+const LOGIN_LINK = `flex h-11 items-center rounded-button px-2 text-[15px] font-medium text-ink no-underline hover:text-ink-2 min-[420px]:px-3.5 ${FOCUS}`;
+
 export function MarketingTopBar({ site, brand, links }: { site: Site; brand: Brand; links: Link[] }) {
   const { topBar, cta } = site;
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur">
-      <div className={`${CONTAINER} flex h-[68px] items-center justify-between gap-6`}>
+      <div className={`${CONTAINER} flex h-[68px] items-center justify-between gap-2 min-[420px]:gap-6`}>
         <a
           href={topBar.logoHref}
           aria-label={fill(topBar.logoLabel, { brand: brand.displayName })}
           className={`flex min-h-11 items-center rounded-button no-underline ${FOCUS}`}
         >
-          <BrandMark brand={brand} />
+          <BrandMark brand={brand} alwaysShowName />
         </a>
         <nav aria-label={topBar.navLabel} className="hidden items-center gap-0.5 min-[820px]:flex">
           {links.map((l: Link) => (
@@ -37,14 +40,14 @@ export function MarketingTopBar({ site, brand, links }: { site: Site; brand: Bra
             </a>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 min-[420px]:gap-2">
           <MobileMenu label={topBar.menuLabel} navLabel={topBar.navLabel} links={links} />
-          <a href={topBar.login.href} className={`${NAV_LINK} rounded-button`}>
+          <a href={topBar.login.href} className={LOGIN_LINK}>
             {topBar.login.label}
           </a>
           <a
             href={cta.href}
-            className={`flex h-11 items-center whitespace-nowrap rounded-button bg-primary px-[18px] text-[15px] font-semibold text-on-primary no-underline hover:opacity-90 ${FOCUS}`}
+            className={`flex h-11 items-center whitespace-nowrap rounded-button bg-primary px-3 text-[15px] font-semibold text-on-primary no-underline hover:opacity-90 min-[420px]:px-[18px] ${FOCUS}`}
           >
             {cta.label}
           </a>
