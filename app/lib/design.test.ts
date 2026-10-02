@@ -802,3 +802,65 @@ test("TG147: Godkjenn-knappen viser «Godkjenner …» og er laast mens kallet p
     /onClick=\{\(\) => onDecide\("approve"\)\}\s*disabled=\{locked\}\s*aria-busy=\{approving\}[\s\S]*?\{approving \? t\(locale, "action\.approving"\) : t\(locale, "action\.approve"\)\}/
   );
 });
+
+// ---------------------------------------------------------------------------
+// Ventebildet (KONTRAKT_VENTEBILDE): JobMedia i Historikk og Express.
+// Reglene er testet i jobMedia.test.ts og autoRefresh.test.ts; her sjekkes
+// at komponenten og sidene bruker dem.
+// ---------------------------------------------------------------------------
+
+test("ventebilde: JobMedia har ingen AI-merkelapp, ingen tekst skrevet rett inn og bare tokens", () => {
+  const src = read("components/JobMedia.tsx");
+  const code = withoutComments(src);
+  // Dagsbildet faar aldri AI-merkelappen.
+  assert.doesNotMatch(code, /compare\.ai|>\s*AI\s*</);
+  assert.match(code, /alt=\{t\(locale, "media\.originalAlt"\)\}/);
+  // Ingen synlig tekst skrevet rett inn (D1c-moensteret).
+  const blocks = jsxBlocks(code);
+  assert.ok(blocks.length >= 2);
+  assert.deepEqual(blocks.flatMap((b) => literalTexts(`${b}<`)), []);
+  // Bare tokens (D1).
+  assert.doesNotMatch(src, /#[0-9a-f]{3,8}\b/i);
+  assert.doesNotMatch(src, /-\[(#|rgb)/);
+  assert.doesNotMatch(src, /\b(slate|gray|zinc|sky|indigo|purple|emerald|teal|red|amber)-\d/);
+  assert.doesNotMatch(src, /\b(text|bg|border)-(white|black)\b/);
+});
+
+test("ventebilde: symbolet snurrer bare med CSS og staar stille ved redusert bevegelse", () => {
+  const code = withoutComments(read("components/JobMedia.tsx"));
+  assert.match(code, /<LoaderCircle[\s\S]*?className="[^"]*animate-\[spin_2s_linear_infinite\] motion-reduce:animate-none"/);
+  // Ingen animasjon i JS.
+  assert.doesNotMatch(code, /requestAnimationFrame|setInterval|setTimeout/);
+  // Statusen staar alltid som tekst ved siden av symbolet.
+  assert.match(code, /<span>\{t\(locale, overlay\.key\)\}<\/span>/);
+  // Fast boks: 3:2, eller kvadrat i Express.
+  assert.match(code, /aspect === "square" \? "aspect-square" : "aspect-\[3\/2\]"/);
+});
+
+test("ventebilde: Historikk viser JobMedia fra thumbSrc og henter selv bare mens jobber er i arbeid", () => {
+  const page = withoutComments(read("(app)/history/page.tsx"));
+  assert.match(page, /<JobMedia\s*view=\{mediaView\(job, thumbSrc\(job\)\)\}/);
+  assert.doesNotMatch(page, /history\.noPreview|<img/);
+  assert.match(page, /useAutoRefresh\(!loading && jobs\.some\(\(j\) => isWorking\(j\.status\)\), silentRefresh, refreshEpoch\);/);
+  assert.match(page, /setJobs\(\(prev\) => mergeRefresh\(prev, rows, PAGE_SIZE\)\);/);
+  // «Oppdater» staar.
+  assert.match(page, /onClick=\{\(\) => void loadInitial\(\)\} disabled=\{loading\}/);
+  const hook = withoutComments(read("hooks/useAutoRefresh.ts"));
+  assert.match(hook, /if \(!active\) return;/);
+  assert.match(hook, /document\.visibilityState === "hidden"/);
+  assert.match(hook, /addEventListener\("visibilitychange", onVisibility\)/);
+  assert.match(hook, /control\.stop\(\);\s*document\.removeEventListener\("visibilitychange", onVisibility\);/);
+});
+
+test("ventebilde: «Ingen forhåndsvisning» finnes ingen steder i koden", () => {
+  for (const f of sourceFiles()) {
+    assert.doesNotMatch(read(relative(APP_DIR, f)), /history\.noPreview|Ingen forhåndsvisning/, f);
+  }
+});
+
+test("ventebilde: Express viser samme symbol mens jobben lages, og resultatet som foer", () => {
+  const page = withoutComments(read("(app)/express/page.tsx"));
+  assert.match(page, /\) : isProcessing \? \(\s*<JobMedia\s*view=\{workingView\(selectedTool\.service\)\}/);
+  assert.match(page, /aspect="square"/);
+  assert.match(page, /outputView\(job\.status, job\.imageUrl\)/);
+});

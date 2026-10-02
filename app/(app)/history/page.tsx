@@ -20,6 +20,10 @@ import {
   statusVariant,
 } from "./statusVariants";
 import { OpenReviewLink } from "@/app/components/OpenReviewLink";
+import { JobMedia } from "@/app/components/JobMedia";
+import { isWorking, mediaView, mergeRefresh } from "@/app/lib/jobMedia";
+import type { RefreshResult } from "@/app/lib/autoRefresh";
+import { useAutoRefresh } from "@/app/hooks/useAutoRefresh";
 import { Button, ButtonLink } from "@/app/components/ui/Button";
 import { Card, cardClass } from "@/app/components/ui/Card";
 import { PageHeader } from "@/app/components/ui/PageHeader";
@@ -98,7 +102,6 @@ function segmentClass(selected: boolean): string {
 
 function JobCard({ job }: { job: JobSummary }) {
   const locale = useLocale();
-  const thumb = thumbSrc(job);
   const rejectedByYou = isRejectedByReviewer(job);
   const other = ownerBadge(job);
   const openKey = openLinkKey(job);
@@ -108,21 +111,12 @@ function JobCard({ job }: { job: JobSummary }) {
 
   return (
     <div className={cardClass("none", "flex flex-col overflow-hidden")}>
-      <div className="relative aspect-[3/2] bg-surface-2 flex items-center justify-center">
-        {thumb !== null ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={thumb}
-            alt={serviceLabel(locale, job.service)}
-            loading="lazy"
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <span className="text-ink-2 text-[13px]">
-            {t(locale, "history.noPreview")}
-          </span>
-        )}
-      </div>
+      {/* Ventebildet: resultatet (thumbSrc), ellers dagsbildet dempet med status, ellers plassholder. */}
+      <JobMedia
+        view={mediaView(job, thumbSrc(job))}
+        resultAlt={serviceLabel(locale, job.service)}
+        locale={locale}
+      />
 
       <div className="p-5 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
@@ -203,6 +197,9 @@ export default function HistoryPage() {
 
   // Bytte av filter mens en henting pagaar: bare det siste svaret teller.
   const requestRef = useRef(0);
+  // Oekes ved hver full henting («Oppdater», filter): den automatiske
+  // hentingen starter telleren paa nytt.
+  const [refreshEpoch, setRefreshEpoch] = useState(0);
 
   const loadInitial = useCallback(async () => {
     const request = ++requestRef.current;
@@ -213,6 +210,7 @@ export default function HistoryPage() {
       if (request !== requestRef.current) return;
       setJobs(rows);
       setHasMore(rows.length === PAGE_SIZE);
+      setRefreshEpoch((n) => n + 1);
     } catch (err) {
       if (request !== requestRef.current) return;
       // 403/422 for scope: tilbake til «Mine jobber» med en kort melding.
@@ -233,6 +231,24 @@ export default function HistoryPage() {
   useEffect(() => {
     void loadInitial();
   }, [loadInitial]);
+
+  // Ventebildet: stille henting av foerste side mens jobber lages (5 s,
+  // tak 10 min, pause naar fanen er skjult). Ingen spinner; sider fra
+  // «Last inn flere» beholdes, og uendrede kort beholder bildet sitt.
+  const silentRefresh = useCallback(async (): Promise<RefreshResult> => {
+    const request = requestRef.current;
+    try {
+      const rows = await listJobs({ limit: PAGE_SIZE, statuses, scope, getToken });
+      // Filteret er byttet: den nye hentingen tar over.
+      if (request !== requestRef.current) return { ok: true, working: false };
+      setJobs((prev) => mergeRefresh(prev, rows, PAGE_SIZE));
+      return { ok: true, working: rows.some((j) => isWorking(j.status)) };
+    } catch {
+      return { ok: false, working: true };
+    }
+  }, [getToken, statuses, scope]);
+
+  useAutoRefresh(!loading && jobs.some((j) => isWorking(j.status)), silentRefresh, refreshEpoch);
 
   const loadMore = useCallback(async () => {
     // Keyset-cursor (TG-NEW-79): plukk SISTE rad med gyldig tidsstempel og
