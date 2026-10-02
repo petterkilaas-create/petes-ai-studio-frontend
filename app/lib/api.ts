@@ -368,6 +368,8 @@ interface JobSummaryWire {
   created_at: string | null;
   /** Lekkasjen L1: merket miniatyr 640x427, eller null. */
   thumb_url?: unknown;
+  /** Ventebildet (KONTRAKT_VENTEBILDE): dagsbildet 640x427, bare uten resultatbilde, ellers null. */
+  original_thumb_url?: unknown;
   error: string | null;
   /** 2d-1a: kode for raden (rejected_by_reviewer, needs_review-koden) eller null. */
   code?: string | null;
@@ -435,6 +437,12 @@ export interface JobSummary {
    * mangler (eldre backend).
    */
   thumbUrl: string | null;
+  /**
+   * Ventebildet (KONTRAKT_VENTEBILDE): liten JPEG av dagsbildet megleren
+   * lastet opp, uten AI-merke. Bare for rader uten resultatbilde; kan alltid
+   * vaere null. Vises aldri som resultat (se jobMedia.ts).
+   */
+  originalThumbUrl: string | null;
   error: string | null;
   /**
    * Kode fra backend (2d-1a): "rejected_by_reviewer" for jobb avvist av
@@ -548,6 +556,7 @@ export async function listJobs(opts: {
     status: normalizeSummaryStatus(row.status),
     createdAt: row.created_at,
     thumbUrl: nonEmptyString(row.thumb_url),
+    originalThumbUrl: nonEmptyString(row.original_thumb_url),
     error: row.error,
     code: nonEmptyString(row.code),
     reason: nonEmptyString(row.reason),

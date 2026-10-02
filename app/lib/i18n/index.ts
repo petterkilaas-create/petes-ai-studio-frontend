@@ -236,7 +236,6 @@ const nbUi = {
   "history.emptyTitle": "Ingen jobber ennå",
   "history.emptyBody": "Lag ditt første bilde, så dukker det opp her.",
   "history.toExpress": "Gå til Express",
-  "history.noPreview": "Ingen forhåndsvisning",
   "history.loadMore": "Last inn flere",
   "history.loadingMore": "Laster …",
   "action.refresh": "Oppdater",
@@ -252,6 +251,12 @@ const nbUi = {
   "brightness.currentRoundOnly": "Lysstyrken kan bare velges for gjeldende runde.",
   "brightness.invalid": "Lysstyrken var ugyldig. Velg et trinn og prøv igjen.",
   "action.approving": "Godkjenner …",
+  // Ventebildet (KONTRAKT_VENTEBILDE): status oppå dagsbildet eller plassholderen.
+  "media.working.scene_transform": "Lager kveldsbilde …",
+  "media.working.privacy_blur": "Skjuler ansikter og skilt …",
+  "media.working.generic": "Lager bildet …",
+  "media.fireplaceQuestion": "Svar på spørsmålet om peisen",
+  "media.originalAlt": "Dagsbildet som ble lastet opp",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -590,7 +595,6 @@ const en: Dictionary = {
     "history.emptyTitle": "No jobs yet",
     "history.emptyBody": "Create your first image, and it will show up here.",
     "history.toExpress": "Go to Express",
-    "history.noPreview": "No preview",
     "history.loadMore": "Load more",
     "history.loadingMore": "Loading …",
     "action.refresh": "Refresh",
@@ -605,6 +609,11 @@ const en: Dictionary = {
     "brightness.currentRoundOnly": "Brightness can only be chosen for the current round.",
     "brightness.invalid": "The brightness was invalid. Choose a step and try again.",
     "action.approving": "Approving …",
+    "media.working.scene_transform": "Creating dusk image …",
+    "media.working.privacy_blur": "Blurring faces and plates …",
+    "media.working.generic": "Creating image …",
+    "media.fireplaceQuestion": "Answer the question about the fireplace",
+    "media.originalAlt": "The uploaded daytime photo",
   },
   codes: {
     reviewCode: {

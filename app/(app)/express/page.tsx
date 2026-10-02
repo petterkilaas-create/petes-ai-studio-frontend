@@ -11,6 +11,8 @@ import { ReviewPanel } from "@/app/components/ReviewPanel";
 import { UnknownStatusPanel } from "@/app/components/UnknownStatusPanel";
 import { ApprovalNotice } from "@/app/components/ApprovalNotice";
 import { PreviewPlaceholder } from "@/app/components/PreviewPlaceholder";
+import { JobMedia } from "@/app/components/JobMedia";
+import { workingView } from "@/app/lib/jobMedia";
 import { outputView } from "@/app/lib/jobState";
 import { ReviewerRejectedPanel } from "@/app/components/ReviewerRejectedPanel";
 import { OpenReviewLink } from "@/app/components/OpenReviewLink";
@@ -366,9 +368,18 @@ export default function ExpressPage() {
               />
             ) : output.kind === "placeholder" ? (
               <PreviewPlaceholder />
+            ) : isProcessing ? (
+              // Ventebildet (Petter 02.10, valg A): samme rolige symbol som i Historikk.
+              <JobMedia
+                view={workingView(selectedTool.service)}
+                resultAlt={t(locale, "review.result")}
+                aspect="square"
+                frame="rounded-button border border-dashed border-line-strong"
+                locale={locale}
+              />
             ) : (
               <div className="aspect-square w-full rounded-button border border-dashed border-line-strong flex items-center justify-center text-ink-2 text-sm">
-                {t(locale, isProcessing ? "express.processing" : "express.noResult")}
+                {t(locale, "express.noResult")}
               </div>
             )}
           </Card>
