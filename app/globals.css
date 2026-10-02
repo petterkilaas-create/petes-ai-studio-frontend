@@ -45,7 +45,7 @@
   --color-on-primary: var(--brand-on-primary);
   --color-accent: var(--brand-accent);
 
-  /* Variablene settes av next/font i layout.tsx. Ikke --font-sans: den
+  /* Variablene settes av next/font i lib/fonts.ts. Ikke --font-sans: den
      styrer standardfonten og ville endret hele appen. */
   --font-display: var(--font-instrument-serif), Georgia, serif;
   --font-ui: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
