@@ -8,6 +8,7 @@ import {
   getReview,
   NO_CAPABILITIES,
   postDecision,
+  type BrightnessStep,
   type Capabilities,
   type DecisionAction,
   type ReviewFetchResult,
@@ -39,6 +40,16 @@ import {
 import { runDecision } from "@/app/lib/decide";
 import { canDownload } from "@/app/lib/download";
 import { compareVariants, selectedVariant, variantLabel } from "@/app/lib/compare";
+import {
+  blockedResult,
+  brightnessResultUrl,
+  brightnessView,
+  isApproving,
+  preloadUrls,
+  selectedStep,
+  stepName,
+  visibleVariants,
+} from "@/app/lib/brightness";
 import { PreviewPlaceholder } from "@/app/components/PreviewPlaceholder";
 import { buttonClass } from "@/app/components/ui/Button";
 import { cardClass } from "@/app/components/ui/Card";
@@ -50,6 +61,7 @@ import { MoodPanel } from "@/app/components/godkjenning/MoodPanel";
 import { DetailsPanel } from "@/app/components/godkjenning/DetailsPanel";
 import { DisclosureBlock } from "@/app/components/godkjenning/DisclosureBlock";
 import { DownloadButton } from "@/app/components/godkjenning/DownloadButton";
+import { BrightnessApproved, BrightnessControl } from "@/app/components/godkjenning/BrightnessControl";
 import { FOCUS } from "@/app/components/godkjenning/classes";
 
 /**
@@ -66,6 +78,10 @@ import { FOCUS } from "@/app/components/godkjenning/classes";
  * D2 (brief §4): stort bilde med slider og varianter (D2a), og ved siden av
  * handlingene i ett kort, stemning og lys, og «Detaljer» bare for admin
  * (D2b). Siden holder tilstanden og alle kall; komponentene viser.
+ *
+ * Lysstyrke (TG-NEW-147): slideren under bildet velger trinn i gjeldende
+ * runde, og bildet er trinnets `preview_url` fra backend. Trinnet sendes
+ * med godkjenningen. Ny henting starter paa `default_step` igjen.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -94,6 +110,11 @@ export default function GodkjenningPage({
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reasonText, setReasonText] = useState("");
   const [busy, setBusy] = useState(false);
+  // Handlingen som er sendt (TG-NEW-147: «Godkjenner …» paa knappen).
+  const [pending, setPending] = useState<DecisionAction | null>(null);
+  // Valgt lysstyrke; null gir default_step. Hovedbildet lastet: forhaandslast de andre trinnene.
+  const [chosenStep, setChosenStep] = useState<BrightnessStep | null>(null);
+  const [resultLoaded, setResultLoaded] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
   // «Korriger bildet» (2d-2b). Bryterne holdes paa key og nullstilles ved Avbryt.
@@ -122,8 +143,11 @@ export default function GodkjenningPage({
     }
     setLoad(result);
     setPollJobId(null);
-    // Etter en ny runde eller avgjoerelse vises gjeldende runde igjen.
+    // Etter en ny runde eller avgjoerelse vises gjeldende runde igjen,
+    // og lysstyrken starter paa default_step (Petter 02.10, valg 4).
     setVariantId(null);
+    setChosenStep(null);
+    setResultLoaded(false);
   }, [jobId, getToken]);
 
   useEffect(() => {
@@ -159,21 +183,29 @@ export default function GodkjenningPage({
   const polling = activePollId !== null && !pollDone;
   const locked = busy || blocked || polling;
 
-  const decide = (action: DecisionAction) => {
+  const decide = (action: DecisionAction, brightnessStep: BrightnessStep | null) => {
     if (locked || load.kind !== "ok") return;
     const review = load.review;
     void runDecision({
       inFlight,
       send: () =>
-        postDecision({ jobId, decision: buildDecision(action, reasonText, answer, review), getToken }),
+        postDecision({
+          jobId,
+          decision: buildDecision(action, reasonText, answer, review, brightnessStep),
+          getToken,
+        }),
       // Etter 200 og 409 status_changed (ny versjon, TG-NEW-130).
       refetch: fetchReview,
       onStart: () => {
         setBusy(true);
+        setPending(action);
         setMessage(null);
       },
       onError: () => setMessage({ key: "decision.error" }),
-      onSettled: () => setBusy(false),
+      onSettled: () => {
+        setBusy(false);
+        setPending(null);
+      },
       handle: (out) => {
         switch (out.kind) {
           case "updated":
@@ -188,12 +220,16 @@ export default function GodkjenningPage({
             setRejectOpen(false);
             setMessage({ key: "decision.statusChanged" });
             break;
-          case "blocked":
-            setMessage({ group: "decisionError", code: out.code });
+          case "blocked": {
             // 409: ingen ny handling. 422 (ugyldig body, f.eks. begrunnelsen)
-            // kan rettes av megleren, saa knappene blir staaende.
-            if (out.code !== "invalid_decision") setBlocked(true);
+            // og trinn som ikke kan lages, kan rettes av megleren, saa
+            // knappene blir staaende (blockedResult, TG-NEW-147).
+            const result = blockedResult(out);
+            if (result.refetch) void fetchReview();
+            setMessage(result.message);
+            if (result.block) setBlocked(true);
             break;
+          }
           case "not_found":
             setLoad({ kind: "not_found" });
             break;
@@ -337,16 +373,31 @@ export default function GodkjenningPage({
             const review = load.review;
             const controls = decisionControls(review, answer);
             const done = outcome(review);
-            const variants = compareVariants(review.images, { isAdmin: caps.viewAll });
+            // «Rått fra modellen» skjules naar lysstyrke finnes (TG-NEW-147, valg (a)).
+            const variants = visibleVariants(
+              compareVariants(review.images, { isAdmin: caps.viewAll }),
+              review.brightness
+            );
             const shown = selectedVariant(variants, variantId);
+            const brightness = brightnessView(review, shown);
+            const step = brightness.kind === "control" ? selectedStep(brightness, chosenStep) : null;
+            // Gjeldende runde med slideren: trinnets lenke fra backend, aldri et CSS-filter.
+            const stepShown = brightness.kind === "control" && !brightness.locked ? step : null;
             // Gamle jobber uten rounds: lenken velges fra de merkede feltene som foer.
             // Runder: lenken som den er, null gir plassholder (ingen tilbakefall).
-            const shownUrl =
+            const roundUrl =
               shown === null
                 ? null
                 : shown.source.kind === "legacy"
                   ? resultImageUrl(review.images, shown.source.variant)
                   : shown.source.url;
+            const shownUrl = stepShown !== null ? brightnessResultUrl(review.brightness, stepShown) : roundUrl;
+            const shownLabel =
+              shown === null
+                ? ""
+                : stepShown !== null
+                  ? `${variantLabel(locale, shown)} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
+                  : variantLabel(locale, shown);
             const correction = correctionControls(review);
             const canCorrect = correction.show && !limitReached && done === null;
             const isEditing = editing && canCorrect;
@@ -387,10 +438,23 @@ export default function GodkjenningPage({
                     />
                     <CompareViewer
                       originalUrl={review.images.originalUrl}
-                      result={shown === null ? null : { url: shownUrl, label: variantLabel(locale, shown) }}
+                      result={shown === null ? null : { url: shownUrl, label: shownLabel }}
                       placeholder={<PreviewPlaceholder />}
+                      onResultLoad={() => setResultLoaded(true)}
                       locale={locale}
                     />
+                    {brightness.kind === "control" && step !== null && (
+                      <BrightnessControl
+                        view={brightness}
+                        step={step}
+                        onChange={setChosenStep}
+                        locked={locked}
+                        preload={preloadUrls(brightness.steps, step)}
+                        ready={resultLoaded}
+                        locale={locale}
+                      />
+                    )}
+                    {brightness.kind === "approved" && <BrightnessApproved step={brightness.step} locale={locale} />}
                   </section>
 
                   <div className="flex flex-col gap-6 min-w-0">
@@ -425,6 +489,7 @@ export default function GodkjenningPage({
                         readOnly={readOnly}
                         locked={locked}
                         busy={busy}
+                        approving={isApproving(pending)}
                         polling={polling}
                         answer={answer}
                         onAnswer={setAnswer}
@@ -432,7 +497,7 @@ export default function GodkjenningPage({
                         onRejectOpen={setRejectOpen}
                         reasonText={reasonText}
                         onReasonText={setReasonText}
-                        onDecide={decide}
+                        onDecide={(action) => decide(action, step)}
                         onStartCorrection={startCorrection}
                         correction={
                           isEditing ? (

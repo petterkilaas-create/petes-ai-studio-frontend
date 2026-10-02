@@ -662,6 +662,30 @@ export interface ReviewRound {
   choices: RoundChoices | null;
 }
 
+/** Trinnene for lysstyrke (TG-NEW-147): -2 til 2. Navnet lages fra trinnet i brightness.ts. */
+export type BrightnessStep = -2 | -1 | 0 | 1 | 2;
+
+/** Ett trinn i `review.brightness.steps`. `null`-lenke gir plassholder. */
+export interface ReviewBrightnessStep {
+  step: BrightnessStep;
+  /** Merket forhaandsvisning av trinnet fra backend. */
+  previewUrl: string | null;
+}
+
+/**
+ * `review.brightness` (KONTRAKT_LYSSTYRKE §2). Gjelder bare gjeldende runde.
+ * Mangler feltet (eldre backend), er `available` false og siden som foer.
+ */
+export interface ReviewBrightness {
+  available: boolean;
+  /** Trinnet som er lik gjeldende bilde: 0 for nye jobber, 1 for gamle. */
+  defaultStep: BrightnessStep | null;
+  /** Satt etter godkjenning med lysstyrke, ellers null. */
+  approvedStep: BrightnessStep | null;
+  /** Sortert fra -2 til 2, hvert trinn bare en gang. */
+  steps: ReviewBrightnessStep[];
+}
+
 export interface RunValue {
   value: string | null;
   runValues: string[];
@@ -722,6 +746,8 @@ export interface JobReviewDetail {
     rounds: ReviewRound[] | null;
   };
   decisions: { action: string | null; at: string | null; byRole: string | null; reason: string | null }[];
+  /** Lysstyrke for gjeldende runde (TG-NEW-147). */
+  brightness: ReviewBrightness;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -821,6 +847,37 @@ function toRounds(raw: unknown): ReviewRound[] | null {
   );
 }
 
+export function isBrightnessStep(value: unknown): value is BrightnessStep {
+  return typeof value === "number" && Number.isInteger(value) && value >= -2 && value <= 2;
+}
+
+function brightnessStepOrNull(value: unknown): BrightnessStep | null {
+  return isBrightnessStep(value) ? value : null;
+}
+
+/**
+ * `review.brightness`: strengt lest. Trinn utenfor -2..2 hoppes over, et
+ * trinn som staar to ganger tas bare med foerste gang, og lenken leses
+ * bare fra trinnets egen `preview_url` (ingen tilbakefall).
+ */
+function toBrightness(raw: unknown): ReviewBrightness {
+  if (!isRecord(raw)) return { available: false, defaultStep: null, approvedStep: null, steps: [] };
+  const seen = new Set<number>();
+  const steps: ReviewBrightnessStep[] = [];
+  for (const s of records(raw.steps)) {
+    if (!isBrightnessStep(s.step) || seen.has(s.step)) continue;
+    seen.add(s.step);
+    steps.push({ step: s.step, previewUrl: nonEmptyString(s.preview_url) });
+  }
+  steps.sort((a, b) => a.step - b.step);
+  return {
+    available: raw.available === true,
+    defaultStep: brightnessStepOrNull(raw.default_step),
+    approvedStep: brightnessStepOrNull(raw.approved_step),
+    steps,
+  };
+}
+
 function toRunValue(raw: unknown): RunValue {
   const r = isRecord(raw) ? raw : {};
   return { value: stringOrNull(r.value), runValues: stringList(r.run_values) };
@@ -887,6 +944,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
       byRole: stringOrNull(d.by_role),
       reason: stringOrNull(d.reason),
     })),
+    brightness: toBrightness(r.brightness),
   };
 }
 
@@ -958,6 +1016,8 @@ export interface DecisionRequest {
   overrides?: CorrectionOverrides;
   /** `version` fra review-svaret siden viser (TG-NEW-130); utelatt uten version. */
   expected_version?: number;
+  /** Bare ved approve naar lysstyrke finnes (TG-NEW-147). */
+  brightness_step?: BrightnessStep;
 }
 
 /**
