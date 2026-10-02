@@ -14,8 +14,10 @@ const brand = DEFAULT_BRAND;
 // Fanetittel: visningsnavnet, og «Side · navn» der ruten har egen tittel
 // (express/, history/ og godkjenning/ har en liten layout.tsx). Ikonene er
 // filene icon.svg og apple-icon.png i app/ (husikonet fra brand.ts).
+// MS4: app-sidene skal aldri indekseres (i tillegg til innloggingen).
 export const metadata: Metadata = {
   title: { default: brand.displayName, template: `%s · ${brand.displayName}` },
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

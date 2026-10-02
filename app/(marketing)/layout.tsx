@@ -2,7 +2,7 @@ import "@/app/globals.css";
 import type { Metadata } from "next";
 import { brandCssVars, DEFAULT_BRAND } from "@/app/lib/brand";
 import { fontVariables } from "@/app/lib/fonts";
-import { MARKETING_PUBLIC } from "@/app/lib/marketingAccess";
+import { MARKETING_PUBLIC, SITE_URL } from "@/app/lib/marketingAccess";
 
 // Rot-layouten til markedssiden (MS2). Uten ClerkProvider og uten
 // app-headeren, saa Clerk-skriptet ikke lastes her (AUDIT_MARKEDSSIDE §3).
@@ -10,7 +10,11 @@ import { MARKETING_PUBLIC } from "@/app/lib/marketingAccess";
 // standardmerket (DEFAULT_BRAND), aldri et foretak.
 //
 // Til lansering (MARKETING_PUBLIC false) skal siden ikke indekseres.
+// MS4: metadataBase gjoer canonical, og:url og delingsbildet til fulle
+// adresser paa SITE_URL. Sidene setter ikke robots selv (metadata slaas
+// sammen grunt, generate-metadata.md:1326).
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   robots: MARKETING_PUBLIC ? undefined : { index: false, follow: false },
 };
 

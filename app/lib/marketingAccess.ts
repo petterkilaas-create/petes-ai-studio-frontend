@@ -22,6 +22,19 @@ export const START_PATH = "/start";
 /** Markedssiden paa norsk. Uten skraastrek til slutt (trailingSlash er av). */
 export const MARKETING_HOME = "/no";
 
+/**
+ * Adressen til markedssiden (MS4, domenestrategien 01.10). Den eneste plassen
+ * adressen staar: metadataBase, canonical, sitemap og robots bruker den.
+ * Uten skraastrek til slutt.
+ */
+export const SITE_URL = "https://husvy.com";
+
+/**
+ * De offentlige markedssidene, som sitemap lister (MS4). Bare sider som
+ * finnes; MS5 legger til innholdssidene. Ingen app-ruter.
+ */
+export const MARKETING_PAGES: readonly string[] = [MARKETING_HOME];
+
 /** `/no` og alt under `/no/`. Ikke `/nokke` eller `/no-x`. */
 export function isMarketingPath(pathname: string): boolean {
   return pathname === MARKETING_HOME || pathname.startsWith(`${MARKETING_HOME}/`);

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DEFAULT_BRAND } from "@/app/lib/brand";
+import { MARKETING_HOME } from "@/app/lib/marketingAccess";
 import { Examples } from "@/app/components/marketing/Examples";
 import { Faq } from "@/app/components/marketing/Faq";
 import { FinalCta } from "@/app/components/marketing/FinalCta";
@@ -30,8 +31,14 @@ const faq = getFaq("no").filter((item) => item.showOnHome);
 const brand = DEFAULT_BRAND;
 const anchors = contentAnchors({ home, footer: site.footer });
 
+// MS4: tittelen og beskrivelsen (ingressen i toppen) fra innholdet. Open
+// Graph og Twitter arver tittel, beskrivelse og bilde (opengraph-image.tsx).
 export const metadata: Metadata = {
   title: fill(site.seo.title, { brand: brand.displayName }),
+  description: home.hero.lead,
+  alternates: { canonical: MARKETING_HOME },
+  openGraph: { type: "website", url: MARKETING_HOME, siteName: brand.displayName, locale: "nb_NO" },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function MarketingHome() {
