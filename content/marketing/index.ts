@@ -1,6 +1,7 @@
+import { faq } from "./nb/faq.ts";
 import { home } from "./nb/home.ts";
 import { site } from "./nb/site.ts";
-import type { Home, Site } from "./schema.ts";
+import type { FaqItem, Home, Site } from "./schema.ts";
 
 /** Spraakene markedssiden finnes paa. Bare norsk i foerste versjon. */
 export type MarketingLang = "no";
@@ -14,4 +15,10 @@ export function getSite(lang: MarketingLang): Site {
 export function getHome(lang: MarketingLang): Home {
   void lang;
   return home;
+}
+
+/** Alle spoersmaal og svar (MS3b). Forsiden viser dem med showOnHome. */
+export function getFaq(lang: MarketingLang): readonly FaqItem[] {
+  void lang;
+  return faq;
 }

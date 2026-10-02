@@ -5,10 +5,14 @@ import type { Brand } from "../lib/brand";
  * visningsnavnet ved siden av. Alt kommer fra merket (brand.ts), ingenting
  * skrives rett inn her. Ikonet tegnes med currentColor, saa det faar samme
  * farge som navnet. Uten logo og ikon vises bare navnet, ogsaa paa smal skjerm.
+ *
+ * Med logo eller ikon skjules navnet under 640 px i appen og paa 404.
+ * Markedssiden viser det alltid (`alwaysShowName`, MS3b, Petter 02.10).
  */
-export function BrandMark({ brand }: { brand: Brand }) {
+export function BrandMark({ brand, alwaysShowName = false }: { brand: Brand; alwaysShowName?: boolean }) {
   const { url, icon } = brand.logo;
   const hasMark = Boolean(url || icon);
+  const hideNameOnSmall = hasMark && !alwaysShowName;
 
   return (
     <span className="flex items-center gap-2.5 text-ink">
@@ -36,7 +40,7 @@ export function BrandMark({ brand }: { brand: Brand }) {
           ))}
         </svg>
       ) : null}
-      <span className={`${hasMark ? "sr-only sm:not-sr-only " : ""}font-display text-[26px] leading-none tracking-[-0.01em]`}>
+      <span className={`${hideNameOnSmall ? "sr-only sm:not-sr-only " : ""}font-display text-[26px] leading-none tracking-[-0.01em]`}>
         {brand.displayName}
       </span>
     </span>

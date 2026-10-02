@@ -12,6 +12,9 @@ import { AI_CHIP, FOCUS } from "./classes";
  * er med i tab-rekkefoelgen (roving tabindex). Piltastene bytter fane og
  * flytter fokus, Home og End gaar til foerste og siste (lib/tabs.ts).
  * Bildene lastes lat; bare toppbildet har hoey prioritet.
+ *
+ * I smalt vindu kan fanene rulles sidelengs, uten det graa rullefeltet
+ * (MS3b, Petter 02.10).
  */
 const SIZES = "(min-width: 1320px) 620px, (min-width: 640px) 48vw, 100vw";
 
@@ -45,7 +48,7 @@ export function ExampleTabs({
       <div
         role="tablist"
         aria-label={labels.tabList}
-        className="flex max-w-full gap-1 self-start overflow-x-auto rounded-[12px] bg-surface-2 p-1"
+        className="flex max-w-full gap-1 self-start overflow-x-auto rounded-[12px] bg-surface-2 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((t, i) => (
           <button

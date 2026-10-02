@@ -10,6 +10,9 @@ import { FOCUS } from "./classes";
  * aria-controls. Escape lukker og setter fokus tilbake paa knappen, og
  * menyen lukkes naar en lenke velges. Over 820 px vises lenkene i
  * topplinjen i stedet. Lenkene er de samme (bare ankre som finnes).
+ *
+ * MS3b: knappen er bare ikonet, saa navnet ved husikonet faar plass i smalt
+ * vindu (Petter 02.10). Teksten «Meny» staar for skjermlesere (sr-only).
  */
 export function MobileMenu({ label, navLabel, links }: { label: string; navLabel: string; links: Link[] }) {
   const [open, setOpen] = useState(false);
@@ -37,10 +40,10 @@ export function MobileMenu({ label, navLabel, links }: { label: string; navLabel
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((o) => !o)}
-        className={`flex h-11 items-center gap-2 rounded-button px-3 text-[15px] font-medium text-ink hover:bg-surface-2 ${FOCUS}`}
+        className={`flex size-11 items-center justify-center rounded-button text-ink hover:bg-surface-2 ${FOCUS}`}
       >
         {open ? <X aria-hidden="true" className="size-5" /> : <Menu aria-hidden="true" className="size-5" />}
-        {label}
+        <span className="sr-only">{label}</span>
       </button>
       <nav
         id={panelId}

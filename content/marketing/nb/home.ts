@@ -9,6 +9,9 @@ import type { Home, ImagePlaceholder } from "../schema.ts";
 // merket pending "image" (Petter 02.10, valg E).
 //
 // MS3a: tillitsstripen, eksemplene, stemningene, tre steg og tjenestene.
+// MS3b: merkingen, den aerlige versjonen, prisene, spoersmaal og svar (selve
+// spoersmaalene i faq.ts) og siste knapp. Ingen tall i tekstene: prisene og
+// antallene fylles fra site.offer.
 // Bildene vi ikke har, er plassholdere med tekst fra utkastet. Teksten under
 // stemningene sier ikke «Ekte eksempel» saa lenge bildet er en plassholder.
 
@@ -227,5 +230,106 @@ export const home = {
       { id: "video", title: "Video", text: "Korte filmer av boligen fra bildene du har.", status: "soon" },
       { id: "copywriter", title: "Annonsetekst", text: "Utkast til tekst for boligannonsen, på norsk.", status: "soon" },
     ],
+  },
+
+  // Linje 247-266. Eksempelteksten lages av kodene med produktets funksjon
+  // (app/lib/disclosure.ts) og blir «Kveldsbilde laget med AI fra dagsbilde.
+  // Himmel og lamper i rommet er redigert.» Bildet er en plassholder (valg C).
+  labeling: {
+    _type: "labeling",
+    anchor: "merking",
+    eyebrow: "Merking",
+    title: "Merket riktig. Hver gang.",
+    lead: "Kjøpere skal kunne stole på bildene i annonsen. Derfor har hvert bilde vi lager et synlig AI-merke, og du får en ferdig tekst som sier hva som er endret.",
+    points: [
+      { text: "AI-merket står på bildet, også i forhåndsvisningen." },
+      { text: "Teksten til annonsen følger med nedlastingen." },
+      { text: "Originalen lagres urørt, så du alltid kan vise den." },
+      { text: "Laget for EUs krav om åpenhet rundt AI-innhold.", pending: "legal" },
+    ],
+    guide: { label: "Les guiden: AI-bilder i boligannonsen" },
+    picture: ph(
+      "Stue som kveldsbilde med AI-merket",
+      "Stue som kveldsbilde laget med AI, med AI-merket synlig nede til venstre"
+    ),
+    example: {
+      title: "Tekst til annonsen",
+      base: "evening_from_day",
+      time: "early",
+      edited: ["sky", "interior_lamps"],
+      note: "Følger med bildet når du laster ned.",
+    },
+  },
+
+  // Linje 272-282.
+  honest: {
+    _type: "honest",
+    title: "Den ærlige versjonen.",
+    lead: "AI kan mye. Dette lar vi være, fordi bildene skal vise boligen slik den er.",
+    points: [
+      "Vi lager ikke vinduer, rom eller utsikt som ikke finnes.",
+      "Vi endrer ikke arkitektur, materialer eller omgivelser.",
+      "Lyset kommer bare fra vinduer og lamper som allerede er i bildet.",
+      "Vi skjuler ikke skader eller feil ved boligen.",
+    ],
+  },
+
+  // Linje 287-339. Tallene staar i site.offer; «Ca. {perImage}» regnes ut
+  // (offer.ts). «Prøv gratis først» gaar dit «Prøv gratis» gaar (site.cta).
+  pricing: {
+    _type: "pricing",
+    anchor: "priser",
+    title: "Åpne priser.",
+    note: "Alle priser er eks. mva. Du godkjenner hvert bilde før du laster det ned.",
+    priceFormat: "{price} kr",
+    free: {
+      name: "Prøv gratis",
+      text: "{n} kveldsbilder når du registrerer deg. Nok til en hel annonse. Uten kort.",
+      features: ["Samme bilde som betalende får", "AI-merke og tekst til annonsen"],
+    },
+    single: {
+      name: "Kveldsbilde",
+      unit: "per bilde",
+      text: "For et enkelt bilde, når du trenger det.",
+      features: ["Velg tidspunkt og himmel", "Én ny runde inkludert", "AI-merke og tekst til annonsen"],
+      ctaLabel: "Prøv gratis først",
+    },
+    bundle: {
+      name: "{n} kveldsbilder",
+      badge: "Lavere pris per bilde",
+      unit: "per oppdrag",
+      text: "Fasade og to rom i samme annonse, for eksempel. Ca. {perImage} kr per bilde.",
+      features: ["Alt i Kveldsbilde", "Én ny runde per bilde"],
+      ctaLabel: "Prøv gratis først",
+    },
+    addOn: "Skjul ansikter og skilt: {price} kr per bilde.",
+    chains: {
+      anchor: "kjeder",
+      eyebrow: "For kjeder og partnere",
+      title: "Deres merkevare. Vår motor.",
+      text: "Pris etter volum og type konto. Løsningen kan leveres i kjedens egen profil.",
+      points: [
+        "Egen logo, egne farger og egen nettadresse",
+        "Bildene leveres i kjedens profil",
+        "Volumpris for alle kontorene",
+      ],
+      cta: { label: "Snakk med oss", href: "#kontakt" },
+    },
+  },
+
+  // Linje 345-349. Spoersmaalene ligger i faq.ts (showOnHome).
+  faq: {
+    _type: "faq",
+    anchor: "sporsmal",
+    title: "Spørsmål og svar",
+    lead: "Finner du ikke svaret? Skriv til {email}.",
+  },
+
+  // Linje 392-398.
+  finalCta: {
+    _type: "finalCta",
+    title: "Se ditt eget bilde i kveldslys.",
+    text: "{n} gratis kveldsbilder når du registrerer deg. Uten kort.",
+    secondary: { label: "Kjede eller partner? Snakk med oss", href: "#kjeder" },
   },
 } as const satisfies Home;

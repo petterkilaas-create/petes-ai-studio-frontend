@@ -34,6 +34,10 @@
   --color-red-bg: #F6DEDB;
   --color-red-fg: #8A1F17;
 
+  /* Kveldsblaatt til de moerke seksjonene paa markedssiden (MS3b). Fast,
+     ikke en merkefarge. Tekst paa den: paper. */
+  --color-night: #101A2C;
+
   --radius-card: 14px;
   --radius-button: 10px;
   --radius-pill: 9999px;
