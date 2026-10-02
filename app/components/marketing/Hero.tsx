@@ -3,6 +3,7 @@ import { fill } from "../../../content/marketing/fill";
 import { IMAGES } from "../../../content/marketing/images";
 import type { Hero as HeroContent, Site } from "../../../content/marketing/schema";
 import { HeroSlider } from "./HeroSlider";
+import { PendingMark } from "./PendingMark";
 import { CONTAINER, FOCUS } from "./classes";
 
 /**
@@ -53,7 +54,11 @@ export function Hero({ hero, site }: { hero: HeroContent; site: Site }) {
             sliderLabel={hero.sliderLabel}
             sliderValue={hero.sliderValue}
           />
-          <figcaption className="text-[13.5px] leading-[1.5] text-ink-2">{hero.caption}</figcaption>
+          <figcaption className="text-[13.5px] leading-[1.5] text-ink-2">
+            {hero.caption}
+            {/* MS3: bildene er midlertidige (pending "image") til de ekte eksemplene er laget. */}
+            {(hero.before.pending || hero.after.pending) && <PendingMark label={site.pendingLabels.image} />}
+          </figcaption>
         </figure>
       </div>
     </section>
