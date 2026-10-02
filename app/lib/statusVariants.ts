@@ -1,5 +1,5 @@
-import type { JobSummary, JobSummaryStatus } from "../../lib/api";
-import type { UiKey } from "../../lib/i18n";
+import type { JobSummary, JobSummaryStatus } from "./api";
+import type { UiKey } from "./i18n";
 
 /** Fargen paa statuspillen (samme navn som tonene i components/ui/Pill). */
 export type StatusTone = "amber" | "green" | "neutral" | "red";

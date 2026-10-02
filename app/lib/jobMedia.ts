@@ -1,7 +1,6 @@
 import type { JobSummary } from "./api";
 import type { UiKey } from "./i18n/index.ts";
-import { rejectedLabelKey } from "./roles.ts";
-import { hasResultImage, isRejectedByReviewer, statusVariant } from "../(app)/history/statusVariants.ts";
+import { hasResultImage } from "./statusVariants.ts";
 
 /**
  * Ventebildet (KONTRAKT_VENTEBILDE): hva bildeboksen paa et jobbkort viser.
@@ -9,11 +8,15 @@ import { hasResultImage, isRejectedByReviewer, statusVariant } from "../(app)/hi
  * api.ts, som kaster ved import naar NEXT_PUBLIC_API_BASE mangler.
  *
  * Rekkefoelgen: det merkede resultatbildet (`thumbSrc`), ellers dagsbildet
- * dempet med status oppå, ellers en rolig plassholder med samme status.
+ * dempet, ellers en rolig plassholder.
  *
  * Originalen er aldri resultatet: dagsbildet brukes bare naar resultatet
  * mangler OG statusen ikke har resultatbilde, og det faar aldri AI-merkelapp.
  * Ingen tilbakefall fra resultat til original (samme regel som Lekkasjen L2).
+ *
+ * Tekst oppå bildet bare naar den gir noe merket ved tittelen ikke gir:
+ * mens jobben lages og ved peisspoersmaalet (opprydding, Petter 02.10).
+ * Ellers staar statusen bare i merket.
  */
 
 /** Statusteksten oppå bildet. `working`: det rolige animerte symbolet vises. */
@@ -24,8 +27,8 @@ export interface MediaOverlay {
 
 export type MediaView =
   | { kind: "result"; url: string }
-  | { kind: "original"; url: string; overlay: MediaOverlay }
-  | { kind: "placeholder"; overlay: MediaOverlay };
+  | { kind: "original"; url: string; overlay: MediaOverlay | null }
+  | { kind: "placeholder"; overlay: MediaOverlay | null };
 
 /** Jobben lages (i koe eller i arbeid). */
 export function isWorking(status: string): boolean {
@@ -51,14 +54,17 @@ export function workingKey(service: string | null | undefined): UiKey {
   }
 }
 
-/** Statusteksten for et kort uten resultatbilde. */
-export function overlayFor(job: Pick<JobSummary, "status" | "service" | "code" | "isOwner">): MediaOverlay {
+/**
+ * Teksten oppå bildet for et kort uten resultatbilde, eller null: bare mens
+ * jobben lages og ved peisspoersmaalet. Avvist, feilet og de andre
+ * statusene staar i merket ved tittelen, ikke to ganger.
+ */
+export function overlayFor(job: Pick<JobSummary, "status" | "service" | "code">): MediaOverlay | null {
   if (isWorking(job.status)) return { key: workingKey(job.service), working: true };
   if (job.status === "needs_review" && job.code !== null && FIREPLACE_CODES.has(job.code)) {
     return { key: "media.fireplaceQuestion", working: false };
   }
-  if (isRejectedByReviewer(job)) return { key: rejectedLabelKey(job), working: false };
-  return { key: statusVariant(job.status, job.service).labelKey, working: false };
+  return null;
 }
 
 /**
@@ -66,7 +72,7 @@ export function overlayFor(job: Pick<JobSummary, "status" | "service" | "code" |
  * `thumbSrc(job)` (Lekkasjen L2); finnes det, vises det og ingenting annet.
  */
 export function mediaView(
-  job: Pick<JobSummary, "status" | "service" | "code" | "isOwner" | "originalThumbUrl">,
+  job: Pick<JobSummary, "status" | "service" | "code" | "originalThumbUrl">,
   thumb: string | null
 ): MediaView {
   if (thumb !== null) return { kind: "result", url: thumb };

@@ -175,7 +175,7 @@ test("D1: listen over aktive filer har skallet, sidene og komponentene", () => {
     "globals.css",
     "(app)/express/page.tsx",
     "(app)/history/page.tsx",
-    "(app)/history/statusVariants.ts",
+    "lib/statusVariants.ts",
     "lib/services.ts",
     "components/AppNav.tsx",
     "components/ServiceUnavailable.tsx",
@@ -415,7 +415,6 @@ test("D1c: ordlista har Express-ordene paa nb og en", () => {
     "express.running",
     "express.reset",
     "express.noImage",
-    "express.processing",
     "express.noResult",
     "express.imageType",
     "express.imageTypeAuto",
@@ -863,4 +862,66 @@ test("ventebilde: Express viser samme symbol mens jobben lages, og resultatet so
   assert.match(page, /\) : isProcessing \? \(\s*<JobMedia\s*view=\{workingView\(selectedTool\.service\)\}/);
   assert.match(page, /aspect="square"/);
   assert.match(page, /outputView\(job\.status, job\.imageUrl\)/);
+});
+
+// ---------------------------------------------------------------------------
+// Opprydding (dag 35): fokusramme, ubrukt tekst, statusordene, «…» og
+// tidsgrensen for testene.
+// ---------------------------------------------------------------------------
+
+test("opprydding: fokusrammen bare med tastatur (focus-visible), og den finnes fortsatt", () => {
+  // focus: (uten -visible/-within) med ring eller outline viser rammen etter museklikk.
+  const FOCUS_ON_CLICK = /(^|[\s"'`])focus:(ring|outline)/;
+  for (const f of activeFiles().filter((f) => f.endsWith(".tsx") || f.endsWith(".ts"))) {
+    assert.doesNotMatch(read(f), FOCUS_ON_CLICK, f);
+  }
+  const RING = /focus-visible:ring-2 focus-visible:ring-accent/;
+  for (const f of [
+    "(app)/layout.tsx",
+    "components/AppNav.tsx",
+    "components/ui/Button.tsx",
+    "components/godkjenning/classes.ts",
+  ]) {
+    assert.match(read(f), RING, f);
+  }
+  // Markedssidens topplinje bruker FOCUS fra godkjenning/classes.ts.
+  assert.match(read("components/marketing/classes.ts"), /export \{ FOCUS \} from "\.\.\/godkjenning\/classes";/);
+  assert.match(read("components/marketing/MarketingTopBar.tsx"), /\$\{FOCUS\}/);
+});
+
+test("opprydding: express.processing er fjernet fra ordlista og koden", () => {
+  for (const locale of ["nb", "en"] as const) {
+    assert.ok(!Object.hasOwn(DICTIONARIES[locale].ui, "express.processing"), locale);
+  }
+  for (const f of sourceFiles()) {
+    assert.doesNotMatch(read(relative(APP_DIR, f)), /express\.processing/, f);
+  }
+});
+
+test("opprydding: statusVariants ligger i app/lib, og ingen importerer den fra (app)/history", () => {
+  assert.ok(existsSync(join(APP_DIR, "lib/statusVariants.ts")));
+  assert.ok(!existsSync(join(APP_DIR, "(app)/history/statusVariants.ts")));
+  for (const f of sourceFiles()) {
+    assert.doesNotMatch(read(relative(APP_DIR, f)), /history\/statusVariants|from "\.\/statusVariants"/, f);
+  }
+  assert.match(read("lib/jobMedia.ts"), /from "\.\/statusVariants\.ts";/);
+  assert.match(read("(app)/history/page.tsx"), /from "@\/app\/lib\/statusVariants";/);
+});
+
+test("opprydding: alle «…» i ordlista har mellomrom foran", () => {
+  for (const locale of ["nb", "en"] as const) {
+    const texts = [
+      ...Object.values(DICTIONARIES[locale].ui),
+      ...Object.values(DICTIONARIES[locale].codes).flatMap((g) => Object.values(g)),
+      ...Object.values(DICTIONARIES[locale].generic),
+    ];
+    assert.deepEqual(texts.filter((s) => /\S…/.test(s)), [], locale);
+  }
+  assert.equal(t("nb", "review.loading"), "Henter jobben …");
+  assert.equal(t("en", "review.statusRunning"), "Creating a new image …");
+});
+
+test("opprydding: testkommandoen har en tidsgrense, saa en test som henger, feiler", () => {
+  const pkg = JSON.parse(readFileSync(join(REPO_DIR, "package.json"), "utf8"));
+  assert.equal(pkg.scripts.test, "node --test --test-timeout=10000");
 });

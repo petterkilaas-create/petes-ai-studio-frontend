@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test"
+    "test": "node --test --test-timeout=10000"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.7",
