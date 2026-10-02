@@ -3,11 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import Autocomplete from "react-google-autocomplete";
-import { supabase } from "../../supabaseClient"; 
+import { supabase } from "@/supabaseClient"; 
 
-import { API_BASE } from "../lib/api";
-import { ServiceUnavailable } from "../components/ServiceUnavailable";
-import { VIDEO_PATH, isPageEnabled } from "../lib/services";
+import { API_BASE } from "@/app/lib/api";
+import { ServiceUnavailable } from "@/app/components/ServiceUnavailable";
+import { VIDEO_PATH, isPageEnabled } from "@/app/lib/services";
 
 type UploadedFile = { id: string; file: File; url: string; type: string; style: string; prompt: string; };
 type GalleryImage = { name: string; url: string; type: 'image' | 'video'; };

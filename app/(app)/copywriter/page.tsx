@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useUser, useAuth } from "@clerk/nextjs"; 
-import { supabase } from "../../supabaseClient"; 
+import { supabase } from "@/supabaseClient"; 
 import Autocomplete from "react-google-autocomplete";
 
-import { API_BASE } from "../lib/api";
-import { ServiceUnavailable } from "../components/ServiceUnavailable";
-import { COPYWRITER_PATH, isPageEnabled } from "../lib/services";
+import { API_BASE } from "@/app/lib/api";
+import { ServiceUnavailable } from "@/app/components/ServiceUnavailable";
+import { COPYWRITER_PATH, isPageEnabled } from "@/app/lib/services";
 
 type OrderArchive = { name: string; address?: string; date: string; status: string; hasCopy: boolean; };
 type UploadedFile = { id: string; file: File; url: string; };

@@ -9,7 +9,7 @@ import {
   statusVariant,
   thumbSrc,
 } from "./statusVariants.ts";
-import { DICTIONARIES } from "../lib/i18n/index.ts";
+import { DICTIONARIES } from "../../lib/i18n/index.ts";
 
 test("statusordene fra ordlista (brief §7, D1): Til godkjenning for begge ventestatusene", () => {
   for (const status of ["awaiting_approval", "needs_review"]) {

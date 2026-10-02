@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { ArrowRight, Clapperboard, Sofa, Zap, type LucideIcon } from "lucide-react";
-import { isPageEnabled, STAGING_PATH, VIDEO_PATH } from "./lib/services";
-import { DEFAULT_BRAND } from "./lib/brand";
-import { cardClass } from "./components/ui/Card";
-import { t } from "./lib/i18n";
-import { useLocale } from "./lib/i18n/useLocale";
+import { isPageEnabled, STAGING_PATH, VIDEO_PATH } from "@/app/lib/services";
+import { DEFAULT_BRAND } from "@/app/lib/brand";
+import { cardClass } from "@/app/components/ui/Card";
+import { t } from "@/app/lib/i18n";
+import { useLocale } from "@/app/lib/i18n/useLocale";
 
 // Merket per foretak kommer med TG-NEW-128 (via resolveBrand).
 const brand = DEFAULT_BRAND;

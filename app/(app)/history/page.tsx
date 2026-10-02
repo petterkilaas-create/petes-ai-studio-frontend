@@ -10,7 +10,7 @@ import {
   type JobScope,
   type JobSummary,
   type JobSummaryStatus,
-} from "../lib/api";
+} from "@/app/lib/api";
 import {
   thumbSrc,
   isRejectedByReviewer,
@@ -19,14 +19,14 @@ import {
   serviceLabelKey,
   statusVariant,
 } from "./statusVariants";
-import { OpenReviewLink } from "../components/OpenReviewLink";
-import { Button, ButtonLink } from "../components/ui/Button";
-import { Card, cardClass } from "../components/ui/Card";
-import { PageHeader } from "../components/ui/PageHeader";
-import { Pill } from "../components/ui/Pill";
-import { messageText, t, type Locale, type UiKey } from "../lib/i18n";
-import { jobMessage } from "../lib/jobMessage";
-import { useLocale } from "../lib/i18n/useLocale";
+import { OpenReviewLink } from "@/app/components/OpenReviewLink";
+import { Button, ButtonLink } from "@/app/components/ui/Button";
+import { Card, cardClass } from "@/app/components/ui/Card";
+import { PageHeader } from "@/app/components/ui/PageHeader";
+import { Pill } from "@/app/components/ui/Pill";
+import { messageText, t, type Locale, type UiKey } from "@/app/lib/i18n";
+import { jobMessage } from "@/app/lib/jobMessage";
+import { useLocale } from "@/app/lib/i18n/useLocale";
 import {
   effectiveScope,
   emptyWaitingKey,
@@ -36,7 +36,7 @@ import {
   showScopeToggle,
   subtitleKey,
   waitingLabelKey,
-} from "../lib/roles";
+} from "@/app/lib/roles";
 
 // Sidestoerrelse pr. henting. before-cursoren pagineres paa createdAt fra
 // siste rad (backendens kontrakt) — se loadMore().

@@ -1,48 +1,70 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
-import { useImagePreview } from "../hooks/useImagePreview";
-import { useProcessJob } from "../hooks/useProcessJob";
-import { StatusBadge } from "../components/StatusBadge";
-import { ErrorPanel } from "../components/ErrorPanel";
-import { ServiceUnavailable } from "../components/ServiceUnavailable";
-import { EXPRESS_V2_PATH, isPageEnabled } from "../lib/services";
+import { useEffect, useState } from "react";
+import { useImagePreview } from "@/app/hooks/useImagePreview";
+import { useProcessJob } from "@/app/hooks/useProcessJob";
+import { StatusBadge } from "@/app/components/StatusBadge";
+import { ErrorPanel } from "@/app/components/ErrorPanel";
+import { RejectionPanel } from "@/app/components/RejectionPanel";
+import type { ProcessParams } from "@/app/lib/api";
+import { nearestAspectRatio, type AspectRatio } from "@/app/lib/aspectRatio";
+import { ServiceUnavailable } from "@/app/components/ServiceUnavailable";
+import { STAGING_PATH, isPageEnabled } from "@/app/lib/services";
 
-type ServiceId = "privacy_blur" | "magic_cleanup" | "virtual_stage";
+// Kun EN tjeneste paa denne siden: Virtual Staging (Scandi).
+const SERVICE = "virtual_stage";
 
-const SERVICES: { id: ServiceId; label: string }[] = [
-  { id: "privacy_blur", label: "Privacy Blur (sync, lokal ML)" },
-  { id: "magic_cleanup", label: "Magic Cleanup (async, fal/Bria)" },
-  { id: "virtual_stage", label: "Virtual Staging Scandi (async, fal/FLUX)" },
-];
+// aspect_ratio finnes ikke i den typede ProcessParams (api.ts), men
+// submitJob serialiserer params via JSON.stringify, saa et ekstra felt
+// naar frem til backend uendret. Vi utvider typen lokalt for aa sende det
+// — samme sti som preset_id, uten aa endre lib-laget. StageParams er
+// tilordningsbar til ProcessParams, saa job.run() godtar den.
+type StageParams = ProcessParams & { aspect_ratio: AspectRatio };
 
 // Stengt mens tjenesten er av (TG-NEW-136, L0). Innholdet er beholdt i
-// ExpressV2PageContent, og hookene der kjoerer ikke naar siden er stengt: ingen
+// StagingPageContent, og hookene der kjoerer ikke naar siden er stengt: ingen
 // jobber og ingen kall mot backend. Slaa paa i lib/services.ts.
-export default function ExpressV2Page() {
-  if (!isPageEnabled(EXPRESS_V2_PATH)) return <ServiceUnavailable />;
-  return <ExpressV2PageContent />;
+export default function StagingPage() {
+  if (!isPageEnabled(STAGING_PATH)) return <ServiceUnavailable />;
+  return <StagingPageContent />;
 }
 
-function ExpressV2PageContent() {
-  const [service, setService] = useState<ServiceId>("privacy_blur");
-
+function StagingPageContent() {
   const preview = useImagePreview();
   const job = useProcessJob();
 
-  const isProcessing = job.isProcessing;
-  const runDisabled = !preview.file || isProcessing;
+  // Naermeste gyldige aspect_ratio fra det opplastede bildets faktiske
+  // dimensjoner. Backend krever eksplisitt aspect_ratio for virtual_stage
+  // (HTTP 422 uten) og godtar ikke "match_input_image".
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio | null>(null);
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    preview.onInputChange(e);
-    // Rydd en tidligere feil-tilstand naar bruker velger ny fil (som foer),
-    // men behold et eksisterende resultat til neste Run.
-    if (job.status === "failed") job.reset();
-  };
+  const isProcessing = job.isProcessing;
+  const runDisabled = !preview.file || !aspectRatio || isProcessing;
+
+  // Les dimensjoner lokalt paa siden (ikke i den delte useImagePreview-
+  // hooken, som /express deler) og regn ut naermeste ratio.
+  useEffect(() => {
+    if (!preview.previewUrl) {
+      setAspectRatio(null);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) {
+        setAspectRatio(nearestAspectRatio(img.naturalWidth, img.naturalHeight));
+      }
+    };
+    img.src = preview.previewUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [preview.previewUrl]);
 
   const handleRun = () => {
-    if (!preview.file || isProcessing) return;
-    void job.run(preview.file, service);
+    if (!preview.file || !aspectRatio || isProcessing) return;
+    const params: StageParams = { aspect_ratio: aspectRatio };
+    job.run(preview.file, SERVICE, params);
   };
 
   const handleReset = () => {
@@ -52,56 +74,50 @@ function ExpressV2PageContent() {
 
   return (
     <div className="min-h-screen bg-[#0B1120] flex flex-col font-sans text-white">
-      <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full p-8 gap-8">
+      <main className="flex-1 flex flex-col max-w-6xl mx-auto w-full p-8 gap-8">
         <header className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-black uppercase tracking-widest mb-2 flex items-center gap-4">
-              <span className="text-4xl">⚡</span> Express V2
+              <span className="text-4xl">🛋️</span> Virtual Staging
             </h1>
             <p className="text-slate-400 max-w-2xl text-sm">
-              Minimal proof-of-concept for backend V2 (/v1/process + /v1/jobs).
+              Furnish empty rooms with clean, Scandinavian-style interiors —
+              one photo at a time.
             </p>
           </div>
           <StatusBadge status={job.status} error={job.error} />
         </header>
 
+        {/* --- OPPLASTING + KJOERING --- */}
         <section className="bg-[#0f172a] border border-slate-800 rounded-3xl p-8 space-y-6">
-          <div>
-            <label className="text-[10px] font-black text-[#009183] uppercase tracking-[0.2em] block mb-3">
-              Service
-            </label>
-            <div className="flex flex-col gap-2">
-              {SERVICES.map((s) => (
-                <label
-                  key={s.id}
-                  className="flex items-center gap-3 cursor-pointer text-slate-300 hover:text-white transition-colors"
-                >
-                  <input
-                    type="radio"
-                    name="service"
-                    value={s.id}
-                    checked={service === s.id}
-                    onChange={() => setService(s.id)}
-                    disabled={isProcessing}
-                    className="accent-[#009183]"
-                  />
-                  <span className="text-sm">{s.label}</span>
-                </label>
-              ))}
+          <div className="flex items-center gap-4">
+            <div className="text-3xl">🛋️</div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                Service
+              </p>
+              <p className="text-white font-black uppercase tracking-widest">
+                Virtual Staging (Scandi)
+              </p>
             </div>
           </div>
 
           <div>
             <label className="text-[10px] font-black text-[#009183] uppercase tracking-[0.2em] block mb-3">
-              Image
+              Step 1: Image
             </label>
             <input
               type="file"
               accept="image/*"
-              onChange={handleFileChange}
+              onChange={preview.onInputChange}
               disabled={isProcessing}
               className="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-widest file:bg-[#009183] file:text-white hover:file:bg-[#00a89a] file:cursor-pointer"
             />
+            {aspectRatio && (
+              <p className="mt-3 text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                Format: <span className="text-slate-300">{aspectRatio}</span>
+              </p>
+            )}
           </div>
 
           <div className="flex gap-3">
@@ -121,9 +137,22 @@ function ExpressV2PageContent() {
             </button>
           </div>
 
-          {job.status === "failed" && <ErrorPanel message={job.error} />}
+          {/* virtual_stage gaar ikke gjennom scene-gaten, men hvis
+              useProcessJob likevel eksponerer et avslag, vis panelet. */}
+          {job.rejection && (
+            <RejectionPanel
+              rejection={job.rejection}
+              onForceExterior={() => void job.resubmitForced()}
+              disabled={runDisabled}
+            />
+          )}
+
+          {job.status === "failed" && !job.rejection && (
+            <ErrorPanel message={job.error} />
+          )}
         </section>
 
+        {/* --- RESULTAT: input/output side om side --- */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-[#0f172a] border border-slate-800 rounded-3xl p-6">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">
