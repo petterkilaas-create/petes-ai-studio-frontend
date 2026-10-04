@@ -173,6 +173,11 @@ export type SubmitResult =
  * Kontrakt 2d-1a (Petter 28.09, alternativ B): jobb avvist av megleren er
  * HTTP 200 + JSON {status:"failed", code:"rejected_by_reviewer", reason}.
  * Det er en avgjoerelse, ikke en feil -> "rejected_by_reviewer".
+ *
+ * TG-NEW-156 (Petter 04.10): feilet jobb er HTTP 200 + JSON
+ * {status:"failed", code:"job_failed"} -> "failed" med detail "job_failed",
+ * ogsaa uten kode eller med ukjent kode. 500 taales til backend er endret
+ * (pollJob kaster, og useJobStatus proever igjen).
  */
 export type JobResult =
   | { kind: "pending"; status: "queued" | "running"; retryAfterMs?: number }
@@ -182,6 +187,9 @@ export type JobResult =
   | { kind: "unknown"; status: string | null; httpStatus: number }
   | { kind: "rejected_by_reviewer"; reason: string | null }
   | { kind: "failed"; detail: string; rejection?: Rejection };
+
+/** Fast detail for en feilet jobb (TG-NEW-156). Aldri tekst fra bodyen. */
+export const JOB_FAILED = "job_failed";
 
 function unknownStatus(status: unknown, httpStatus: number): JobResult {
   return {
@@ -226,6 +234,11 @@ export function parseStatusBody(data: JobStatusBody, jobId: string): JobResult {
   }
   if (data.status === "failed" && data.code === "rejected_by_reviewer") {
     return { kind: "rejected_by_reviewer", reason: nonEmptyString(data.reason) };
+  }
+  if (data.status === "failed") {
+    // TG-NEW-156: feilet jobb, ogsaa uten kode eller med ukjent kode. Fast
+    // detail, aldri tekst fra bodyen (TG-NEW-121).
+    return { kind: "failed", detail: JOB_FAILED };
   }
   if (data.status === "needs_review") {
     const reasons = Array.isArray(data.reasons)

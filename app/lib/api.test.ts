@@ -1,5 +1,6 @@
 import { test, before, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import type { PollOutcome } from "./jobState.ts";
 
 // api.ts kaster ved import uten NEXT_PUBLIC_API_BASE — sett en dummy-verdi
 // foer dynamisk import. fetch mockes; ingen nettverkskall.
@@ -7,6 +8,7 @@ process.env.NEXT_PUBLIC_API_BASE = "http://api.test";
 const api = await import("./api.ts");
 const { buildDecision } = await import("./review.ts");
 const { buildCorrection, initialToggles } = await import("./correction.ts");
+const { afterPoll } = await import("./jobState.ts");
 
 const realFetch = globalThis.fetch;
 const getToken = async () => "tok";
@@ -192,10 +194,96 @@ test("rejected_by_reviewer uten begrunnelse gir reason null", async () => {
   }
 });
 
-test("200 failed med annen kode er fortsatt unknown (ikke avvist)", async () => {
-  mockFetch(200, { status: "failed", code: "something_else" });
+// ---- TG-NEW-156: feilet jobb som 200 + job_failed ---------------------------
+
+test("200 failed + job_failed gir failed, og detail er koden", async () => {
+  mockFetch(200, { job_id: "j1", service: "scene_transform", status: "failed", code: "job_failed" });
   const r = await api.pollJob({ jobId: "j1", getToken });
-  assert.equal(r.kind, "unknown");
+  assert.deepEqual(r, { kind: "failed", detail: "job_failed" });
+});
+
+test("200 failed: feiltekst i bodyen havner aldri i detail", async () => {
+  mockFetch(200, {
+    status: "failed",
+    code: "job_failed",
+    error: "submit: inntak https://fal.example/x",
+    detail: "Traceback ...",
+    message: "rå feil",
+  });
+  const r = await api.pollJob({ jobId: "j1", getToken });
+  assert.deepEqual(r, { kind: "failed", detail: "job_failed" });
+});
+
+test("200 failed uten kode eller med ukjent kode gir failed, ikke unknown", async () => {
+  for (const body of [
+    { status: "failed" },
+    { status: "failed", code: "something_else", error: "rå feil" },
+    { status: "failed", code: null },
+  ]) {
+    mockFetch(200, body);
+    const r = await api.pollJob({ jobId: "j1", getToken });
+    assert.deepEqual(r, { kind: "failed", detail: "job_failed" }, JSON.stringify(body));
+  }
+});
+
+test("500 kaster fortsatt (taales til backend er endret)", async () => {
+  mockFetch(500, { detail: "submit: inntak" });
+  await assert.rejects(api.pollJob({ jobId: "j1", getToken }), /pollJob failed \(500\)/);
+});
+
+/**
+ * Kjoerer hookens poll-loekke (afterPoll) mot pollJob med en serie svar,
+ * uten timere. Gir antall kall, ventetidene og sluttsteget.
+ */
+async function runPollLoop(responses: { status: number; body: unknown }[]) {
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    const { status, body } = responses[Math.min(calls, responses.length - 1)];
+    calls += 1;
+    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+  const delays: number[] = [];
+  let consecutiveErrors = 0;
+  for (let i = 0; i < 10; i++) {
+    let outcome: PollOutcome;
+    try {
+      outcome = { ok: true, result: await api.pollJob({ jobId: "j1", getToken }) };
+    } catch (error) {
+      outcome = { ok: false, error };
+    }
+    const step = afterPoll(outcome, consecutiveErrors);
+    if (step.kind !== "wait") return { calls, delays, step };
+    delays.push(step.delayMs);
+    consecutiveErrors = step.consecutiveErrors;
+  }
+  throw new Error("pollingen stoppet ikke");
+}
+
+test("hooken: job_failed gir failed etter ett kall, uten nye forsoek", async () => {
+  const { calls, delays, step } = await runPollLoop([
+    { status: 200, body: { status: "failed", code: "job_failed" } },
+  ]);
+  assert.equal(calls, 1);
+  assert.deepEqual(delays, []);
+  assert.equal(step.kind, "terminal");
+  assert.equal(step.kind === "terminal" && step.state.status, "failed");
+});
+
+test("hooken: 500 gir fortsatt failed etter tre kall (2 s og 4 s), som foer", async () => {
+  const { calls, delays, step } = await runPollLoop([{ status: 500, body: { detail: "submit: inntak" } }]);
+  assert.equal(calls, 3);
+  assert.deepEqual(delays, [2000, 4000]);
+  assert.equal(step.kind, "gave_up");
+});
+
+test("hooken: running poller videre, saa job_failed stopper", async () => {
+  const { calls, delays, step } = await runPollLoop([
+    { status: 202, body: { status: "running" } },
+    { status: 200, body: { status: "failed", code: "job_failed" } },
+  ]);
+  assert.equal(calls, 2);
+  assert.deepEqual(delays, [2000]);
+  assert.equal(step.kind === "terminal" && step.state.status, "failed");
 });
 
 test("listJobs sender statusfilteret og leser code/reason", async () => {

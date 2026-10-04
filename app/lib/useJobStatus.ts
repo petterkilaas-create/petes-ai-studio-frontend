@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { pollJob, type Rejection, type Review } from "./api";
-import { terminalState, type JobStatus } from "./jobState";
+import { afterPoll, type JobStatus, type PollOutcome } from "./jobState";
 
 export type { JobStatus } from "./jobState";
 
@@ -27,14 +27,6 @@ export interface UseJobStatusResult {
   /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
   reviewerReason: string | null;
 }
-
-const POLL_INTERVAL_MS = 2000;
-
-// Transient nettverksfeil dreper ikke loopen umiddelbart: vi proever paa
-// nytt med eksponentiell backoff (2 s, 4 s) og gir foerst opp ved tredje
-// paafoelgende feil. Et vellykket poll nullstiller telleren.
-const MAX_CONSECUTIVE_ERRORS = 3;
-const BACKOFF_BASE_MS = 2000;
 
 export function useJobStatus(jobId: string | null): UseJobStatusResult {
   const { getToken } = useAuth();
@@ -78,41 +70,34 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
     };
 
     const tick = async () => {
+      let outcome: PollOutcome;
       try {
-        const result = await pollJob({ jobId, getToken });
-        if (cancelled) return;
-        consecutiveErrors = 0;
-
-        // Alt unntatt pending er terminalt (ogsaa ukjent status) — ingen
-        // ny schedule, saa pollingen stopper.
-        const next = terminalState(result);
-        if (next !== null) {
-          setImageUrl(next.imageUrl);
-          setError(next.error);
-          setRejection(next.rejection);
-          setReview(next.review);
-          setReviewerReason(next.reviewerReason);
-          setStatus(next.status);
-          return;
-        }
-
-        // pending — backend kan styre tempoet via Retry-After.
-        if (result.kind === "pending") {
-          schedule(result.retryAfterMs ?? POLL_INTERVAL_MS);
-        }
+        outcome = { ok: true, result: await pollJob({ jobId, getToken }) };
       } catch (err) {
-        if (cancelled) return;
-        consecutiveErrors += 1;
-
-        if (consecutiveErrors < MAX_CONSECUTIVE_ERRORS) {
-          // 1. feil -> vent 2 s, 2. feil -> vent 4 s.
-          schedule(BACKOFF_BASE_MS * 2 ** (consecutiveErrors - 1));
-          return;
-        }
-
-        setError(err instanceof Error ? err.message : String(err));
-        setStatus("failed");
+        outcome = { ok: false, error: err };
       }
+      if (cancelled) return;
+
+      const step = afterPoll(outcome, consecutiveErrors);
+      if (step.kind === "wait") {
+        // pending (Retry-After) eller backoff etter en feil.
+        consecutiveErrors = step.consecutiveErrors;
+        schedule(step.delayMs);
+        return;
+      }
+      if (step.kind === "gave_up") {
+        setError(step.error);
+        setStatus("failed");
+        return;
+      }
+      // Terminalt — ingen ny schedule, saa pollingen stopper.
+      const next = step.state;
+      setImageUrl(next.imageUrl);
+      setError(next.error);
+      setRejection(next.rejection);
+      setReview(next.review);
+      setReviewerReason(next.reviewerReason);
+      setStatus(next.status);
     };
 
     void tick();
