@@ -4,11 +4,19 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_BRAND } from "../../app/lib/brand.ts";
-import { MARKETING_HOME, MARKETING_PAGES, MARKETING_PUBLIC, SITE_URL } from "../../app/lib/marketingAccess.ts";
+import {
+  CONTACT_PATH,
+  FAQ_PATH,
+  LABELING_PATH,
+  MARKETING_HOME,
+  MARKETING_PAGES,
+  MARKETING_PUBLIC,
+  SITE_URL,
+} from "../../app/lib/marketingAccess.ts";
 import { ogText, robotsFor, sitemapFor } from "../../app/lib/seo.ts";
-import { literalTextsInFile } from "../../app/lib/testing/jsxText.ts";
+import { literalTextsInFile, withoutComments } from "../../app/lib/testing/jsxText.ts";
 import { fill } from "./fill.ts";
-import { getFaq, getHome, getSite } from "./index.ts";
+import { getContactPage, getFaq, getFaqPage, getHome, getLabelingPage, getSite } from "./index.ts";
 import { pendingItems } from "./pending.ts";
 
 // MS4: SEO-grunnlaget. robots og sitemap foelger MARKETING_PUBLIC, metadata
@@ -238,4 +246,57 @@ test("MS4: ved lansering er robots, sitemap og delingsbildet utenfor innlogginge
     // Til lansering ligger alt bak innloggingen (MS4 endrer ikke proxyen).
     for (const p of paths) assert.ok(runs(p), p);
   }
+});
+
+// ---------------------------------------------------------------------------
+// MS5a: innholdssidene
+// ---------------------------------------------------------------------------
+
+test("MS5a: MARKETING_PAGES er sidene som finnes under (marketing)/no", () => {
+  const pages = walk("app/(marketing)/no")
+    .filter((f) => f.endsWith("/page.tsx"))
+    .map((f) => f.slice("app/(marketing)".length, -"/page.tsx".length))
+    .sort();
+  assert.deepEqual(pages, [...MARKETING_PAGES].sort());
+  assert.deepEqual(MARKETING_PAGES, [MARKETING_HOME, FAQ_PATH, LABELING_PATH, CONTACT_PATH]);
+  // Sitemap tar dem med ved lansering, med full adresse.
+  assert.deepEqual(
+    sitemapFor(true).map((e) => e.url),
+    MARKETING_PAGES.map((p) => `${SITE_URL}${p}`)
+  );
+});
+
+const SUBPAGES = [
+  { file: "app/(marketing)/no/sporsmal-og-svar/page.tsx", path: FAQ_PATH, constName: "FAQ_PATH", content: getFaqPage("no") },
+  { file: "app/(marketing)/no/merking/page.tsx", path: LABELING_PATH, constName: "LABELING_PATH", content: getLabelingPage("no") },
+  { file: "app/(marketing)/no/kontakt/page.tsx", path: CONTACT_PATH, constName: "CONTACT_PATH", content: getContactPage("no") },
+];
+
+test("MS5a: hver underside har tittel, beskrivelse og canonical, og arver noindex og delingsbildet", () => {
+  const waiting = pendingTexts({ site, home, faq: getFaq("no") });
+  for (const { file, path, constName, content } of SUBPAGES) {
+    const src = withoutComments(read(file));
+    assert.match(src, /title: fill\(page\.seo\.title, \{ brand: brand\.displayName \}\),/, file);
+    assert.match(src, /description: fill\(page\.seo\.description, \{ brand: brand\.displayName \}\),/, file);
+    assert.match(src, new RegExp(`alternates: \\{ canonical: ${constName} \\},`), file);
+    // Siden setter ikke robots, openGraph eller twitter: noindex og
+    // delingsbildet arves (openGraph her ville erstattet bildet, sjekket i build).
+    assert.doesNotMatch(src, /robots:/, file);
+    assert.doesNotMatch(src, /openGraph:|twitter:|images:/, file);
+    assert.equal(new URL(path, SITE_URL).href, `https://husvy.com${path}`);
+    const title = fill(content.seo.title, { brand });
+    const description = fill(content.seo.description, { brand });
+    assert.ok(content.seo.title.includes("{brand}") && !content.seo.title.includes(brand), file);
+    assert.ok(title.endsWith(` – ${brand}`), title);
+    for (const text of [title, description]) {
+      assert.doesNotMatch(text, /[[\]{}]/, text);
+      assert.doesNotMatch(text, /\bEU\b|juridisk|minutt|sekund|\btimer?\b/i, text);
+      for (const w of waiting) assert.ok(!text.includes(w), `${text} har en paastand som venter: ${w}`);
+    }
+    assert.ok(description.length >= 50 && description.length <= 160, `${file}: ${description.length}`);
+  }
+  // Delingsbildet ligger bare paa /no; undersidene arver det.
+  assert.deepEqual(walk("app/(marketing)").filter((f) => /opengraph-image|twitter-image/.test(f)), [
+    "app/(marketing)/no/opengraph-image.tsx",
+  ]);
 });

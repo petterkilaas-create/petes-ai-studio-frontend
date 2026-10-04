@@ -1,4 +1,5 @@
 import type { Brand } from "../../lib/brand";
+import { onPage } from "../../../content/marketing/links";
 import type { MaybeLink, Site } from "../../../content/marketing/schema";
 import { BrandMark } from "../BrandMark";
 import { PendingMark } from "./PendingMark";
@@ -10,6 +11,9 @@ import { CONTAINER, FOCUS } from "./classes";
  * trygghet, kontakt og ©. Sidene som ikke finnes ennaa (MS5), vises som
  * tekst uten lenke. Ingen spraakvelger foer det finnes flere spraak.
  * Ankeret (#kontakt) er maalet for «Snakk med oss».
+ *
+ * MS5a: kolonnen «Hjelp» er hjelpelista (site.help, samme som i appen). Paa
+ * en underside (homePath satt) gaar ankrene til forsiden (onPage).
  */
 const LINK = `rounded-button text-ink no-underline hover:underline ${FOCUS}`;
 
@@ -22,19 +26,21 @@ function Item({ link }: { link: MaybeLink }) {
   );
 }
 
-export function Footer({ site, brand }: { site: Site; brand: Brand }) {
-  const { footer, contact, offer } = site;
+export function Footer({ site, brand, homePath = null }: { site: Site; brand: Brand; homePath?: string | null }) {
+  const { footer, contact, offer, help } = site;
+  const [services, ...rest] = footer.columns;
+  const columns = [services, help, ...rest];
   return (
     <footer id={footer.anchor} className="border-t border-line bg-paper">
-      <div className={`${CONTAINER} grid grid-cols-1 gap-10 py-14 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]`}>
+      <div className={`${CONTAINER} grid grid-cols-1 gap-10 py-14 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]`}>
         <div className="flex flex-col gap-3">
           <BrandMark brand={brand} alwaysShowName />
           <p className="m-0 text-[15px] text-ink-2">{footer.tagline}</p>
         </div>
-        {footer.columns.map((col) => (
+        {columns.map((col) => (
           <nav key={col.title} aria-label={col.title} className="flex flex-col gap-2 text-[15px]">
             <p className="m-0 font-semibold text-ink">{col.title}</p>
-            {col.links.map((l) => (
+            {onPage(col.links, homePath).map((l) => (
               <Item key={l.label} link={l} />
             ))}
           </nav>
@@ -50,7 +56,7 @@ export function Footer({ site, brand }: { site: Site; brand: Brand }) {
               <PendingMark label={site.pendingLabels[contact.email.pending]} />
             </span>
           )}
-          {footer.contact.links.map((l) => (
+          {onPage(footer.contact.links, homePath).map((l) => (
             <Item key={l.label} link={l} />
           ))}
         </div>

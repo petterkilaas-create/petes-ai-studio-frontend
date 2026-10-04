@@ -10,7 +10,8 @@ import type { Site } from "../schema.ts";
 // bunnen (linje 405-444). Sidene i bunnen finnes ikke ennaa (MS5) og vises
 // som tekst uten lenke. Spraakvelgeren vises ikke foer det finnes flere spraak.
 // MS4: alt-teksten til delingsbildet, satt sammen av merket og overskriften
-// (Petter 02.10).
+// (Petter 02.10). MS5a: hjelpesidene (MS5_TEKSTER.md §4, godkjent av Petter
+// 04.10) og skjermleserteksten paa merket paa undersidene.
 export const site = {
   _type: "site",
   seo: {
@@ -21,6 +22,7 @@ export const site = {
     _type: "topBar",
     logoLabel: "{brand}, til toppen av siden",
     logoHref: "#topp",
+    logoHomeLabel: "{brand}, til forsiden",
     navLabel: "Hovedmeny",
     links: [
       { label: "Tjenester", href: "#tjenester" },
@@ -75,6 +77,14 @@ export const site = {
     copyright: "© {year} {companyName}",
     companyName: { pending: "companyName" },
     note: "Alle eksempelbilder er laget med tjenesten og merket som AI.",
+  },
+  help: {
+    title: "Hjelp",
+    links: [
+      { label: "Spørsmål og svar", href: "/no/sporsmal-og-svar" },
+      { label: "Slik merker vi bildene", href: "/no/merking" },
+      { label: "Kontakt", href: "/no/kontakt" },
+    ],
   },
   pendingLabels: {
     dataRegion: "[BEKREFT REGION]",

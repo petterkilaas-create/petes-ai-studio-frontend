@@ -1,7 +1,9 @@
-import { faq } from "./nb/faq.ts";
+import { contactPage } from "./nb/contact.ts";
+import { faq, faqPage } from "./nb/faq.ts";
 import { home } from "./nb/home.ts";
+import { labelingPage } from "./nb/labeling.ts";
 import { site } from "./nb/site.ts";
-import type { FaqItem, Home, Site } from "./schema.ts";
+import type { ContactPage, FaqItem, FaqPage, Home, LabelingPage, Site } from "./schema.ts";
 
 /** Spraakene markedssiden finnes paa. Bare norsk i foerste versjon. */
 export type MarketingLang = "no";
@@ -21,4 +23,20 @@ export function getHome(lang: MarketingLang): Home {
 export function getFaq(lang: MarketingLang): readonly FaqItem[] {
   void lang;
   return faq;
+}
+
+/** Innholdssidene (MS5a). */
+export function getFaqPage(lang: MarketingLang): FaqPage {
+  void lang;
+  return faqPage;
+}
+
+export function getLabelingPage(lang: MarketingLang): LabelingPage {
+  void lang;
+  return labelingPage;
+}
+
+export function getContactPage(lang: MarketingLang): ContactPage {
+  void lang;
+  return contactPage;
 }

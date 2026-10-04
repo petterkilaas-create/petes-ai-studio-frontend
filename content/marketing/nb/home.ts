@@ -193,7 +193,7 @@ export const home = {
       { title: "Velg stemning", text: "Velg tidspunkt og himmel. Bildet lages mens du jobber videre med annonsen." },
       {
         title: "Godkjenn og last ned",
-        text: "Sammenlign med originalen og godkjenn, eller be om en ny runde. Du laster ned bildet med AI-merke og ferdig tekst til annonsen.",
+        text: "Sammenlign med originalen og godkjenn, eller be om en ny runde. Du laster ned bildet med AI-merket og kopierer den ferdige teksten til annonsen.",
       },
     ],
   },
@@ -243,11 +243,14 @@ export const home = {
     lead: "Kjøpere skal kunne stole på bildene i annonsen. Derfor har hvert bilde vi lager et synlig AI-merke, og du får en ferdig tekst som sier hva som er endret.",
     points: [
       { text: "AI-merket står på bildet, også i forhåndsvisningen." },
-      { text: "Teksten til annonsen følger med nedlastingen." },
-      { text: "Originalen lagres urørt, så du alltid kan vise den." },
+      // MS5a (MS5_TEKSTER_SVAR §3): fila har bare grunnsetningen; hele
+      // teksten faar megleren paa godkjenningssiden.
+      { text: "Teksten til annonsen får du når du godkjenner bildet." },
+      { text: "Originalen lagres urørt, og du ser den ved siden av kveldsbildet før du godkjenner." },
       { text: "Laget for EUs krav om åpenhet rundt AI-innhold.", pending: "legal" },
     ],
     guide: { label: "Les guiden: AI-bilder i boligannonsen" },
+    more: { label: "Les mer om merkingen", href: "/no/merking" },
     picture: ph(
       "Stue som kveldsbilde med AI-merket",
       "Stue som kveldsbilde laget med AI, med AI-merket synlig nede til venstre"
@@ -257,7 +260,7 @@ export const home = {
       base: "evening_from_day",
       time: "early",
       edited: ["sky", "interior_lamps"],
-      note: "Følger med bildet når du laster ned.",
+      note: "Klar til å kopiere når bildet er godkjent.",
     },
   },
 
@@ -323,6 +326,7 @@ export const home = {
     anchor: "sporsmal",
     title: "Spørsmål og svar",
     lead: "Finner du ikke svaret? Skriv til {email}.",
+    more: { label: "Se alle spørsmål", href: "/no/sporsmal-og-svar" },
   },
 
   // Linje 392-398.

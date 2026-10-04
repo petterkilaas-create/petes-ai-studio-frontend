@@ -65,6 +65,8 @@ export type Site = {
     /** Skjermlesertekst paa merket oeverst til venstre. Mal med {brand}. */
     logoLabel: string;
     logoHref: string;
+    /** Det samme paa en underside, der merket gaar til /no (MS5a). Mal med {brand}. */
+    logoHomeLabel: string;
     navLabel: string;
     links: readonly Link[];
     login: Link;
@@ -91,6 +93,12 @@ export type Site = {
   };
   /** Bunnen (MS3b, utkastet linje 405-444). Ankeret er maalet for «Snakk med oss». */
   footer: Footer;
+  /**
+   * Hjelpesidene (MS5a): kolonnen i bunnen, lenkene oeverst paa
+   * spoersmaalssiden og «Hjelp» i appen (AppNav) bruker denne lista. Den
+   * foerste lenken er startsiden for hjelp, dit «Hjelp» i appen gaar.
+   */
+  help: { title: string; links: readonly Link[] };
   /** Merkelappene for det som venter (MS3). Vises bare mens siden er bak innlogging. */
   pendingLabels: Record<PendingKey, string>;
   /** Teksten i en bildeplassholder, over beskrivelsen. */
@@ -205,8 +213,10 @@ export type Labeling = {
   title: string;
   lead: string;
   points: readonly Claim[];
-  /** Guiden finnes ikke ennaa (MS5): uten href. */
+  /** Guiden finnes ikke ennaa (MS5b): uten href. */
   guide: MaybeLink;
+  /** Lenken til merkesiden (MS5a). */
+  more: Link;
   picture: Picture;
   example: {
     title: string;
@@ -268,6 +278,8 @@ export type FaqBlock = {
   title: string;
   /** Mal med {email}. */
   lead: string;
+  /** «Se alle spørsmål» (MS5a). */
+  more: Link;
 };
 
 /**
@@ -319,4 +331,55 @@ export type Home = {
   pricing: Pricing;
   faq: FaqBlock;
   finalCta: FinalCta;
+};
+
+// ---------------------------------------------------------------------------
+// Innholdssidene (MS5a). Hver side er et eget dokument (Sanity: document type).
+// ---------------------------------------------------------------------------
+
+/** Tittel og beskrivelse for en side (metadata). Maler med {brand}. */
+export type PageSeo = { title: string; description: string };
+
+/** Spoersmaalssiden. Spoersmaalene ligger i faq.ts (alle, ikke bare showOnHome). */
+export type FaqPage = {
+  _type: "faqPage";
+  seo: PageSeo;
+  title: string;
+  /** Mal med {email}. */
+  lead: string;
+};
+
+/** En del av en innholdsside: en overskrift og avsnitt som kan vente. */
+export type TextSection = { title: string; points: readonly Claim[] };
+
+/**
+ * Merkesiden. Bildet, eksempelet paa teksten og guiden hentes fra
+ * home.labeling, og lista over hva som kan vaere redigert fra ordlista
+ * (codes.disclosureEdited), saa ingenting staar to steder.
+ */
+export type LabelingPage = {
+  _type: "labelingPage";
+  seo: PageSeo;
+  title: string;
+  /** Mal med {brand}. */
+  lead: string;
+  mark: TextSection;
+  adText: TextSection;
+  list: TextSection;
+  file: TextSection;
+  original: TextSection;
+  /** `faqId`: spoersmaalet det lenkes til (spoersmaalet er lenketeksten). */
+  rules: TextSection & { faqId: string };
+};
+
+/** Kontaktsiden. E-posten og selskapsnavnet kommer fra site (ingen kopi). */
+export type ContactPage = {
+  _type: "contactPage";
+  seo: PageSeo;
+  title: string;
+  lead: string;
+  /** Maler med {email}. */
+  groups: readonly { title: string; text: string; more?: Link }[];
+  /** Overskriften over selskapsnavnet. */
+  companyTitle: string;
 };

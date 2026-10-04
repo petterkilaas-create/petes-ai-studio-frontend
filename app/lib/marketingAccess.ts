@@ -30,10 +30,19 @@ export const MARKETING_HOME = "/no";
 export const SITE_URL = "https://husvy.com";
 
 /**
- * De offentlige markedssidene, som sitemap lister (MS4). Bare sider som
- * finnes; MS5 legger til innholdssidene. Ingen app-ruter.
+ * Innholdssidene (MS5a, valg C1): en offentlig adresse per side, bare under
+ * /no. Lenkene i innholdet (site.help) bruker de samme adressene; testen
+ * sjekker at de henger sammen og at sidene finnes.
  */
-export const MARKETING_PAGES: readonly string[] = [MARKETING_HOME];
+export const FAQ_PATH = "/no/sporsmal-og-svar";
+export const LABELING_PATH = "/no/merking";
+export const CONTACT_PATH = "/no/kontakt";
+
+/**
+ * De offentlige markedssidene, som sitemap lister (MS4). Bare sider som
+ * finnes (testen sjekker mappene under app/(marketing)/no). Ingen app-ruter.
+ */
+export const MARKETING_PAGES: readonly string[] = [MARKETING_HOME, FAQ_PATH, LABELING_PATH, CONTACT_PATH];
 
 /** `/no` og alt under `/no/`. Ikke `/nokke` eller `/no-x`. */
 export function isMarketingPath(pathname: string): boolean {
