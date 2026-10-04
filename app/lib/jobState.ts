@@ -63,6 +63,49 @@ export function terminalState(result: JobResult): TerminalJobState | null {
   }
 }
 
+export const POLL_INTERVAL_MS = 2000;
+
+// Transient nettverksfeil dreper ikke loopen umiddelbart: vi proever paa
+// nytt med eksponentiell backoff (2 s, 4 s) og gir foerst opp ved tredje
+// paafoelgende feil. Et vellykket poll nullstiller telleren.
+export const MAX_CONSECUTIVE_ERRORS = 3;
+export const BACKOFF_BASE_MS = 2000;
+
+/** Utfallet av ett pollJob-kall: et svar, eller et kastet unntak (f.eks. 500). */
+export type PollOutcome = { ok: true; result: JobResult } | { ok: false; error: unknown };
+
+/**
+ * Hva useJobStatus gjoer etter ett kall: sluttstatus (stopp), vent og poll
+ * igjen, eller gi opp etter for mange feil paa rad.
+ */
+export type PollStep =
+  | { kind: "terminal"; state: TerminalJobState }
+  | { kind: "wait"; delayMs: number; consecutiveErrors: number }
+  | { kind: "gave_up"; error: string };
+
+/**
+ * Regelen for neste steg i pollingen, skilt ut fra hooken saa den kan
+ * testes. Et svar (ogsaa failed, TG-NEW-156) stopper eller fortsetter etter
+ * svaret selv; bare et kastet unntak gir nye forsoek.
+ */
+export function afterPoll(outcome: PollOutcome, consecutiveErrors: number): PollStep {
+  if (outcome.ok) {
+    // Alt unntatt pending er terminalt (ogsaa ukjent status).
+    const state = terminalState(outcome.result);
+    if (state !== null) return { kind: "terminal", state };
+    // pending — backend kan styre tempoet via Retry-After.
+    const retryAfterMs = outcome.result.kind === "pending" ? outcome.result.retryAfterMs : undefined;
+    return { kind: "wait", delayMs: retryAfterMs ?? POLL_INTERVAL_MS, consecutiveErrors: 0 };
+  }
+  const errors = consecutiveErrors + 1;
+  if (errors < MAX_CONSECUTIVE_ERRORS) {
+    // 1. feil -> vent 2 s, 2. feil -> vent 4 s.
+    return { kind: "wait", delayMs: BACKOFF_BASE_MS * 2 ** (errors - 1), consecutiveErrors: errors };
+  }
+  const { error } = outcome;
+  return { kind: "gave_up", error: error instanceof Error ? error.message : String(error) };
+}
+
 /**
  * Hva Express viser i Output-ruten (Lekkasjen L2): bildet naar vi har en
  * URL, plassholder naar jobben er ferdig (done/awaiting_approval) uten
