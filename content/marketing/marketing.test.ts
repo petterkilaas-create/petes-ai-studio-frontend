@@ -5,9 +5,13 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_BRAND } from "../../app/lib/brand.ts";
 import {
+  CONTACT_PATH,
+  FAQ_PATH,
   isMarketingPath,
   isOpenMarketingPath,
+  LABELING_PATH,
   MARKETING_HOME,
+  MARKETING_PAGES,
   MARKETING_PUBLIC,
   rootTarget,
   START_PATH,
@@ -18,8 +22,8 @@ import { DICTIONARIES } from "../../app/lib/i18n/index.ts";
 import { DISCLOSURE_DETAIL, DISCLOSURE_LOCALE, disclosureText } from "../../app/lib/disclosure.ts";
 import { tabKey } from "../../app/lib/tabs.ts";
 import { fill, fillParts } from "./fill.ts";
-import { getFaq, getHome, getSite } from "./index.ts";
-import { contentAnchors, visibleLinks } from "./links.ts";
+import { getContactPage, getFaq, getFaqPage, getHome, getLabelingPage, getSite } from "./index.ts";
+import { contentAnchors, onPage, visibleLinks } from "./links.ts";
 import { formatNok, perImage, priceVars } from "./offer.ts";
 import { pendingItems } from "./pending.ts";
 
@@ -34,6 +38,9 @@ const read = (rel: string) => readFileSync(join(REPO_DIR, rel), "utf8");
 const site = getSite("no");
 const home = getHome("no");
 const faq = getFaq("no");
+const faqPage = getFaqPage("no");
+const labelingPage = getLabelingPage("no");
+const contactPage = getContactPage("no");
 
 /** Alle .ts/.tsx i en mappe (rekursivt), uten testfilene. Relativt til repoet. */
 function filesIn(rel: string, ext = /\.tsx?$/): string[] {
@@ -209,9 +216,10 @@ test("MS2: under 820 px skjules bare menylenkene, «Logg inn» og «Prøv gratis
   }
 });
 
-test("MS2: lenkene i innholdet er ankre, /start eller markedssiden", () => {
-  for (const [path, href] of [...strings(site, "site"), ...strings(home, "home")].filter(([p]) => p.endsWith(".href") || p.endsWith("logoHref"))) {
-    assert.ok(/^#[a-z]+$/.test(href) || href === START_PATH || href === MARKETING_HOME, `${path}: ${href}`);
+test("MS2: lenkene i innholdet er ankre, /start eller markedssidene", () => {
+  const docs = { site, home, faqPage, labelingPage, contactPage };
+  for (const [path, href] of strings(docs).filter(([p]) => p.endsWith(".href") || p.endsWith("logoHref"))) {
+    assert.ok(/^#[a-z]+$/.test(href) || href === START_PATH || MARKETING_PAGES.includes(href), `${path}: ${href}`);
   }
   assert.equal(site.topBar.logoHref, `#${home.hero.anchor}`);
   assert.equal(site.topBar.login.href, START_PATH);
@@ -533,10 +541,12 @@ const PENDING_NOW = [
   ["faq[3].slots.time", "time"],
   ["faq[6]", "trainingAnswer"],
   ["faq[7]", "storageAnswer"],
+  // MS5a: linja om EUs krav paa merkesiden (samme paastand som paa forsiden).
+  ["labelingPage.rules.points[0]", "legal"],
 ];
 
 test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () => {
-  const items = pendingItems({ site, home, faq });
+  const items = pendingItems({ site, home, faq, faqPage, labelingPage, contactPage });
   if (MARKETING_PUBLIC) {
     assert.deepEqual(items, [], "MARKETING_PUBLIC er true, men noe i innholdet venter fortsatt");
   }
@@ -717,7 +727,7 @@ test("MS3b: prisene og antallene staar ett sted, og «ca. 116» og svaret om pri
   assert.match(pricing, /const vars = priceVars\(offer\);/);
   assert.match(pricing, /price\(offer\.prices\.single\)/);
   assert.match(pricing, /price\(offer\.prices\.bundle\)/);
-  assert.match(read("app/components/marketing/Faq.tsx"), /const vars = priceVars\(site\.offer\);/);
+  assert.match(read("app/components/marketing/FaqList.tsx"), /const vars = priceVars\(site\.offer\);/);
   // «Prøv gratis» og «Prøv gratis først» gaar dit site.cta gaar.
   assert.equal((pricing.match(/href=\{cta\.href\}/g) ?? []).length, 3);
   assert.match(read("app/components/marketing/FinalCta.tsx"), /href=\{site\.cta\.href\}/);
@@ -761,11 +771,14 @@ test("MS3b: spoersmaal og svar har alle spoersmaalene fra utkastet, med <details
     for (const m of (i.a ?? "").matchAll(/\{(\w+)\}/g)) assert.ok(TEMPLATE_KEYS.includes(m[1]), `${i.id}: {${m[1]}}`);
   }
   assert.match(read("app/(marketing)/no/page.tsx"), /getFaq\("no"\)\.filter\(\(item\) => item\.showOnHome\)/);
-  const src = withoutComments(read("app/components/marketing/Faq.tsx"));
-  assert.match(src, /<details key=\{item\.id\}/);
+  // MS5a: lista er skilt ut i FaqList (forsiden og spoersmaalssiden).
+  const src = withoutComments(read("app/components/marketing/FaqList.tsx"));
+  assert.match(src, /<details key=\{item\.id\} id=\{item\.id\}/);
   assert.match(src, /<summary/);
-  assert.match(src, /vars=\{\{ email: site\.contact\.email \}\}/);
   assert.match(src, /item\.pending && <PendingMark label=\{site\.pendingLabels\[item\.pending\]\} \/>/);
+  const block = withoutComments(read("app/components/marketing/Faq.tsx"));
+  assert.match(block, /vars=\{\{ email: site\.contact\.email \}\}/);
+  assert.match(block, /<FaqList items=\{items\} site=\{site\} \/>/);
 });
 
 test("MS3b: fillParts setter merkelappen der verdien som venter skal staa", () => {
@@ -806,4 +819,186 @@ test("MS3b: rettelsene fra den lokale sjekken (rullefeltet under fanene og navne
   for (const f of ["app/(app)/layout.tsx", "app/global-not-found.tsx"]) {
     assert.match(read(f), /<BrandMark brand=\{brand\} \/>/, f);
   }
+});
+
+// ---------------------------------------------------------------------------
+// MS5a: innholdssidene og «Hjelp» i appen
+// ---------------------------------------------------------------------------
+
+const MS5A_PAGES = [
+  "app/(marketing)/no/sporsmal-og-svar/page.tsx",
+  "app/(marketing)/no/merking/page.tsx",
+  "app/(marketing)/no/kontakt/page.tsx",
+];
+const MS5A_TSX = [
+  ...MS5A_PAGES,
+  ...["Subpage", "PageIntro", "TextSection", "FaqList", "LabelingPage", "ContactPage"].map(
+    (n) => `app/components/marketing/${n}.tsx`
+  ),
+];
+
+test("MS5a: de nye sidene og komponentene er med i teksttesten (ingen synlig tekst i JSX)", () => {
+  for (const f of MS5A_TSX) {
+    assert.ok(MARKETING_TSX.includes(f), f);
+    assert.deepEqual(literalTextsInFile(read(f)), [], f);
+  }
+});
+
+test("MS5a: hjelpelista har de tre sidene, og de finnes", () => {
+  assert.deepEqual(
+    site.help.links.map((l) => l.href),
+    [FAQ_PATH, LABELING_PATH, CONTACT_PATH]
+  );
+  // Den foerste er dit «Hjelp» i appen gaar.
+  assert.equal(site.help.links[0].href, FAQ_PATH);
+  for (const p of [FAQ_PATH, LABELING_PATH, CONTACT_PATH]) {
+    assert.ok(routeExists(p), p);
+    assert.ok(MARKETING_PAGES.includes(p), p);
+    assert.match(p, /^\/no\/[a-z-]+$/, "ASCII, uten skraastrek til slutt");
+  }
+});
+
+/**
+ * Om en lenke paa en side virker: en rute som finnes, eventuelt med et
+ * anker som finnes paa maalsiden (forsidens seksjoner, eller et spoersmaal
+ * paa spoersmaalssiden). Et anker alene maa finnes paa siden selv.
+ */
+function linkWorks(href: string, ownAnchors: ReadonlySet<string>): boolean {
+  const homeAnchors = contentAnchors({ home, footer: site.footer });
+  const [path, hash] = href.split("#");
+  if (path === "") return ownAnchors.has(hash);
+  if (!routeExists(path)) return false;
+  if (hash === undefined) return true;
+  if (path === MARKETING_HOME) return homeAnchors.has(hash);
+  if (path === FAQ_PATH) return faq.some((i) => i.id === hash);
+  return false;
+}
+
+test("MS5a: alle lenker paa en underside virker (topplinjen, bunnen, hjelpen og innholdet)", () => {
+  const homeAnchors = contentAnchors({ home, footer: site.footer });
+  // Undersiden har bare bunnens anker (#kontakt) selv; alt annet gaar til forsiden.
+  const own = new Set([site.footer.anchor]);
+  const shown: [string, string][] = [
+    ...onPage(visibleLinks(site.topBar.links, homeAnchors), MARKETING_HOME).map((l): [string, string] => ["topBar", l.href]),
+    ["logo", MARKETING_HOME],
+    ["login", site.topBar.login.href],
+    ["cta", site.cta.href],
+    ...[...site.footer.columns, site.help, site.footer.contact].flatMap((col) =>
+      onPage(col.links, MARKETING_HOME)
+        .filter((l): l is { label: string; href: string } => l.href !== undefined)
+        .map((l): [string, string] => [col.title, l.href])
+    ),
+    ...strings({ faqPage, labelingPage, contactPage }).filter(([p]) => p.endsWith(".href")),
+    ["merking → spoersmaal", `${FAQ_PATH}#${labelingPage.rules.faqId}`],
+  ];
+  assert.ok(shown.length >= 12, String(shown.length));
+  for (const [where, href] of shown) assert.ok(linkWorks(href, own), `${where}: ${href} virker ikke fra en underside`);
+  // Paa en underside gaar ankrene til forsiden.
+  assert.deepEqual(
+    onPage(visibleLinks(site.topBar.links, homeAnchors), MARKETING_HOME).map((l) => l.href),
+    ["/no#tjenester", "/no#eksempler", "/no#priser", "/no#kjeder"]
+  );
+  assert.deepEqual(onPage(site.topBar.links, null), [...site.topBar.links]);
+  // Forsiden lenker videre.
+  assert.equal(home.faq.more.href, FAQ_PATH);
+  assert.equal(home.labeling.more.href, LABELING_PATH);
+  // Guiden kommer i MS5b, og sidene under «Trygghet» finnes ikke ennaa (TG-NEW-154).
+  assert.equal((home.labeling.guide as { href?: string }).href, undefined);
+  assert.deepEqual(site.footer.columns[1].links.map((l) => "href" in l), [false, false, false, false]);
+});
+
+test("MS5a: undersidene bruker skallet med merket til /no, og bunnen har kolonnen «Hjelp»", () => {
+  for (const f of MS5A_PAGES) {
+    const src = withoutComments(read(f));
+    assert.match(src, /<Subpage site=\{site\} home=\{home\} brand=\{brand\}>/, f);
+    assert.match(src, /<PageIntro /, f);
+  }
+  const shell = withoutComments(read("app/components/marketing/Subpage.tsx"));
+  assert.match(shell, /links=\{onPage\(visibleLinks\(site\.topBar\.links, anchors\), MARKETING_HOME\)\}/);
+  assert.match(shell, /href: MARKETING_HOME, label: fill\(site\.topBar\.logoHomeLabel/);
+  assert.match(shell, /<Footer site=\{site\} brand=\{brand\} homePath=\{MARKETING_HOME\} \/>/);
+  const footer = withoutComments(read("app/components/marketing/Footer.tsx"));
+  assert.match(footer, /const columns = \[services, help, \.\.\.rest\];/);
+  assert.match(footer, /onPage\(col\.links, homePath\)/);
+  assert.match(footer, /onPage\(footer\.contact\.links, homePath\)/);
+  // Forsiden sender ikke homePath: ankrene er uendret der.
+  assert.match(withoutComments(read("app/(marketing)/no/page.tsx")), /<Footer site=\{site\} brand=\{brand\} \/>/);
+});
+
+test("MS5a: «Hjelp» i appen kommer fra hjelpelista i site.ts, og AppNav har ingen egne kopier", () => {
+  const src = withoutComments(read("app/components/AppNav.tsx"));
+  assert.match(src, /import \{ site \} from "\.\.\/\.\.\/content\/marketing\/nb\/site";/);
+  assert.match(src, /const HELP_HREF = site\.help\.links\[0\]\.href;/);
+  assert.match(src, /href=\{HELP_HREF\}/);
+  assert.match(src, /<span className="sr-only sm:not-sr-only">\{t\(locale, "nav\.help"\)\}<\/span>/);
+  // Ingen adresser eller lenketekster fra hjelpelista skrevet inn i AppNav.
+  assert.doesNotMatch(src, /["'`]\/no\b/);
+  for (const l of site.help.links) {
+    assert.ok(!src.includes(l.href), `AppNav har en kopi av ${l.href}`);
+    assert.ok(!src.includes(l.label), `AppNav har en kopi av «${l.label}»`);
+  }
+  // Ordet foelger appens spraak.
+  assert.equal(DICTIONARIES.nb.ui["nav.help"], "Hjelp");
+  assert.equal(DICTIONARIES.en.ui["nav.help"], "Help");
+  // AppNav importerer ikke hele innholdet (forsiden har bildeimporter).
+  assert.doesNotMatch(src, /content\/marketing["']|content\/marketing\/index|nb\/home/);
+});
+
+test("MS5a: spoersmaalssiden viser alle spoersmaalene, og forsiden bare showOnHome", () => {
+  const src = withoutComments(read("app/(marketing)/no/sporsmal-og-svar/page.tsx"));
+  assert.match(src, /const faq = getFaq\("no"\);/);
+  assert.match(src, /<FaqList items=\{faq\} site=\{site\} \/>/);
+  assert.doesNotMatch(src, /showOnHome/);
+  assert.match(src, /const related = site\.help\.links\.filter\(\(l\) => l\.href !== FAQ_PATH\);/);
+  assert.match(read("app/(marketing)/no/page.tsx"), /getFaq\("no"\)\.filter\(\(item\) => item\.showOnHome\)/);
+});
+
+test("MS5a: hver underside har en h1, og den er tittelen fra innholdet", () => {
+  const shellParts = ["Subpage", "TextSection", "FaqList", "LabelingPage", "ContactPage", "Footer", "MarketingTopBar", "MobileMenu", "MarketingPicture"];
+  for (const n of shellParts) assert.doesNotMatch(read(`app/components/marketing/${n}.tsx`), /<h1/, n);
+  assert.equal(read("app/components/marketing/PageIntro.tsx").split("<h1").length - 1, 1);
+  for (const f of MS5A_PAGES) assert.equal(read(f).split("<PageIntro").length - 1, 1, f);
+  for (const page of [faqPage, labelingPage, contactPage]) assert.ok(page.title.trim().length > 0);
+});
+
+test("MS5a: merkesiden henter bildet, eksempelet og lista fra kilden, ingen kopier", () => {
+  const src = withoutComments(read("app/components/marketing/LabelingPage.tsx"));
+  assert.match(src, /DICTIONARIES\[DISCLOSURE_LOCALE\]\.codes\.disclosureEdited/);
+  assert.match(src, /const disclosure = disclosureText\(\s*DISCLOSURE_LOCALE,/);
+  assert.match(src, /picture=\{labeling\.picture\}/);
+  assert.match(src, /\{labeling\.guide\.label\}/);
+  assert.match(src, /faq\.find\(\(item\) => item\.id === page\.rules\.faqId\)/);
+  // Lista og eksempelet staar ikke i innholdet til siden.
+  for (const [path, text] of strings(labelingPage, "labelingPage")) {
+    assert.doesNotMatch(text, /stearinlys|ild i peisen|lys i nabohus|Himmel og lamper/i, path);
+  }
+  assert.ok(faq.some((i) => i.id === labelingPage.rules.faqId));
+  // Forsiden og merkesiden sier det samme om originalen (MS5_TEKSTER_SVAR).
+  assert.equal(labelingPage.original.points[0].text, home.labeling.points[2].text);
+  assert.equal(labelingPage.rules.points[0].text, home.labeling.points[3].text);
+});
+
+test("MS5a: ingen tekst sier at hele teksten til annonsen foelger med fila (AVVIK 1)", () => {
+  const all = strings({ site, home, faq, faqPage, labelingPage, contactPage });
+  for (const [path, text] of all) {
+    assert.doesNotMatch(text, /følger med (nedlastingen|når du laster ned|bildet når du laster ned)/i, path);
+  }
+  assert.equal(home.labeling.points[1].text, "Teksten til annonsen får du når du godkjenner bildet.");
+  assert.equal(home.labeling.example.note, "Klar til å kopiere når bildet er godkjent.");
+  // Petter 04.10 (AVVIK 2 i Fase B): det tredje steget.
+  assert.ok(
+    home.steps.items.some((i) => i.text.endsWith("Du laster ned bildet med AI-merket og kopierer den ferdige teksten til annonsen.")),
+    "tredje steg"
+  );
+  for (const [path, text] of all) assert.doesNotMatch(text, /laster ned bildet med AI-merke og ferdig tekst/, path);
+  assert.match(faq[1].a ?? "", /Teksten får du når du godkjenner bildet, klar til å kopiere inn i annonsen\.$/);
+});
+
+test("MS5a: kontaktsiden har e-post og selskapsnavn fra site, og ikke noe skjema", () => {
+  const src = withoutComments(read("app/components/marketing/ContactPage.tsx"));
+  assert.match(src, /vars=\{\{ email: site\.contact\.email \}\}/);
+  assert.match(src, /const company = site\.footer\.companyName;/);
+  assert.doesNotMatch(src, /<form|<input|<textarea/);
+  for (const g of contactPage.groups) assert.match(g.text, /\{email\}/, g.title);
+  assert.doesNotMatch(JSON.stringify(contactPage), /@|telefon|org\.?nr|\badresse\b/i);
 });

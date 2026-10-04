@@ -15,20 +15,34 @@ import { CONTAINER, FOCUS } from "./classes";
  *
  * MS3: `links` er bare lenkene til seksjoner som finnes (visibleLinks i
  * content/marketing/links.ts), og under 820 px ligger de i MobileMenu.
+ *
+ * MS5a: paa en underside sender siden `logo` (merket gaar til /no) og
+ * lenkene til forsidens ankre (onPage). Uten `logo` gaar merket til toppen.
  */
 const NAV_LINK = `flex h-11 items-center rounded-[8px] px-3.5 text-[15px] font-medium text-ink no-underline hover:text-ink-2 ${FOCUS}`;
 
 /** «Logg inn» ved siden av «Prøv gratis»: smalere under 420 px, saa navnet ved ikonet faar plass (MS3b). */
 const LOGIN_LINK = `flex h-11 items-center rounded-button px-2 text-[15px] font-medium text-ink no-underline hover:text-ink-2 min-[420px]:px-3.5 ${FOCUS}`;
 
-export function MarketingTopBar({ site, brand, links }: { site: Site; brand: Brand; links: Link[] }) {
+export function MarketingTopBar({
+  site,
+  brand,
+  links,
+  logo,
+}: {
+  site: Site;
+  brand: Brand;
+  links: Link[];
+  logo?: Link;
+}) {
   const { topBar, cta } = site;
+  const logoLink = logo ?? { href: topBar.logoHref, label: fill(topBar.logoLabel, { brand: brand.displayName }) };
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur">
       <div className={`${CONTAINER} flex h-[68px] items-center justify-between gap-2 min-[420px]:gap-6`}>
         <a
-          href={topBar.logoHref}
-          aria-label={fill(topBar.logoLabel, { brand: brand.displayName })}
+          href={logoLink.href}
+          aria-label={logoLink.label}
           className={`flex min-h-11 items-center rounded-button no-underline ${FOCUS}`}
         >
           <BrandMark brand={brand} alwaysShowName />

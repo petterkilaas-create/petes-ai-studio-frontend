@@ -1,4 +1,4 @@
-import type { FaqItem } from "../schema.ts";
+import type { FaqItem, FaqPage } from "../schema.ts";
 
 // Spoersmaal og svar (MS3b), ordrett fra utkastet (MARKEDSSIDE_UTKAST.dc.html,
 // linje 353-386). Forsiden viser dem med showOnHome; senere ogsaa en egen
@@ -16,7 +16,8 @@ export const faq = [
   {
     id: "merking",
     q: "Hvordan merkes bildene?",
-    a: "Med et synlig AI-merke i hjørnet av bildet, og en kort tekst som sier hva som er endret, for eksempel at himmel og lamper er redigert. Teksten følger med når du laster ned.",
+    // MS5a (MS5_TEKSTER_SVAR §3): siste setning rettet.
+    a: "Med et synlig AI-merke i hjørnet av bildet, og en kort tekst som sier hva som er endret, for eksempel at himmel og lamper er redigert. Teksten får du når du godkjenner bildet, klar til å kopiere inn i annonsen.",
     showOnHome: true,
   },
   {
@@ -65,3 +66,15 @@ export const faq = [
     showOnHome: true,
   },
 ] as const satisfies readonly FaqItem[];
+
+// Spoersmaalssiden (MS5a, MS5_TEKSTER.md §1, godkjent av Petter 04.10). Siden
+// viser alle spoersmaalene over, i samme rekkefoelge.
+export const faqPage = {
+  _type: "faqPage",
+  seo: {
+    title: "Spørsmål og svar – {brand}",
+    description: "Svar om kveldsbilder for eiendomsmeglere: merking, pris, tid og hvilke bilder som passer.",
+  },
+  title: "Spørsmål og svar",
+  lead: "Her finner du svarene om kveldsbilder, merking og pris. Finner du ikke svaret? Skriv til {email}.",
+} as const satisfies FaqPage;

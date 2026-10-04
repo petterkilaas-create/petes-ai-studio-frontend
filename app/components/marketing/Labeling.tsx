@@ -3,14 +3,15 @@ import { DISCLOSURE_DETAIL, DISCLOSURE_LOCALE, disclosureText } from "../../lib/
 import type { Labeling as LabelingContent, Site } from "../../../content/marketing/schema";
 import { MarketingPicture } from "./MarketingPicture";
 import { PendingMark } from "./PendingMark";
-import { CONTAINER, H2 } from "./classes";
+import { CONTAINER, FOCUS, H2 } from "./classes";
 
 /**
  * Merkingen (MS3b, utkastet linje 247-266), paa kveldsblaatt (night).
  * Eksempelet paa teksten til annonsen lages med produktets funksjon
  * (disclosureText, samme detaljnivaa og spraak som i appen), saa siden
  * aldri viser en annen tekst enn den megleren faar. Gir funksjonen ingen
- * tekst, vises ingen boks. Guiden finnes ikke ennaa (MS5): tekst uten lenke.
+ * tekst, vises ingen boks. Guiden finnes ikke ennaa (MS5b): tekst uten lenke.
+ * MS5a: lenken til merkesiden.
  */
 const SIZES = "(min-width: 1320px) 600px, (min-width: 1024px) 45vw, 100vw";
 
@@ -54,6 +55,12 @@ export function Labeling({ labeling, site }: { labeling: LabelingContent; site: 
               </li>
             ))}
           </ul>
+          <a
+            href={labeling.more.href}
+            className={`flex min-h-11 items-center self-start rounded-button text-[16px] font-medium text-paper underline underline-offset-4 ${FOCUS}`}
+          >
+            {labeling.more.label}
+          </a>
           <p className="m-0 text-[15px] font-medium text-paper/80">{labeling.guide.label}</p>
         </div>
         <figure className="m-0 flex flex-col gap-4">

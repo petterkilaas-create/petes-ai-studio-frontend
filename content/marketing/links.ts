@@ -20,3 +20,13 @@ export function contentAnchors(value: unknown, out: Set<string> = new Set()): Se
 export function visibleLinks<T extends { href?: string }>(links: readonly T[], anchors: ReadonlySet<string>): T[] {
   return links.filter((l) => l.href === undefined || !l.href.startsWith("#") || anchors.has(l.href.slice(1)));
 }
+
+/**
+ * Lenkene paa en underside (MS5a): ankrene ligger paa forsiden, saa «#priser»
+ * blir «/no#priser». Paa forsiden (homePath null) er lenkene uendret. Lenker
+ * uten href (sider som ikke finnes) og lenker til en rute er uendret.
+ */
+export function onPage<T extends { href?: string }>(links: readonly T[], homePath: string | null): T[] {
+  if (homePath === null) return [...links];
+  return links.map((l) => (l.href !== undefined && l.href.startsWith("#") ? { ...l, href: `${homePath}${l.href}` } : l));
+}
