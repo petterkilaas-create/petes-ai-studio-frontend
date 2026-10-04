@@ -7,8 +7,8 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { brandCssVars, DEFAULT_BRAND, HOUSE_ICON, resolveBrand } from "./brand.ts";
 import { DICTIONARIES, t } from "./i18n/index.ts";
-import { expressCategories, type NavId } from "./services.ts";
-import { jsxBlocks, literalTexts, withoutComments } from "./testing/jsxText.ts";
+import { ENABLED, expressCategories, type NavId } from "./services.ts";
+import { jsxBlocks, literalTexts, literalTextsInFile, withoutComments } from "./testing/jsxText.ts";
 
 // Redesign D0 (brief v4 §8, §13). node --test kan ikke laste .tsx, saa
 // globals.css og layout.tsx sjekkes som tekst (som i L0).
@@ -934,4 +934,97 @@ test("opprydding: alle «…» i ordlista har mellomrom foran", () => {
 test("opprydding: testkommandoen har en tidsgrense, saa en test som henger, feiler", () => {
   const pkg = JSON.parse(readFileSync(join(REPO_DIR, "package.json"), "utf8"));
   assert.equal(pkg.scripts.test, "node --test --test-timeout=10000");
+});
+
+// ---------------------------------------------------------------------------
+// TG-NEW-158: ingen synlig tekst skrevet rett inn i noen aktiv .tsx. Filene
+// velges av activeFiles() (alt under app/ utenom HIDDEN_DIRS), saa en ny fil
+// blir sjekket uten at noen legger den inn. Unntak gjelder enkelttekster, og
+// bare mens tekstene ikke vises.
+// ---------------------------------------------------------------------------
+
+const TEXT_EXCEPTIONS: { file: string; texts: string[]; why: string; hidden: () => boolean }[] = [
+  {
+    file: "(app)/start/page.tsx",
+    texts: [
+      "Virtual Staging",
+      "Transform empty spaces into beautifully furnished, inviting homes with Scandinavian or Luxury styles.",
+      "Start Staging",
+      "Cinematic Video",
+      "Turn your property photos into a premium, 30-second social media reel using Veo AI and dynamic camera tracking.",
+      "Build Film",
+    ],
+    why: "kortene er skjult mens Virtual Staging og Video er av (TG-NEW-136); slaas de paa, maa tekstene i ordlista",
+    hidden: () => !ENABLED.virtual_stage && !ENABLED.video,
+  },
+  {
+    file: "components/RejectionPanel.tsx",
+    texts: [
+      "Fortsett som eksteriør",
+      "Bildet ble vurdert som interiør",
+      "Usikker scene-vurdering",
+      "Eksteriør-presets passer ikke for interiørbilder. Hvis du er sikker på at dette faktisk er et eksteriørbilde, kan du overstyre vurderingen:",
+      "Klassifisereren klarte ikke avgjøre scene-typen. Hvis dette er et eksteriørbilde, kan du fortsette med eksplisitt overstyring:",
+    ],
+    why: "avslaget fra den gamle porten kommer bare fra klart_vaer, som er av; tekstene tas i TG-NEW-159",
+    hidden: () => !ENABLED.klart_vaer,
+  },
+];
+
+const ACTIVE_TSX = activeFiles().filter((f) => f.endsWith(".tsx"));
+
+test("TG-158: ingen aktiv .tsx har synlig tekst skrevet rett inn, utover unntakene", () => {
+  // Alle funnene samlet, saa feilmeldingen viser hver fil, ikke bare den foerste.
+  const hits: Record<string, string[]> = {};
+  for (const f of ACTIVE_TSX) {
+    const allowed = TEXT_EXCEPTIONS.find((e) => e.file === f)?.texts ?? [];
+    // Tom alt="" er riktig for pyntebilder (BrandMark), ikke synlig tekst.
+    const texts = literalTextsInFile(read(f)).filter((x) => x !== "" && !allowed.includes(x));
+    if (texts.length > 0) hits[f] = texts;
+  }
+  assert.deepEqual(hits, {});
+});
+
+test("TG-158: hver .tsx under components/ blir sjekket", () => {
+  const all = readdirSync(join(APP_DIR, "components"), { recursive: true, encoding: "utf8" })
+    .filter((f) => f.endsWith(".tsx") && !/\.test\.tsx$/.test(f))
+    .map((f) => join("components", f));
+  assert.ok(all.includes("components/ErrorPanel.tsx"));
+  for (const f of all) assert.ok(ACTIVE_TSX.includes(f), f);
+});
+
+test("TG-158: hver .tsx med JSX har JSX-blokker hjelperen ser", () => {
+  // Hjelperen ser bare `return ( … );` og `return <…>;`. En fil med JSX
+  // (lukkende eller selvlukkende tagg) men uten slike blokker ville slippe gjennom.
+  for (const f of ACTIVE_TSX) {
+    const code = withoutComments(read(f));
+    if (/<\/|\/>/.test(code)) assert.ok(jsxBlocks(code).length > 0, f);
+  }
+});
+
+test("TG-158: unntakslista har bare filer og tekster som finnes, og bare skjulte tekster", () => {
+  for (const e of TEXT_EXCEPTIONS) {
+    assert.ok(ACTIVE_TSX.includes(e.file), e.file);
+    assert.ok(e.why.length > 0, e.file);
+    const found = literalTextsInFile(read(e.file));
+    for (const text of e.texts) assert.ok(found.includes(text), `${e.file}: ${text}`);
+    assert.ok(e.hidden(), `${e.file} vises naa: flytt tekstene til ordlista og fjern unntaket`);
+  }
+});
+
+test("TG-158: ErrorPanel henter overskriften fra ordlista", () => {
+  const src = withoutComments(read("components/ErrorPanel.tsx"));
+  assert.match(src, /const locale = useLocale\(\);/);
+  assert.match(src, /\{t\(locale, "error\.title"\)\}/);
+  assert.doesNotMatch(src, />\s*Error\s*</);
+  assert.equal(t("nb", "error.title"), "Noe gikk galt");
+  assert.equal(t("en", "error.title"), "Something went wrong");
+});
+
+test("TG-158: UnknownStatusPanel henter teksten fra ordlista", () => {
+  const src = withoutComments(read("components/UnknownStatusPanel.tsx"));
+  assert.match(src, /const locale = useLocale\(\);/);
+  assert.match(src, /\{t\(locale, "unknownStatus\.title"\)\}/);
+  assert.equal(t("nb", "unknownStatus.title"), "Vi fikk et uventet svar fra serveren. Prøv igjen.");
+  assert.equal(t("en", "unknownStatus.title"), "We got an unexpected response from the server. Please try again.");
 });
