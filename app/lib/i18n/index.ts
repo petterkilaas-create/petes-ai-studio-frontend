@@ -32,7 +32,8 @@ export type CodeGroup =
   | "roundSky"
   | "disclosureBase"
   | "disclosureTime"
-  | "disclosureEdited";
+  | "disclosureEdited"
+  | "orderError";
 
 const nbUi = {
   "review.title": "Kontroll av bildet",
@@ -111,6 +112,9 @@ const nbUi = {
   "status.rejectedByYou": "Avvist av deg",
   "job.failed": "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
   "job.rejected": "Bildet passet ikke for dette verktøyet og ble ikke laget.",
+  // TG-NEW-149: antallet kommer alltid fra backend ({limit}), aldri herfra.
+  "quota.counter": "{remaining} av {limit} gratis bilder igjen",
+  "quota.exhausted": "Du har brukt de {limit} gratis bildene dine. Du kan ikke bestille flere kveldsbilder nå.",
   "history.loadError": "Noe gikk galt. Prøv igjen om litt.",
   "dusk.title": "Stemning",
   "dusk.time": "Tidspunkt",
@@ -374,6 +378,15 @@ const nb: Dictionary = {
       candles: "stearinlys",
       fireplace_fire: "ild i peisen",
     },
+    // TG-NEW-149 (KONTRAKT_KVOTE): feil fra bestillingen, POST /v1/process.
+    orderError: {
+      free_quota_exhausted: "Du har brukt alle gratisbildene dine. Du kan ikke bestille flere kveldsbilder nå.",
+      daily_capacity_reached: "Vi tar ikke imot flere gratisbestillinger i dag. Prøv igjen senere.",
+      quota_unavailable: "Vi får ikke sjekket gratisbildene dine akkurat nå. Prøv igjen om litt.",
+      job_create_failed: "Bestillingen kunne ikke startes. Ingen gratisbilder er brukt.",
+      duplicate_request: "Bestillingen er allerede mottatt. Du finner den i Historikk.",
+      invalid_idempotency_key: "Bestillingen kunne ikke startes. Last siden på nytt og prøv igjen.",
+    },
   },
   generic: {
     reviewCode: "Bildet må sjekkes.",
@@ -392,6 +405,7 @@ const nb: Dictionary = {
     disclosureBase: "Merketeksten kunne ikke lages.",
     disclosureTime: "Merketeksten kunne ikke lages.",
     disclosureEdited: "Merketeksten kunne ikke lages.",
+    orderError: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
   },
 };
 
@@ -473,6 +487,8 @@ const en: Dictionary = {
     "status.rejectedByYou": "Rejected by you",
     "job.failed": "The image could not be processed. Please try again, or contact us.",
     "job.rejected": "The image did not suit this tool and was not created.",
+    "quota.counter": "{remaining} of {limit} free images left",
+    "quota.exhausted": "You have used your {limit} free images. You cannot order more dusk images right now.",
     "history.loadError": "Something went wrong. Please try again shortly.",
     "dusk.title": "Mood",
     "dusk.time": "Time",
@@ -715,6 +731,14 @@ const en: Dictionary = {
       candles: "candles",
       fireplace_fire: "fire in the fireplace",
     },
+    orderError: {
+      free_quota_exhausted: "You have used all your free images. You cannot order more dusk images right now.",
+      daily_capacity_reached: "We are not accepting more free orders today. Please try again later.",
+      quota_unavailable: "We can't check your free images right now. Please try again shortly.",
+      job_create_failed: "The order could not be started. No free images were used.",
+      duplicate_request: "The order has already been received. You can find it in History.",
+      invalid_idempotency_key: "The order could not be started. Reload the page and try again.",
+    },
   },
   generic: {
     reviewCode: "The image needs a check.",
@@ -733,6 +757,7 @@ const en: Dictionary = {
     disclosureBase: "The disclosure text could not be created.",
     disclosureTime: "The disclosure text could not be created.",
     disclosureEdited: "The disclosure text could not be created.",
+    orderError: "The image could not be processed. Please try again, or contact us.",
   },
 };
 
