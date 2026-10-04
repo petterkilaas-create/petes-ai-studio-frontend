@@ -4,12 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import {
   submitJob,
+  SubmitError,
   ValidationError,
   type ProcessParams,
   type Rejection,
   type Review,
 } from "../lib/api";
 import { useJobStatus } from "../lib/useJobStatus";
+import { OrderKeys } from "../lib/orderKey";
+import type { QuotaEvent } from "../lib/quota";
 import {
   deriveProcessStatus,
   isProcessingStatus,
@@ -39,6 +42,11 @@ export interface UseProcessJobResult {
   imageUrl: string | null;
   /** Bruker-rettet feilmelding (ValidationError-detail eller poll-feil). */
   error: string | null;
+  /**
+   * Koden fra en feilet bestilling (TG-NEW-149), f.eks. free_quota_exhausted.
+   * Teksten hentes fra ordlista (orderError). null uten kode.
+   */
+  errorCode: string | null;
   /** Strukturert scene-gate-avslag (TG-NEW-58), eller null. */
   rejection: Rejection | null;
   /** needs_review: code + reasons fra port 1, ellers null. */
@@ -67,18 +75,28 @@ interface LastRun {
   params?: ProcessParams;
 }
 
-export function useProcessJob(): UseProcessJobResult {
+export interface UseProcessJobOptions {
+  /** Kvoten fra bestillingen: 202 med `quota`, eller 402 (TG-NEW-149). */
+  onQuota?: (event: QuotaEvent) => void;
+}
+
+export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJobResult {
   const { getToken } = useAuth();
+  const { onQuota } = options;
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [syncResultUrl, setSyncResultUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitErrorCode, setSubmitErrorCode] = useState<string | null>(null);
 
   // Object-URL for sync-blob holdes i ref slik at vi kan revokere den
   // ved ny kjoering, reset og avmontering (poll-resultatet eier useJobStatus).
   const syncBlobUrlRef = useRef<string | null>(null);
   const lastRunRef = useRef<LastRun | null>(null);
+  // Idempotency-Key: samme ved nytt forsoek av samme bestilling (valg 2A).
+  const orderKeysRef = useRef<OrderKeys | null>(null);
+  orderKeysRef.current ??= new OrderKeys();
 
   const job = useJobStatus(jobId);
 
@@ -100,20 +118,33 @@ export function useProcessJob(): UseProcessJobResult {
       setSyncResultUrl(null);
       setJobId(null);
       setSubmitError(null);
+      setSubmitErrorCode(null);
       lastRunRef.current = { file, service, params };
       setIsSubmitting(true);
 
+      const orderKeys = orderKeysRef.current!;
+      const idempotencyKey = orderKeys.keyFor({ file, service, params });
+
       try {
-        const result = await submitJob({ service, image: file, params, getToken });
+        const result = await submitJob({ service, image: file, params, idempotencyKey, getToken });
+        // Mottatt (ogsaa duplicate: true): neste klikk er en ny bestilling.
+        orderKeys.accepted();
         if (result.kind === "sync") {
           const url = URL.createObjectURL(result.imageBlob);
           syncBlobUrlRef.current = url;
           setSyncResultUrl(url);
         } else {
+          onQuota?.({ kind: "accepted", quota: result.quota });
           setJobId(result.jobId);
         }
       } catch (err) {
-        if (err instanceof ValidationError) {
+        if (err instanceof SubmitError) {
+          setSubmitError(err.message);
+          setSubmitErrorCode(err.code);
+          if (err.code === "free_quota_exhausted") {
+            onQuota?.({ kind: "exhausted", ...err.detail });
+          }
+        } else if (err instanceof ValidationError) {
           setSubmitError(`Ugyldige parametre: ${err.detail}`);
         } else {
           setSubmitError(err instanceof Error ? err.message : String(err));
@@ -122,7 +153,7 @@ export function useProcessJob(): UseProcessJobResult {
         setIsSubmitting(false);
       }
     },
-    [getToken, revokeSyncUrl]
+    [getToken, revokeSyncUrl, onQuota]
   );
 
   const resubmitForced = useCallback(async () => {
@@ -140,8 +171,10 @@ export function useProcessJob(): UseProcessJobResult {
     setSyncResultUrl(null);
     setJobId(null);
     setSubmitError(null);
+    setSubmitErrorCode(null);
     setIsSubmitting(false);
     lastRunRef.current = null;
+    orderKeysRef.current?.clear();
   }, [revokeSyncUrl]);
 
   const status: ProcessStatus = deriveProcessStatus({
@@ -156,6 +189,7 @@ export function useProcessJob(): UseProcessJobResult {
     status,
     imageUrl: syncResultUrl ?? job.imageUrl,
     error: submitError ?? job.error,
+    errorCode: submitErrorCode,
     rejection: job.rejection,
     review: job.review,
     reviewerReason: job.reviewerReason,

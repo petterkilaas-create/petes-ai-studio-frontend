@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Clock, Eraser, ScanFace, Sun, Sunset, Zap, type LucideIcon } from "lucide-react";
 import { useImagePreview } from "@/app/hooks/useImagePreview";
 import { useProcessJob } from "@/app/hooks/useProcessJob";
+import { useQuota } from "@/app/hooks/useQuota";
+import { QuotaNotice } from "@/app/components/QuotaNotice";
+import { canOrder, countsAgainstQuota, quotaView } from "@/app/lib/quota";
 import { StatusBadge } from "@/app/components/StatusBadge";
 import { ErrorPanel } from "@/app/components/ErrorPanel";
 import { RejectionPanel } from "@/app/components/RejectionPanel";
@@ -18,7 +21,7 @@ import { ReviewerRejectedPanel } from "@/app/components/ReviewerRejectedPanel";
 import { OpenReviewLink } from "@/app/components/OpenReviewLink";
 import { DuskChoicePicker } from "@/app/components/DuskChoicePicker";
 import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "@/app/lib/dusk";
-import { t } from "@/app/lib/i18n";
+import { codeText, t } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import { expressCategories } from "@/app/lib/services";
 import { Button } from "@/app/components/ui/Button";
@@ -63,7 +66,10 @@ export default function ExpressPage() {
 
   const locale = useLocale();
   const preview = useImagePreview();
-  const job = useProcessJob();
+  // Kvoten for gratisbilder (TG-NEW-149): fra GET /v1/quota, oppdatert fra bestillingen.
+  const quota = useQuota();
+  const job = useProcessJob({ onQuota: quota.apply });
+  const refreshQuota = quota.refresh;
 
   const activeCategory =
     CATEGORIES.find((c) => c.id === activeCategoryId) ?? CATEGORIES[0];
@@ -77,7 +83,22 @@ export default function ExpressPage() {
     selectedTool?.kind === "scene" && selectedTool.sceneGate !== false;
   const showDuskControls =
     selectedTool !== null && isDuskOrder(selectedTool.service, selectedTool.presetId);
-  const runDisabled = !selectedTool || !preview.file || isProcessing;
+  const quotaShown = countsAgainstQuota(selectedTool?.service)
+    ? quotaView(quota.quota)
+    : ({ kind: "hidden" } as const);
+  const runDisabled =
+    !selectedTool || !preview.file || isProcessing || !canOrder(selectedTool.service, quota.quota);
+  // 402 vises av QuotaNotice naar kvoten er kjent; ellers av feilboksen.
+  const showSubmitError =
+    job.status === "failed" &&
+    !job.rejection &&
+    !(job.errorCode === "free_quota_exhausted" && quotaShown.kind === "exhausted");
+
+  // En jobb som ender failed av teknisk grunn har gitt bildet tilbake:
+  // hent tallet paa nytt (KONTRAKT_KVOTE).
+  useEffect(() => {
+    if (job.status === "failed" && job.jobId !== null) refreshQuota();
+  }, [job.status, job.jobId, refreshQuota]);
 
   const selectTool = (toolId: string) => {
     if (isProcessing) return;
@@ -296,6 +317,8 @@ export default function ExpressPage() {
             />
           )}
 
+          <QuotaNotice view={quotaShown} locale={locale} />
+
           <div className="flex flex-wrap gap-3">
             <Button onClick={handleRun} disabled={runDisabled}>
               {t(locale, isProcessing ? "express.running" : "express.run")}
@@ -313,10 +336,11 @@ export default function ExpressPage() {
             />
           )}
 
-          {/* Teknisk feil har ingen kode: alltid den generiske meldingen,
-              aldri job.error (TG-NEW-121). */}
-          {job.status === "failed" && !job.rejection && (
-            <ErrorPanel message={t(locale, "job.failed")} />
+          {/* Aldri job.error (TG-NEW-121). Feil fra bestillingen med kode
+              (TG-NEW-149) har egen tekst; uten kode, eller med ukjent kode,
+              den generiske meldingen. */}
+          {showSubmitError && (
+            <ErrorPanel message={codeText(locale, "orderError", job.errorCode)} />
           )}
 
           {job.status === "needs_review" && job.review && (

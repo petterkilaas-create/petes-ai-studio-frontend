@@ -1,6 +1,7 @@
-// Bare typer: api.ts har ingen runtime-importer (testes med node --test).
+// Bare typer, pluss den rene quota.ts (.ts-endelse: testes med node --test).
 import type { DuskSky, DuskTime, ReviewDusk } from "./dusk";
 import type { ReviewDisclosure } from "./disclosure";
+import { parseQuota, type Quota } from "./quota.ts";
 
 const apiBase = process.env.NEXT_PUBLIC_API_BASE;
 if (!apiBase) {
@@ -122,9 +123,39 @@ export class ValidationError extends Error {
   }
 }
 
+/**
+ * Feil fra POST /v1/process med kode (TG-NEW-149, KONTRAKT_KVOTE), f.eks.
+ * free_quota_exhausted (402), daily_capacity_reached (429),
+ * quota_unavailable / job_create_failed (503), duplicate_request (409) og
+ * invalid_idempotency_key (400). `code` er null naar svaret ikke har en.
+ * Teksten til brukeren kommer fra ordlista (gruppen orderError), aldri herfra.
+ */
+export class SubmitError extends Error {
+  readonly httpStatus: number;
+  readonly code: string | null;
+  /** 402: `used`/`limit` fra svaret, ellers tom. */
+  readonly detail: { used?: unknown; limit?: unknown };
+
+  constructor(httpStatus: number, code: string | null, detail: { used?: unknown; limit?: unknown } = {}) {
+    super(`submitJob failed (${httpStatus})${code ? `: ${code}` : ""}`);
+    this.name = "SubmitError";
+    this.httpStatus = httpStatus;
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
 export type SubmitResult =
   | { kind: "sync"; imageBlob: Blob; requestId: string }
-  | { kind: "async"; jobId: string; service: string };
+  | {
+      kind: "async";
+      jobId: string;
+      service: string;
+      /** Samme Idempotency-Key igjen: ingen ny jobb, foelg den som vanlig. */
+      duplicate: boolean;
+      /** Kvoten etter trekket, eller null (privacy_blur, eldre svar). */
+      quota: Quota | null;
+    };
 
 /**
  * Poll-resultat. Alt unntatt "pending" er terminalt — pollingen stopper.
@@ -250,9 +281,11 @@ export async function submitJob(opts: {
    * Beholdt for bakoverkompatibilitet med eksisterende kall-steder.
    */
   paramsJson?: string;
+  /** Én per bestilling, samme ved nytt forsoek (se orderKey.ts). */
+  idempotencyKey?: string;
   getToken: GetToken;
 }): Promise<SubmitResult> {
-  const { service, image, params, getToken } = opts;
+  const { service, image, params, idempotencyKey, getToken } = opts;
 
   // params (typet) har forrang; deretter legacy paramsJson; ellers "{}".
   // JSON.stringify utelater undefined-felter, saa et ProcessParams-objekt
@@ -266,9 +299,12 @@ export async function submitJob(opts: {
   form.append("image", image);
   form.append("params_json", paramsJson);
 
+  const headers = new Headers(await authHeader(getToken));
+  if (idempotencyKey !== undefined) headers.set("Idempotency-Key", idempotencyKey);
+
   const res = await fetch(`${API_BASE}/v1/process`, {
     method: "POST",
-    headers: await authHeader(getToken),
+    headers,
     body: form,
   });
 
@@ -282,17 +318,67 @@ export async function submitJob(opts: {
   }
 
   if (res.status === 202) {
-    const data = (await res.json()) as { job_id: string; service: string };
-    return { kind: "async", jobId: data.job_id, service: data.service };
+    const data = (await res.json()) as {
+      job_id: string;
+      service: string;
+      duplicate?: unknown;
+      quota?: unknown;
+    };
+    return {
+      kind: "async",
+      jobId: data.job_id,
+      service: data.service,
+      duplicate: data.duplicate === true,
+      quota: parseQuota(data.quota),
+    };
+  }
+
+  // Feil med kode (kvoten, TG-NEW-149) gaar foran den gamle 400-grenen:
+  // invalid_idempotency_key er 400, men ingen ValidationError.
+  const raw = await res.text().catch(() => "");
+  const body = parseJsonOrNull(raw);
+  const code = errorCode(body);
+  if (code !== null) {
+    const outer = isRecord(body) ? body : {};
+    const inner = isRecord(outer.detail) ? outer.detail : {};
+    throw new SubmitError(res.status, code, { used: inner.used, limit: inner.limit });
   }
 
   if (res.status === 400) {
-    const detail = await extractDetail(res);
-    throw new ValidationError(detail);
+    throw new ValidationError(detailText(body, raw, res));
   }
 
-  const detail = await extractDetail(res);
-  throw new Error(`submitJob failed (${res.status}): ${detail}`);
+  throw new Error(`submitJob failed (${res.status}): ${detailText(body, raw, res)}`);
+}
+
+function parseJsonOrNull(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** Feilteksten i et svar som allerede er lest (samme form som extractDetail). */
+function detailText(body: unknown, raw: string, res: Response): string {
+  if (body === null) return raw || `${res.status} ${res.statusText}`;
+  if (isRecord(body) && typeof body.detail === "string") return body.detail;
+  return JSON.stringify(body);
+}
+
+/**
+ * Kvoten for gratisbilder (GET /v1/quota, TG-NEW-149). null ved 503
+ * quota_unavailable, nettverksfeil eller ukjent form: da vises ingen
+ * teller, og backend avgjoer ved bestillingen.
+ */
+export async function getQuota(opts: { getToken: GetToken }): Promise<Quota | null> {
+  try {
+    const res = await authedFetch(`${API_BASE}/v1/quota`, { method: "GET" }, opts.getToken);
+    if (res.status !== 200) return null;
+    return parseQuota(await readJson(res));
+  } catch {
+    return null;
+  }
 }
 
 /** Parser Retry-After-header (sekunder) -> millisekunder, clampe 0-30 s. */
