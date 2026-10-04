@@ -67,7 +67,8 @@ function strings(value: unknown, path = ""): [string, string][] {
 
 /**
  * Plassene malene i innholdet kan ha. MS3b: prisene og antallene (offer.ts),
- * e-posten, tiden, aarstallet og selskapsnavnet (de tre siste venter).
+ * e-posten, tiden, aarstallet og selskapsnavnet (de tre siste venter). MS4:
+ * overskriften i alt-teksten til delingsbildet.
  */
 const TEMPLATE_KEYS = [
   "brand",
@@ -82,6 +83,7 @@ const TEMPLATE_KEYS = [
   "time",
   "year",
   "companyName",
+  "title",
 ];
 
 // ---------------------------------------------------------------------------

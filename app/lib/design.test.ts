@@ -113,13 +113,16 @@ const BRAND_NAMES = [...new Set([DEFAULT_BRAND.displayName, "Husvy", "The Studio
 
 test("merkenavnet staar bare i brand.ts, ikke i .ts eller .tsx under app/ eller content/", () => {
   // Hele fila, ogsaa kommentarer. Testfilene er unntatt. content/ (MS2):
-  // innholdet paa markedssiden bruker {brand}.
+  // innholdet paa markedssiden bruker {brand}. MS4: domenet er ikke
+  // visningsnavnet og staar i SITE_URL (marketingAccess.ts); bare den linja
+  // er unntatt (seo.test.ts sjekker at adressen staar der og bare der).
   const brandFile = join(APP_DIR, "lib", "brand.ts");
   const contentDir = join(REPO_DIR, "content");
+  const withoutSiteUrl = (src: string) => src.replace(/^export const SITE_URL = "https:\/\/[^"]+";$/m, "");
   for (const name of BRAND_NAMES) {
     const hits = [...sourceFiles(), ...sourceFiles(contentDir)]
       .filter((f) => f !== brandFile)
-      .filter((f) => readFileSync(f, "utf8").toLowerCase().includes(name.toLowerCase()))
+      .filter((f) => withoutSiteUrl(readFileSync(f, "utf8")).toLowerCase().includes(name.toLowerCase()))
       .map((f) => relative(REPO_DIR, f));
     assert.deepEqual(hits, [], name);
   }

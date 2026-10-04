@@ -54,6 +54,11 @@ export type Site = {
   seo: {
     /** Fanetittelen paa markedssiden. Mal med {brand}. */
     title: string;
+    /**
+     * Alt-teksten til delingsbildet (MS4). Mal med {brand} og {title} =
+     * hero.title, som er teksten i bildet. Beskrivelsen er hero.lead.
+     */
+    ogImageAlt: string;
   };
   topBar: {
     _type: "topBar";

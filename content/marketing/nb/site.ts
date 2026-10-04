@@ -9,10 +9,13 @@ import type { Site } from "../schema.ts";
 // MS3b: prisene og aarstallet (de eneste tallene paa siden), kontakt og
 // bunnen (linje 405-444). Sidene i bunnen finnes ikke ennaa (MS5) og vises
 // som tekst uten lenke. Spraakvelgeren vises ikke foer det finnes flere spraak.
+// MS4: alt-teksten til delingsbildet, satt sammen av merket og overskriften
+// (Petter 02.10).
 export const site = {
   _type: "site",
   seo: {
     title: "{brand} – kveldsbilder for eiendomsmeglere",
+    ogImageAlt: "{brand}: {title}",
   },
   topBar: {
     _type: "topBar",
