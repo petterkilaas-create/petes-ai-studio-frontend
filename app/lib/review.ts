@@ -60,6 +60,15 @@ export function decisionControls(
   };
 }
 
+/**
+ * Bildene er slettet (TG-NEW-117): `media_deleted_at` er satt. null og
+ * undefined betyr det samme: ikke slettet. Knappene er da allerede borte,
+ * fordi backend sender tom `allowed_actions`.
+ */
+export function mediaDeleted(review: Pick<JobReviewDetail, "mediaDeletedAt">): boolean {
+  return review.mediaDeletedAt != null;
+}
+
 /** Lengde i tegn (kodepunkter), etter trimming, slik backend teller. */
 export function reasonLength(text: string): number {
   return [...text.trim()].length;

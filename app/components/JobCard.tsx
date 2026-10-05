@@ -10,7 +10,8 @@ import {
 } from "../lib/statusVariants";
 import { OpenReviewLink } from "./OpenReviewLink";
 import { JobMedia } from "./JobMedia";
-import { mediaView } from "../lib/jobMedia";
+import { cardNote, mediaView } from "../lib/jobMedia";
+import { formatDate } from "../lib/dates";
 import { cardClass } from "./ui/Card";
 import { Pill } from "./ui/Pill";
 import { messageText, t, type Locale, type UiKey } from "../lib/i18n";
@@ -36,19 +37,6 @@ function serviceLabel(locale: Locale, service: string): string {
   if (key !== null) return t(locale, key);
   const pretty = service.replace(/_/g, " ");
   return pretty.charAt(0).toUpperCase() + pretty.slice(1);
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("nb-NO", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 // Status-pill: frikoblet fra StatusBadge (som tar en annen status-union).
@@ -81,6 +69,7 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
   // Kort melding ut fra status og `code`, aldri raa `error` (TG-NEW-121).
   // Avvist av megleren: merket sier det, og begrunnelsen vises under.
   const message = rejectedByYou ? null : jobMessage(job.status, job.code);
+  const note = cardNote(job, thumb);
 
   return (
     <div className={cardClass("none", "flex flex-col overflow-hidden")}>
@@ -105,6 +94,10 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
         <span className="text-ink-2 text-[13px]">
           {formatDate(job.createdAt)}
         </span>
+        {note !== null && (
+          // TG-NEW-117: miniatyren finnes, men bildene i full stoerrelse er slettet.
+          <span className="text-ink-2 text-[13px]">{t(locale, note)}</span>
+        )}
         {other && (
           // TG-NEW-127: en annen brukers jobb (scope=all). Bare de 6 siste
           // tegnene i eierens id; navn og e-post krever Clerk secret key.

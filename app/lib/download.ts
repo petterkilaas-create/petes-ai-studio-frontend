@@ -1,5 +1,6 @@
 import type { JobReviewDetail } from "./api";
 import type { UiKey } from "./i18n";
+import { mediaDeleted } from "./review.ts";
 
 /**
  * «Last ned merket bilde» (merking PR 4, TG-NEW-55). Backend leverer JPEG med
@@ -9,9 +10,12 @@ import type { UiKey } from "./i18n";
  * fetch med token -> blob -> <a download>.
  */
 
-/** Knappen vises bare for eieren, og bare naar jobben er godkjent. */
-export function canDownload(review: Pick<JobReviewDetail, "status" | "isOwner">): boolean {
-  return review.status === "succeeded" && review.isOwner === true;
+/**
+ * Knappen vises bare for eieren, bare naar jobben er godkjent, og ikke naar
+ * bildene er slettet (TG-NEW-117; statusen er da fortsatt succeeded).
+ */
+export function canDownload(review: Pick<JobReviewDetail, "status" | "isOwner" | "mediaDeletedAt">): boolean {
+  return review.status === "succeeded" && review.isOwner === true && !mediaDeleted(review);
 }
 
 /**
@@ -35,6 +39,8 @@ export function downloadErrorKey(httpStatus: number, body: unknown): UiKey {
   const inner = isRecord(outer.detail) ? outer.detail : outer;
   const code = typeof inner.code === "string" ? inner.code : null;
   if (httpStatus === 409 && code === "action_not_allowed") return "review.downloadNotAllowed";
+  // TG-NEW-117: bildene er slettet.
+  if (httpStatus === 410 && code === "media_deleted") return "review.downloadDeleted";
   if (code !== null && BROKEN_CODES.has(code)) return "review.downloadBroken";
   return "review.downloadFailed";
 }

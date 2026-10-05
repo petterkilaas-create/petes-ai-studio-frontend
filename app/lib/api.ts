@@ -72,6 +72,8 @@ interface JobStatusBody {
   reasons?: unknown;
   /** Meglerens egen begrunnelse ved rejected_by_reviewer (2d-1). */
   reason?: unknown;
+  /** TG-NEW-117: naar bildene ble slettet. Bare med naar det er satt. */
+  media_deleted_at?: unknown;
 }
 
 /**
@@ -182,8 +184,8 @@ export type SubmitResult =
  */
 export type JobResult =
   | { kind: "pending"; status: "queued" | "running"; retryAfterMs?: number }
-  | { kind: "done"; previewUrl: string | null; jobId: string }
-  | { kind: "awaiting_approval"; previewUrl: string | null; jobId: string }
+  | { kind: "done"; previewUrl: string | null; jobId: string; mediaDeletedAt?: string }
+  | { kind: "awaiting_approval"; previewUrl: string | null; jobId: string; mediaDeletedAt?: string }
   | { kind: "needs_review"; review: Review }
   | { kind: "unknown"; status: string | null; httpStatus: number }
   | { kind: "rejected_by_reviewer"; reason: string | null }
@@ -205,6 +207,15 @@ function nonEmptyString(value: unknown): string | null {
 }
 
 /**
+ * TG-NEW-117: poll sender `media_deleted_at` bare naar bildene er slettet.
+ * Mangler feltet, mangler det ogsaa her (ikke slettet).
+ */
+function pollDeleted(data: JobStatusBody): { mediaDeletedAt?: string } {
+  const at = nonEmptyString(data.media_deleted_at);
+  return at === null ? {} : { mediaDeletedAt: at };
+}
+
+/**
  * Tolker status-JSON fra HTTP 200. Det ENESTE stedet som kjenner
  * terminal-statusene i poll-kontrakten.
  */
@@ -223,6 +234,7 @@ export function parseStatusBody(data: JobStatusBody, jobId: string): JobResult {
       kind: "awaiting_approval",
       previewUrl: nonEmptyString(data.preview_url),
       jobId: data.job_id ?? jobId,
+      ...pollDeleted(data),
     };
   }
   if (data.status === "succeeded") {
@@ -231,6 +243,7 @@ export function parseStatusBody(data: JobStatusBody, jobId: string): JobResult {
       kind: "done",
       previewUrl: nonEmptyString(data.preview_url),
       jobId: data.job_id ?? jobId,
+      ...pollDeleted(data),
     };
   }
   if (data.status === "failed" && data.code === "rejected_by_reviewer") {
@@ -488,6 +501,10 @@ interface JobSummaryWire {
   is_owner?: boolean;
   /** TG-NEW-127: de 6 siste tegnene i eierens id, eller null. */
   owner_short?: string | null;
+  /** TG-NEW-117: naar bildene i full stoerrelse ble slettet, eller null. */
+  media_deleted_at?: unknown;
+  /** TG-NEW-117: naar den merkede miniatyren ble slettet, eller null. */
+  thumb_deleted_at?: unknown;
 }
 
 /**
@@ -568,6 +585,13 @@ export interface JobSummary {
   isOwner: boolean;
   /** De 6 siste tegnene i eierens id (for «Eier: …»), ellers null. */
   ownerShort: string | null;
+  /**
+   * TG-NEW-117: naar bildene i full stoerrelse ble slettet. Den merkede
+   * miniatyren kan fortsatt finnes. null og undefined: ikke slettet.
+   */
+  mediaDeletedAt?: string | null;
+  /** TG-NEW-117: naar den merkede miniatyren ble slettet. null og undefined: ikke slettet. */
+  thumbDeletedAt?: string | null;
 }
 
 /** Statusene i filteret «Venter paa meg» (GET /v1/jobs?status=, 2d-1a). */
@@ -663,6 +687,8 @@ export async function listJobs(opts: {
     reason: nonEmptyString(row.reason),
     isOwner: row.is_owner !== false,
     ownerShort: nonEmptyString(row.owner_short),
+    mediaDeletedAt: nonEmptyString(row.media_deleted_at),
+    thumbDeletedAt: nonEmptyString(row.thumb_deleted_at),
   }));
 }
 
@@ -858,6 +884,11 @@ export interface JobReviewDetail {
   decisions: { action: string | null; at: string | null; byRole: string | null; reason: string | null }[];
   /** Lysstyrke for gjeldende runde (TG-NEW-147). */
   brightness: ReviewBrightness;
+  /**
+   * TG-NEW-117: naar bildene ble slettet. Da er alle bildefeltene null og
+   * `allowedActions` tom. null og undefined: ikke slettet.
+   */
+  mediaDeletedAt?: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1055,6 +1086,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
       reason: stringOrNull(d.reason),
     })),
     brightness: toBrightness(r.brightness),
+    mediaDeletedAt: nonEmptyString(r.media_deleted_at),
   };
 }
 
@@ -1148,8 +1180,9 @@ export interface DecisionRequest {
  *   sluttstatus, hent saa review paa nytt.
  * - status_changed (409): noen andre har avgjort, eller siden viser en eldre
  *   versjon (TG-NEW-130); last paa nytt og vis melding.
- * - blocked (409 action_not_allowed/original_missing/correction_limit,
- *   422 invalid_decision med eventuell override_code): vis melding.
+ * - blocked (409 action_not_allowed/original_missing/correction_limit/
+ *   media_deleted, 422 invalid_decision med eventuell override_code):
+ *   vis melding. media_deleted (TG-NEW-117): bildene er slettet.
  * - unavailable (503): archive_failed eller backend uten database; trygt aa
  *   proeve igjen.
  * - not_found (404), error (alt annet).

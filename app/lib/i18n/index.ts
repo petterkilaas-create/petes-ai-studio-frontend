@@ -170,6 +170,7 @@ const nbUi = {
   "review.downloadFailed": "Kunne ikke laste ned bildet. Prøv igjen om litt.",
   "review.downloadNotAllowed": "Bare eieren av jobben kan laste ned bildet.",
   "review.downloadBroken": "Bildet kunne ikke hentes. Kontakt oss.",
+  "review.downloadDeleted": "Bildet er slettet og kan ikke lastes ned lenger.",
   "history.open": "Åpne",
   "unavailable.title": "Midlertidig ikke tilgjengelig",
   "unavailable.body": "Denne tjenesten er midlertidig ikke tilgjengelig.",
@@ -274,6 +275,10 @@ const nbUi = {
   "media.working.generic": "Lager bildet …",
   "media.fireplaceQuestion": "Svar på spørsmålet om peisen",
   "media.originalAlt": "Dagsbildet som ble lastet opp",
+  // TG-NEW-117: bildene er slettet. Ingen antall dager i tekstene; fristene kan endres.
+  "media.deleted": "Bildet er slettet",
+  "media.fullSizeDeleted": "Bildene i full størrelse er slettet",
+  "review.mediaDeleted": "Bildene i full størrelse ble slettet {date}. Opplysningene om jobben er tatt vare på.",
   // Spraakvalget i brukermenyen (TG-NEW-129): navnet paa spraaket, paa spraaket selv.
   "account.languageName": "Norsk",
 } as const;
@@ -349,6 +354,8 @@ const nb: Dictionary = {
       raw_missing: "Dette trinnet kan ikke lages nå. Velg trinnet bildet startet på, eller prøv igjen senere.",
       raw_mismatch: "Dette trinnet kan ikke lages nå. Velg trinnet bildet startet på, eller prøv igjen senere.",
       brightness_failed: "Bildet med valgt lysstyrke kunne ikke lages. Ingenting er endret. Prøv igjen.",
+      // TG-NEW-117: en fane som stod åpen mens bildene ble slettet.
+      media_deleted: "Bildene er slettet, så jobben kan ikke godkjennes eller rettes lenger.",
     },
     overrideCode: {
       too_many_lights: "For mange lyskilder er slått på. Slå av noen og prøv igjen.",
@@ -560,6 +567,7 @@ const en: Dictionary = {
     "review.downloadFailed": "Could not download the image. Please try again shortly.",
     "review.downloadNotAllowed": "Only the job owner can download the image.",
     "review.downloadBroken": "The image could not be retrieved. Please contact us.",
+    "review.downloadDeleted": "The image has been deleted and can no longer be downloaded.",
     "history.open": "Open",
     "unavailable.title": "Temporarily unavailable",
     "unavailable.body": "This service is temporarily unavailable.",
@@ -656,6 +664,9 @@ const en: Dictionary = {
     "media.working.generic": "Creating image …",
     "media.fireplaceQuestion": "Answer the question about the fireplace",
     "media.originalAlt": "The uploaded daytime photo",
+    "media.deleted": "Image deleted",
+    "media.fullSizeDeleted": "Full-size images deleted",
+    "review.mediaDeleted": "The full-size images were deleted on {date}. The job details have been kept.",
     "account.languageName": "English",
   },
   codes: {
@@ -717,6 +728,7 @@ const en: Dictionary = {
       raw_missing: "This step cannot be created right now. Choose the step the image started on, or try again later.",
       raw_mismatch: "This step cannot be created right now. Choose the step the image started on, or try again later.",
       brightness_failed: "The image with the chosen brightness could not be created. Nothing was changed. Please try again.",
+      media_deleted: "The images have been deleted, so the job can no longer be approved or corrected.",
     },
     overrideCode: {
       too_many_lights: "Too many light sources are turned on. Turn some off and try again.",
