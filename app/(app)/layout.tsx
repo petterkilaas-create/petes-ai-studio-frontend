@@ -8,6 +8,7 @@ import { AppNav } from "@/app/components/AppNav";
 import { BrandMark } from "@/app/components/BrandMark";
 import { brandCssVars, DEFAULT_BRAND } from "@/app/lib/brand";
 import { fontVariables } from "@/app/lib/fonts";
+import { clerkLocalization } from "@/app/lib/i18n/clerkLocalization";
 import { LOCALE_COOKIE, resolveLocale } from "@/app/lib/i18n/locale";
 import { LocaleProvider } from "@/app/lib/i18n/LocaleProvider";
 import { START_PATH } from "@/app/lib/marketingAccess";
@@ -28,6 +29,10 @@ export const metadata: Metadata = {
 // Accept-Language. cookies() og headers() gjoer app-sidene dynamiske; det er
 // greit bak innloggingen (Petter 05.10). Markedssiden har egen rot-layout og
 // forblir statisk.
+// K1: Clerks egne tekster (brukermenyen, «Administrer konto») foelger det
+// samme spraaket (clerkLocalization.ts). Etter router.refresh() faar
+// ClerkProvider ny localization og bytter uten full omlasting. Innloggingen
+// paa accounts-domenet er Clerks Account Portal og styres ikke herfra.
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const [cookieStore, headerList] = await Promise.all([cookies(), headers()]);
   const locale = resolveLocale({
@@ -36,7 +41,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   });
 
   return (
-    <ClerkProvider>
+    <ClerkProvider localization={clerkLocalization(locale)}>
       <html lang={locale} className={fontVariables} style={brandCssVars(brand) as React.CSSProperties}>
         <body className="min-h-screen">
           <LocaleProvider locale={locale}>

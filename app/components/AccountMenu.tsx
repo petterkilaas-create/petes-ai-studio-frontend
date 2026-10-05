@@ -17,7 +17,7 @@ import { useLocale } from "../lib/i18n/useLocale";
  * Valget skrives til cookien (visningen) og til Clerk unsafeMetadata
  * (foelger brukeren til andre enheter), og router.refresh() rendrer
  * rot-layouten paa nytt med riktig spraak og lang. Clerks egne tekster i
- * menyen er engelske til K1 (@clerk/localizations, egen PR).
+ * menyen foelger med (localization i rot-layouten, K1).
  */
 function writeCookie(locale: Locale): void {
   document.cookie = localeCookie(locale, window.location.protocol === "https:");
