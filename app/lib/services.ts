@@ -133,6 +133,31 @@ export interface Category {
 // (L0) saa filtreringen kan testes. Tekstene ligger i ordlista (D1c); id,
 // service og presetId sendes til backend og er uendret.
 const CATEGORIES: Category[] = [
+  // Lys og himmel foerst: kveldsbildet er hovedtjenesten, og /tjenester
+  // uten ?tjeneste= aapner her (dag 38, Petter: S2).
+  {
+    id: "timetraveler",
+    titleKey: "express.category.timetraveler",
+    items: [
+      {
+        id: "klart_vaer",
+        service: "scene_transform",
+        presetId: "klart_vaer",
+        kind: "scene",
+        titleKey: "express.tool.klart_vaer.title",
+        descKey: "express.tool.klart_vaer.desc",
+      },
+      {
+        id: "skumring",
+        service: "scene_transform",
+        presetId: "skumring",
+        kind: "scene",
+        sceneGate: false,
+        titleKey: "service.scene_transform",
+        descKey: "express.tool.skumring.desc",
+      },
+    ],
+  },
   {
     id: "fixit",
     titleKey: "express.category.fixit",
@@ -208,29 +233,6 @@ const CATEGORIES: Category[] = [
   //     // },
   //   ],
   // },
-  {
-    id: "timetraveler",
-    titleKey: "express.category.timetraveler",
-    items: [
-      {
-        id: "klart_vaer",
-        service: "scene_transform",
-        presetId: "klart_vaer",
-        kind: "scene",
-        titleKey: "express.tool.klart_vaer.title",
-        descKey: "express.tool.klart_vaer.desc",
-      },
-      {
-        id: "skumring",
-        service: "scene_transform",
-        presetId: "skumring",
-        kind: "scene",
-        sceneGate: false,
-        titleKey: "service.scene_transform",
-        descKey: "express.tool.skumring.desc",
-      },
-    ],
-  },
 ];
 
 /** Kategoriene paa Tjenester med bare paaslaatte verktoey. Tomme kategorier skjules. */
