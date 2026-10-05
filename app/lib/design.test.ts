@@ -86,7 +86,8 @@ test("fontene lastes med next/font i lib/fonts.ts, bare som variabler, og alle r
   assert.doesNotMatch(fonts, /(instrumentSerif|geist)\.className/, ".className bytter font (synlig)");
   for (const rel of ["(app)/layout.tsx", "(marketing)/layout.tsx", "global-not-found.tsx"]) {
     const src = read(rel);
-    assert.match(src, /<html lang="(no|nb)" className=\{fontVariables\}/, rel);
+    // Appen: spraaket fra layouten (TG-NEW-129). Markedssiden og 404: norsk.
+    assert.match(src, /<html lang=(?:"nb"|\{locale\}) className=\{fontVariables\}/, rel);
     assert.match(src, /brandCssVars\(/, rel);
     assert.match(src, /import "(@\/app\/|\.\/)globals\.css";/, rel);
     assert.doesNotMatch(src, /next\/font/, `${rel}: fontene lastes bare i lib/fonts.ts`);
@@ -1026,4 +1027,71 @@ test("TG-158: UnknownStatusPanel henter teksten fra ordlista", () => {
   assert.match(src, /\{t\(locale, "unknownStatus\.title"\)\}/);
   assert.equal(t("nb", "unknownStatus.title"), "Vi fikk et uventet svar fra serveren. Prøv igjen.");
   assert.equal(t("en", "unknownStatus.title"), "We got an unexpected response from the server. Please try again.");
+});
+
+// ---------------------------------------------------------------------------
+// TG-NEW-129: spraakvalget. Rot-layouten for (app) leser cookien, velgeren
+// staar i brukermenyen, og teksten til annonsen foelger annonsens spraak.
+// ---------------------------------------------------------------------------
+
+test("TG-129: rot-layouten for (app) leser cookien og Accept-Language, og lang foelger spraaket", () => {
+  const src = withoutComments(layout);
+  assert.match(src, /import \{ cookies, headers \} from "next\/headers";/);
+  assert.match(src, /export default async function RootLayout/);
+  assert.match(src, /cookie: cookieStore\.get\(LOCALE_COOKIE\)\?\.value,/);
+  assert.match(src, /acceptLanguage: headerList\.get\("accept-language"\),/);
+  assert.match(src, /<html lang=\{locale\} className=\{fontVariables\}/);
+  assert.match(src, /<LocaleProvider locale=\{locale\}>[\s\S]*<AppNav \/>[\s\S]*<AccountMenu \/>[\s\S]*\{children\}[\s\S]*<\/LocaleProvider>/);
+  assert.doesNotMatch(src, /<UserButton/, "brukermenyen er AccountMenu");
+});
+
+test("TG-129: markedssiden og 404 leser ikke cookien og forblir statiske og norske", () => {
+  for (const rel of ["(marketing)/layout.tsx", "global-not-found.tsx"]) {
+    const src = withoutComments(read(rel));
+    assert.doesNotMatch(src, /next\/headers|cookies\(|headers\(|LocaleProvider|LOCALE_COOKIE/, rel);
+    assert.match(src, /<html lang="nb"/, rel);
+  }
+});
+
+test("TG-129: useLocale leser layoutens spraak, med nettleseren som reserve, og samme signatur", () => {
+  const src = withoutComments(read("lib/i18n/useLocale.ts"));
+  assert.match(src, /export function useLocale\(\): Locale \{/);
+  assert.match(src, /const fromLayout = useContext\(LocaleContext\);/);
+  assert.match(src, /return fromLayout \?\? fromBrowser;/);
+  assert.match(withoutComments(read("lib/i18n/LocaleProvider.tsx")), /createContext<Locale \| null>\(null\)/);
+});
+
+test("TG-129: velgeren i brukermenyen skriver cookien og Clerk, og rendrer paa nytt", () => {
+  const src = withoutComments(read("components/AccountMenu.tsx"));
+  assert.match(src, /<UserButton\.MenuItems>\s*<UserButton\.Action/);
+  assert.match(src, /label=\{t\(next, "account\.languageName"\)\}/);
+  assert.match(src, /const next: Locale = locale === "nb" \? "en" : "nb";/);
+  // Clerk: update erstatter hele unsafeMetadata, saa resten tas med.
+  assert.match(src, /user\.update\(\{ unsafeMetadata: \{ \.\.\.user\.unsafeMetadata, locale: next \} \}\)/);
+  assert.match(src, /document\.cookie = localeCookie\(locale, window\.location\.protocol === "https:"\);/);
+  assert.match(src, /router\.refresh\(\);/);
+  // Verdien fra Clerk valideres, og synken kan ikke overstyre brukerens valg.
+  assert.match(src, /parseLocale\(user\?\.unsafeMetadata\?\.locale\)/);
+  assert.match(src, /settled\.current = true;\s*writeCookie\(next\);/);
+  // Navnet paa spraaket, paa spraaket selv.
+  assert.equal(t("nb", "account.languageName"), "Norsk");
+  assert.equal(t("en", "account.languageName"), "English");
+});
+
+test("TG-129: teksten til annonsen foelger annonsens spraak, aldri brukerens", () => {
+  const src = withoutComments(read("components/godkjenning/DisclosureBlock.tsx"));
+  assert.match(src, /disclosureText\(DISCLOSURE_LOCALE, disclosure, DISCLOSURE_DETAIL\)/);
+  assert.match(src, /lang=\{DISCLOSURE_LOCALE\}/);
+  // Ingen aktiv fil lager teksten med brukerens spraak.
+  for (const f of activeFiles()) {
+    // Kall med locale som foerste argument (definisjonen har `locale: Locale`).
+    assert.doesNotMatch(withoutComments(read(f)), /disclosureText\(\s*locale\s*,/, f);
+  }
+});
+
+test("TG-129: spraaket sendes aldri til backend (XMP og merket foelger ikke appen)", () => {
+  // Skal backend faa spraaket senere, maa denne testen endres med vilje.
+  for (const f of ["lib/api.ts", "lib/download.ts"]) {
+    assert.doesNotMatch(withoutComments(read(f)), /Accept-Language|\blocale\b|\blang\b|LOCALE_COOKIE/i, f);
+  }
 });
