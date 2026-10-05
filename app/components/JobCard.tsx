@@ -92,7 +92,7 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
           />
         </div>
         <span className="text-ink-2 text-[13px]">
-          {formatDate(job.createdAt)}
+          {formatDate(job.createdAt, locale)}
         </span>
         {note !== null && (
           // TG-NEW-117: miniatyren finnes, men bildene i full stoerrelse er slettet.

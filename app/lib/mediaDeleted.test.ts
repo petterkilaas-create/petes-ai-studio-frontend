@@ -15,6 +15,7 @@ const { canDownload, downloadErrorKey, downloadMarkedImage } = await import("./d
 const { blockedResult } = await import("./brightness.ts");
 const { correctionResult } = await import("./correction.ts");
 const { codeText, DICTIONARIES, t } = await import("./i18n/index.ts");
+const { formatDate } = await import("./dates.ts");
 
 import type { JobSummary } from "./api.ts";
 
@@ -218,7 +219,8 @@ test("slettet: godkjenningssiden viser banneret og laaser knappene, slideren og 
   const page = read("(app)/godkjenning/[jobId]/page.tsx");
   assert.match(page, /const deleted = mediaDeleted\(review\);/);
   // Banneret med datoen fra samme funksjon som kortene.
-  assert.match(page, /\{deleted && \([\s\S]*?t\(locale, "review\.mediaDeleted", \{ date: formatDate\(review\.mediaDeletedAt/);
+  // Datoen paa brukerens spraak (TG-NEW-129).
+  assert.match(page, /\{deleted && \([\s\S]*?t\(locale, "review\.mediaDeleted", \{ date: formatDate\(review\.mediaDeletedAt \?\? null, locale\) \}\)/);
   assert.match(page, /import \{ formatDate \} from "@\/app\/lib\/dates";/);
   // Én boks i stedet for varianter, bildene og lysstyrke-slideren (A1).
   const branch = page.slice(page.indexOf("{deleted ? ("));
@@ -236,10 +238,28 @@ test("slettet: godkjenningssiden viser banneret og laaser knappene, slideren og 
   assert.match(read("lib/download.ts"), /!mediaDeleted\(review\)/);
 });
 
-test("slettet: kortet bruker den delte datofunksjonen, som er uendret", () => {
+test("slettet: kortet bruker den delte datofunksjonen, med brukerens spraak", () => {
   const cardSrc = read("components/JobCard.tsx");
   assert.match(cardSrc, /import \{ formatDate \} from "\.\.\/lib\/dates";/);
   assert.doesNotMatch(cardSrc, /function formatDate/);
   assert.match(cardSrc, /cardNote\(job, thumb\)/);
-  assert.match(read("lib/dates.ts"), /toLocaleString\("nb-NO"/);
+  assert.match(cardSrc, /\{formatDate\(job\.createdAt, locale\)\}/);
+});
+
+test("TG-129: datoen foelger spraaket (nb-NO og en-GB), og ingen dato gir strek", () => {
+  // Midt paa dagen UTC, saa dagen er den samme i alle tidssoner vi bruker.
+  const iso = "2026-10-15T12:00:00Z";
+  assert.match(formatDate(iso, "nb"), /^15\. okt\. 2026, \d\d:00$/);
+  assert.match(formatDate(iso, "en"), /^15 Oct 2026, \d\d:00$/);
+  for (const locale of ["nb", "en"] as const) {
+    assert.equal(formatDate(null, locale), "—");
+    assert.equal(formatDate("ikke en dato", locale), "—");
+  }
+  // Ingen fast nb-NO igjen; formatet velges fra spraaket.
+  const src = read("lib/dates.ts");
+  assert.doesNotMatch(src, /toLocaleString\("nb-NO"/);
+  assert.match(src, /const DATE_LOCALES: Readonly<Record<Locale, string>> = \{ nb: "nb-NO", en: "en-GB" \};/);
+  // Banneret paa godkjenningssiden med samme funksjon og spraaket.
+  const banner = t("en", "review.mediaDeleted", { date: formatDate(iso, "en") });
+  assert.match(banner, /^The full-size images were deleted on 15 Oct 2026, /);
 });
