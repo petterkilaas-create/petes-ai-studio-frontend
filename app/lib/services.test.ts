@@ -8,6 +8,7 @@ import {
   ENABLED,
   EXPRESS_V2_PATH,
   ORDERS_PATH,
+  SERVICES_PATH,
   STAGING_PATH,
   VIDEO_PATH,
   expressCategories,
@@ -52,7 +53,7 @@ test("ukjent tjeneste er av", () => {
   assert.equal(isServiceEnabled("toString"), false);
 });
 
-test("Express har ikke Klart vaer eller Magic Cleanup, men har Privacy Blur og skumring", () => {
+test("Tjenester har ikke Klart vaer eller Magic Cleanup, men har Privacy Blur og skumring", () => {
   const tools = expressCategories().flatMap((c) => c.items);
   const ids = tools.map((t) => t.id);
   assert.ok(!ids.includes("klart_vaer"));
@@ -70,12 +71,12 @@ test("Express har ikke Klart vaer eller Magic Cleanup, men har Privacy Blur og s
   for (const c of expressCategories()) assert.ok(c.items.length > 0, c.id);
 });
 
-test("menyen har bare Express og Historikk", () => {
+test("menyen har Start, Tjenester og Historikk (TG-NEW-153)", () => {
   const hrefs = navLinks().map((l) => l.href);
   for (const h of [STAGING_PATH, EXPRESS_V2_PATH, VIDEO_PATH, COPYWRITER_PATH, ORDERS_PATH]) {
     assert.ok(!hrefs.includes(h), h);
   }
-  assert.deepEqual(hrefs, ["/express", "/history"]);
+  assert.deepEqual(hrefs, ["/start", "/tjenester", "/history"]);
 });
 
 test("ingen side har lenke til /staging eller /express-v2 skrevet rett inn", () => {
@@ -90,7 +91,7 @@ test("ingen side har lenke til /staging eller /express-v2 skrevet rett inn", () 
 test("/staging og /express-v2: sidelogikken gir «ikke tilgjengelig» og starter ingen jobb", () => {
   assert.equal(isPageEnabled(STAGING_PATH), false);
   assert.equal(isPageEnabled(EXPRESS_V2_PATH), false);
-  assert.equal(isPageEnabled("/express"), true);
+  assert.equal(isPageEnabled(SERVICES_PATH), true);
   assert.equal(isPageEnabled("/history"), true);
 
   for (const [rel, path] of [
@@ -124,7 +125,7 @@ test("debug-siden er slettet, og ingen lenke peker dit", () => {
 
 test("meldingen paa stengte sider: nb og en har noeklene", () => {
   for (const locale of ["nb", "en"] as const) {
-    for (const key of ["unavailable.title", "unavailable.body", "unavailable.toExpress"] as const) {
+    for (const key of ["unavailable.title", "unavailable.body", "unavailable.toServices"] as const) {
       assert.ok(DICTIONARIES[locale].ui[key].trim().length > 0, `${locale} ${key}`);
     }
   }
@@ -136,7 +137,7 @@ test("meldingen paa stengte sider: nb og en har noeklene", () => {
 // det som leveres (skumring og Privacy Blur).
 // ---------------------------------------------------------------------------
 
-test("konstanten: video, copywriter og orders er av, Express, Historikk og skumring er paa", () => {
+test("konstanten: video, copywriter og orders er av, Tjenester, Historikk og skumring er paa", () => {
   for (const id of ["video", "copywriter", "orders"]) {
     assert.equal(isServiceEnabled(id), false, id);
   }
@@ -144,10 +145,10 @@ test("konstanten: video, copywriter og orders er av, Express, Historikk og skumr
   assert.equal(ENABLED.copywriter, false);
   assert.equal(ENABLED.orders, false);
   assert.equal(isServiceEnabled("skumring"), true);
-  assert.equal(isPageEnabled("/express"), true);
+  assert.equal(isPageEnabled(SERVICES_PATH), true);
   assert.equal(isPageEnabled("/history"), true);
   const hrefs = navLinks().map((l) => l.href);
-  assert.ok(hrefs.includes("/express"));
+  assert.ok(hrefs.includes(SERVICES_PATH));
   assert.ok(hrefs.includes("/history"));
 });
 
@@ -178,13 +179,13 @@ test("/video, /copywriter og /orders: stengt side gir «ikke tilgjengelig» og g
 const HOME_KEYS = [
   "home.title",
   "home.intro",
-  "home.express.title",
-  "home.express.desc",
-  "home.express.cta",
+  "home.services.title",
+  "home.services.desc",
+  "home.services.cta",
   "express.subtitle",
 ] as const satisfies readonly UiKey[];
 
-test("forsiden og Express: teksten lover ikke video, Veo, HDR eller aarstider", () => {
+test("forsiden og Tjenester: teksten lover ikke video, Veo, HDR eller aarstider", () => {
   const forbidden = /video|veo|hdr|season|årstid|film|reel|klart vær|staging|copywrit/i;
   for (const locale of ["nb", "en"] as const) {
     for (const key of HOME_KEYS) {
@@ -194,20 +195,92 @@ test("forsiden og Express: teksten lover ikke video, Veo, HDR eller aarstider", 
     }
   }
   // Teksten staar i ordlista, ikke rett inn i sidene.
-  assert.doesNotMatch(read("(app)/express/page.tsx"), /seasonal/i);
+  assert.doesNotMatch(read("(app)/tjenester/page.tsx"), /seasonal/i);
   const home = read("(app)/start/page.tsx");
   for (const key of HOME_KEYS.filter((k) => k.startsWith("home."))) {
     // home.title faar navnet som variabel: t(locale, "home.title", { brand }).
     assert.ok(home.includes(`t(locale, "${key}"`), key);
   }
-  assert.ok(read("(app)/express/page.tsx").includes(`t(locale, "express.subtitle")`));
+  assert.ok(read("(app)/tjenester/page.tsx").includes(`t(locale, "express.subtitle")`));
 });
 
-test("forsiden og Express: nb og en har de samme noeklene", () => {
+test("forsiden og Tjenester: nb og en har de samme noeklene", () => {
   const pick = (locale: "nb" | "en") =>
     Object.keys(DICTIONARIES[locale].ui)
       .filter((k) => k.startsWith("home.") || k.startsWith("express."))
       .sort();
   assert.deepEqual(pick("nb"), pick("en"));
   for (const key of HOME_KEYS) assert.ok(pick("nb").includes(key), key);
+});
+
+// ---------------------------------------------------------------------------
+// TG-NEW-153 (dag 38): Express heter Tjenester (Petter 05.10). Adressen er
+// /tjenester, og /express sendes dit med 307 fra next.config.ts.
+// ---------------------------------------------------------------------------
+
+test("TG-153: /express sendes til /tjenester med 307, og ingen regel treffer /express-v2", async () => {
+  const { default: nextConfig } = await import("../../next.config.ts");
+  assert.ok(nextConfig.redirects, "next.config.ts har redirects()");
+  const rules = await nextConfig.redirects();
+  assert.deepEqual(rules, [{ source: "/express", destination: SERVICES_PATH, permanent: false }]);
+  assert.equal(SERVICES_PATH, "/tjenester");
+  for (const rule of rules) {
+    // Eksakt kilde uten parametre eller regex: treffer bare akkurat /express.
+    assert.doesNotMatch(rule.source, /[:*()+?{}]/, rule.source);
+    assert.notEqual(rule.source, EXPRESS_V2_PATH);
+    assert.notEqual(rule.destination, rule.source);
+  }
+});
+
+test("TG-153: siden ligger i (app)/tjenester, og (app)/express finnes ikke", () => {
+  assert.ok(existsSync(join(APP_DIR, "(app)", "tjenester", "page.tsx")));
+  assert.ok(existsSync(join(APP_DIR, "(app)", "tjenester", "layout.tsx")));
+  assert.equal(existsSync(join(APP_DIR, "(app)", "express")), false);
+  assert.ok(existsSync(join(APP_DIR, "(app)", "express-v2", "page.tsx")), "/express-v2 er urørt");
+});
+
+test("TG-153: ingen side har lenke til /express skrevet rett inn", () => {
+  // /express-v2 er en annen side og har egen test over.
+  const pattern = /["'`]\/express["'`?#/]/;
+  for (const file of sourceFiles()) {
+    assert.doesNotMatch(readFileSync(file, "utf8"), pattern, file);
+  }
+});
+
+test("TG-153: ordlista sier Tjenester og Start, aldri Express, og de gamle noeklene er borte", () => {
+  for (const locale of ["nb", "en"] as const) {
+    const ui = DICTIONARIES[locale].ui as Record<string, string>;
+    for (const [key, text] of Object.entries(ui)) {
+      assert.doesNotMatch(text, /\bExpress\b/i, `${locale} ${key}`);
+    }
+    for (const old of ["nav.express", "nav.home", "history.toExpress", "unavailable.toExpress", "home.express.title"]) {
+      assert.ok(!Object.hasOwn(ui, old), `${locale} ${old}`);
+    }
+  }
+  const { nb, en } = DICTIONARIES;
+  assert.equal(nb.ui["nav.start"], "Start");
+  assert.equal(nb.ui["nav.services"], "Tjenester");
+  assert.equal(nb.ui["express.title"], "Tjenester");
+  assert.equal(nb.ui["history.toServices"], "Gå til Tjenester");
+  assert.equal(nb.ui["unavailable.toServices"], "Gå til Tjenester");
+  assert.equal(en.ui["nav.services"], "Services");
+  assert.equal(en.ui["express.title"], "Services");
+});
+
+test("TG-153: lenkene til Tjenester bruker SERVICES_PATH", () => {
+  for (const rel of ["(app)/start/page.tsx", "(app)/history/page.tsx", "components/ServiceUnavailable.tsx"]) {
+    assert.match(read(rel), /href=\{SERVICES_PATH\}/, rel);
+  }
+});
+
+test("TG-153: menyen viser bare ikonet under 640 px, og Start er ikke et hus", () => {
+  const nav = read("components/AppNav.tsx");
+  // Ordet for hver lenke er for skjermlesere under sm, og synlig fra sm.
+  assert.match(nav, /<span className="sr-only sm:not-sr-only">\{t\(locale, `nav\.\$\{l\.id\}`\)\}<\/span>/);
+  assert.match(nav, /<span className="sr-only sm:not-sr-only">\{t\(locale, "nav\.help"\)\}<\/span>/);
+  // Lenkene er minst 44 x 44 px ogsaa uten ord.
+  assert.equal((nav.match(/min-h-11 min-w-11/g) ?? []).length, 2);
+  assert.match(nav, /start: LayoutDashboard,/);
+  assert.match(nav, /services: LayoutGrid,/);
+  assert.doesNotMatch(nav, /\b(House|Home)\b/);
 });

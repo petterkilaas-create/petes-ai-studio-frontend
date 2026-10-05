@@ -278,13 +278,35 @@ test("MS2: proxyen beskytter app-rutene som foer", () => {
   );
   // Matcheren er uendret fra foer MS2: proxyen kjoerer paa alle sider.
   assert.equal(matchers().length, 2);
-  for (const path of ["/", "/start", "/express", "/history", "/godkjenning/abc", "/no", "/no/x", "/finnes-ikke", "/api/x"]) {
+  for (const path of [
+    "/",
+    "/start",
+    "/tjenester",
+    "/express",
+    "/history",
+    "/godkjenning/abc",
+    "/no",
+    "/no/x",
+    "/finnes-ikke",
+    "/api/x",
+  ]) {
     assert.ok(proxyRuns(path), path);
   }
   assert.ok(!proxyRuns("/_next/static/x.js"));
   // Ingen app-rute er aapen, uansett flagget.
   for (const pub of [false, true]) {
-    for (const path of ["/", "/start", "/express", "/history", "/godkjenning/abc", "/staging", "/nokke", "/no-x", "/finnes-ikke"]) {
+    for (const path of [
+      "/",
+      "/start",
+      "/tjenester",
+      "/express",
+      "/history",
+      "/godkjenning/abc",
+      "/staging",
+      "/nokke",
+      "/no-x",
+      "/finnes-ikke",
+    ]) {
       assert.equal(isOpenMarketingPath(path, pub), false, `${path} (${pub})`);
     }
   }

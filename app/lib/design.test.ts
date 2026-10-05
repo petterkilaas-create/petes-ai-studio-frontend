@@ -177,8 +177,9 @@ test("D1: listen over aktive filer har skallet, sidene og komponentene", () => {
     "(app)/layout.tsx",
     "(app)/page.tsx",
     "(app)/start/page.tsx",
+    "(app)/start/layout.tsx",
     "globals.css",
-    "(app)/express/page.tsx",
+    "(app)/tjenester/page.tsx",
     "(app)/history/page.tsx",
     "lib/statusVariants.ts",
     "lib/services.ts",
@@ -242,7 +243,12 @@ test("D1: skallet bruker merket fra brand.ts, og metadata har fanetittelen", () 
   assert.match(body, /background-color:\s*var\(--color-paper\);/);
   assert.match(body, /color:\s*var\(--color-ink\);/);
   assert.match(body, /font-family:\s*var\(--font-ui\);/);
-  for (const [dir, title] of [["express", "Express"], ["history", "Historikk"], ["godkjenning", "Godkjenning"]]) {
+  for (const [dir, title] of [
+    ["start", "Start"],
+    ["tjenester", "Tjenester"],
+    ["history", "Historikk"],
+    ["godkjenning", "Godkjenning"],
+  ]) {
     assert.match(read(`(app)/${dir}/layout.tsx`), new RegExp(`title: "${title}"`), dir);
   }
 });
@@ -286,7 +292,7 @@ test("D1: ingen emoji i menyen (Lucide-ikoner)", () => {
   assert.doesNotMatch(layout, EMOJI);
 });
 
-const NAV_IDS: NavId[] = ["express", "staging", "video", "copywriter", "orders", "history"];
+const NAV_IDS: NavId[] = ["start", "services", "staging", "video", "copywriter", "orders", "history"];
 
 test("D1: ordlista har de nye ordene paa nb og en", () => {
   const keys = [
@@ -343,9 +349,10 @@ test("D1: produktnavnet staar ikke i ordlista (kommer fra brand.ts)", () => {
 test("D1: testene for annonseteksten og lekkasjevernet er uendret", () => {
   // sha256 fra main foer D1 (249cee3). Endres de, maa det vaere et eget valg.
   // MS1 (dag 35): previews.test.ts fikk nye stier til sidene i (app)/, ellers uendret.
+  // TG-NEW-153 (dag 38): to stier fra (app)/express til (app)/tjenester, ellers uendret (Petter 05.10).
   const expected: Record<string, string> = {
     "lib/disclosure.test.ts": "8acedaed814203b88c6395209b43ffe7798734b58d888b63985f9126937769ce",
-    "lib/previews.test.ts": "f00f42d77f98755c2052cb61b81c646a03c1b90e506338c6a00e8b8bd94bce33",
+    "lib/previews.test.ts": "e78901bf96250efc8fca3f5eea49d985abc6bf7213870dac66c528182a65b4d4",
     "lib/jobState.test.ts": "cac4d79a9ed60e6307f4cdd0118fcba43c22b8aa8ba7a783ba4c0e1522a818c5",
   };
   for (const [rel, hash] of Object.entries(expected)) {
@@ -354,7 +361,8 @@ test("D1: testene for annonseteksten og lekkasjevernet er uendret", () => {
 });
 
 // ---------------------------------------------------------------------------
-// D1c: Express-tekstene via ordlista (brief §7), uten metaforer og steg-nummer.
+// D1c: tekstene paa Tjenester (tidligere Express) via ordlista (brief §7), uten
+// metaforer og steg-nummer.
 // ---------------------------------------------------------------------------
 
 /** JSX-delen av komponenten: fra `return (` i default-eksporten/komponenten. */
@@ -366,11 +374,11 @@ function jsxOf(rel: string, fn: string): string {
 }
 
 const EXPRESS_JSX: [string, string][] = [
-  ["(app)/express/page.tsx", "export default function ExpressPage"],
+  ["(app)/tjenester/page.tsx", "export default function ExpressPage"],
   ["components/DuskChoicePicker.tsx", "export function DuskChoicePicker"],
 ];
 
-test("D1c: Express og DuskChoicePicker har ingen synlig tekst skrevet rett inn", () => {
+test("D1c: Tjenester og DuskChoicePicker har ingen synlig tekst skrevet rett inn", () => {
   for (const [rel, fn] of EXPRESS_JSX) {
     assert.deepEqual(literalTexts(jsxOf(rel, fn)), [], rel);
   }
@@ -379,7 +387,7 @@ test("D1c: Express og DuskChoicePicker har ingen synlig tekst skrevet rett inn",
 // Store og smaa bokstaver teller: id-en og parameteren «skumring» (TG-138) er ikke synlig tekst.
 const OLD_EXPRESS_WORDS = /Time Traveler|Fix-It|Step \d|Studio|Magic Cleanup|Privacy Blur|Skumring|Klart vær|[Cc]lassifier/;
 
-test("D1c: de gamle Express-ordene finnes ikke i synlig tekst", () => {
+test("D1c: de gamle ordene fra Express finnes ikke i synlig tekst", () => {
   for (const locale of ["nb", "en"] as const) {
     for (const [key, text] of Object.entries(DICTIONARIES[locale].ui)) {
       assert.doesNotMatch(text, OLD_EXPRESS_WORDS, `${locale} ${key}`);
@@ -402,7 +410,7 @@ test("D1c: services.ts har bare noekler til ordlista, ingen tekst eller emoji", 
   assert.equal(count(/^\s*descKey: "/gm), tools);
 });
 
-test("D1c: ordlista har Express-ordene paa nb og en", () => {
+test("D1c: ordlista har ordene til Tjenester paa nb og en", () => {
   const keys = [
     "express.title",
     "express.chooseService",
@@ -867,8 +875,8 @@ test("ventebilde: «Ingen forhåndsvisning» finnes ingen steder i koden", () =>
   }
 });
 
-test("ventebilde: Express viser samme symbol mens jobben lages, og resultatet som foer", () => {
-  const page = withoutComments(read("(app)/express/page.tsx"));
+test("ventebilde: Tjenester viser samme symbol mens jobben lages, og resultatet som foer", () => {
+  const page = withoutComments(read("(app)/tjenester/page.tsx"));
   assert.match(page, /\) : isProcessing \? \(\s*<JobMedia\s*view=\{workingView\(selectedTool\.service\)\}/);
   assert.match(page, /aspect="square"/);
   assert.match(page, /outputView\(job\.status, job\.imageUrl\)/);

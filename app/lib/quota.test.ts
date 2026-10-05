@@ -194,7 +194,7 @@ test("TG149: antallet gratisbilder er ikke skrevet inn i ordlista, komponenten e
   for (const rel of ["components/QuotaNotice.tsx", "lib/quota.ts", "hooks/useQuota.ts"]) {
     assert.doesNotMatch(read(rel), /\b3\b/, rel);
   }
-  const page = read("(app)/express/page.tsx");
+  const page = read("(app)/tjenester/page.tsx");
   assert.doesNotMatch(page, /\b(limit|remaining|used)\s*[:=]\s*\d/);
   assert.doesNotMatch(page, /\b(av|of) \d+ (gratis|free)/);
   assert.match(page, /<QuotaNotice view=\{quotaShown\}/);

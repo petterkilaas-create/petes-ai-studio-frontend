@@ -4,10 +4,11 @@ import { ButtonLink } from "./ui/Button";
 import { Card } from "./ui/Card";
 import { t } from "../lib/i18n";
 import { useLocale } from "../lib/i18n/useLocale";
+import { SERVICES_PATH } from "../lib/services";
 
 /**
  * Det en stengt side viser (TG-NEW-136, L0): en kort melding og lenke til
- * Express. Ingen kall mot backend, ingen jobber.
+ * Tjenester. Ingen kall mot backend, ingen jobber.
  */
 export function ServiceUnavailable() {
   const locale = useLocale();
@@ -17,7 +18,7 @@ export function ServiceUnavailable() {
       <Card padding="lg" className="w-full max-w-lg text-center">
         <p className="mb-2 text-lg font-medium text-ink">{t(locale, "unavailable.title")}</p>
         <p className="mb-8 text-sm text-ink-2">{t(locale, "unavailable.body")}</p>
-        <ButtonLink href="/express">{t(locale, "unavailable.toExpress")}</ButtonLink>
+        <ButtonLink href={SERVICES_PATH}>{t(locale, "unavailable.toServices")}</ButtonLink>
       </Card>
     </main>
   );

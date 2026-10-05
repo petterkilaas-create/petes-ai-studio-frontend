@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Clapperboard, Sofa, Zap, type LucideIcon } from "lucide-react";
-import { isPageEnabled, STAGING_PATH, VIDEO_PATH } from "@/app/lib/services";
+import { ArrowRight, Clapperboard, LayoutGrid, Sofa, type LucideIcon } from "lucide-react";
+import { isPageEnabled, SERVICES_PATH, STAGING_PATH, VIDEO_PATH } from "@/app/lib/services";
 import { DEFAULT_BRAND } from "@/app/lib/brand";
 import { cardClass } from "@/app/components/ui/Card";
 import { t } from "@/app/lib/i18n";
@@ -59,11 +59,11 @@ export default function Home() {
 
       <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-3">
         <ProductCard
-          href="/express"
-          icon={Zap}
-          title={t(locale, "home.express.title")}
-          desc={t(locale, "home.express.desc")}
-          cta={t(locale, "home.express.cta")}
+          href={SERVICES_PATH}
+          icon={LayoutGrid}
+          title={t(locale, "home.services.title")}
+          desc={t(locale, "home.services.desc")}
+          cta={t(locale, "home.services.cta")}
         />
 
         {/* Skjult mens Virtual Staging er av (TG-NEW-136, lib/services.ts). */}

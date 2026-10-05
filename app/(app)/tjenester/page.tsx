@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Clock, Eraser, ScanFace, Sun, Sunset, Zap, type LucideIcon } from "lucide-react";
+import { Check, Clock, Eraser, LayoutGrid, ScanFace, Sun, Sunset, type LucideIcon } from "lucide-react";
 import { useImagePreview } from "@/app/hooks/useImagePreview";
 import { useProcessJob } from "@/app/hooks/useProcessJob";
 import { useQuota } from "@/app/hooks/useQuota";
@@ -161,7 +161,7 @@ export default function ExpressPage() {
       <PageHeader
         title={
           <span className="flex items-center gap-3">
-            <Zap aria-hidden className="size-7" strokeWidth={1.5} /> {t(locale, "express.title")}
+            <LayoutGrid aria-hidden className="size-7" strokeWidth={1.5} /> {t(locale, "express.title")}
           </span>
         }
         subtitle={t(locale, "express.subtitle")}
