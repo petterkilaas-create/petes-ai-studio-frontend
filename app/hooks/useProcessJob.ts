@@ -5,7 +5,6 @@ import { useAuth } from "@clerk/nextjs";
 import {
   submitJob,
   SubmitError,
-  ValidationError,
   type ProcessParams,
   type Rejection,
   type Review,
@@ -24,7 +23,7 @@ export type { ProcessStatus } from "./processStatus";
 /**
  * Samlet livssyklus for en /v1/process-jobb: submit -> (sync-blob | poll).
  *
- * Pakker submitJob + useJobStatus + ValidationError-gren + rejection bak
+ * Pakker submitJob + useJobStatus + feilene + rejection bak
  * ett flatt grensesnitt, slik at PR 1/PR 2 kan bygge vilkaarlige
  * side-layouter oppaa samme logikk. Lib-laget (api.ts/useJobStatus.ts)
  * er uendret — dette er kun en orkestrerings-hook.
@@ -40,7 +39,7 @@ export interface UseProcessJobResult {
    * merkede previewUrl fra poll (Lekkasjen L2/L4). null gir plassholder.
    */
   imageUrl: string | null;
-  /** Bruker-rettet feilmelding (ValidationError-detail eller poll-feil). */
+  /** Feilmelding fra bestillingen eller pollingen. Vises ikke paa Tjenester (TG-NEW-121). */
   error: string | null;
   /**
    * Koden fra en feilet bestilling (TG-NEW-149), f.eks. free_quota_exhausted.
@@ -146,9 +145,9 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
           if (err.code === "free_quota_exhausted") {
             onQuota?.({ kind: "exhausted", ...err.detail });
           }
-        } else if (err instanceof ValidationError) {
-          setSubmitError(`Ugyldige parametre: ${err.detail}`);
         } else {
+          // Ogsaa ValidationError. Teksten vises ikke: Tjenester viser
+          // orderError etter koden (TG-NEW-121).
           setSubmitError(err instanceof Error ? err.message : String(err));
         }
       } finally {

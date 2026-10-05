@@ -284,6 +284,11 @@ const nbUi = {
   "review.mediaDeleted": "Bildene i full størrelse ble slettet {date}. Opplysningene om jobben er tatt vare på.",
   // Spraakvalget i brukermenyen (TG-NEW-129): navnet paa spraaket, paa spraaket selv.
   "account.languageName": "Norsk",
+  // Fanetitlene (TG-NEW-129 PR 2): «Side · visningsnavn» via title.template i (app)/layout.tsx.
+  "title.start": "Start",
+  "title.services": "Tjenester",
+  "title.history": "Historikk",
+  "title.review": "Godkjenning",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -685,6 +690,10 @@ const en: Dictionary = {
     "media.fullSizeDeleted": "Full-size images deleted",
     "review.mediaDeleted": "The full-size images were deleted on {date}. The job details have been kept.",
     "account.languageName": "English",
+    "title.start": "Start",
+    "title.services": "Services",
+    "title.history": "History",
+    "title.review": "Approval",
   },
   codes: {
     reviewCode: {

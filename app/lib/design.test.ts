@@ -244,14 +244,7 @@ test("D1: skallet bruker merket fra brand.ts, og metadata har fanetittelen", () 
   assert.match(body, /background-color:\s*var\(--color-paper\);/);
   assert.match(body, /color:\s*var\(--color-ink\);/);
   assert.match(body, /font-family:\s*var\(--font-ui\);/);
-  for (const [dir, title] of [
-    ["start", "Start"],
-    ["tjenester", "Tjenester"],
-    ["history", "Historikk"],
-    ["godkjenning", "Godkjenning"],
-  ]) {
-    assert.match(read(`(app)/${dir}/layout.tsx`), new RegExp(`title: "${title}"`), dir);
-  }
+  // Fanetitlene paa sidene: se TG-129-testene nederst (generateMetadata).
 });
 
 /** D2a: komponentene til godkjenningssiden. Nye filer i mappa kommer med av seg selv. */
@@ -1064,7 +1057,7 @@ test("TG-129: rot-layouten for (app) leser cookien og Accept-Language, og lang f
 test("TG-129: markedssiden og 404 leser ikke cookien og forblir statiske og norske", () => {
   for (const rel of ["(marketing)/layout.tsx", "global-not-found.tsx"]) {
     const src = withoutComments(read(rel));
-    assert.doesNotMatch(src, /next\/headers|cookies\(|headers\(|LocaleProvider|LOCALE_COOKIE/, rel);
+    assert.doesNotMatch(src, /next\/headers|cookies\(|headers\(|LocaleProvider|LOCALE_COOKIE|requestLocale/, rel);
     assert.match(src, /<html lang="nb"/, rel);
   }
 });
@@ -1110,4 +1103,45 @@ test("TG-129: spraaket sendes aldri til backend (XMP og merket foelger ikke appe
   for (const f of ["lib/api.ts", "lib/download.ts"]) {
     assert.doesNotMatch(withoutComments(read(f)), /Accept-Language|\blocale\b|\blang\b|LOCALE_COOKIE/i, f);
   }
+});
+
+/** Fanetitlene (TG-NEW-129 PR 2): mappen og noekkelen i ordlista. */
+const PAGE_TITLES = [
+  ["start", "title.start"],
+  ["tjenester", "title.services"],
+  ["history", "title.history"],
+  ["godkjenning", "title.review"],
+] as const;
+
+test("TG-129: fanetitlene har noekler paa nb og en", () => {
+  for (const [, key] of PAGE_TITLES) {
+    for (const locale of ["nb", "en"] as const) {
+      const text = DICTIONARIES[locale].ui[key];
+      assert.equal(typeof text, "string", `${locale} ${key}`);
+      assert.ok(text.trim().length > 0, `${locale} ${key}`);
+    }
+  }
+  assert.deepEqual(
+    PAGE_TITLES.map(([, key]) => [t("nb", key), t("en", key)]),
+    [
+      ["Start", "Start"],
+      ["Tjenester", "Services"],
+      ["Historikk", "History"],
+      ["Godkjenning", "Approval"],
+    ]
+  );
+});
+
+test("TG-129: layoutene har ingen fast tittel, men generateMetadata med spraaket fra forespoerselen", () => {
+  for (const [dir, key] of PAGE_TITLES) {
+    const src = withoutComments(read(`(app)/${dir}/layout.tsx`));
+    assert.doesNotMatch(src, /title:\s*["'`]/, `${dir}: fast tittel`);
+    assert.doesNotMatch(src, /export const metadata\b/, `${dir}: statisk metadata`);
+    assert.match(src, /export async function generateMetadata\(\): Promise<Metadata> \{/, dir);
+    assert.match(src, new RegExp(`return \\{ title: t\\(await requestLocale\\(\\), "${key.replace(".", "\\.")}"\\) \\};`), dir);
+  }
+  // Samme regel som rot-layouten: cookien, ellers Accept-Language.
+  const helper = withoutComments(read("lib/i18n/requestLocale.ts"));
+  assert.match(helper, /cookie: cookieStore\.get\(LOCALE_COOKIE\)\?\.value,/);
+  assert.match(helper, /acceptLanguage: headerList\.get\("accept-language"\),/);
 });

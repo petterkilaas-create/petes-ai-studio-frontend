@@ -444,7 +444,7 @@ export default function GodkjenningPage({
                     className="text-sm text-neutral-fg bg-neutral-bg rounded-button p-3"
                     role="status"
                   >
-                    {t(locale, "review.mediaDeleted", { date: formatDate(review.mediaDeletedAt ?? null) })}
+                    {t(locale, "review.mediaDeleted", { date: formatDate(review.mediaDeletedAt ?? null, locale) })}
                   </p>
                 )}
 
