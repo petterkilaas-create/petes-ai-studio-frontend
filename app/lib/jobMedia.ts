@@ -17,6 +17,10 @@ import { hasResultImage } from "./statusVariants.ts";
  * Tekst oppå bildet bare naar den gir noe merket ved tittelen ikke gir:
  * mens jobben lages og ved peisspoersmaalet (opprydding, Petter 02.10).
  * Ellers staar statusen bare i merket.
+ *
+ * Slettede bilder (TG-NEW-117): uten miniatyr viser boksen «Bildet er
+ * slettet», ikke det tomme ikonet. Finnes miniatyren, vises den som foer,
+ * med en liten linje om at bildene i full stoerrelse er slettet.
  */
 
 /** Statusteksten oppå bildet. `working`: det rolige animerte symbolet vises. */
@@ -28,7 +32,12 @@ export interface MediaOverlay {
 export type MediaView =
   | { kind: "result"; url: string }
   | { kind: "original"; url: string; overlay: MediaOverlay | null }
-  | { kind: "placeholder"; overlay: MediaOverlay | null };
+  | { kind: "placeholder"; overlay: MediaOverlay | null }
+  /** TG-NEW-117: bildet er slettet. Teksten i stedet for det tomme ikonet; aldri statustekst oppå. */
+  | { kind: "deleted"; overlay: null };
+
+/** Feltene om slettingen (TG-NEW-117). null og undefined: ikke slettet. */
+type Deleted = Pick<JobSummary, "mediaDeletedAt" | "thumbDeletedAt">;
 
 /** Jobben lages (i koe eller i arbeid). */
 export function isWorking(status: string): boolean {
@@ -72,15 +81,33 @@ export function overlayFor(job: Pick<JobSummary, "status" | "service" | "code">)
  * `thumbSrc(job)` (Lekkasjen L2); finnes det, vises det og ingenting annet.
  */
 export function mediaView(
-  job: Pick<JobSummary, "status" | "service" | "code" | "originalThumbUrl">,
+  job: Pick<JobSummary, "status" | "service" | "code" | "originalThumbUrl"> & Deleted,
   thumb: string | null
 ): MediaView {
+  if (job.thumbDeletedAt != null) return { kind: "deleted", overlay: null };
   if (thumb !== null) return { kind: "result", url: thumb };
+  if (job.mediaDeletedAt != null) return { kind: "deleted", overlay: null };
   const overlay = overlayFor(job);
   if (!hasResultImage(job.status) && job.originalThumbUrl !== null) {
     return { kind: "original", url: job.originalThumbUrl, overlay };
   }
   return { kind: "placeholder", overlay };
+}
+
+/**
+ * Den lille linja under datoen (TG-NEW-117): bare naar miniatyren vises og
+ * bildene i full stoerrelse er slettet. Ellers null.
+ */
+export function cardNote(job: Deleted, thumb: string | null): UiKey | null {
+  if (job.mediaDeletedAt == null || job.thumbDeletedAt != null || thumb === null) return null;
+  return "media.fullSizeDeleted";
+}
+
+/** Teksten i plassholderen paa godkjenningssiden og Tjenester: ikke klar ennaa, eller slettet. */
+export type PlaceholderReason = "notReady" | "deleted";
+
+export function placeholderKey(reason: PlaceholderReason): UiKey {
+  return reason === "deleted" ? "media.deleted" : "preview.notReady";
 }
 
 /** Express mens jobben lages: plassholderen med symbolet (Petter 02.10, valg A). */
@@ -104,7 +131,9 @@ function sameView(a: JobSummary, b: JobSummary): boolean {
     a.ownerShort === b.ownerShort &&
     a.createdAt === b.createdAt &&
     (a.thumbUrl === null) === (b.thumbUrl === null) &&
-    (a.originalThumbUrl === null) === (b.originalThumbUrl === null)
+    (a.originalThumbUrl === null) === (b.originalThumbUrl === null) &&
+    (a.mediaDeletedAt == null) === (b.mediaDeletedAt == null) &&
+    (a.thumbDeletedAt == null) === (b.thumbDeletedAt == null)
   );
 }
 

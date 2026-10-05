@@ -6,7 +6,8 @@ import { t, type Locale } from "../lib/i18n";
 
 /**
  * Bildeboksen paa et jobbkort (KONTRAKT_VENTEBILDE): resultatbildet, ellers
- * dagsbildet dempet med status oppå, ellers en rolig plassholder. Brukes i
+ * dagsbildet dempet med status oppå, ellers en rolig plassholder, eller
+ * «Bildet er slettet» (TG-NEW-117). Brukes i
  * Historikk og Express, og senere under «Pågår» paa /start.
  *
  * Fast boks (3:2, eller kvadrat i Express), saa kortet ikke hopper naar
@@ -40,6 +41,17 @@ export function JobMedia({
       <div className={box}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={view.url} alt={resultAlt} loading="lazy" className="h-full w-full object-cover" />
+      </div>
+    );
+  }
+
+  if (view.kind === "deleted") {
+    // TG-NEW-117: teksten i stedet for det tomme ikonet.
+    return (
+      <div className={box}>
+        <div className="absolute inset-0 flex items-center justify-center p-4 text-center text-[13px] text-ink-2">
+          {t(locale, "media.deleted")}
+        </div>
       </div>
     );
   }

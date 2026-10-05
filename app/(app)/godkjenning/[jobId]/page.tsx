@@ -19,6 +19,7 @@ import { useLocale } from "@/app/lib/i18n/useLocale";
 import {
   buildDecision,
   decisionControls,
+  mediaDeleted,
   outcome,
   resultImageUrl,
   shouldPoll,
@@ -39,6 +40,7 @@ import {
 } from "@/app/lib/correction";
 import { runDecision } from "@/app/lib/decide";
 import { canDownload } from "@/app/lib/download";
+import { formatDate } from "@/app/lib/dates";
 import { compareVariants, selectedVariant, variantLabel } from "@/app/lib/compare";
 import {
   blockedResult,
@@ -82,6 +84,11 @@ import { FOCUS } from "@/app/components/godkjenning/classes";
  * Lysstyrke (TG-NEW-147): slideren under bildet velger trinn i gjeldende
  * runde, og bildet er trinnets `preview_url` fra backend. Trinnet sendes
  * med godkjenningen. Ny henting starter paa `default_step` igjen.
+ *
+ * Slettede bilder (TG-NEW-117): naar `media_deleted_at` er satt, vises et
+ * banner med datoen og én boks med «Bildet er slettet» i stedet for bildene,
+ * varianter og lysstyrke. Backend sender tom `allowed_actions`, og
+ * nedlastingen skjules (canDownload). «Tekst til annonsen» staar.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -416,6 +423,7 @@ export default function GodkjenningPage({
             });
 
             const readOnly = isReadOnlyOther(review);
+            const deleted = mediaDeleted(review);
 
             return (
               <>
@@ -430,34 +438,51 @@ export default function GodkjenningPage({
                   </p>
                 )}
 
+                {deleted && (
+                  // TG-NEW-117: bildene i full stoerrelse er slettet; opplysningene er beholdt.
+                  <p
+                    className="text-sm text-neutral-fg bg-neutral-bg rounded-button p-3"
+                    role="status"
+                  >
+                    {t(locale, "review.mediaDeleted", { date: formatDate(review.mediaDeletedAt ?? null) })}
+                  </p>
+                )}
+
                 {/* Stort bilde til venstre, handlinger og stemning ved siden av. Paa mobil under hverandre. */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                   <section className={`${CARD} lg:col-span-2 flex flex-col gap-6 min-w-0`}>
-                    <VariantPicker
-                      variants={variants}
-                      selectedId={shown?.id ?? null}
-                      onSelect={setVariantId}
-                      locale={locale}
-                    />
-                    <CompareViewer
-                      originalUrl={review.images.originalUrl}
-                      result={shown === null ? null : { url: shownUrl, label: shownLabel }}
-                      placeholder={<PreviewPlaceholder />}
-                      onResultLoad={() => setResultLoaded(true)}
-                      locale={locale}
-                    />
-                    {brightness.kind === "control" && step !== null && (
-                      <BrightnessControl
-                        view={brightness}
-                        step={step}
-                        onChange={setChosenStep}
-                        locked={locked}
-                        preload={preloadUrls(brightness.steps, step)}
-                        ready={resultLoaded}
-                        locale={locale}
-                      />
+                    {deleted ? (
+                      // Ingen varianter, modusknapper eller lysstyrke: én boks (Petter 05.10, A1).
+                      <PreviewPlaceholder reason="deleted" />
+                    ) : (
+                      <>
+                        <VariantPicker
+                          variants={variants}
+                          selectedId={shown?.id ?? null}
+                          onSelect={setVariantId}
+                          locale={locale}
+                        />
+                        <CompareViewer
+                          originalUrl={review.images.originalUrl}
+                          result={shown === null ? null : { url: shownUrl, label: shownLabel }}
+                          placeholder={<PreviewPlaceholder />}
+                          onResultLoad={() => setResultLoaded(true)}
+                          locale={locale}
+                        />
+                        {brightness.kind === "control" && step !== null && (
+                          <BrightnessControl
+                            view={brightness}
+                            step={step}
+                            onChange={setChosenStep}
+                            locked={locked}
+                            preload={preloadUrls(brightness.steps, step)}
+                            ready={resultLoaded}
+                            locale={locale}
+                          />
+                        )}
+                        {brightness.kind === "approved" && <BrightnessApproved step={brightness.step} locale={locale} />}
+                      </>
                     )}
-                    {brightness.kind === "approved" && <BrightnessApproved step={brightness.step} locale={locale} />}
                   </section>
 
                   <div className="flex flex-col gap-6 min-w-0">
@@ -489,7 +514,8 @@ export default function GodkjenningPage({
                         controls={controls}
                         canCorrect={canCorrect}
                         roundFailed={correction.roundFailed}
-                        readOnly={readOnly}
+                        // Banneret sier det allerede: ingen «Ingen handlinger …» (C1).
+                        readOnly={readOnly || deleted}
                         locked={locked}
                         busy={busy}
                         approving={isApproving(pending)}
