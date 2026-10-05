@@ -126,6 +126,7 @@ export default function GodkjenningPage({
   // Synkront vern mot dobbeltklikk; busy-state rekker ikke aa oppdatere
   // mellom to raske klikk. Backend har ogsaa eget vern.
   const inFlight = useRef(false);
+  const [waking, setWaking] = useState(false);
   // Etter 202 (continue), eller naar siden aapnes mens jobben kjoerer: poll
   // med den eksisterende mekanismen til jobben er ferdig eller venter igjen,
   // og hent saa review paa nytt.
@@ -137,10 +138,12 @@ export default function GodkjenningPage({
   const fetchReview = useCallback(async () => {
     let result: ReviewFetchResult;
     try {
-      result = await getReview({ jobId, getToken });
+      // Kaldstart (TG-NEW-134): getReview proever paa nytt, og lasteteksten blir rolig.
+      result = await getReview({ jobId, getToken, onRetry: () => setWaking(true) });
     } catch {
       result = { kind: "error", httpStatus: 0 };
     }
+    setWaking(false);
     setLoad(result);
     setPollJobId(null);
     // Etter en ny runde eller avgjoerelse vises gjeldende runde igjen,
@@ -343,7 +346,7 @@ export default function GodkjenningPage({
           <div className="flex flex-col items-center justify-center py-24 gap-4">
             <div className="w-8 h-8 border-4 border-line border-t-ink rounded-full animate-spin motion-reduce:animate-none" />
             <p className="text-ink-2 text-sm">
-              {t(locale, "review.loading")}
+              {t(locale, waking ? "net.waking" : "review.loading")}
             </p>
           </div>
         )}

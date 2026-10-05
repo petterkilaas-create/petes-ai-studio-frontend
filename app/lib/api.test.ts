@@ -9,6 +9,9 @@ const api = await import("./api.ts");
 const { buildDecision } = await import("./review.ts");
 const { buildCorrection, initialToggles } = await import("./correction.ts");
 const { afterPoll } = await import("./jobState.ts");
+const { retryClock } = await import("./retry.ts");
+// TG-NEW-134: GET proever paa nytt ved 502-504 og nettverksfeil. Ingen ekte venting i testene.
+retryClock.sleep = async () => {};
 
 const realFetch = globalThis.fetch;
 const getToken = async () => "tok";

@@ -2,6 +2,7 @@
 import type { DuskSky, DuskTime, ReviewDusk } from "./dusk";
 import type { ReviewDisclosure } from "./disclosure";
 import { parseQuota, type Quota } from "./quota.ts";
+import { getWithRetry, isNetworkError, isRetryableStatus, TransientError } from "./retry.ts";
 
 const apiBase = process.env.NEXT_PUBLIC_API_BASE;
 if (!apiBase) {
@@ -411,19 +412,25 @@ export async function pollJob(opts: {
 
   const url = `${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}`;
 
-  let res = await fetch(url, {
-    method: "GET",
-    headers: await authHeader(getToken),
-  });
+  // Ingen nye forsoek her: afterPoll styrer pausene (TG-NEW-134). En
+  // nettverksfeil blir TransientError, saa pollingen taaler en kaldstart.
+  const send = async (options?: { skipCache?: boolean }) => {
+    const headers = await authHeader(getToken, options);
+    try {
+      return await fetch(url, { method: "GET", headers });
+    } catch (err) {
+      if (!isNetworkError(err)) throw err;
+      throw new TransientError(null, `pollJob failed (network): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  let res = await send();
 
   // 401 = Clerk-tokenet har utloept (levetid ~60 s) — hent ferskt token
   // utenom cache og prov EN gang til. Vedvarende 401 faller gjennom til
   // den generiske feilgrenen nederst.
   if (res.status === 401) {
-    res = await fetch(url, {
-      method: "GET",
-      headers: await authHeader(getToken, { skipCache: true }),
-    });
+    res = await send({ skipCache: true });
   }
 
   if (res.status === 200) {
@@ -452,6 +459,9 @@ export async function pollJob(opts: {
   // Gate-avslag er ikke lenger HTTP 500 (TG-NEW-70 fjernet prefiks-formen);
   // 500 er derfor naa kun ekte pipeline-feil.
   const detail = await extractDetail(res);
+  if (isRetryableStatus(res.status)) {
+    throw new TransientError(res.status, `pollJob failed (${res.status}): ${detail}`);
+  }
   throw new Error(`pollJob failed (${res.status}): ${detail}`);
 }
 
@@ -605,8 +615,9 @@ export function errorCode(body: unknown): string | null {
  * (createdAt, jobId) fra siste element. `limit` klemmes til [1, 100] paa
  * backend (default 50).
  *
- * Foelger samme 401-retry som pollJob: Clerk-JWT lever ~60 s, saa et
- * utloept token hentes paa nytt med skipCache og kallet proeves EN gang til.
+ * Gaar gjennom authedFetch: samme 401-retry som pollJob (Clerk-JWT lever
+ * ~60 s, saa et utloept token hentes paa nytt med skipCache og kallet
+ * proeves EN gang til), og nye forsoek ved kaldstart (TG-NEW-134).
  */
 export async function listJobs(opts: {
   limit?: number;
@@ -617,8 +628,10 @@ export async function listJobs(opts: {
   /** TG-NEW-127: "all" sender scope=all; "mine" eller utelatt sender ingenting. */
   scope?: JobScope;
   getToken: GetToken;
+  /** Kalles foer hver pause ved kaldstart (TG-NEW-134). */
+  onRetry?: () => void;
 }): Promise<JobSummary[]> {
-  const { limit, before, beforeId, statuses, scope, getToken } = opts;
+  const { limit, before, beforeId, statuses, scope, getToken, onRetry } = opts;
 
   const params = new URLSearchParams();
   if (limit !== undefined) params.set("limit", String(limit));
@@ -631,18 +644,7 @@ export async function listJobs(opts: {
   const qs = params.toString();
   const url = `${API_BASE}/v1/jobs${qs ? `?${qs}` : ""}`;
 
-  let res = await fetch(url, {
-    method: "GET",
-    headers: await authHeader(getToken),
-  });
-
-  // 401 = utloept Clerk-token — hent ferskt (skipCache) og proev EN gang til.
-  if (res.status === 401) {
-    res = await fetch(url, {
-      method: "GET",
-      headers: await authHeader(getToken, { skipCache: true }),
-    });
-  }
+  const res = await authedFetch(url, { method: "GET" }, getToken, onRetry);
 
   if (res.status !== 200) {
     throw new ListJobsError(res.status, errorCode(await readJson(res)));
@@ -1064,19 +1066,28 @@ export type ReviewFetchResult =
   | { kind: "unavailable" }
   | { kind: "error"; httpStatus: number };
 
-/** GET med samme 401-retry som pollJob/listJobs. */
+/**
+ * Kall med samme 401-retry som pollJob. GET proeves i tillegg paa nytt ved
+ * kaldstart (getWithRetry, TG-NEW-134); POST proeves aldri paa nytt der.
+ */
 async function authedFetch(
   url: string,
   init: RequestInit,
-  getToken: GetToken
+  getToken: GetToken,
+  onRetry?: () => void
 ): Promise<Response> {
-  const withAuth = async (options?: { skipCache?: boolean }) => ({
-    ...init,
-    headers: { ...(init.headers ?? {}), ...(await authHeader(getToken, options)) },
-  });
-  const res = await fetch(url, await withAuth());
+  const isGet = (init.method ?? "GET").toUpperCase() === "GET";
+  const send = async (options?: { skipCache?: boolean }) => {
+    const once = async () =>
+      fetch(url, {
+        ...init,
+        headers: { ...(init.headers ?? {}), ...(await authHeader(getToken, options)) },
+      });
+    return isGet ? getWithRetry(once, { onRetry }) : once();
+  };
+  const res = await send();
   if (res.status !== 401) return res;
-  return fetch(url, await withAuth({ skipCache: true }));
+  return send({ skipCache: true });
 }
 
 async function readJson(res: Response): Promise<unknown> {
@@ -1090,10 +1101,12 @@ async function readJson(res: Response): Promise<unknown> {
 export async function getReview(opts: {
   jobId: string;
   getToken: GetToken;
+  /** Kalles foer hver pause ved kaldstart (TG-NEW-134). */
+  onRetry?: () => void;
 }): Promise<ReviewFetchResult> {
-  const { jobId, getToken } = opts;
+  const { jobId, getToken, onRetry } = opts;
   const url = `${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/review`;
-  const res = await authedFetch(url, { method: "GET" }, getToken);
+  const res = await authedFetch(url, { method: "GET" }, getToken, onRetry);
   if (res.status === 200) {
     return { kind: "ok", review: normalizeReview(await readJson(res), jobId) };
   }

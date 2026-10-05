@@ -57,6 +57,8 @@ export interface UseProcessJobResult {
   jobId: string | null;
   /** True mens vi laster opp eller poller. */
   isProcessing: boolean;
+  /** True mens pollingen venter ved kaldstart (TG-NEW-134). */
+  waking: boolean;
   run: (file: File, service: string, params?: ProcessParams) => Promise<void>;
   /**
    * "Fortsett som eksterioer"-flyten: kjoer forrige submit paa nytt med
@@ -195,6 +197,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
     reviewerReason: job.reviewerReason,
     jobId,
     isProcessing: isProcessingStatus(status),
+    waking: job.waking,
     run,
     resubmitForced,
     reset,

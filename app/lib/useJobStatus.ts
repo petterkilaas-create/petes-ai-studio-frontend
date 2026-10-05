@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { pollJob, type Rejection, type Review } from "./api";
-import { afterPoll, type JobStatus, type PollOutcome } from "./jobState";
+import { afterPoll, isTransientPollError, type JobStatus, type PollOutcome } from "./jobState";
 
 export type { JobStatus } from "./jobState";
 
@@ -26,6 +26,8 @@ export interface UseJobStatusResult {
   review: Review | null;
   /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
   reviewerReason: string | null;
+  /** True mens pollingen venter etter en nettverksfeil eller 502-504 (TG-NEW-134). */
+  waking: boolean;
 }
 
 export function useJobStatus(jobId: string | null): UseJobStatusResult {
@@ -37,8 +39,10 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
   const [rejection, setRejection] = useState<Rejection | null>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [reviewerReason, setReviewerReason] = useState<string | null>(null);
+  const [waking, setWaking] = useState(false);
 
   useEffect(() => {
+    setWaking(false);
     if (!jobId) {
       setStatus("idle");
       setImageUrl(null);
@@ -79,6 +83,8 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
       if (cancelled) return;
 
       const step = afterPoll(outcome, consecutiveErrors);
+      // Rolig tekst bare ved kaldstart-feil, ikke ved 500 (TG-NEW-134).
+      setWaking(step.kind === "wait" && isTransientPollError(outcome));
       if (step.kind === "wait") {
         // pending (Retry-After) eller backoff etter en feil.
         consecutiveErrors = step.consecutiveErrors;
@@ -110,5 +116,5 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
     };
   }, [jobId, getToken]);
 
-  return { status, imageUrl, error, rejection, review, reviewerReason };
+  return { status, imageUrl, error, rejection, review, reviewerReason, waking };
 }
