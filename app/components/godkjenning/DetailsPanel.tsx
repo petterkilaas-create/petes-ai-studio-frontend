@@ -2,6 +2,7 @@
 
 import type { JobReviewDetail, ReviewLight, RunValue } from "../../lib/api";
 import { codeText, t, type Locale } from "../../lib/i18n";
+import { lightNames, type LightName } from "../../lib/lightsView";
 import { fireplaceAnswerKey } from "../../lib/review";
 import { cardClass } from "../ui/Card";
 import { FOCUS, LABEL } from "./classes";
@@ -36,7 +37,17 @@ function RunValueLine({
   );
 }
 
-function LightList({ title, lights, locale }: { title: string; lights: ReviewLight[]; locale: Locale }) {
+function LightList({
+  title,
+  lights,
+  nameOf,
+  locale,
+}: {
+  title: string;
+  lights: ReviewLight[];
+  nameOf: (light: ReviewLight) => LightName;
+  locale: Locale;
+}) {
   return (
     <div>
       <p className="text-xs font-bold text-ink mb-2">
@@ -48,7 +59,7 @@ function LightList({ title, lights, locale }: { title: string; lights: ReviewLig
         <ul className="space-y-1 text-xs text-ink">
           {lights.map((light, i) => (
             <li key={`${light.key ?? light.id ?? "x"}-${i}`}>
-              <LightLabel light={light} locale={locale} location reason state />
+              <LightLabel light={light} name={nameOf(light)} locale={locale} location reason state />
             </li>
           ))}
         </ul>
@@ -63,6 +74,7 @@ function LightList({ title, lights, locale }: { title: string; lights: ReviewLig
  * naar showDetails(caps) er sann (i dag bare admin). Lukket som standard.
  */
 export function DetailsPanel({ review, locale }: { review: JobReviewDetail; locale: Locale }) {
+  const nameOf = lightNames(review.lights);
   return (
     <details className={CARD}>
       <summary className={`min-h-11 flex items-center cursor-pointer rounded-button text-sm font-medium text-ink ${FOCUS}`}>
@@ -126,9 +138,9 @@ export function DetailsPanel({ review, locale }: { review: JobReviewDetail; loca
         <div className="flex flex-col gap-4">
           <p className={`${LABEL} mb-0`}>{t(locale, "review.lights")}</p>
           {review.validRuns === 0 && <p className="text-xs text-amber-fg">{t(locale, "review.noValidRuns")}</p>}
-          <LightList title={t(locale, "review.lightsApproved")} lights={review.lights.approved} locale={locale} />
-          <LightList title={t(locale, "review.lightsUnstable")} lights={review.lights.unstable} locale={locale} />
-          <LightList title={t(locale, "review.lightsRejected")} lights={review.lights.rejected} locale={locale} />
+          <LightList title={t(locale, "review.lightsApproved")} lights={review.lights.approved} nameOf={nameOf} locale={locale} />
+          <LightList title={t(locale, "review.lightsUnstable")} lights={review.lights.unstable} nameOf={nameOf} locale={locale} />
+          <LightList title={t(locale, "review.lightsRejected")} lights={review.lights.rejected} nameOf={nameOf} locale={locale} />
         </div>
       </div>
     </details>

@@ -22,6 +22,7 @@ export type CodeGroup =
   | "flagCode"
   | "lightType"
   | "lightReason"
+  | "lightZone"
   | "imageType"
   | "skyVisibility"
   | "decisionError"
@@ -148,6 +149,8 @@ const nbUi = {
   "correct.uncertain": "Usikker",
   "review.moodTitle": "Stemning og lys",
   "review.lightsLit": "Lys som tennes",
+  // TG-NEW-148: plasseringen fra analysen (engelsk fritekst), bare i «Detaljer».
+  "review.analysisLocation": "Analysens tekst: {text}",
   "review.details": "Detaljer",
   "history.subtitle": "Alle jobbene dine, nyeste først.",
   "history.subtitleAll": "Alle brukeres jobber, nyeste først.",
@@ -330,6 +333,18 @@ const nb: Dictionary = {
     lightReason: {
       not_confirmed: "Ikke bekreftet av begge analysene",
     },
+    // TG-NEW-148: sonen i bildet, fra midtpunktet i boksen (lightsView.ts).
+    lightZone: {
+      top_left: "oppe til venstre",
+      top_center: "oppe i midten",
+      top_right: "oppe til høyre",
+      left: "til venstre",
+      center: "i midten",
+      right: "til høyre",
+      bottom_left: "nede til venstre",
+      bottom_center: "nede i midten",
+      bottom_right: "nede til høyre",
+    },
     imageType: {
       interior: "Interiør",
       exterior_facade: "Fasade",
@@ -417,6 +432,7 @@ const nb: Dictionary = {
     flagCode: "Annen merknad.",
     lightType: "Lyskilde",
     lightReason: "Ikke godkjent",
+    lightZone: "ukjent plassering",
     imageType: "Ukjent bildetype",
     skyVisibility: "Ukjent",
     decisionError: "Noe gikk galt. Prøv igjen senere.",
@@ -545,6 +561,7 @@ const en: Dictionary = {
     "correct.uncertain": "Uncertain",
     "review.moodTitle": "Mood and lights",
     "review.lightsLit": "Lights turned on",
+    "review.analysisLocation": "Analysis text: {text}",
     "review.details": "Details",
     "history.subtitle": "All your jobs, newest first.",
     "history.subtitleAll": "All users' jobs, newest first.",
@@ -705,6 +722,17 @@ const en: Dictionary = {
     lightReason: {
       not_confirmed: "Not confirmed by both analyses",
     },
+    lightZone: {
+      top_left: "top left",
+      top_center: "top center",
+      top_right: "top right",
+      left: "left",
+      center: "center",
+      right: "right",
+      bottom_left: "bottom left",
+      bottom_center: "bottom center",
+      bottom_right: "bottom right",
+    },
     imageType: {
       interior: "Interior",
       exterior_facade: "Facade",
@@ -787,6 +815,7 @@ const en: Dictionary = {
     flagCode: "Other note.",
     lightType: "Light source",
     lightReason: "Not approved",
+    lightZone: "unknown position",
     imageType: "Unknown image type",
     skyVisibility: "Unknown",
     decisionError: "Something went wrong. Please try again later.",

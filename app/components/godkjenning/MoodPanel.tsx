@@ -3,7 +3,7 @@
 import type { JobReviewDetail } from "../../lib/api";
 import { duskFacts } from "../../lib/dusk";
 import { codeText, t, type Locale } from "../../lib/i18n";
-import { litLights } from "../../lib/lightsView";
+import { lightNames, litLights } from "../../lib/lightsView";
 import { fireplaceAnswerKey } from "../../lib/review";
 import { cardClass } from "../ui/Card";
 import { LABEL } from "./classes";
@@ -13,9 +13,9 @@ const CARD = cardClass("md");
 
 /**
  * Stemning og lys i sidepanelet (D2b, brief §4): valgene megleren gjorde
- * (tidspunkt, himmel, peis) og lysene som tennes, bare med lampetypen. Ingen
- * analyse her (brief §3 punkt 6), og ingen plassering (fritekst fra
- * analysen, D2c); den ligger i «Detaljer». Himmelen vises
+ * (tidspunkt, himmel, peis) og lysene som tennes, med lampetype, nummer og
+ * sone (TG-NEW-148). Ingen analyse her (brief §3 punkt 6), og ingen
+ * plassering fra analysen (fritekst, D2c); den ligger i «Detaljer». Himmelen vises
  * ikke som valg naar den ikke ble brukt (sky_applied false).
  */
 export function MoodPanel({
@@ -27,6 +27,7 @@ export function MoodPanel({
 }) {
   const facts = duskFacts(review.dusk);
   const lit = litLights(review.lights);
+  const nameOf = lightNames(review.lights);
   const fire = review.fireplace.answer === "yes" || review.fireplace.answer === "no" ? review.fireplace.answer : null;
   return (
     <section className={`${CARD} flex flex-col gap-4`}>
@@ -61,7 +62,7 @@ export function MoodPanel({
           <ul className="space-y-1 text-sm text-ink">
             {lit.map((light, i) => (
               <li key={`${light.key ?? light.id ?? "x"}-${i}`}>
-                <LightLabel light={light} locale={locale} />
+                <LightLabel light={light} name={nameOf(light)} locale={locale} />
               </li>
             ))}
           </ul>

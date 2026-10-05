@@ -2,18 +2,22 @@
 
 import type { ReviewLight } from "../../lib/api";
 import { codeText, t, type Locale } from "../../lib/i18n";
+import { lightText, type LightName } from "../../lib/lightsView";
 import { BADGE } from "./classes";
 
 /**
- * En lyskilde: lampetypen, og plasseringen naar `location` er satt.
- * Plasseringen er fritekst fra analysen, ofte paa engelsk, saa den vises bare
- * i «Detaljer» og i rettingen (D2c, Petter 01.10, valg B), ikke i «Stemning
- * og lys». Grunnen fra analysen («ikke bekreftet») vises bare i «Detaljer» (`reason`). «Usikker» vises i rettingen for
- * ustabile og avviste (D2b, avvik 3 A). Merkelappene «Slått på/av av deg»
+ * En lyskilde: lampetypen med nummer naar typen finnes flere ganger, og
+ * sonen i bildet (TG-NEW-148): «Utvendig vegglampe 3 · til høyre». Begge er
+ * koder fra ordlista, saa de vises overalt. Plasseringen fra analysen er
+ * engelsk fritekst og vises bare i «Detaljer» (`location`), merket som
+ * analysens tekst (Petter 05.10, punkt 3). Grunnen fra analysen («ikke
+ * bekreftet») vises bare i «Detaljer» (`reason`). «Usikker» vises i rettingen
+ * for ustabile og avviste (D2b, avvik 3 A). Merkelappene «Slått på/av av deg»
  * viser valg brukeren selv har gjort, ikke analysen.
  */
 export function LightLabel({
   light,
+  name,
   locale,
   location = false,
   reason = false,
@@ -21,17 +25,18 @@ export function LightLabel({
   state = false,
 }: {
   light: ReviewLight;
+  name: LightName;
   locale: Locale;
   location?: boolean;
   reason?: boolean;
   uncertain?: boolean;
   state?: boolean;
 }) {
+  const text = lightText(locale, light, name);
   return (
     <>
-      <span className="font-bold">{codeText(locale, "lightType", light.type)}</span>
-      {/* location er fritekst fra analysen; React escaper den. */}
-      {location && light.location && <span className="text-ink-2"> · {light.location}</span>}
+      <span className="font-bold">{text.title}</span>
+      {text.zone !== null && <span className="text-ink-2"> · {text.zone}</span>}
       {reason && light.reasonCode !== null && (
         <span className="text-ink-2">
           {" "}
@@ -43,6 +48,10 @@ export function LightLabel({
         <span className={BADGE}>
           {t(locale, light.state === "promoted" ? "review.lightPromoted" : "review.lightDisabled")}
         </span>
+      )}
+      {/* location er fritekst fra analysen; React escaper den. */}
+      {location && light.location && (
+        <span className="block text-ink-2">{t(locale, "review.analysisLocation", { text: light.location })}</span>
       )}
     </>
   );

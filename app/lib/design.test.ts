@@ -558,7 +558,7 @@ test("D2b: «Detaljer» vises bare naar showDetails(caps) er sann", () => {
 });
 
 /** Ord og koder fra analysen som bare hoerer hjemme i «Detaljer». */
-const ANALYSIS = /review\.lightsUnstable|review\.lightsRejected|review\.lightsApproved|"lightReason"|"reasonCode"|"flagCode"|review\.runValues|review\.analysisTitle|review\.noValidRuns|(?<![.\w])reason(?=[\s/>])/;
+const ANALYSIS = /review\.lightsUnstable|review\.lightsRejected|review\.lightsApproved|"lightReason"|"reasonCode"|"flagCode"|review\.runValues|review\.analysisTitle|review\.analysisLocation|review\.noValidRuns|(?<![.\w])reason(?=[\s/>])/;
 
 test("D2b: analysen staar bare i DetailsPanel (megleren ser den ikke)", () => {
   const files = ["(app)/godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("DetailsPanel.tsx") && !f.endsWith("LightLabel.tsx"))];
@@ -574,7 +574,7 @@ test("D2b: analysen staar bare i DetailsPanel (megleren ser den ikke)", () => {
 test("D2b: rettingen er én flat liste med «Usikker», uten grunner, tidspunkt eller himmel", () => {
   const panel = withoutComments(read("components/godkjenning/CorrectionPanel.tsx"));
   assert.match(panel, /const rows = flatLights\(lights\);/);
-  assert.match(panel, /<LightLabel light=\{light\} locale=\{locale\} location uncertain=\{uncertain\} state \/>/);
+  assert.match(panel, /<LightLabel light=\{light\} name=\{nameOf\(light\)\} locale=\{locale\} uncertain=\{uncertain\} state \/>/);
   assert.match(panel, /onToggle\(light, uncertain, e\.target\.checked\)/);
   // Ingen grunn fra analysen, og ingen valg av tidspunkt eller himmel (TG-NEW-145).
   assert.doesNotMatch(panel, /\breason\b|lightReason/);
@@ -618,31 +618,47 @@ test("D2b: ordlista har de nye ordene paa nb og en", () => {
 // D2c: plasseringen av lysene og overskriften i «Stemning og lys» (Petter 01.10, valg B).
 // ---------------------------------------------------------------------------
 
-test("D2c: plasseringen (fritekst fra analysen) vises bare naar location er satt", () => {
+test("D2c/TG-NEW-148: plasseringen fra analysen vises bare med location, merket som analysens tekst", () => {
   const label = withoutComments(read("components/godkjenning/LightLabel.tsx"));
   assert.match(label, /location = false,/);
-  assert.match(label, /\{location && light\.location && /);
-  // Plasseringen leses bare i den ene linja som krever `location`.
+  // Plasseringen leses bare i den ene linja som krever `location`, og staar i review.analysisLocation.
   const lines = label.split("\n").filter((l) => l.includes("light.location"));
-  assert.equal(lines.length, 1, "plasseringen leses ett sted");
-  assert.match(lines[0], /^\s*\{location && light\.location && /);
+  assert.equal(lines.length, 2, "betingelsen og teksten");
+  assert.match(lines[0], /^\s*\{location && light\.location && \($/);
+  assert.match(lines[1], /t\(locale, "review\.analysisLocation", \{ text: light\.location \}\)/);
+  assert.equal(DICTIONARIES.nb.ui["review.analysisLocation"], "Analysens tekst: {text}");
+  assert.equal(DICTIONARIES.en.ui["review.analysisLocation"], "Analysis text: {text}");
 });
 
-test("D2c: «Stemning og lys» viser bare lampetypen; Detaljer og rettingen viser plasseringen", () => {
+test("TG-NEW-148: bare «Detaljer» (admin) viser analysens plassering; alle visninger viser nummer og sone", () => {
   const usesOf = (f: string) =>
     [...withoutComments(read(f)).matchAll(/<LightLabel\b[^>]*\/>/g)].map((m) => m[0]);
-  const mood = usesOf("components/godkjenning/MoodPanel.tsx");
-  assert.equal(mood.length, 1);
-  for (const use of mood) assert.doesNotMatch(use, /\blocation\b/, use);
-  assert.doesNotMatch(withoutComments(read("components/godkjenning/MoodPanel.tsx")), /\.location\b/);
-  for (const f of ["components/godkjenning/DetailsPanel.tsx", "components/godkjenning/CorrectionPanel.tsx"]) {
+  const details = usesOf("components/godkjenning/DetailsPanel.tsx");
+  assert.ok(details.length > 0 && details.every((u) => /\blocation\b/.test(u)), "Detaljer");
+  for (const f of ["components/godkjenning/MoodPanel.tsx", "components/godkjenning/CorrectionPanel.tsx"]) {
     const uses = usesOf(f);
-    assert.ok(uses.length > 0 && uses.every((u) => /\blocation\b/.test(u)), f);
+    assert.equal(uses.length, 1, f);
+    // Ikke-admin ser aldri den engelske plasseringen: rettingen og «Stemning og lys».
+    for (const use of uses) assert.doesNotMatch(use, /\blocation\b/, use);
+  }
+  // Nummer og sone fra samme lightNames over hele lista i alle tre visninger.
+  for (const f of [
+    "components/godkjenning/MoodPanel.tsx",
+    "components/godkjenning/CorrectionPanel.tsx",
+    "components/godkjenning/DetailsPanel.tsx",
+  ]) {
+    const src = withoutComments(read(f));
+    for (const use of usesOf(f)) assert.match(use, /name=\{nameOf\(light\)\}/, f);
+    assert.match(src, /const nameOf = lightNames\((review\.)?lights\);/, f);
   }
   // Ingen andre steder leser plasseringen direkte.
   for (const f of ["(app)/godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("LightLabel.tsx"))]) {
     assert.doesNotMatch(withoutComments(read(f)), /\.location\b/, f);
   }
+  // Typenavnet kommer bare via lightText (nummeret), ikke direkte fra ordlista.
+  const label = withoutComments(read("components/godkjenning/LightLabel.tsx"));
+  assert.doesNotMatch(label, /"lightType"/);
+  assert.match(label, /const text = lightText\(locale, light, name\);/);
 });
 
 test("D2c: overskriften heter «Lys som tennes» i alle tilstander", () => {
