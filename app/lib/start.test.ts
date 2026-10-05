@@ -14,7 +14,7 @@ import {
   WAITING_LIMIT,
   waitingFromParam,
 } from "./start.ts";
-import { ENABLED, orderableTools, SERVICE_PARAM, serviceHref, SERVICES_PATH, toolFromParam } from "./services.ts";
+import { ENABLED, expressCategories, orderableTools, SERVICE_PARAM, serviceHref, SERVICES_PATH, toolFromParam } from "./services.ts";
 import { DICTIONARIES } from "./i18n/index.ts";
 
 // TG-NEW-153 (dag 38), PR 2: startsiden /start, forhaandsvalg paa Tjenester
@@ -104,7 +104,7 @@ test("TG-153 start: den automatiske hentingen gaar bare mens en jobb lages", () 
 
 test("TG-153: snarveiene viser bare tjenester som kan bestilles i prod", () => {
   // Speiler services/enabled.py i backend (TG-NEW-138): privacy_blur og skumring.
-  assert.deepEqual(orderableTools().map((t) => t.id), ["privacy_blur", "skumring"]);
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "privacy_blur"]);
   for (const tool of orderableTools()) assert.equal(ENABLED[tool.id as keyof typeof ENABLED], true, tool.id);
 });
 
@@ -118,6 +118,27 @@ test("TG-153: forhaandsvalget godtar bare tjenester som er slaatt paa", () => {
     assert.equal(toolFromParam(hidden), null, hidden);
   }
   assert.equal(toolFromParam(null), null);
+});
+
+test("dag 38: /tjenester uten ?tjeneste= aapner Lys og himmel, uten tjeneste valgt", () => {
+  // Standardkategorien er den foerste i lista; ?tjeneste= har forrang, som foer.
+  assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "fixit"]);
+  const page = withoutComments(read("(app)/tjenester/page.tsx"));
+  assert.match(page, /initial\?\.categoryId \?\? CATEGORIES\[0\]\?\.id \?\? ""/);
+  assert.match(page, /useState<string \| null>\(initial\?\.toolId \?\? null\)/);
+  assert.equal(toolFromParam(null), null);
+  assert.deepEqual(toolFromParam("privacy_blur"), { categoryId: "fixit", toolId: "privacy_blur" });
+});
+
+test("dag 38: ingressen paa Tjenester sier det samme som home.intro", () => {
+  for (const locale of ["nb", "en"] as const) {
+    const ui = DICTIONARIES[locale].ui;
+    const sub = ui["express.subtitle"];
+    const tail = sub.charAt(0).toLowerCase() + sub.slice(1);
+    assert.ok(ui["home.intro"].endsWith(`: ${tail}`), locale);
+  }
+  assert.doesNotMatch(DICTIONARIES.nb.ui["express.subtitle"], /sladding/);
+  assert.doesNotMatch(DICTIONARIES.en.ui["express.subtitle"], /privacy blur/i);
 });
 
 test("TG-153: Historikk aapner med «Venter paa meg» bare fra ?vis=venter", () => {

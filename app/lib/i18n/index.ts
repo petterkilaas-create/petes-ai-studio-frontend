@@ -190,7 +190,7 @@ const nbUi = {
   "start.services.open": "Bruk tjenesten",
   "start.loading": "Henter jobbene …",
   "start.loadErrorTitle": "Kunne ikke hente jobbene",
-  "express.subtitle": "Kveldsbilde laget med AI fra dagsbilde, og sladding av personlige detaljer.",
+  "express.subtitle": "Kveldsbilde laget med AI fra dagsbilde, og skjuling av ansikter og bilskilt.",
   // D1c: tekstene paa Tjenester (brief §7), uten metaforer og steg-nummer.
   // Noeklene heter fortsatt express.* (TG-NEW-153, valg B1).
   "express.title": "Tjenester",
@@ -575,7 +575,7 @@ const en: Dictionary = {
     "start.services.open": "Use this service",
     "start.loading": "Loading your jobs …",
     "start.loadErrorTitle": "Could not load your jobs",
-    "express.subtitle": "Dusk image made with AI from a daytime photo, and privacy blur.",
+    "express.subtitle": "Dusk image made with AI from a daytime photo, and blurring of faces and license plates.",
     "express.title": "Services",
     "express.chooseService": "Choose a service",
     "express.category.fixit": "Clean up and blur",
