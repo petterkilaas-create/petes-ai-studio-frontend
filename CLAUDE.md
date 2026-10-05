@@ -56,15 +56,11 @@ utover det som staar her.
 - Installer fra lockfila med `npm ci`. `npm install` kan endre
   `package-lock.json` - commit aldri lockfil-endringer du ikke ble bedt om.
 - Typesjekk (porten lokalt): `npx tsc --noEmit` - forventet rent.
-- `npm test` (node --test) - 434 tester per 2026-10-05, forventet groent.
+- `npm test` (node --test) - 454 tester per 2026-10-05, forventet groent.
 - Dev-server: `npm run dev`, aapne http://localhost:3000 - aldri 127.0.0.1
   (Clerk-cookies og cross-origin oppfoerer seg annerledes).
-- `npm run build` feiler lokalt (verifisert 2026-09-23) under prerender av
-  `/express-v2`: `app/lib/api.ts` kaster fordi `NEXT_PUBLIC_API_BASE` ikke er
-  satt i lokal env. Sidene bygges parallelt og build stopper ved foerste
-  feil, saa den kan like gjerne stoppe paa `/copywriter` (Supabase-env
-  mangler, sett 2026-09-30). Foer-eksisterende, ikke en regresjon;
-  `tsc --noEmit` er porten.
+- `npm run build` gaar gjennom lokalt (verifisert 2026-10-05, etter
+  TG-NEW-129 PR 1). `tsc --noEmit` er fortsatt porten.
 
 ## Harde regler (brytes aldri)
 1. Aldri `git push`. Den er blokkert i `.claude/settings.json` - ikke proev
