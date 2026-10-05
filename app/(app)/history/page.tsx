@@ -194,6 +194,8 @@ export default function HistoryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
+  // Kaldstart (TG-NEW-134): listJobs proever paa nytt, og spinneren viser en rolig tekst.
+  const [waking, setWaking] = useState(false);
 
   // Bytte av filter mens en henting pagaar: bare det siste svaret teller.
   const requestRef = useRef(0);
@@ -205,8 +207,12 @@ export default function HistoryPage() {
     const request = ++requestRef.current;
     setLoading(true);
     setError(null);
+    setWaking(false);
+    const onRetry = () => {
+      if (request === requestRef.current) setWaking(true);
+    };
     try {
-      const rows = await listJobs({ limit: PAGE_SIZE, statuses, scope, getToken });
+      const rows = await listJobs({ limit: PAGE_SIZE, statuses, scope, getToken, onRetry });
       if (request !== requestRef.current) return;
       setJobs(rows);
       setHasMore(rows.length === PAGE_SIZE);
@@ -224,7 +230,10 @@ export default function HistoryPage() {
       }
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      if (request === requestRef.current) setLoading(false);
+      if (request === requestRef.current) {
+        setLoading(false);
+        setWaking(false);
+      }
     }
   }, [getToken, statuses, scope]);
 
@@ -346,7 +355,7 @@ export default function HistoryPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4" role="status">
           <div className="w-8 h-8 border-4 border-line border-t-ink rounded-full animate-spin motion-reduce:animate-none" />
-          <p className="text-ink-2 text-sm">{t(locale, "history.loading")}</p>
+          <p className="text-ink-2 text-sm">{t(locale, waking ? "net.waking" : "history.loading")}</p>
         </div>
       ) : error && jobs.length === 0 ? (
         <Card padding="lg" className="text-center max-w-lg mx-auto">

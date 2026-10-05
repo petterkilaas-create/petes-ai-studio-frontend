@@ -1,4 +1,5 @@
 import type { JobResult, Rejection, Review } from "./api";
+import { POLL_TRANSIENT_DELAYS_MS, TransientError } from "./retry.ts";
 
 /**
  * Rene tilstandsregler for useJobStatus — skilt ut saa de kan testes uten
@@ -83,6 +84,11 @@ export type PollStep =
   | { kind: "wait"; delayMs: number; consecutiveErrors: number }
   | { kind: "gave_up"; error: string };
 
+/** Et kastet unntak som kan gaa over av seg selv (kaldstart, TG-NEW-134). */
+export function isTransientPollError(outcome: PollOutcome): boolean {
+  return !outcome.ok && outcome.error instanceof TransientError;
+}
+
 /**
  * Regelen for neste steg i pollingen, skilt ut fra hooken saa den kan
  * testes. Et svar (ogsaa failed, TG-NEW-156) stopper eller fortsetter etter
@@ -98,7 +104,13 @@ export function afterPoll(outcome: PollOutcome, consecutiveErrors: number): Poll
     return { kind: "wait", delayMs: retryAfterMs ?? POLL_INTERVAL_MS, consecutiveErrors: 0 };
   }
   const errors = consecutiveErrors + 1;
-  if (errors < MAX_CONSECUTIVE_ERRORS) {
+  // Kaldstart (TG-NEW-134): nettverksfeil og 502, 503 og 504 faar pausene
+  // 2, 4, 6 og 8 s (20 s) foer pollingen gir opp. Andre feil som foer.
+  if (isTransientPollError(outcome)) {
+    if (errors <= POLL_TRANSIENT_DELAYS_MS.length) {
+      return { kind: "wait", delayMs: POLL_TRANSIENT_DELAYS_MS[errors - 1], consecutiveErrors: errors };
+    }
+  } else if (errors < MAX_CONSECUTIVE_ERRORS) {
     // 1. feil -> vent 2 s, 2. feil -> vent 4 s.
     return { kind: "wait", delayMs: BACKOFF_BASE_MS * 2 ** (errors - 1), consecutiveErrors: errors };
   }

@@ -11,6 +11,9 @@ const api = await import("./api.ts");
 const { applyQuotaEvent, canOrder, countsAgainstQuota, parseQuota, quotaView } = await import("./quota.ts");
 const { OrderKeys } = await import("./orderKey.ts");
 const { DICTIONARIES, codeText, t } = await import("./i18n/index.ts");
+const { retryClock } = await import("./retry.ts");
+// TG-NEW-134: GET proever paa nytt ved 502-504 og nettverksfeil. Ingen ekte venting i testene.
+retryClock.sleep = async () => {};
 
 const realFetch = globalThis.fetch;
 const getToken = async () => "tok";

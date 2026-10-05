@@ -328,6 +328,12 @@ export default function ExpressPage() {
             </Button>
           </div>
 
+          {job.waking && (
+            <p className="text-sm text-ink-2" role="status">
+              {t(locale, "net.waking")}
+            </p>
+          )}
+
           {job.rejection && (
             <RejectionPanel
               rejection={job.rejection}
