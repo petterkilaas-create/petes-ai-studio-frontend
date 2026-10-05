@@ -374,7 +374,7 @@ function jsxOf(rel: string, fn: string): string {
 }
 
 const EXPRESS_JSX: [string, string][] = [
-  ["(app)/tjenester/page.tsx", "export default function ExpressPage"],
+  ["(app)/tjenester/page.tsx", "function ExpressContent"],
   ["components/DuskChoicePicker.tsx", "export function DuskChoicePicker"],
 ];
 
@@ -856,8 +856,12 @@ test("ventebilde: symbolet snurrer bare med CSS og staar stille ved redusert bev
 
 test("ventebilde: Historikk viser JobMedia fra thumbSrc og henter selv bare mens jobber er i arbeid", () => {
   const page = withoutComments(read("(app)/history/page.tsx"));
-  assert.match(page, /<JobMedia\s*view=\{mediaView\(job, thumbSrc\(job\)\)\}/);
-  assert.doesNotMatch(page, /history\.noPreview|<img/);
+  // TG-NEW-153: kortet er components/JobCard.tsx; siden gir det thumbSrc(job).
+  assert.match(page, /<JobCard key=\{job\.jobId\} job=\{job\} thumb=\{thumbSrc\(job\)\} \/>/);
+  const card = withoutComments(read("components/JobCard.tsx"));
+  assert.match(card, /<JobMedia\s*view=\{mediaView\(job, thumb\)\}/);
+  assert.doesNotMatch(card, /thumbSrc|\.thumbUrl|\.originalThumbUrl/, "kortet velger ikke bildet selv");
+  for (const src of [page, card]) assert.doesNotMatch(src, /history\.noPreview|<img/);
   assert.match(page, /useAutoRefresh\(!loading && jobs\.some\(\(j\) => isWorking\(j\.status\)\), silentRefresh, refreshEpoch\);/);
   assert.match(page, /setJobs\(\(prev\) => mergeRefresh\(prev, rows, PAGE_SIZE\)\);/);
   // «Oppdater» staar.
@@ -952,19 +956,6 @@ test("opprydding: testkommandoen har en tidsgrense, saa en test som henger, feil
 // ---------------------------------------------------------------------------
 
 const TEXT_EXCEPTIONS: { file: string; texts: string[]; why: string; hidden: () => boolean }[] = [
-  {
-    file: "(app)/start/page.tsx",
-    texts: [
-      "Virtual Staging",
-      "Transform empty spaces into beautifully furnished, inviting homes with Scandinavian or Luxury styles.",
-      "Start Staging",
-      "Cinematic Video",
-      "Turn your property photos into a premium, 30-second social media reel using Veo AI and dynamic camera tracking.",
-      "Build Film",
-    ],
-    why: "kortene er skjult mens Virtual Staging og Video er av (TG-NEW-136); slaas de paa, maa tekstene i ordlista",
-    hidden: () => !ENABLED.virtual_stage && !ENABLED.video,
-  },
   {
     file: "components/RejectionPanel.tsx",
     texts: [

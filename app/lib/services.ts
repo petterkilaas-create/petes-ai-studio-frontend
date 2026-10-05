@@ -240,3 +240,32 @@ export function expressCategories(): Category[] {
     items: c.items.filter((tool) => isServiceEnabled(tool.id)),
   })).filter((c) => c.items.length > 0);
 }
+
+/** Tjenestene som kan bestilles, i samme rekkefoelge som paa Tjenester. */
+export function orderableTools(): Tool[] {
+  return expressCategories().flatMap((c) => c.items);
+}
+
+// ---------------------------------------------------------------------------
+// Forhaandsvalg fra adressen (TG-NEW-153, Petter 05.10): /tjenester?tjeneste=<id>
+// ---------------------------------------------------------------------------
+
+export const SERVICE_PARAM = "tjeneste";
+
+/** Lenken til Tjenester med verktoeyet valgt, f.eks. snarveiene paa /start. */
+export function serviceHref(toolId: string): string {
+  return `${SERVICES_PATH}?${SERVICE_PARAM}=${encodeURIComponent(toolId)}`;
+}
+
+/**
+ * Verktoeyet i adressen, og kategorien det ligger i. Bare tjenester som er
+ * slaatt paa: en skjult eller ukjent id gir null, og siden starter uten valg.
+ */
+export function toolFromParam(value: string | null): { categoryId: string; toolId: string } | null {
+  if (value === null) return null;
+  for (const c of expressCategories()) {
+    const tool = c.items.find((t) => t.id === value);
+    if (tool !== undefined) return { categoryId: c.id, toolId: tool.id };
+  }
+  return null;
+}
