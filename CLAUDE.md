@@ -26,8 +26,11 @@ utover det som staar her.
   gjennom `app/lib/api.ts`.
 - Legacy-sider (bl.a. orders, copywriter, video) kaller Supabase direkte. Ikke
   utvid det moensteret - maalet er at frontend aldri snakker med Supabase (TG-NEW-72).
-- Demo-flyten (skumring) ligger i `/express`. `/scene-transform-debug` er
-  slettet (L0, 2026-09-30).
+- Bestillingen (skumring og sladding) ligger paa Tjenester, `/tjenester`
+  (`app/(app)/tjenester/`, TG-NEW-153). `/express` sendes dit med 307 fra
+  `redirects()` i `next.config.ts`; ordlista bruker fortsatt `express.*`
+  for sidens tekster (valg B1). `/scene-transform-debug` er slettet (L0,
+  2026-09-30).
 - Tjenester av/paa: `ENABLED` i `app/lib/services.ts`. Klart vaer, Magic
   Cleanup, Virtual Staging og `/express-v2` er av til de er merket (TG-NEW-136).
 - Mappestruktur (MS1, 2026-10-02): app-sidene og rot-layouten (ClerkProvider)
@@ -53,7 +56,7 @@ utover det som staar her.
 - Installer fra lockfila med `npm ci`. `npm install` kan endre
   `package-lock.json` - commit aldri lockfil-endringer du ikke ble bedt om.
 - Typesjekk (porten lokalt): `npx tsc --noEmit` - forventet rent.
-- `npm test` (node --test) - 387 tester per 2026-10-05, forventet groent.
+- `npm test` (node --test) - 393 tester per 2026-10-05, forventet groent.
 - Dev-server: `npm run dev`, aapne http://localhost:3000 - aldri 127.0.0.1
   (Clerk-cookies og cross-origin oppfoerer seg annerledes).
 - `npm run build` feiler lokalt (verifisert 2026-09-23) under prerender av

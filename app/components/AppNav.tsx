@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CircleHelp, Clapperboard, FolderOpen, History, PenLine, Sofa, Zap, type LucideIcon } from "lucide-react";
+import {
+  CircleHelp,
+  Clapperboard,
+  FolderOpen,
+  History,
+  LayoutDashboard,
+  LayoutGrid,
+  PenLine,
+  Sofa,
+  type LucideIcon,
+} from "lucide-react";
 import { navLinks, type NavId } from "../lib/services";
 import { t } from "../lib/i18n";
 import { useLocale } from "../lib/i18n/useLocale";
@@ -16,12 +26,17 @@ import { site } from "../../content/marketing/nb/site";
  * MS5a (valg B): «Hjelp» gaar til den foerste hjelpesiden i site.help, den
  * samme lista bunnen paa markedssiden bruker; AppNav har ingen egne
  * adresser. Ordet er fra ordlista, saa det foelger appens spraak (sidene
- * finnes bare paa norsk). Under 640 px bare ikonet, og ordet for
- * skjermlesere. Vanlig <a>: markedssidene har egen rot-layout (full sidelast).
+ * finnes bare paa norsk). Vanlig <a>: markedssidene har egen rot-layout
+ * (full sidelast).
+ *
+ * TG-NEW-153: Start, Tjenester, Historikk og Hjelp. Under 640 px viser alle
+ * lenkene bare ikonet, og ordet er for skjermlesere (375 px faar plass).
+ * Start har LayoutDashboard, ikke et hus: merket er huset (Petter 05.10).
  */
 const HELP_HREF = site.help.links[0].href;
 const ICONS: Record<NavId, LucideIcon> = {
-  express: Zap,
+  start: LayoutDashboard,
+  services: LayoutGrid,
   staging: Sofa,
   video: Clapperboard,
   copywriter: PenLine,
@@ -50,12 +65,12 @@ export function AppNav() {
             <Link
               href={l.href}
               aria-current={active ? "page" : undefined}
-              className={`inline-flex min-h-11 items-center gap-2 rounded-button px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${
+              className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-button px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface ${
                 active ? "bg-surface-2 font-medium text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink"
               }`}
             >
               <Icon aria-hidden className="size-4" strokeWidth={1.75} />
-              {t(locale, `nav.${l.id}`)}
+              <span className="sr-only sm:not-sr-only">{t(locale, `nav.${l.id}`)}</span>
             </Link>
           </span>
         );

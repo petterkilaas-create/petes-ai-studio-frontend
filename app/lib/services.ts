@@ -6,13 +6,15 @@
  * KI-endring.
  *
  * Slaa en tjeneste paa igjen ved aa endre EN linje i ENABLED. Koden for
- * tjenestene og sidene er beholdt. Backend er uendret og sperrer ingenting.
+ * tjenestene og sidene er beholdt. Backend har sin egen tillatelsesliste
+ * (services/enabled.py, TG-NEW-138), som maa aapnes i samme slengen.
  *
- * Rene data og funksjoner (bare en type-import), saa modulen kan testes med
- * node --test.
+ * Rene data og funksjoner (en type-import, og marketingAccess.ts uten egne
+ * importer), saa modulen kan testes med node --test.
  */
 
 import type { UiKey } from "./i18n";
+import { START_PATH } from "./marketingAccess.ts";
 
 export const ENABLED = {
   klart_vaer: false,
@@ -42,6 +44,8 @@ export function isServiceEnabled(id: string): boolean {
 // Sider som styres av en tjeneste
 // ---------------------------------------------------------------------------
 
+/** Tjenester (TG-NEW-153): alle tjenestene samles her. /express sendes hit (next.config.ts). */
+export const SERVICES_PATH = "/tjenester";
 export const STAGING_PATH = "/staging";
 export const EXPRESS_V2_PATH = "/express-v2";
 export const VIDEO_PATH = "/video";
@@ -70,7 +74,7 @@ export function isPageEnabled(path: string): boolean {
 // ---------------------------------------------------------------------------
 
 /** Id-en gir teksten (`nav.<id>` i ordlista) og ikonet (AppNav). */
-export type NavId = "express" | "staging" | "video" | "copywriter" | "orders" | "history";
+export type NavId = "start" | "services" | "staging" | "video" | "copywriter" | "orders" | "history";
 
 export interface NavLink {
   id: NavId;
@@ -81,7 +85,8 @@ export interface NavLink {
 
 // Tekst, ikon og farger ligger i AppNav og ordlista (D1), ikke her.
 const ALL_NAV_LINKS: NavLink[] = [
-  { id: "express", href: "/express" },
+  { id: "start", href: START_PATH },
+  { id: "services", href: SERVICES_PATH },
   { id: "staging", href: STAGING_PATH },
   { id: "video", href: VIDEO_PATH },
   { id: "copywriter", href: COPYWRITER_PATH },
@@ -95,7 +100,7 @@ export function navLinks(): NavLink[] {
 }
 
 // ---------------------------------------------------------------------------
-// Tjenestevalget i Express
+// Tjenestevalget paa Tjenester (heter fortsatt express* internt, valg B1)
 // ---------------------------------------------------------------------------
 
 // "simple" = service alene (ingen params, backend-defaults gjelder).
@@ -113,7 +118,7 @@ export interface Tool {
    * false der backend bestemmer bildetypen selv (skumring, nivaa 2).
    */
   sceneGate?: boolean;
-  /** Tekstene staar i ordlista (D1c, brief §7); ikonet i express/page.tsx. */
+  /** Tekstene staar i ordlista (D1c, brief §7); ikonet i tjenester/page.tsx. */
   titleKey: UiKey;
   descKey: UiKey;
 }
@@ -228,7 +233,7 @@ const CATEGORIES: Category[] = [
   },
 ];
 
-/** Kategoriene i Express med bare paaslaatte verktoey. Tomme kategorier skjules. */
+/** Kategoriene paa Tjenester med bare paaslaatte verktoey. Tomme kategorier skjules. */
 export function expressCategories(): Category[] {
   return CATEGORIES.map((c) => ({
     ...c,

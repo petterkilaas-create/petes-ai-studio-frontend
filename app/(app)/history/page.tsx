@@ -31,6 +31,7 @@ import { Pill } from "@/app/components/ui/Pill";
 import { messageText, t, type Locale, type UiKey } from "@/app/lib/i18n";
 import { jobMessage } from "@/app/lib/jobMessage";
 import { useLocale } from "@/app/lib/i18n/useLocale";
+import { SERVICES_PATH } from "@/app/lib/services";
 import {
   effectiveScope,
   emptyWaitingKey,
@@ -371,7 +372,7 @@ export default function HistoryPage() {
         <Card padding="lg" className="text-center max-w-lg mx-auto">
           <p className="text-ink font-medium text-lg mb-2">{t(locale, "history.emptyTitle")}</p>
           <p className="text-ink-2 text-sm mb-8">{t(locale, "history.emptyBody")}</p>
-          <ButtonLink href="/express">{t(locale, "history.toExpress")}</ButtonLink>
+          <ButtonLink href={SERVICES_PATH}>{t(locale, "history.toServices")}</ButtonLink>
         </Card>
       ) : (
         <>
