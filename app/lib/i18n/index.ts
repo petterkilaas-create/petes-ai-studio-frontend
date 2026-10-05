@@ -4,8 +4,8 @@
  * oversettes her. Rene funksjoner uten import, saa modulen kan testes med
  * node --test.
  *
- * Spraak velges foreloepig fra nettleseren (se useLocale). Spraakvelger,
- * lagret spraakvalg og oversettelse av eksisterende sider er TG-NEW-129.
+ * Spraaket velges i brukermenyen og lagres i en cookie og i Clerk; uten
+ * valg brukes nettleserens spraak (TG-NEW-129, se locale.ts og useLocale).
  *
  * Nye tekster: legg inn i BAADE nb og en. `Dictionary` krever samme
  * ui-noekler i begge, og en test sjekker at kodegruppene har samme koder.
@@ -274,6 +274,8 @@ const nbUi = {
   "media.working.generic": "Lager bildet …",
   "media.fireplaceQuestion": "Svar på spørsmålet om peisen",
   "media.originalAlt": "Dagsbildet som ble lastet opp",
+  // Spraakvalget i brukermenyen (TG-NEW-129): navnet paa spraaket, paa spraaket selv.
+  "account.languageName": "Norsk",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -654,6 +656,7 @@ const en: Dictionary = {
     "media.working.generic": "Creating image …",
     "media.fireplaceQuestion": "Answer the question about the fireplace",
     "media.originalAlt": "The uploaded daytime photo",
+    "account.languageName": "English",
   },
   codes: {
     reviewCode: {

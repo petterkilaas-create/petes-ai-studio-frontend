@@ -1,12 +1,16 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useContext, useSyncExternalStore } from "react";
 import { DEFAULT_LOCALE, pickLocale, type Locale } from "./index";
+import { LocaleContext } from "./LocaleProvider";
 
 /**
- * Spraaket fra nettleseren (navigator.languages). Paa serveren og ved
- * foerste hydrering brukes DEFAULT_LOCALE (nb), saa en engelsk nettleser kan
- * et oeyeblikk se norsk. Spraakvelger og lagret valg: TG-NEW-129.
+ * Spraaket som vises (TG-NEW-129). I appen kommer det fra rot-layouten for
+ * (app), som leser cookien `pas_locale` og nettleserens Accept-Language
+ * (LocaleProvider), saa siden er paa riktig spraak fra foerste byte.
+ *
+ * Utenfor den layouten: nettleserens spraak (navigator.languages). Paa
+ * serveren og ved foerste hydrering brukes da DEFAULT_LOCALE (nb).
  */
 function subscribe(onChange: () => void): () => void {
   window.addEventListener("languagechange", onChange);
@@ -22,5 +26,7 @@ function getServerSnapshot(): Locale {
 }
 
 export function useLocale(): Locale {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const fromLayout = useContext(LocaleContext);
+  const fromBrowser = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  return fromLayout ?? fromBrowser;
 }
