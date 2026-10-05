@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Check, Clock, Eraser, LayoutGrid, ScanFace, Sun, Sunset, type LucideIcon } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Check, Clock, Eraser, LayoutGrid, type LucideIcon } from "lucide-react";
+import { TOOL_ICONS } from "@/app/components/toolIcons";
 import { useImagePreview } from "@/app/hooks/useImagePreview";
 import { useProcessJob } from "@/app/hooks/useProcessJob";
 import { useQuota } from "@/app/hooks/useQuota";
@@ -23,7 +25,7 @@ import { DuskChoicePicker } from "@/app/components/DuskChoicePicker";
 import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "@/app/lib/dusk";
 import { codeText, t } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
-import { expressCategories } from "@/app/lib/services";
+import { expressCategories, SERVICE_PARAM, toolFromParam } from "@/app/lib/services";
 import { Button } from "@/app/components/ui/Button";
 import { Card, cardClass } from "@/app/components/ui/Card";
 import { PageHeader } from "@/app/components/ui/PageHeader";
@@ -33,12 +35,6 @@ const CATEGORIES = expressCategories();
 
 // Lucide i stedet for emojiene i services.ts (D1). Ukjent id: ingen ikon.
 const CATEGORY_ICONS: Record<string, LucideIcon> = { fixit: Eraser, timetraveler: Clock };
-const TOOL_ICONS: Record<string, LucideIcon> = {
-  magic_cleanup: Eraser,
-  privacy_blur: ScanFace,
-  klart_vaer: Sun,
-  skumring: Sunset,
-};
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
@@ -54,9 +50,24 @@ function chipClass(selected: boolean): string {
 
 type SceneType = "auto" | "exterior" | "interior";
 
+// useSearchParams krever en Suspense-grense i prod-bygget (use-search-params.md).
 export default function ExpressPage() {
-  const [activeCategoryId, setActiveCategoryId] = useState<string>(CATEGORIES[0]?.id ?? "");
-  const [selectedToolId, setSelectedToolId] = useState<string | null>(null);
+  return (
+    <Suspense fallback={null}>
+      <ExpressContent />
+    </Suspense>
+  );
+}
+
+function ExpressContent() {
+  // TG-NEW-153: /tjenester?tjeneste=<id> velger verktoeyet (snarveiene paa
+  // /start). Bare tjenester som er slaatt paa; ellers ingen valg, som foer.
+  const searchParams = useSearchParams();
+  const [initial] = useState(() => toolFromParam(searchParams.get(SERVICE_PARAM)));
+  const [activeCategoryId, setActiveCategoryId] = useState<string>(
+    initial?.categoryId ?? CATEGORIES[0]?.id ?? ""
+  );
+  const [selectedToolId, setSelectedToolId] = useState<string | null>(initial?.toolId ?? null);
 
   // Scene-type-gate-kontroller (kun for scene_transform-kort).
   const [sceneType, setSceneType] = useState<SceneType>("auto");

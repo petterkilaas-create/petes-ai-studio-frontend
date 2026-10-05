@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
   getCapabilities,
@@ -9,34 +10,22 @@ import {
   type Capabilities,
   type JobScope,
   type JobSummary,
-  type JobSummaryStatus,
 } from "@/app/lib/api";
-import {
-  thumbSrc,
-  isRejectedByReviewer,
-  openLinkKey,
-  REVIEWER_REJECTED_TONE,
-  serviceLabelKey,
-  statusVariant,
-} from "@/app/lib/statusVariants";
-import { OpenReviewLink } from "@/app/components/OpenReviewLink";
-import { JobMedia } from "@/app/components/JobMedia";
-import { isWorking, mediaView, mergeRefresh } from "@/app/lib/jobMedia";
+import { thumbSrc } from "@/app/lib/statusVariants";
+import { JobCard } from "@/app/components/JobCard";
+import { isWorking, mergeRefresh } from "@/app/lib/jobMedia";
 import type { RefreshResult } from "@/app/lib/autoRefresh";
 import { useAutoRefresh } from "@/app/hooks/useAutoRefresh";
 import { Button, ButtonLink } from "@/app/components/ui/Button";
-import { Card, cardClass } from "@/app/components/ui/Card";
+import { Card } from "@/app/components/ui/Card";
 import { PageHeader } from "@/app/components/ui/PageHeader";
-import { Pill } from "@/app/components/ui/Pill";
-import { messageText, t, type Locale, type UiKey } from "@/app/lib/i18n";
-import { jobMessage } from "@/app/lib/jobMessage";
+import { t, type UiKey } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import { SERVICES_PATH } from "@/app/lib/services";
+import { HISTORY_VIEW_PARAM, waitingFromParam } from "@/app/lib/start";
 import {
   effectiveScope,
   emptyWaitingKey,
-  ownerBadge,
-  rejectedLabelKey,
   scopeFallback,
   showScopeToggle,
   subtitleKey,
@@ -47,51 +36,6 @@ import {
 // siste rad (backendens kontrakt) — se loadMore().
 const PAGE_SIZE = 20;
 
-// Tjenestenavnene staar i ordlista (brief §7). Ukjente faller tilbake til en
-// prettifisert utgave av den raa enum-verdien, saa nye tjenester rendres
-// lesbart uten kode-endring her.
-function serviceLabel(locale: Locale, service: string): string {
-  const key = serviceLabelKey(service);
-  if (key !== null) return t(locale, key);
-  const pretty = service.replace(/_/g, " ");
-  return pretty.charAt(0).toUpperCase() + pretty.slice(1);
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("nb-NO", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-// Status-pill: frikoblet fra StatusBadge (som tar en annen status-union).
-function StatusPill({
-  status,
-  service,
-  rejectedKey = null,
-}: {
-  status: JobSummaryStatus;
-  service: string;
-  /** Avvist ved godkjenning: «av deg» eller «av eieren» (TG-NEW-127). */
-  rejectedKey?: UiKey | null;
-}) {
-  const locale = useLocale();
-  const v = rejectedKey !== null
-    ? { labelKey: rejectedKey, tone: REVIEWER_REJECTED_TONE, pulse: false }
-    : statusVariant(status, service);
-  return (
-    <Pill tone={v.tone} pulse={v.pulse}>
-      {t(locale, v.labelKey)}
-    </Pill>
-  );
-}
-
 // Filterknapp (segment): valgt = primary, saa valget ikke bare vises med farge.
 function segmentClass(selected: boolean): string {
   return `min-h-11 px-4 rounded-pill text-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper ${
@@ -101,76 +45,23 @@ function segmentClass(selected: boolean): string {
   }`;
 }
 
-function JobCard({ job }: { job: JobSummary }) {
-  const locale = useLocale();
-  const rejectedByYou = isRejectedByReviewer(job);
-  const other = ownerBadge(job);
-  const openKey = openLinkKey(job);
-  // Kort melding ut fra status og `code`, aldri raa `error` (TG-NEW-121).
-  // Avvist av megleren: merket sier det, og begrunnelsen vises under.
-  const message = rejectedByYou ? null : jobMessage(job.status, job.code);
-
+// useSearchParams krever en Suspense-grense i prod-bygget (use-search-params.md).
+export default function HistoryPage() {
   return (
-    <div className={cardClass("none", "flex flex-col overflow-hidden")}>
-      {/* Ventebildet: resultatet (thumbSrc), ellers dagsbildet dempet med status, ellers plassholder. */}
-      <JobMedia
-        view={mediaView(job, thumbSrc(job))}
-        resultAlt={serviceLabel(locale, job.service)}
-        locale={locale}
-      />
-
-      <div className="p-5 flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <span className="font-medium text-ink text-[15px] truncate">
-            {serviceLabel(locale, job.service)}
-          </span>
-          <StatusPill
-            status={job.status}
-            service={job.service}
-            rejectedKey={rejectedByYou ? rejectedLabelKey(job) : null}
-          />
-        </div>
-        <span className="text-ink-2 text-[13px]">
-          {formatDate(job.createdAt)}
-        </span>
-        {other && (
-          // TG-NEW-127: en annen brukers jobb (scope=all). Bare de 6 siste
-          // tegnene i eierens id; navn og e-post krever Clerk secret key.
-          <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
-            <Pill tone="neutral">{t(locale, "history.notYours")}</Pill>
-            {other.ownerShort && (
-              <span>
-                {t(locale, "history.owner")}: <span className="font-mono">{other.ownerShort}</span>
-              </span>
-            )}
-          </div>
-        )}
-        {message && (
-          <p className="text-[13px] text-ink bg-surface-2 rounded-button p-3 leading-relaxed">
-            {messageText(locale, message)}
-          </p>
-        )}
-        {rejectedByYou && job.reason && (
-          <p className="text-[13px] text-ink bg-surface-2 rounded-button p-3 leading-relaxed break-words">
-            {t(locale, "review.reasonLabel")}: {job.reason}
-          </p>
-        )}
-        {openKey && (
-          <div>
-            <OpenReviewLink jobId={job.jobId} labelKey={openKey} />
-          </div>
-        )}
-      </div>
-    </div>
+    <Suspense fallback={null}>
+      <HistoryContent />
+    </Suspense>
   );
 }
 
-export default function HistoryPage() {
+function HistoryContent() {
   const { getToken } = useAuth();
   const locale = useLocale();
+  const searchParams = useSearchParams();
 
   // «Venter paa meg» (2d-1): ?status=awaiting_approval,needs_review.
-  const [waitingOnly, setWaitingOnly] = useState(false);
+  // TG-NEW-153: /history?vis=venter aapner med filteret valgt (lenken fra /start).
+  const [waitingOnly, setWaitingOnly] = useState(() => waitingFromParam(searchParams.get(HISTORY_VIEW_PARAM)));
   const statuses = waitingOnly ? WAITING_FOR_ME_STATUSES : undefined;
 
   // TG-NEW-127: bryteren «Mine jobber / Alle brukere» vises bare naar /me gir
@@ -378,7 +269,7 @@ export default function HistoryPage() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
             {jobs.map((job) => (
-              <JobCard key={job.jobId} job={job} />
+              <JobCard key={job.jobId} job={job} thumb={thumbSrc(job)} />
             ))}
           </div>
 

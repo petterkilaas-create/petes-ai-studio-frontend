@@ -179,9 +179,17 @@ test("/video, /copywriter og /orders: stengt side gir «ikke tilgjengelig» og g
 const HOME_KEYS = [
   "home.title",
   "home.intro",
-  "home.services.title",
-  "home.services.desc",
-  "home.services.cta",
+  "start.newOrder",
+  "start.waiting.title",
+  "start.waiting.empty",
+  "start.waiting.more",
+  "start.recent.title",
+  "start.recent.all",
+  "start.services.title",
+  "start.services.lead",
+  "start.services.open",
+  "start.loading",
+  "start.loadErrorTitle",
   "express.subtitle",
 ] as const satisfies readonly UiKey[];
 
@@ -201,13 +209,17 @@ test("forsiden og Tjenester: teksten lover ikke video, Veo, HDR eller aarstider"
     // home.title faar navnet som variabel: t(locale, "home.title", { brand }).
     assert.ok(home.includes(`t(locale, "${key}"`), key);
   }
+  // start.loading velges med net.waking: t(locale, waking ? "net.waking" : "start.loading").
+  for (const key of HOME_KEYS.filter((k) => k.startsWith("start."))) {
+    assert.ok(home.includes(`"${key}"`), key);
+  }
   assert.ok(read("(app)/tjenester/page.tsx").includes(`t(locale, "express.subtitle")`));
 });
 
 test("forsiden og Tjenester: nb og en har de samme noeklene", () => {
   const pick = (locale: "nb" | "en") =>
     Object.keys(DICTIONARIES[locale].ui)
-      .filter((k) => k.startsWith("home.") || k.startsWith("express."))
+      .filter((k) => k.startsWith("home.") || k.startsWith("start.") || k.startsWith("express."))
       .sort();
   assert.deepEqual(pick("nb"), pick("en"));
   for (const key of HOME_KEYS) assert.ok(pick("nb").includes(key), key);
