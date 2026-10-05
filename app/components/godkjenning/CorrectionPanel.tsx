@@ -2,7 +2,7 @@
 
 import type { ReviewLight } from "../../lib/api";
 import { canToggle, isOn, type Lights, type Toggles } from "../../lib/correction";
-import { flatLights } from "../../lib/lightsView";
+import { flatLights, lightNames } from "../../lib/lightsView";
 import { t, type Locale } from "../../lib/i18n";
 import type { FireplaceAnswer } from "../../lib/review";
 import { buttonClass } from "../ui/Button";
@@ -15,7 +15,8 @@ const BTN_SECONDARY = buttonClass("secondary");
 
 /**
  * «Korriger bildet» i handlingskortet (D2b, brief §5): én flat liste over
- * lysene, uten analysens kategorier, koder eller grunner. Ustabile og
+ * lysene, uten analysens kategorier, koder, grunner eller engelske plassering.
+ * Like lamper skilles med nummer og sone (TG-NEW-148). Ustabile og
  * avviste har merkelappen «Usikker» og starter som av. Peisspoersmaalet som
  * foer. Tidspunkt og himmel kan ikke endres her ennaa (TG-NEW-145), saa de
  * vises ikke. Body bygges av buildCorrection paa siden, uendret.
@@ -55,6 +56,7 @@ export function CorrectionPanel({
   locale: Locale;
 }) {
   const rows = flatLights(lights);
+  const nameOf = lightNames(lights);
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -89,7 +91,7 @@ export function CorrectionPanel({
                       className={`w-5 h-5 shrink-0 accent-primary ${FOCUS}`}
                     />
                     <span className="flex-1">
-                      <LightLabel light={light} locale={locale} location uncertain={uncertain} state />
+                      <LightLabel light={light} name={nameOf(light)} locale={locale} uncertain={uncertain} state />
                     </span>
                     <span className="text-[13px] text-ink-2">
                       {editable

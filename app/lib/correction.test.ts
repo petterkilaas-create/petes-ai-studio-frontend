@@ -21,7 +21,7 @@ function light(
   state: LightState,
   editable = true
 ): ReviewLight {
-  return { key, id, run, type: "spotlight", location: null, reasonCode: null, editable, state };
+  return { key, id, run, type: "spotlight", location: null, box: null, reasonCode: null, editable, state };
 }
 
 // B08-lignende: to godkjente, én ustabil og én avvist spot (id-ene er eksempler).

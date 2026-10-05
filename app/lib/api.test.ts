@@ -428,7 +428,7 @@ test("getReview 200 normaliserer svaret og ignorerer ukjente handlinger", async 
   assert.deepEqual(r.review.reasonCodes, ["analysis_uncertain", "brand_new_code"]);
   // Svar fra foer 2d-2a (uten key/editable/state) gir laaste lyskilder.
   assert.deepEqual(r.review.lights.rejected[0], {
-    key: null, id: "L3", run: 2, type: "candle", location: "vindu", reasonCode: "not_confirmed",
+    key: null, id: "L3", run: 2, type: "candle", location: "vindu", box: null, reasonCode: "not_confirmed",
     editable: false, state: null,
   });
   assert.deepEqual(r.review.correction, { roundsLeft: 0, lastRoundFailed: false });
@@ -559,7 +559,7 @@ test("normalizeReview leser Rett-feltene (2d-2a)", () => {
       allowed_actions: ["approve", "reject", "correct"],
       lights: {
         approved: [
-          { key: "L1", id: "L1", run: null, type: "pendant", location: "x", editable: true, state: "approved" },
+          { key: "L1", id: "L1", run: null, type: "pendant", location: "x", box: [418, 7, 449, 23], editable: true, state: "approved" },
           { key: "L2", id: "L2", run: null, type: "pendant", location: "y", editable: true, state: "teleported" },
         ],
         unstable: [{ key: "r2:L3", id: "L3", run: 2, type: "spotlight", editable: false, state: "promoted" }],
@@ -575,9 +575,10 @@ test("normalizeReview leser Rett-feltene (2d-2a)", () => {
   );
   assert.deepEqual(r.allowedActions, ["approve", "reject", "correct"]);
   assert.deepEqual(r.lights.approved[0], {
-    key: "L1", id: "L1", run: null, type: "pendant", location: "x", reasonCode: null,
+    key: "L1", id: "L1", run: null, type: "pendant", location: "x", box: [418, 7, 449, 23], reasonCode: null,
     editable: true, state: "approved",
   });
+  assert.equal(r.lights.unstable[0].box, null, "uten box (lagt til for haand eller gammel backend)");
   assert.equal(r.lights.approved[1].state, null, "ukjent state");
   assert.equal(r.lights.unstable[0].run, 2);
   assert.equal(r.lights.unstable[0].editable, false);
@@ -792,4 +793,15 @@ test("normalizeReview: images.rounds (D2a, KONTRAKT_RUNDER)", () => {
     },
     { round: 0, current: false, previewUrl: null, rawPreviewUrl: null, choices: null },
   ]);
+});
+
+test("toLightBox: fire heltall i 0-1000, ellers null (TG-NEW-148, som light_box i backend)", () => {
+  assert.deepEqual(api.toLightBox([418, 7, 449, 23]), [418, 7, 449, 23]);
+  assert.deepEqual(api.toLightBox([0, 0, 1000, 1000]), [0, 0, 1000, 1000]);
+  for (const bad of [
+    null, undefined, [], [1, 2, 3], [1, 2, 3, 4, 5], [1.5, 2, 3, 4], [-1, 2, 3, 4], [1, 2, 3, 1001],
+    ["1", 2, 3, 4], [true, 2, 3, 4], [NaN, 2, 3, 4], [Infinity, 2, 3, 4], "1,2,3,4", { 0: 1, 1: 2, 2: 3, 3: 4, length: 4 },
+  ]) {
+    assert.equal(api.toLightBox(bad), null, JSON.stringify(bad));
+  }
 });

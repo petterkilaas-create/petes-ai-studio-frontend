@@ -747,6 +747,12 @@ export type LightState = "approved" | "disabled" | "candidate" | "promoted";
 
 const LIGHT_STATES: ReadonlySet<string> = new Set(["approved", "disabled", "candidate", "promoted"]);
 
+/**
+ * Boksen rundt en lyskilde i originalbildet (TG-NEW-148): `[ymin, xmin, ymax,
+ * xmax]`, heltall 0-1000 (andel av hoeyden og bredden).
+ */
+export type LightBox = readonly [number, number, number, number];
+
 /** En lyskilde fra analysen. `type` og `reasonCode` er koder, `location` fritekst. */
 export interface ReviewLight {
   /** Noekkel i UI (2d-2a): "L1" for godkjente, "r2:L3" for kandidater. Tolkes aldri. */
@@ -756,6 +762,8 @@ export interface ReviewLight {
   run: number | null;
   type: string | null;
   location: string | null;
+  /** null naar backend ikke har boksen (lagt til for haand, eller gammel backend). */
+  box: LightBox | null;
   /** Bare for avviste lyskilder, f.eks. "not_confirmed". */
   reasonCode: string | null;
   /** false naar id-en er tvetydig i kjoeringen, eller feltet mangler. */
@@ -911,6 +919,13 @@ function numberOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+/** Boksen leses strengt: fire heltall i 0-1000, ellers null (som `light_box` i backend). */
+export function toLightBox(value: unknown): LightBox | null {
+  if (!Array.isArray(value) || value.length !== 4) return null;
+  if (!value.every((v) => Number.isInteger(v) && v >= 0 && v <= 1000)) return null;
+  return [value[0], value[1], value[2], value[3]];
+}
+
 function toLight(raw: Record<string, unknown>): ReviewLight {
   const state = stringOrNull(raw.state);
   return {
@@ -919,6 +934,7 @@ function toLight(raw: Record<string, unknown>): ReviewLight {
     run: numberOrNull(raw.run),
     type: stringOrNull(raw.type),
     location: stringOrNull(raw.location),
+    box: toLightBox(raw.box),
     reasonCode: stringOrNull(raw.reason_code),
     editable: raw.editable === true,
     state: state !== null && LIGHT_STATES.has(state) ? (state as LightState) : null,
