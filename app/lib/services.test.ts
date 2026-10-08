@@ -4,13 +4,10 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  COPYWRITER_PATH,
   ENABLED,
   EXPRESS_V2_PATH,
-  ORDERS_PATH,
   SERVICES_PATH,
   STAGING_PATH,
-  VIDEO_PATH,
   expressCategories,
   isPageEnabled,
   isServiceEnabled,
@@ -37,6 +34,24 @@ function sourceFiles(dir = APP_DIR): string[] {
 }
 
 const read = (rel: string) => readFileSync(join(APP_DIR, rel), "utf8");
+
+const ROOT_DIR = join(APP_DIR, "..");
+
+/** Kode i hele repoet (.ts/.tsx/.js/.mjs/.cjs), uten node_modules, .next, .git og testfilene. */
+function repoCodeFiles(dir = ROOT_DIR): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if ([".git", ".next", "node_modules"].includes(entry.name)) continue;
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...repoCodeFiles(path));
+    else if (/\.(tsx?|[cm]?js)$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) out.push(path);
+  }
+  if (dir === ROOT_DIR) {
+    assert.ok(out.includes(join(ROOT_DIR, "proxy.ts")), "fant ikke proxy.ts paa rot");
+    assert.ok(out.includes(join(APP_DIR, "lib", "services.ts")), "fant ikke app/lib/services.ts");
+  }
+  return out;
+}
 
 test("konstanten: de tre tjenestene er av, privacy_blur og skumring er paa", () => {
   for (const id of ["klart_vaer", "magic_cleanup", "virtual_stage", "express_v2"]) {
@@ -73,7 +88,7 @@ test("Tjenester har ikke Klart vaer eller Magic Cleanup, men har Privacy Blur og
 
 test("menyen har Start, Tjenester og Historikk (TG-NEW-153)", () => {
   const hrefs = navLinks().map((l) => l.href);
-  for (const h of [STAGING_PATH, EXPRESS_V2_PATH, VIDEO_PATH, COPYWRITER_PATH, ORDERS_PATH]) {
+  for (const h of [STAGING_PATH, EXPRESS_V2_PATH, "/video", "/copywriter", "/orders"]) {
     assert.ok(!hrefs.includes(h), h);
   }
   assert.deepEqual(hrefs, ["/start", "/tjenester", "/history"]);
@@ -133,17 +148,16 @@ test("meldingen paa stengte sider: nb og en har noeklene", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Dag 33, L0b: Video, Copywriter og Orders er skjult, og forsiden lover bare
-// det som leveres (skumring og Privacy Blur).
+// Dag 33, L0b: Video, Copywriter og Orders ble skjult. TG-NEW-142 (dag 39):
+// sidene, supabaseClient.ts og pakkene er slettet (TG-NEW-72), og forsiden
+// lover bare det som leveres (skumring og Privacy Blur).
 // ---------------------------------------------------------------------------
 
-test("konstanten: video, copywriter og orders er av, Tjenester, Historikk og skumring er paa", () => {
+test("TG-142: video, copywriter og orders er borte fra ENABLED og menyen", () => {
   for (const id of ["video", "copywriter", "orders"]) {
+    assert.ok(!Object.keys(ENABLED).includes(id), id);
     assert.equal(isServiceEnabled(id), false, id);
   }
-  assert.equal(ENABLED.video, false);
-  assert.equal(ENABLED.copywriter, false);
-  assert.equal(ENABLED.orders, false);
   assert.equal(isServiceEnabled("skumring"), true);
   assert.equal(isPageEnabled(SERVICES_PATH), true);
   assert.equal(isPageEnabled("/history"), true);
@@ -159,20 +173,38 @@ test("ingen side har lenke til /video, /copywriter eller /orders skrevet rett in
   }
 });
 
-test("/video, /copywriter og /orders: stengt side gir «ikke tilgjengelig» og gjoer ingen kall", () => {
-  for (const [rel, path, value] of [
-    ["(app)/video/page.tsx", "VIDEO_PATH", VIDEO_PATH],
-    ["(app)/copywriter/page.tsx", "COPYWRITER_PATH", COPYWRITER_PATH],
-    ["(app)/orders/page.tsx", "ORDERS_PATH", ORDERS_PATH],
-  ] as const) {
-    assert.equal(isPageEnabled(value), false, rel);
-    const src = read(rel);
-    const start = src.indexOf("export default function");
-    assert.ok(start >= 0, rel);
-    const body = src.slice(start, src.indexOf("\n}\n", start));
-    assert.match(body, new RegExp(`if \\(!isPageEnabled\\(${path}\\)\\) return <ServiceUnavailable />;`), rel);
-    assert.doesNotMatch(body, /\buse[A-Z]\w*\(/, rel);
-    assert.doesNotMatch(body, /fetch\(|supabase|API_BASE/, rel);
+test("TG-142: sidene /video, /copywriter og /orders og supabaseClient.ts er slettet", () => {
+  for (const d of ["video", "copywriter", "orders"]) {
+    assert.equal(existsSync(join(APP_DIR, "(app)", d)), false, d);
+    assert.equal(existsSync(join(APP_DIR, d)), false, d);
+  }
+  assert.equal(existsSync(join(ROOT_DIR, "supabaseClient.ts")), false);
+});
+
+test("TG-142: ingen kode importerer Supabase eller react-google-autocomplete, og pakkene er fjernet", () => {
+  const pattern = /["'](@supabase\/supabase-js|@\/supabaseClient|react-google-autocomplete)["']|supabaseClient/;
+  for (const file of repoCodeFiles()) {
+    assert.doesNotMatch(readFileSync(file, "utf8"), pattern, file);
+  }
+  const pkg = JSON.parse(readFileSync(join(ROOT_DIR, "package.json"), "utf8"));
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  for (const name of ["@supabase/supabase-js", "react-google-autocomplete"]) {
+    assert.ok(!(name in deps), name);
+  }
+});
+
+test("TG-142: ingen kode leser Supabase- eller Google Maps-noeklene", () => {
+  const pattern = /NEXT_PUBLIC_SUPABASE_URL|NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY|NEXT_PUBLIC_GOOGLE_MAPS_API_KEY/;
+  for (const file of repoCodeFiles()) {
+    assert.doesNotMatch(readFileSync(file, "utf8"), pattern, file);
+  }
+});
+
+test("TG-142: ingen kode har den gamle jobbadressen", () => {
+  // Satt sammen her, saa testen ikke inneholder adressen selv.
+  const needle = ["@diakrit", "com"].join(".");
+  for (const file of repoCodeFiles()) {
+    assert.ok(!readFileSync(file, "utf8").toLowerCase().includes(needle), file);
   }
 });
 

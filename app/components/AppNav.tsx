@@ -4,12 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CircleHelp,
-  Clapperboard,
-  FolderOpen,
   History,
   LayoutDashboard,
   LayoutGrid,
-  PenLine,
   Sofa,
   type LucideIcon,
 } from "lucide-react";
@@ -38,9 +35,6 @@ const ICONS: Record<NavId, LucideIcon> = {
   start: LayoutDashboard,
   services: LayoutGrid,
   staging: Sofa,
-  video: Clapperboard,
-  copywriter: PenLine,
-  orders: FolderOpen,
   history: History,
 };
 

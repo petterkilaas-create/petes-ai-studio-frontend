@@ -24,13 +24,6 @@ export const ENABLED = {
   express_v2: false,
   privacy_blur: true,
   skumring: true,
-  /**
-   * Gamle sider uten tjeneste bak (dag 33, L0b): backend-rutene de kaller
-   * (routers/jobs.py, routers/media.py) er ikke montert.
-   */
-  video: false,
-  copywriter: false,
-  orders: false,
 } as const;
 
 /** Ukjent id gir av: en ny tjeneste maa legges inn over foer den vises. */
@@ -48,16 +41,10 @@ export function isServiceEnabled(id: string): boolean {
 export const SERVICES_PATH = "/tjenester";
 export const STAGING_PATH = "/staging";
 export const EXPRESS_V2_PATH = "/express-v2";
-export const VIDEO_PATH = "/video";
-export const COPYWRITER_PATH = "/copywriter";
-export const ORDERS_PATH = "/orders";
 
 const PAGE_SERVICE: Record<string, string> = {
   [STAGING_PATH]: "virtual_stage",
   [EXPRESS_V2_PATH]: "express_v2",
-  [VIDEO_PATH]: "video",
-  [COPYWRITER_PATH]: "copywriter",
-  [ORDERS_PATH]: "orders",
 };
 
 /**
@@ -74,7 +61,7 @@ export function isPageEnabled(path: string): boolean {
 // ---------------------------------------------------------------------------
 
 /** Id-en gir teksten (`nav.<id>` i ordlista) og ikonet (AppNav). */
-export type NavId = "start" | "services" | "staging" | "video" | "copywriter" | "orders" | "history";
+export type NavId = "start" | "services" | "staging" | "history";
 
 export interface NavLink {
   id: NavId;
@@ -88,9 +75,6 @@ const ALL_NAV_LINKS: NavLink[] = [
   { id: "start", href: START_PATH },
   { id: "services", href: SERVICES_PATH },
   { id: "staging", href: STAGING_PATH },
-  { id: "video", href: VIDEO_PATH },
-  { id: "copywriter", href: COPYWRITER_PATH },
-  { id: "orders", href: ORDERS_PATH, dividerBefore: true },
   { id: "history", href: "/history" },
 ];
 
