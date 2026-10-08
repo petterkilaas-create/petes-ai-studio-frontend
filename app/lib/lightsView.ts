@@ -1,6 +1,7 @@
-import type { LightBox, ReviewLight } from "./api";
+import type { JobReviewDetail, LightBox, ReviewLight } from "./api";
 import { initialOn, type Lights } from "./correction.ts";
 import { codeText, type Locale } from "./i18n/index.ts";
+import { mediaDeleted } from "./review.ts";
 
 /**
  * Lysene slik megleren ser dem (D2b, Petter 01.10, avvik 3 A). Rene
@@ -124,4 +125,74 @@ export function lightText(locale: Locale, light: ReviewLight, name: LightName): 
     title: name.number === null ? type : `${type} ${name.number}`,
     zone: name.zone === null ? null : codeText(locale, "lightZone", name.zone),
   };
+}
+
+/**
+ * Markoerene i originalen (TG-NEW-166). Hvilken liste lyset staar i, gir
+ * stilen (Petter 08.10, valg 3 A): godkjent er fylt, ustabil stiplet og hul,
+ * avvist med graa kant. I teksten er ustabile og avviste begge «Usikker», som
+ * i lista.
+ */
+export type MarkerKind = "approved" | "unstable" | "rejected";
+
+export interface LightMarker {
+  light: ReviewLight;
+  kind: MarkerKind;
+  /** Samme navn som i lista (lightNames): nummer og sone. */
+  name: LightName;
+  /** Midtpunktet av boksen i prosent av bredden (x) og hoeyden (y). */
+  x: number;
+  y: number;
+  /** Stoerrelsen paa boksen i prosent av bredden og hoeyden. */
+  width: number;
+  height: number;
+}
+
+/**
+ * Boksen `[ymin, xmin, ymax, xmax]` (0-1000) i prosent: midtpunktet og
+ * stoerrelsen. En snudd boks (ymin > ymax eller xmin > xmax) normaliseres med
+ * min og max.
+ */
+export function markerPosition(box: LightBox): { x: number; y: number; width: number; height: number } {
+  const [y1, x1, y2, x2] = box;
+  const [top, bottom] = [Math.min(y1, y2), Math.max(y1, y2)];
+  const [left, right] = [Math.min(x1, x2), Math.max(x1, x2)];
+  return { x: (left + right) / 20, y: (top + bottom) / 20, width: (right - left) / 10, height: (bottom - top) / 10 };
+}
+
+/**
+ * Markoerene i rekkefoelgen fra den flate lista, og hvor mange lys som ikke
+ * har boks (de har nummer i lista, men ingen markoer).
+ */
+export function lightMarkers(lights: Lights): { markers: LightMarker[]; withoutBox: number } {
+  const nameOf = lightNames(lights);
+  const all: { light: ReviewLight; kind: MarkerKind }[] = [
+    ...lights.approved.map((light) => ({ light, kind: "approved" as const })),
+    ...lights.unstable.map((light) => ({ light, kind: "unstable" as const })),
+    ...lights.rejected.map((light) => ({ light, kind: "rejected" as const })),
+  ];
+  const markers: LightMarker[] = [];
+  let withoutBox = 0;
+  for (const { light, kind } of all) {
+    if (light.box === null) {
+      withoutBox += 1;
+      continue;
+    }
+    markers.push({ light, kind, name: nameOf(light), ...markerPosition(light.box) });
+  }
+  return { markers, withoutBox };
+}
+
+/**
+ * Knappen «Vis lampene i bildet» (TG-NEW-166): bare naar originalen finnes,
+ * bildene ikke er slettet (TG-NEW-117) og minst ett lys har boks.
+ */
+export function canShowMarkers(
+  review: Pick<JobReviewDetail, "images" | "lights" | "mediaDeletedAt">
+): boolean {
+  return (
+    review.images.originalUrl !== null &&
+    !mediaDeleted(review) &&
+    flatLights(review.lights).some((f) => f.light.box !== null)
+  );
 }

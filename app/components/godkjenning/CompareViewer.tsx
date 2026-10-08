@@ -15,6 +15,11 @@ import { choiceClass, FOCUS, LABEL } from "./classes";
  * Slideren (WCAG 2.5.7): kan dras, men ogsaa styres med tastaturet og med
  * klikk eller trykk paa sporet. Paa mobil ruller siden fortsatt loddrett
  * (touch-action: pan-y).
+ *
+ * «Vis lampene i bildet» (TG-NEW-166, valg 1 B og 2 A): knappen staar sammen
+ * med visningsknappene og viser `lightsView` (originalen med markoerer) i
+ * stedet for glideren. Siden lager visningen; denne fila importerer den ikke,
+ * saa markoerene aldri tegnes paa glideren.
  */
 
 type Mode = "slider" | "side" | "result";
@@ -153,6 +158,7 @@ export function CompareViewer({
   result,
   placeholder,
   onResultLoad,
+  lightsView = null,
   locale,
 }: {
   originalUrl: string | null;
@@ -162,11 +168,37 @@ export function CompareViewer({
   placeholder: ReactNode;
   /** Resultatbildet er lastet (TG-NEW-147: da forhaandslastes de andre trinnene). */
   onResultLoad?: () => void;
+  /** Originalen med markoerer (TG-NEW-166); null skjuler knappen. */
+  lightsView?: ReactNode;
   locale: Locale;
 }) {
   const [mode, setMode] = useState<Mode>("slider");
+  const [lightsOn, setLightsOn] = useState(false);
+  const showLights = lightsOn && lightsView !== null;
 
-  if (result === null) return <OriginalImage url={originalUrl} locale={locale} />;
+  const lightsButton =
+    lightsView === null ? null : (
+      <button
+        type="button"
+        onClick={() => setLightsOn(!lightsOn)}
+        aria-pressed={showLights}
+        className={choiceClass(showLights, "rounded-pill")}
+      >
+        {t(locale, "markers.show")}
+      </button>
+    );
+
+  if (result === null) {
+    if (lightsButton === null) return <OriginalImage url={originalUrl} locale={locale} />;
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap gap-2" role="group" aria-label={t(locale, "compare.mode")}>
+          {lightsButton}
+        </div>
+        {showLights ? lightsView : <OriginalImage url={originalUrl} locale={locale} />}
+      </div>
+    );
+  }
 
   const resultAlt = t(locale, "compare.altResult", { label: result.label });
   // Slideren trenger begge bildene; ellers vises de side ved side.
@@ -180,17 +212,23 @@ export function CompareViewer({
           <button
             key={m}
             type="button"
-            onClick={() => setMode(m)}
+            onClick={() => {
+              setMode(m);
+              setLightsOn(false);
+            }}
             disabled={m === "slider" && !canSlide}
-            aria-pressed={shown === m}
-            className={choiceClass(shown === m, "rounded-pill disabled:cursor-not-allowed disabled:opacity-50")}
+            aria-pressed={!showLights && shown === m}
+            className={choiceClass(!showLights && shown === m, "rounded-pill disabled:cursor-not-allowed disabled:opacity-50")}
           >
             {t(locale, key)}
           </button>
         ))}
+        {lightsButton}
       </div>
 
-      {shown === "slider" && originalUrl !== null && result.url !== null && (
+      {showLights && lightsView}
+
+      {!showLights && shown === "slider" && originalUrl !== null && result.url !== null && (
         <Slider
           originalUrl={originalUrl}
           aiUrl={result.url}
@@ -200,7 +238,7 @@ export function CompareViewer({
         />
       )}
 
-      {shown === "side" && (
+      {!showLights && shown === "side" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className={`${LABEL} mb-2`}>{t(locale, "review.original")}</p>
@@ -213,7 +251,7 @@ export function CompareViewer({
         </div>
       )}
 
-      {shown === "result" && (
+      {!showLights && shown === "result" && (
         <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} onLoad={onResultLoad} />
       )}
     </div>
