@@ -24,8 +24,8 @@ utover det som staar her.
   kaster feil hvis den mangler; settes i `.env.local` lokalt og i Vercel
   Environment Variables). All ny kode snakker med backend via `/v1`
   gjennom `app/lib/api.ts`.
-- Legacy-sider (bl.a. orders, copywriter, video) kaller Supabase direkte. Ikke
-  utvid det moensteret - maalet er at frontend aldri snakker med Supabase (TG-NEW-72).
+- Frontend snakker ikke med Supabase (TG-NEW-72). De skjulte sidene `/orders`,
+  `/video` og `/copywriter` og `supabaseClient.ts` er slettet (TG-NEW-142, 2026-10-08).
 - Bestillingen (skumring og sladding) ligger paa Tjenester, `/tjenester`
   (`app/(app)/tjenester/`, TG-NEW-153). `/express` sendes dit med 307 fra
   `redirects()` i `next.config.ts`; ordlista bruker fortsatt `express.*`
@@ -56,7 +56,7 @@ utover det som staar her.
 - Installer fra lockfila med `npm ci`. `npm install` kan endre
   `package-lock.json` - commit aldri lockfil-endringer du ikke ble bedt om.
 - Typesjekk (porten lokalt): `npx tsc --noEmit` - forventet rent.
-- `npm test` (node --test) - 454 tester per 2026-10-05, forventet groent.
+- `npm test` (node --test) - 457 tester per 2026-10-08, forventet groent.
 - Dev-server: `npm run dev`, aapne http://localhost:3000 - aldri 127.0.0.1
   (Clerk-cookies og cross-origin oppfoerer seg annerledes).
 - `npm run build` gaar gjennom lokalt (verifisert 2026-10-05, etter

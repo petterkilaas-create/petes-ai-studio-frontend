@@ -149,8 +149,11 @@ test("«Gavl» finnes ingen steder i repoet", () => {
 // D1 (D1a og D1b): skallet og de aktive sidene i retning A. Tekstsjekker, som over.
 // ---------------------------------------------------------------------------
 
-/** Skjulte sider: viser bare ServiceUnavailable og ryddes i D5. Sidene ligger i route group (app) (MS1). */
-const HIDDEN_DIRS = ["staging", "express-v2", "video", "copywriter", "orders"].map((d) => `(app)/${d}`);
+/**
+ * Skjulte sider: viser bare ServiceUnavailable og ryddes i D5. Sidene ligger i route group (app) (MS1).
+ * /video, /copywriter og /orders er slettet (TG-NEW-142).
+ */
+const HIDDEN_DIRS = ["staging", "express-v2"].map((d) => `(app)/${d}`);
 
 /** Aktive filer (.ts/.tsx/.css under app/, uten tester), relativt til app/. Nye filer kommer med av seg selv. */
 function activeFiles(dir = APP_DIR): string[] {
@@ -192,7 +195,7 @@ test("D1: listen over aktive filer har skallet, sidene og komponentene", () => {
   ]) {
     assert.ok(files.includes(f), f);
   }
-  assert.ok(!files.some((f) => f.startsWith("(app)/video/") || f.startsWith("(app)/orders/")));
+  assert.ok(!files.some((f) => HIDDEN_DIRS.some((d) => f.startsWith(`${d}/`))));
 });
 
 test("D1: ingen #009183 (turkis, under WCAG AA) og ingen #0B1120 i de aktive filene", () => {
@@ -286,7 +289,7 @@ test("D1: ingen emoji i menyen (Lucide-ikoner)", () => {
   assert.doesNotMatch(layout, EMOJI);
 });
 
-const NAV_IDS: NavId[] = ["start", "services", "staging", "video", "copywriter", "orders", "history"];
+const NAV_IDS: NavId[] = ["start", "services", "staging", "history"];
 
 test("D1: ordlista har de nye ordene paa nb og en", () => {
   const keys = [
