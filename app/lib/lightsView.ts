@@ -128,16 +128,17 @@ export function lightText(locale: Locale, light: ReviewLight, name: LightName): 
 }
 
 /**
- * Markoerene i originalen (TG-NEW-166). Hvilken liste lyset staar i, gir
- * stilen (Petter 08.10, valg 3 A): godkjent er fylt, ustabil stiplet og hul,
- * avvist med graa kant. I teksten er ustabile og avviste begge «Usikker», som
- * i lista.
+ * Markoerene i originalen (TG-NEW-166). To stiler, som ordene i lista
+ * (TG-166-oppfoelging, valg 2 A): godkjente er fylt, ustabile og avviste
+ * er «Usikker», stiplet og hul. Analysens kategorier vises ikke (brief §3
+ * punkt 6).
  */
-export type MarkerKind = "approved" | "unstable" | "rejected";
-
 export interface LightMarker {
   light: ReviewLight;
-  kind: MarkerKind;
+  /** Ustabil eller avvist: «Usikker», som i lista. */
+  uncertain: boolean;
+  /** Merket paa bildet og i forklaringen: A, B, C ... (valg 1 A), saa det ikke forveksles med «Spotlight 2». */
+  letter: string;
   /** Samme navn som i lista (lightNames): nummer og sone. */
   name: LightName;
   /** Midtpunktet av boksen i prosent av bredden (x) og hoeyden (y). */
@@ -146,6 +147,18 @@ export interface LightMarker {
   /** Stoerrelsen paa boksen i prosent av bredden og hoeyden. */
   width: number;
   height: number;
+}
+
+/** Merket for markoer nummer `i` (fra 0): A-Z, saa AA, AB ... */
+export function markerLetter(i: number): string {
+  let n = i + 1;
+  let out = "";
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    out = String.fromCharCode(65 + r) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
 }
 
 /**
@@ -161,26 +174,47 @@ export function markerPosition(box: LightBox): { x: number; y: number; width: nu
 }
 
 /**
- * Markoerene i rekkefoelgen fra den flate lista, og hvor mange lys som ikke
- * har boks (de har nummer i lista, men ingen markoer).
+ * Markoerene i rekkefoelgen fra den flate lista, med merke A, B, C ... i den
+ * rekkefoelgen, og hvor mange lys som ikke har boks (de har navn i lista, men
+ * ingen markoer og intet merke).
  */
 export function lightMarkers(lights: Lights): { markers: LightMarker[]; withoutBox: number } {
   const nameOf = lightNames(lights);
-  const all: { light: ReviewLight; kind: MarkerKind }[] = [
-    ...lights.approved.map((light) => ({ light, kind: "approved" as const })),
-    ...lights.unstable.map((light) => ({ light, kind: "unstable" as const })),
-    ...lights.rejected.map((light) => ({ light, kind: "rejected" as const })),
-  ];
   const markers: LightMarker[] = [];
   let withoutBox = 0;
-  for (const { light, kind } of all) {
+  for (const { light, uncertain } of flatLights(lights)) {
     if (light.box === null) {
       withoutBox += 1;
       continue;
     }
-    markers.push({ light, kind, name: nameOf(light), ...markerPosition(light.box) });
+    const letter = markerLetter(markers.length);
+    markers.push({ light, uncertain, letter, name: nameOf(light), ...markerPosition(light.box) });
   }
   return { markers, withoutBox };
+}
+
+/** Hvor merket staar i forhold til rammen: over, under eller inni; og ved venstre kant, midt paa eller ved hoeyre kant. */
+export interface BadgePlacement {
+  vertical: "above" | "below" | "inside";
+  horizontal: "start" | "center" | "end";
+}
+
+/** Merket trenger saa mye plass over eller under rammen, i prosent av hoeyden (22 px er ca. 9 % paa 375 px). */
+export const BADGE_ROOM = 10;
+/** Naermere kanten enn dette (prosent av bredden) legges merket inntil kanten, saa det ikke kuttes. */
+export const BADGE_EDGE = 6;
+
+/**
+ * Merket staar utenfor rammen, saa det ikke dekker smaa lamper: over rammen,
+ * under naar det ikke er plass over, og inni bare naar boksen fyller nesten
+ * hele hoeyden.
+ */
+export function badgePlacement(m: Pick<LightMarker, "x" | "y" | "height">): BadgePlacement {
+  const top = m.y - m.height / 2;
+  const bottom = m.y + m.height / 2;
+  const vertical = top >= BADGE_ROOM ? "above" : bottom <= 100 - BADGE_ROOM ? "below" : "inside";
+  const horizontal = m.x < BADGE_EDGE ? "start" : m.x > 100 - BADGE_EDGE ? "end" : "center";
+  return { vertical, horizontal };
 }
 
 /**

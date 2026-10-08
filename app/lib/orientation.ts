@@ -4,8 +4,9 @@
  * Analysen faar bytene med EXIF, og det er ikke kjent om Gemini roterer etter
  * retningen foer boksen lages. Nettleseren roterer bildet. Derfor vises
  * markoerene bare for JPEG med retning 1 eller uten retningstag (Petter 08.10,
- * valg 4 A). Alt annet gir sperren: andre retninger, PNG, WebP, AVIF,
- * oedelagte filer og feil i hentingen.
+ * valg 4 A), og for AVIF uten irot, imir og clap (TG-166-oppfoelging). Alt
+ * annet gir sperren: andre retninger, PNG, WebP, HEIC, oedelagte filer og feil
+ * i hentingen.
  *
  * Rene funksjoner uten import, saa de kan testes med node --test.
  */
@@ -19,7 +20,10 @@ export const HEAD_TIMEOUT_MS = 8000;
 export type ImageOrientation =
   /** null: JPEG uten retningstag. */
   | { kind: "jpeg"; orientation: number | null }
-  | { kind: "not_jpeg" }
+  /** AVIF med hovedmerke `avif`; `transformed` naar irot, imir eller clap finnes. */
+  | { kind: "avif"; transformed: boolean }
+  /** Et annet format (PNG, WebP, HEIC ...). */
+  | { kind: "other" }
   /** Avkuttet eller oedelagt: ingen sikker retning. */
   | { kind: "unknown" };
 
@@ -56,7 +60,7 @@ function tiffOrientation(b: Uint8Array, t: number, end: number): ImageOrientatio
  */
 export function jpegOrientation(b: Uint8Array): ImageOrientation {
   if (b.length < 2) return UNKNOWN;
-  if (b[0] !== 0xff || b[1] !== 0xd8) return { kind: "not_jpeg" };
+  if (b[0] !== 0xff || b[1] !== 0xd8) return { kind: "other" };
   let i = 2;
   while (i + 1 < b.length) {
     if (b[i] !== 0xff) return UNKNOWN;
@@ -92,8 +96,81 @@ export function jpegOrientation(b: Uint8Array): ImageOrientation {
   return UNKNOWN;
 }
 
-/** Sperren (valg 4 A): bare JPEG med retning 1 eller uten retningstag. */
+interface Box {
+  type: string;
+  /** Der innholdet starter (etter stoerrelse og type). */
+  body: number;
+  end: number;
+}
+
+/**
+ * Boksen (ISO BMFF) som starter paa `i`, eller null naar den ikke gaar opp:
+ * avkuttet foer `end`, stoerrelse under 8, eller stoerrelse 0 og 1 (til
+ * slutten av fila og 64 bit), som vi ikke leser.
+ */
+function boxAt(b: Uint8Array, i: number, end: number): Box | null {
+  if (i + 8 > end) return null;
+  const size = ((b[i] << 24) >>> 0) + (b[i + 1] << 16) + (b[i + 2] << 8) + b[i + 3];
+  if (size < 8 || i + size > end) return null;
+  return { type: String.fromCharCode(b[i + 4], b[i + 5], b[i + 6], b[i + 7]), body: i + 8, end: i + size };
+}
+
+/** Alle boksene fra `start` til `end`; null naar de ikke gaar opp noeyaktig. */
+function boxes(b: Uint8Array, start: number, end: number): Box[] | null {
+  const out: Box[] = [];
+  for (let i = start; i < end; ) {
+    const box = boxAt(b, i, end);
+    if (box === null) return null;
+    out.push(box);
+    i = box.end;
+  }
+  return out;
+}
+
+/** Boksene som endrer bildet nettleseren viser, men ikke det analysen faar (Pillow dekoder uten dem). */
+const AVIF_TRANSFORMS = new Set(["irot", "imir", "clap"]);
+
+/**
+ * AVIF: hovedmerket i `ftyp` og egenskapene i `meta` > `iprp` > `ipco`.
+ * `meta` maa ligge helt innenfor bytene; ellers er resultatet ukjent. Paa
+ * toppnivaa leses boksene bare fram til `meta`, saa `mdat` etterpaa kan
+ * vaere avkuttet.
+ */
+export function avifTransforms(b: Uint8Array): ImageOrientation {
+  if (b.length < 12) return UNKNOWN;
+  const head = String.fromCharCode(...b.subarray(4, 12));
+  if (head.slice(0, 4) !== "ftyp") return { kind: "other" };
+  // Bare `avif` (stillbilde); `avis` (sekvens) og HEIC gir sperren.
+  if (head.slice(4) !== "avif") return { kind: "other" };
+  let meta: Box | null = null;
+  for (let i = 0; meta === null; ) {
+    const box = boxAt(b, i, b.length);
+    if (box === null) return UNKNOWN;
+    if (box.type === "meta") meta = box;
+    i = box.end;
+  }
+  // meta er en FullBox: 4 byte versjon og flagg foer barna.
+  const inMeta = boxes(b, meta.body + 4, meta.end);
+  const iprp = inMeta?.find((x) => x.type === "iprp");
+  const inIprp = iprp === undefined ? null : boxes(b, iprp.body, iprp.end);
+  const ipco = inIprp?.find((x) => x.type === "ipco");
+  const props = ipco === undefined ? null : boxes(b, ipco.body, ipco.end);
+  if (props === null) return UNKNOWN;
+  return { kind: "avif", transformed: props.some((x) => AVIF_TRANSFORMS.has(x.type)) };
+}
+
+/** Formatet fra de foerste bytene: AVIF naar bytene 4-8 er `ftyp`, ellers JPEG eller annet. */
+export function imageOrientation(b: Uint8Array): ImageOrientation {
+  if (b.length >= 8 && String.fromCharCode(...b.subarray(4, 8)) === "ftyp") return avifTransforms(b);
+  return jpegOrientation(b);
+}
+
+/**
+ * Sperren (valg 4 A): JPEG med retning 1 eller uten retningstag, og AVIF uten
+ * irot, imir og clap. Alt annet, ogsaa ukjent, gir sperren.
+ */
 export function markersAllowed(o: ImageOrientation): boolean {
+  if (o.kind === "avif") return !o.transformed;
   return o.kind === "jpeg" && (o.orientation === null || o.orientation === 1);
 }
 
@@ -141,7 +218,7 @@ export async function checkOrientation(
       signal: controller.signal,
     });
     if ((res.status !== 200 && res.status !== 206) || res.body === null) return false;
-    return markersAllowed(jpegOrientation(await readPrefix(res.body, HEAD_BYTES)));
+    return markersAllowed(imageOrientation(await readPrefix(res.body, HEAD_BYTES)));
   } catch {
     return false;
   } finally {
