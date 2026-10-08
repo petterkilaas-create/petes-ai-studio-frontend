@@ -657,6 +657,73 @@ test("TG-NEW-148: bare «Detaljer» (admin) viser analysens plassering; alle vis
   assert.match(label, /const text = lightText\(locale, light, name\);/);
 });
 
+// ---------------------------------------------------------------------------
+// TG-NEW-166: markoerene for lampene i originalen (Petter 08.10, valg 1 B, 2 A, 3 A, 4 A).
+// ---------------------------------------------------------------------------
+
+test("TG-NEW-166: markoerene brukes bare av godkjenningssiden, aldri av glideren, nedlastingen eller merkingen", () => {
+  const page = "(app)/godkjenning/[jobId]/page.tsx";
+  const markers = "components/godkjenning/LightMarkers.tsx";
+  assert.ok(GODKJENNING_COMPONENTS.includes(markers), "med i D1-sjekkene");
+  for (const f of activeFiles().filter((f) => /\.tsx?$/.test(f) && f !== page && f !== markers)) {
+    assert.doesNotMatch(withoutComments(read(f)), /LightMarkers/, f);
+  }
+  // Retningen leses bare av markoerene.
+  for (const f of activeFiles().filter((f) => /\.tsx?$/.test(f) && f !== markers && f !== "lib/orientation.ts")) {
+    assert.doesNotMatch(withoutComments(read(f)), /orientation"|orientation\.ts"/, f);
+  }
+  // Siden lager visningen og gir den til CompareViewer; knappen bare naar canShowMarkers er sann.
+  const src = withoutComments(read(page));
+  assert.match(src, /import \{ LightMarkers \} from "@\/app\/components\/godkjenning\/LightMarkers";/);
+  assert.equal(src.match(/<LightMarkers /g)?.length, 1);
+  assert.match(
+    src,
+    /lightsView=\{\s*canShowMarkers\(review\) && review\.images\.originalUrl !== null \? \(\s*<LightMarkers url=\{review\.images\.originalUrl\} lights=\{review\.lights\} locale=\{locale\} \/>\s*\) : null\s*\}/
+  );
+  // Glideren faar aldri visningen.
+  const viewer = withoutComments(read("components/godkjenning/CompareViewer.tsx"));
+  const slider = viewer.slice(viewer.indexOf("function Slider("), viewer.indexOf("export function CompareViewer("));
+  assert.ok(slider.length > 0);
+  assert.doesNotMatch(slider, /lightsView|showLights/);
+  assert.match(viewer, /\{!showLights && shown === "slider" && /);
+  assert.match(viewer, /aria-pressed=\{showLights\}/);
+  assert.match(viewer, /t\(locale, "markers\.show"\)/);
+});
+
+test("TG-NEW-166: originalen med naturlig sideforhold, og markoerene med tekst for skjermlesere", () => {
+  const src = withoutComments(read("components/godkjenning/LightMarkers.tsx"));
+  assert.match(src, /<img src=\{url\} alt=\{t\(locale, "compare\.altOriginal"\)\} className="block w-full h-auto" \/>/);
+  assert.doesNotMatch(src, /object-(cover|contain)/);
+  // Plassering i prosent fra midtpunktet i boksen.
+  assert.match(src, /left: `\$\{m\.x\}%`, top: `\$\{m\.y\}%`/);
+  assert.match(src, /-translate-x-1\/2 -translate-y-1\/2/);
+  // Lista og hver markoer har navn; nummeret er tekst. Samme navn som lista (lightText og lightNames).
+  assert.match(src, /<ol aria-label=\{t\(locale, "markers\.listLabel"\)\}/);
+  assert.match(src, /aria-label=\{label\}/);
+  assert.match(src, /const text = lightText\(locale, m\.light, m\.name\);/);
+  assert.match(src, /\{m\.name\.number\}/);
+  // Markoerene vises bare naar retningen er sjekket og trygg; ellers en kort tekst.
+  assert.match(src, /\{allowed === true && \(\s*<ol /);
+  assert.match(src, /\{allowed === false && \(/);
+  assert.match(src, /t\(locale, "markers\.unavailable"\)/);
+  assert.match(src, /orientationAllowed\(url\)/);
+  // Ingen analyse-tekst (plasseringen eller grunnen) i markoerene.
+  assert.doesNotMatch(src, /\.location\b|reasonCode/);
+});
+
+test("TG-NEW-166: ordlista har ordene for markoerene paa nb og en", () => {
+  const nb = DICTIONARIES.nb.ui;
+  const en = DICTIONARIES.en.ui;
+  assert.equal(nb["markers.show"], "Vis lampene i bildet");
+  assert.equal(en["markers.show"], "Show the lights in the image");
+  assert.equal(nb["markers.unavailable"], "Lampene kan ikke vises i dette bildet.");
+  assert.equal(en["markers.unavailable"], "The lights cannot be shown in this image.");
+  assert.equal(t("nb", "markers.noBox", { n: 2 }), "Lamper uten plassering i bildet: 2");
+  assert.equal(t("en", "markers.noBox", { n: 2 }), "Lights without a position in the image: 2");
+  assert.equal(nb["markers.listLabel"], "Lampene i bildet");
+  assert.equal(en["markers.listLabel"], "The lights in the image");
+});
+
 test("D2c: overskriften heter «Lys som tennes» i alle tilstander", () => {
   assert.equal(DICTIONARIES.nb.ui["review.lightsLit"], "Lys som tennes");
   assert.equal(DICTIONARIES.en.ui["review.lightsLit"], "Lights turned on");

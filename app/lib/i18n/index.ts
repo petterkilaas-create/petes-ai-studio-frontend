@@ -152,6 +152,11 @@ const nbUi = {
   // TG-NEW-148: plasseringen fra analysen (engelsk fritekst), bare i «Detaljer».
   "review.analysisLocation": "Analysens tekst: {text}",
   "review.details": "Detaljer",
+  // TG-NEW-166: markoerene for lampene i originalen.
+  "markers.show": "Vis lampene i bildet",
+  "markers.listLabel": "Lampene i bildet",
+  "markers.noBox": "Lamper uten plassering i bildet: {n}",
+  "markers.unavailable": "Lampene kan ikke vises i dette bildet.",
   "history.subtitle": "Alle jobbene dine, nyeste først.",
   "history.subtitleAll": "Alle brukeres jobber, nyeste først.",
   "history.scope.mine": "Mine jobber",
@@ -565,6 +570,10 @@ const en: Dictionary = {
     "review.lightsLit": "Lights turned on",
     "review.analysisLocation": "Analysis text: {text}",
     "review.details": "Details",
+    "markers.show": "Show the lights in the image",
+    "markers.listLabel": "The lights in the image",
+    "markers.noBox": "Lights without a position in the image: {n}",
+    "markers.unavailable": "The lights cannot be shown in this image.",
     "history.subtitle": "All your jobs, newest first.",
     "history.subtitleAll": "All users' jobs, newest first.",
     "history.scope.mine": "My jobs",

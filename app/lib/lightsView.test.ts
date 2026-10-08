@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { flatLights, lightNames, lightText, lightZone, litLights, third } from "./lightsView.ts";
+import {
+  canShowMarkers,
+  flatLights,
+  lightMarkers,
+  lightNames,
+  lightText,
+  lightZone,
+  litLights,
+  markerPosition,
+  third,
+} from "./lightsView.ts";
 import { buildCorrection, initialToggles, isOn, setToggle, type Lights } from "./correction.ts";
 import type { LightBox, LightState, ReviewLight } from "./api.ts";
 
@@ -229,4 +239,57 @@ test("ukjent type og lys utenfor listene gir aldri krasj", () => {
   assert.equal(label("nb", l, y), "Lyskilde 2");
   const stranger = lamp("L9", "pendant", [900, 900, 910, 910]);
   assert.deepEqual(lightNames(l)(stranger), { number: null, zone: "bottom_right" });
+});
+
+// ---------------------------------------------------------------------------
+// TG-NEW-166: markoerene i originalen.
+// ---------------------------------------------------------------------------
+
+function boxed(key: string, type: string, box: LightBox | null): ReviewLight {
+  return { key, id: key, run: null, type, location: null, box, reasonCode: null, editable: true, state: "approved" };
+}
+
+test("markoeren staar midt i boksen, i prosent; 0 og 1000 er kantene", () => {
+  assert.deepEqual(markerPosition([100, 200, 300, 600]), { x: 40, y: 20, width: 40, height: 20 });
+  assert.deepEqual(markerPosition([0, 0, 1000, 1000]), { x: 50, y: 50, width: 100, height: 100 });
+  assert.deepEqual(markerPosition([1000, 1000, 1000, 1000]), { x: 100, y: 100, width: 0, height: 0 });
+});
+
+test("en snudd boks (ymin > ymax, xmin > xmax) normaliseres med min og max", () => {
+  assert.deepEqual(markerPosition([300, 600, 100, 200]), markerPosition([100, 200, 300, 600]));
+  assert.deepEqual(markerPosition([300, 200, 100, 600]), markerPosition([100, 200, 300, 600]));
+});
+
+test("markoerene har samme nummer og sone som lista, og lys uten boks telles", () => {
+  const l: Lights = {
+    approved: [boxed("L1", "exterior_wall_lamp", [400, 800, 450, 820]), boxed("L2", "exterior_wall_lamp", [400, 100, 450, 120])],
+    unstable: [boxed("r2:L3", "exterior_wall_lamp", [400, 500, 450, 520])],
+    rejected: [boxed("r1:L4", "pendant", null), boxed("r1:L5", "spotlight", [10, 10, 20, 20])],
+  };
+  const nameOf = lightNames(l);
+  const { markers, withoutBox } = lightMarkers(l);
+  assert.equal(withoutBox, 1);
+  assert.deepEqual(
+    markers.map((m) => [m.light.key, m.kind, m.name.number]),
+    [
+      ["L1", "approved", 3],
+      ["L2", "approved", 1],
+      ["r2:L3", "unstable", 2],
+      ["r1:L5", "rejected", null],
+    ]
+  );
+  for (const m of markers) assert.deepEqual(m.name, nameOf(m.light), m.light.key ?? "");
+  assert.equal(lightText("nb", markers[0].light, markers[0].name).title, "Utvendig vegglampe 3");
+});
+
+test("knappen vises bare med original, uten sletting og med minst én boks", () => {
+  const withBox: Lights = { approved: [boxed("L1", "pendant", [1, 2, 3, 4])], unstable: [], rejected: [] };
+  const noBox: Lights = { approved: [boxed("L1", "pendant", null)], unstable: [], rejected: [] };
+  const review = (originalUrl: string | null, lights: Lights, mediaDeletedAt: string | null = null) =>
+    ({ images: { originalUrl }, lights, mediaDeletedAt }) as Parameters<typeof canShowMarkers>[0];
+  assert.equal(canShowMarkers(review("https://x/o.jpg", withBox)), true);
+  assert.equal(canShowMarkers(review(null, withBox)), false);
+  assert.equal(canShowMarkers(review("https://x/o.jpg", withBox, "2026-10-01T00:00:00Z")), false);
+  assert.equal(canShowMarkers(review("https://x/o.jpg", noBox)), false);
+  assert.equal(canShowMarkers(review("https://x/o.jpg", { approved: [], unstable: [], rejected: [] })), false);
 });

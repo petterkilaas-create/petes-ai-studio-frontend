@@ -42,6 +42,7 @@ import { runDecision } from "@/app/lib/decide";
 import { canDownload } from "@/app/lib/download";
 import { formatDate } from "@/app/lib/dates";
 import { compareVariants, selectedVariant, variantLabel } from "@/app/lib/compare";
+import { canShowMarkers } from "@/app/lib/lightsView";
 import {
   blockedResult,
   brightnessResultUrl,
@@ -56,6 +57,7 @@ import { PreviewPlaceholder } from "@/app/components/PreviewPlaceholder";
 import { buttonClass } from "@/app/components/ui/Button";
 import { cardClass } from "@/app/components/ui/Card";
 import { CompareViewer } from "@/app/components/godkjenning/CompareViewer";
+import { LightMarkers } from "@/app/components/godkjenning/LightMarkers";
 import { VariantPicker } from "@/app/components/godkjenning/VariantPicker";
 import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
 import { CorrectionPanel } from "@/app/components/godkjenning/CorrectionPanel";
@@ -467,6 +469,11 @@ export default function GodkjenningPage({
                           result={shown === null ? null : { url: shownUrl, label: shownLabel }}
                           placeholder={<PreviewPlaceholder />}
                           onResultLoad={() => setResultLoaded(true)}
+                          lightsView={
+                            canShowMarkers(review) && review.images.originalUrl !== null ? (
+                              <LightMarkers url={review.images.originalUrl} lights={review.lights} locale={locale} />
+                            ) : null
+                          }
                           locale={locale}
                         />
                         {brightness.kind === "control" && step !== null && (
