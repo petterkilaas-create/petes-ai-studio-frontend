@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  badgePlacement,
   canShowMarkers,
   flatLights,
   lightMarkers,
@@ -8,6 +9,7 @@ import {
   lightText,
   lightZone,
   litLights,
+  markerLetter,
   markerPosition,
   third,
 } from "./lightsView.ts";
@@ -260,7 +262,7 @@ test("en snudd boks (ymin > ymax, xmin > xmax) normaliseres med min og max", () 
   assert.deepEqual(markerPosition([300, 200, 100, 600]), markerPosition([100, 200, 300, 600]));
 });
 
-test("markoerene har samme nummer og sone som lista, og lys uten boks telles", () => {
+test("markoerene har samme nummer og sone som lista, merke A, B, C i rekkefoelgen, og lys uten boks telles", () => {
   const l: Lights = {
     approved: [boxed("L1", "exterior_wall_lamp", [400, 800, 450, 820]), boxed("L2", "exterior_wall_lamp", [400, 100, 450, 120])],
     unstable: [boxed("r2:L3", "exterior_wall_lamp", [400, 500, 450, 520])],
@@ -270,12 +272,13 @@ test("markoerene har samme nummer og sone som lista, og lys uten boks telles", (
   const { markers, withoutBox } = lightMarkers(l);
   assert.equal(withoutBox, 1);
   assert.deepEqual(
-    markers.map((m) => [m.light.key, m.kind, m.name.number]),
+    markers.map((m) => [m.light.key, m.letter, m.uncertain, m.name.number]),
     [
-      ["L1", "approved", 3],
-      ["L2", "approved", 1],
-      ["r2:L3", "unstable", 2],
-      ["r1:L5", "rejected", null],
+      ["L1", "A", false, 3],
+      ["L2", "B", false, 1],
+      ["r2:L3", "C", true, 2],
+      // Lyset uten boks (r1:L4) faar intet merke; avviste er usikre, som ustabile (valg 2 A).
+      ["r1:L5", "D", true, null],
     ]
   );
   for (const m of markers) assert.deepEqual(m.name, nameOf(m.light), m.light.key ?? "");
@@ -292,4 +295,32 @@ test("knappen vises bare med original, uten sletting og med minst én boks", () 
   assert.equal(canShowMarkers(review("https://x/o.jpg", withBox, "2026-10-01T00:00:00Z")), false);
   assert.equal(canShowMarkers(review("https://x/o.jpg", noBox)), false);
   assert.equal(canShowMarkers(review("https://x/o.jpg", { approved: [], unstable: [], rejected: [] })), false);
+});
+
+test("TG-166-oppfoelging: merket er A-Z, saa AA, AB ... (valg 1 A)", () => {
+  assert.deepEqual([0, 1, 25, 26, 27, 51, 52, 701, 702].map(markerLetter), ["A", "B", "Z", "AA", "AB", "AZ", "BA", "ZZ", "AAA"]);
+});
+
+test("TG-166-oppfoelging: en lampe alene om typen har ikke nummer, men faar likevel et merke", () => {
+  const l: Lights = { approved: [boxed("L1", "pendant", [100, 100, 200, 200])], unstable: [], rejected: [] };
+  const [m] = lightMarkers(l).markers;
+  assert.equal(m.name.number, null);
+  assert.equal(m.letter, "A");
+});
+
+test("TG-166-oppfoelging: merket staar over rammen, under naar det ikke er plass, og inni bare naar boksen fyller hoeyden", () => {
+  // Liten lampe midt i: over. Toppen akkurat paa grensen (10 %) er over.
+  assert.equal(badgePlacement({ x: 50, y: 50, height: 4 }).vertical, "above");
+  assert.equal(badgePlacement({ x: 50, y: 12, height: 4 }).vertical, "above");
+  // Rammen helt oeverst: under.
+  assert.equal(badgePlacement({ x: 50, y: 5, height: 4 }).vertical, "below");
+  assert.equal(badgePlacement({ x: 50, y: 11.9, height: 4 }).vertical, "below");
+  // Hoey boks uten plass over eller under: inni.
+  assert.equal(badgePlacement({ x: 50, y: 50, height: 95 }).vertical, "inside");
+  // Ved kantene inntil kanten, ellers midt paa.
+  assert.equal(badgePlacement({ x: 3, y: 50, height: 4 }).horizontal, "start");
+  assert.equal(badgePlacement({ x: 50, y: 50, height: 4 }).horizontal, "center");
+  assert.equal(badgePlacement({ x: 97, y: 50, height: 4 }).horizontal, "end");
+  // Fra en boks: samme plassering som markerPosition gir.
+  assert.deepEqual(badgePlacement(markerPosition([0, 980, 40, 1000])), { vertical: "below", horizontal: "end" });
 });

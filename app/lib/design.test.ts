@@ -690,25 +690,50 @@ test("TG-NEW-166: markoerene brukes bare av godkjenningssiden, aldri av glideren
   assert.match(viewer, /t\(locale, "markers\.show"\)/);
 });
 
-test("TG-NEW-166: originalen med naturlig sideforhold, og markoerene med tekst for skjermlesere", () => {
+test("TG-NEW-166: originalen med naturlig sideforhold, og forklaringen er lista for skjermlesere", () => {
   const src = withoutComments(read("components/godkjenning/LightMarkers.tsx"));
   assert.match(src, /<img src=\{url\} alt=\{t\(locale, "compare\.altOriginal"\)\} className="block w-full h-auto" \/>/);
   assert.doesNotMatch(src, /object-(cover|contain)/);
   // Plassering i prosent fra midtpunktet i boksen.
   assert.match(src, /left: `\$\{m\.x\}%`, top: `\$\{m\.y\}%`/);
   assert.match(src, /-translate-x-1\/2 -translate-y-1\/2/);
-  // Lista og hver markoer har navn; nummeret er tekst. Samme navn som lista (lightText og lightNames).
+  // Laget paa bildet er skjult for skjermlesere; forklaringen (ol) har navnet fra lista (lightText og lightNames).
+  assert.match(src, /\{allowed === true && \(\s*<div aria-hidden="true" className="pointer-events-none absolute inset-0">/);
   assert.match(src, /<ol aria-label=\{t\(locale, "markers\.listLabel"\)\}/);
-  assert.match(src, /aria-label=\{label\}/);
+  assert.equal(src.match(/<ol /g)?.length, 1);
   assert.match(src, /const text = lightText\(locale, m\.light, m\.name\);/);
-  assert.match(src, /\{m\.name\.number\}/);
+  assert.match(src, /m\.uncertain \? t\(locale, "correct\.uncertain"\) : null/);
   // Markoerene vises bare naar retningen er sjekket og trygg; ellers en kort tekst.
-  assert.match(src, /\{allowed === true && \(\s*<ol /);
   assert.match(src, /\{allowed === false && \(/);
   assert.match(src, /t\(locale, "markers\.unavailable"\)/);
   assert.match(src, /orientationAllowed\(url\)/);
   // Ingen analyse-tekst (plasseringen eller grunnen) i markoerene.
   assert.doesNotMatch(src, /\.location\b|reasonCode/);
+});
+
+test("TG-166-oppfoelging: alle markoerer har merket A, B, C, ogsaa lamper alene om typen (valg 1 A)", () => {
+  const src = withoutComments(read("components/godkjenning/LightMarkers.tsx"));
+  // Merket er bokstaven, aldri typenummeret (som er null for en lampe alene om typen).
+  assert.doesNotMatch(src, /\{m\.name\.number\}/);
+  assert.equal(src.match(/>\s*\{m\.letter\}\s*</g)?.length, 2, "paa bildet og i forklaringen");
+});
+
+test("TG-166-oppfoelging: merket staar utenfor rammen (badgePlacement), ikke midt paa lampa", () => {
+  const src = withoutComments(read("components/godkjenning/LightMarkers.tsx"));
+  assert.match(src, /const place = badgePlacement\(m\);/);
+  assert.match(src, /\$\{VERTICAL\[place\.vertical\]\} \$\{HORIZONTAL\[place\.horizontal\]\}/);
+  assert.match(src, /above: "bottom-full mb-0\.5"/);
+  assert.match(src, /below: "top-full mt-0\.5"/);
+  assert.doesNotMatch(src, /left-1\/2 top-1\/2 flex/);
+});
+
+test("TG-166-oppfoelging: to stiler med forklaring, og ordet «Avvist» vises ikke (valg 2 A, brief §3 punkt 6)", () => {
+  const src = withoutComments(read("components/godkjenning/LightMarkers.tsx"));
+  assert.match(src, /t\(locale, "markers\.styleSure"\)/);
+  assert.match(src, /t\(locale, "markers\.styleUncertain"\)/);
+  assert.doesNotMatch(src, /rejected|lightsRejected|MarkerKind/);
+  assert.match(src, /badgeClass\(m\.uncertain\)/);
+  assert.match(src, /outlineClass\(m\.uncertain\)/);
 });
 
 test("TG-NEW-166: ordlista har ordene for markoerene paa nb og en", () => {
@@ -722,6 +747,10 @@ test("TG-NEW-166: ordlista har ordene for markoerene paa nb og en", () => {
   assert.equal(t("en", "markers.noBox", { n: 2 }), "Lights without a position in the image: 2");
   assert.equal(nb["markers.listLabel"], "Lampene i bildet");
   assert.equal(en["markers.listLabel"], "The lights in the image");
+  assert.equal(nb["markers.styleSure"], "Fylt merke: sikker");
+  assert.equal(en["markers.styleSure"], "Filled marker: certain");
+  assert.equal(nb["markers.styleUncertain"], "Stiplet merke: usikker");
+  assert.equal(en["markers.styleUncertain"], "Dashed marker: uncertain");
 });
 
 test("D2c: overskriften heter «Lys som tennes» i alle tilstander", () => {
