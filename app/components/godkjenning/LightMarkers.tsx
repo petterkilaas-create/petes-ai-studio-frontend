@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { InputOrientation } from "../../lib/api";
 import type { Lights } from "../../lib/correction";
 import { t, type Locale } from "../../lib/i18n";
 import { badgePlacement, lightMarkers, lightText, type BadgePlacement } from "../../lib/lightsView";
-import { orientationAllowed } from "../../lib/orientation";
+import { markersGate } from "../../lib/orientation";
 
 /**
  * Originalen alene med markoerer for lampene analysen fant (TG-NEW-166).
@@ -14,7 +15,8 @@ import { orientationAllowed } from "../../lib/orientation";
  *
  * Bildet vises med naturlig sideforhold (w-full h-auto), saa prosentene fra
  * boksen treffer. Markoerene vises bare naar retningen i originalen er trygg
- * (orientation.ts, valg 4 A); ellers vises bildet med en kort tekst.
+ * (orientation.ts, valg 4 A); ellers vises bildet med en kort tekst. Har
+ * jobben `inputOrientation` (TG-NEW-170), hentes ikke bildet (markersGate).
  *
  * Oppfoelgingen: hver markoer har et merke A, B, C ... (valg 1 A) utenfor
  * rammen (badgePlacement), og forklaringen under bildet har det samme merket
@@ -46,18 +48,30 @@ const HORIZONTAL: Record<BadgePlacement["horizontal"], string> = {
   end: "right-0",
 };
 
-export function LightMarkers({ url, lights, locale }: { url: string; lights: Lights; locale: Locale }) {
-  // Resultatet gjelder bare URL-en det ble hentet for.
+export function LightMarkers({
+  url,
+  lights,
+  inputOrientation,
+  locale,
+}: {
+  url: string;
+  lights: Lights;
+  inputOrientation: InputOrientation | null;
+  locale: Locale;
+}) {
+  // Resultatet gjelder bare URL-en det ble hentet for. Avhenger av om feltet
+  // finnes, ikke av objektet, saa ingenting hentes paa nytt ved hver rendring.
+  const known = inputOrientation !== null;
   const [checked, setChecked] = useState<{ url: string; ok: boolean } | null>(null);
   useEffect(() => {
     let alive = true;
-    void orientationAllowed(url).then((ok) => {
+    void markersGate(url, known).then((ok) => {
       if (alive) setChecked({ url, ok });
     });
     return () => {
       alive = false;
     };
-  }, [url]);
+  }, [url, known]);
   const allowed = checked !== null && checked.url === url ? checked.ok : null;
 
   const { markers, withoutBox } = lightMarkers(lights);

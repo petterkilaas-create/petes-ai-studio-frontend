@@ -805,3 +805,54 @@ test("toLightBox: fire heltall i 0-1000, ellers null (TG-NEW-148, som light_box 
     assert.equal(api.toLightBox(bad), null, JSON.stringify(bad));
   }
 });
+
+// ---------------------------------------------------------------------------
+// TG-NEW-170 PR 3b: `input_orientation` i review-svaret, strengt lest.
+// ---------------------------------------------------------------------------
+
+test("TG-NEW-170: gyldig input_orientation leses som inputOrientation", () => {
+  for (const [value, applied] of [[6, true], [2, true], [8, true], [1, false], [null, false]] as const) {
+    assert.deepEqual(
+      api.normalizeReview({ input_orientation: { value, applied } }, "j").inputOrientation,
+      { value, applied },
+      `${value} ${applied}`
+    );
+  }
+});
+
+test("TG-NEW-170: feltet mangler eller er null gir null (gamle jobber)", () => {
+  assert.equal(api.normalizeReview({}, "j").inputOrientation, null);
+  assert.equal(api.normalizeReview({ input_orientation: null }, "j").inputOrientation, null);
+});
+
+test("TG-NEW-170: feil typer gir null", () => {
+  for (const raw of [
+    "6",
+    6,
+    true,
+    [6, true],
+    {},
+    { value: 6 },
+    { applied: true },
+    { value: "6", applied: true },
+    { value: 0, applied: false },
+    { value: 9, applied: true },
+    { value: 1.5, applied: false },
+    { value: 6, applied: "true" },
+    { value: 6, applied: 1 },
+    { value: undefined, applied: false },
+  ]) {
+    assert.equal(api.toInputOrientation(raw), null, JSON.stringify(raw) ?? String(raw));
+  }
+});
+
+test("TG-NEW-170: kombinasjoner som ikke henger sammen gir null (applied bare for 2-8)", () => {
+  for (const raw of [
+    { value: 6, applied: false },
+    { value: 2, applied: false },
+    { value: 1, applied: true },
+    { value: null, applied: true },
+  ]) {
+    assert.equal(api.toInputOrientation(raw), null, JSON.stringify(raw));
+  }
+});

@@ -7,6 +7,7 @@ import {
   imageOrientation,
   jpegOrientation,
   markersAllowed,
+  markersGate,
   orientationAllowed,
   readPrefix,
 } from "./orientation.ts";
@@ -279,4 +280,32 @@ test("orientationAllowed: hentes bare én gang per URL", async () => {
 test("checkOrientation: AVIF uten irot gir true, med irot false", async () => {
   assert.equal(await checkOrientation("https://x/g.avif", async () => response(206, avif([ISPE]))), true);
   assert.equal(await checkOrientation("https://x/h.avif", async () => response(206, avif([ISPE, IROT]))), false);
+});
+
+// ---------------------------------------------------------------------------
+// TG-NEW-170 PR 3b: med input_orientation hentes ikke bildet.
+// ---------------------------------------------------------------------------
+
+test("markersGate: med input_orientation vises markoerene uten aa hente bildet", async () => {
+  let calls = 0;
+  const counting = async () => {
+    calls += 1;
+    return response(206, withOrientation(6));
+  };
+  // Ogsaa for en URL der bildet har retning 6 (stoerende bilde, som be21c202).
+  assert.equal(await markersGate("https://x/gate-1", true, counting), true);
+  assert.equal(await markersGate("https://x/gate-2", true, counting), true);
+  assert.equal(calls, 0);
+});
+
+test("markersGate: uten input_orientation sjekkes originalen som foer, med Range", async () => {
+  const seen: RequestInit[] = [];
+  const fake = (bytes: Uint8Array) => async (_url: string, init: RequestInit) => {
+    seen.push(init);
+    return response(206, bytes);
+  };
+  assert.equal(await markersGate("https://x/gate-3", false, fake(withOrientation(1))), true);
+  assert.equal(await markersGate("https://x/gate-4", false, fake(withOrientation(6))), false);
+  assert.equal(seen.length, 2);
+  for (const init of seen) assert.deepEqual(init.headers, { Range: `bytes=0-${HEAD_BYTES - 1}` });
 });
