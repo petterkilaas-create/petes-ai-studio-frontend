@@ -839,6 +839,17 @@ export interface RunValue {
  * Det megleren trenger for aa avgjoere en jobb (GET /v1/jobs/{id}/review).
  * Bare koder og data; tekstene kommer fra ordlista (app/lib/i18n).
  */
+/**
+ * Retningen i originalen slik backend leste den foer modellene (TG-NEW-170).
+ * `value`: EXIF-retningen 1-8, eller null (ingen, eller ugyldig i fila).
+ * `applied`: pikslene ble snudd (bare for 2-8). Da er boksene i samme ramme
+ * som nettleseren viser originalen i.
+ */
+export interface InputOrientation {
+  value: number | null;
+  applied: boolean;
+}
+
 export interface JobReviewDetail {
   jobId: string;
   status: string;
@@ -897,6 +908,11 @@ export interface JobReviewDetail {
    * `allowedActions` tom. null og undefined: ikke slettet.
    */
   mediaDeletedAt?: string | null;
+  /**
+   * TG-NEW-170: null for jobber fra foer rettingen (eller feltet mangler).
+   * Da sjekker markoerene retningen i originalen selv (orientation.ts).
+   */
+  inputOrientation: InputOrientation | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1035,6 +1051,19 @@ function toBrightness(raw: unknown): ReviewBrightness {
   };
 }
 
+/**
+ * `input_orientation`: strengt lest. Alt som ikke er `{value: 1-8 | null,
+ * applied: boolean}`, gir null. Det gjelder ogsaa kombinasjoner som ikke
+ * henger sammen (Petter 08.10): `applied` er sann bare for 2-8.
+ */
+export function toInputOrientation(raw: unknown): InputOrientation | null {
+  if (!isRecord(raw) || typeof raw.applied !== "boolean") return null;
+  const value = raw.value;
+  if (value !== null && !(typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 8)) return null;
+  if (raw.applied !== (value !== null && value >= 2)) return null;
+  return { value, applied: raw.applied };
+}
+
 function toRunValue(raw: unknown): RunValue {
   const r = isRecord(raw) ? raw : {};
   return { value: stringOrNull(r.value), runValues: stringList(r.run_values) };
@@ -1103,6 +1132,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     })),
     brightness: toBrightness(r.brightness),
     mediaDeletedAt: nonEmptyString(r.media_deleted_at),
+    inputOrientation: toInputOrientation(r.input_orientation),
   };
 }
 

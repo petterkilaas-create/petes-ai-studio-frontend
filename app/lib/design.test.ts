@@ -675,10 +675,10 @@ test("TG-NEW-166: markoerene brukes bare av godkjenningssiden, aldri av glideren
   // Siden lager visningen og gir den til CompareViewer; knappen bare naar canShowMarkers er sann.
   const src = withoutComments(read(page));
   assert.match(src, /import \{ LightMarkers \} from "@\/app\/components\/godkjenning\/LightMarkers";/);
-  assert.equal(src.match(/<LightMarkers /g)?.length, 1);
+  assert.equal(src.match(/<LightMarkers\s/g)?.length, 1);
   assert.match(
     src,
-    /lightsView=\{\s*canShowMarkers\(review\) && review\.images\.originalUrl !== null \? \(\s*<LightMarkers url=\{review\.images\.originalUrl\} lights=\{review\.lights\} locale=\{locale\} \/>\s*\) : null\s*\}/
+    /lightsView=\{\s*canShowMarkers\(review\) && review\.images\.originalUrl !== null \? \(\s*<LightMarkers\s+url=\{review\.images\.originalUrl\}\s+lights=\{review\.lights\}\s+inputOrientation=\{review\.inputOrientation\}\s+locale=\{locale\}\s*\/>\s*\) : null\s*\}/
   );
   // Glideren faar aldri visningen.
   const viewer = withoutComments(read("components/godkjenning/CompareViewer.tsx"));
@@ -706,7 +706,11 @@ test("TG-NEW-166: originalen med naturlig sideforhold, og forklaringen er lista 
   // Markoerene vises bare naar retningen er sjekket og trygg; ellers en kort tekst.
   assert.match(src, /\{allowed === false && \(/);
   assert.match(src, /t\(locale, "markers\.unavailable"\)/);
-  assert.match(src, /orientationAllowed\(url\)/);
+  // TG-NEW-170: gjennom markersGate; med inputOrientation hentes ikke bildet.
+  assert.match(src, /const known = inputOrientation !== null;/);
+  assert.match(src, /markersGate\(url, known\)/);
+  assert.match(src, /\}, \[url, known\]\);/);
+  assert.doesNotMatch(src, /orientationAllowed|checkOrientation|fetch\(/);
   // Ingen analyse-tekst (plasseringen eller grunnen) i markoerene.
   assert.doesNotMatch(src, /\.location\b|reasonCode/);
 });

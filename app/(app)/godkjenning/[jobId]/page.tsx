@@ -471,7 +471,12 @@ export default function GodkjenningPage({
                           onResultLoad={() => setResultLoaded(true)}
                           lightsView={
                             canShowMarkers(review) && review.images.originalUrl !== null ? (
-                              <LightMarkers url={review.images.originalUrl} lights={review.lights} locale={locale} />
+                              <LightMarkers
+                                url={review.images.originalUrl}
+                                lights={review.lights}
+                                inputOrientation={review.inputOrientation}
+                                locale={locale}
+                              />
                             ) : null
                           }
                           locale={locale}

@@ -8,6 +8,9 @@
  * annet gir sperren: andre retninger, PNG, WebP, HEIC, oedelagte filer og feil
  * i hentingen.
  *
+ * Sjekken gjelder jobber fra foer TG-NEW-170. Nyere jobber har
+ * `input_orientation` i review-svaret, og da hentes ikke bildet (markersGate).
+ *
  * Rene funksjoner uten import, saa de kan testes med node --test.
  */
 
@@ -236,4 +239,16 @@ export function orientationAllowed(url: string, fetchImpl?: FetchLike): Promise<
     checked.set(url, result);
   }
   return result;
+}
+
+/**
+ * Kan markoerene vises? (TG-NEW-170.) `hasInputOrientation`: review-svaret har
+ * `input_orientation`, saa jobben er laget etter at backend snur bildet foer
+ * modellene. Boksene er da i samme ramme som nettleseren viser originalen i,
+ * og bildet hentes ikke. Uten feltet (gamle jobber) sjekkes retningen i
+ * originalen som foer.
+ */
+export function markersGate(url: string, hasInputOrientation: boolean, fetchImpl?: FetchLike): Promise<boolean> {
+  if (hasInputOrientation) return Promise.resolve(true);
+  return orientationAllowed(url, fetchImpl);
 }
