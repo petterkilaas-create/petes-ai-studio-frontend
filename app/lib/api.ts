@@ -126,20 +126,27 @@ export class ValidationError extends Error {
   }
 }
 
+export interface SubmitErrorDetail {
+  used?: unknown;
+  limit?: unknown;
+  reason?: unknown;
+}
+
 /**
  * Feil fra POST /v1/process med kode (TG-NEW-149, KONTRAKT_KVOTE), f.eks.
  * free_quota_exhausted (402), daily_capacity_reached (429),
- * quota_unavailable / job_create_failed (503), duplicate_request (409) og
- * invalid_idempotency_key (400). `code` er null naar svaret ikke har en.
+ * quota_unavailable / job_create_failed (503), duplicate_request (409),
+ * invalid_idempotency_key og unsupported_image (400). `code` er null naar
+ * svaret ikke har en.
  * Teksten til brukeren kommer fra ordlista (gruppen orderError), aldri herfra.
  */
 export class SubmitError extends Error {
   readonly httpStatus: number;
   readonly code: string | null;
-  /** 402: `used`/`limit` fra svaret, ellers tom. */
-  readonly detail: { used?: unknown; limit?: unknown };
+  /** 402: `used`/`limit` fra svaret. 400 unsupported_image: `reason` (TG-NEW-185). Ellers tom. */
+  readonly detail: SubmitErrorDetail;
 
-  constructor(httpStatus: number, code: string | null, detail: { used?: unknown; limit?: unknown } = {}) {
+  constructor(httpStatus: number, code: string | null, detail: SubmitErrorDetail = {}) {
     super(`submitJob failed (${httpStatus})${code ? `: ${code}` : ""}`);
     this.name = "SubmitError";
     this.httpStatus = httpStatus;
@@ -368,7 +375,7 @@ export async function submitJob(opts: {
   if (code !== null) {
     const outer = isRecord(body) ? body : {};
     const inner = isRecord(outer.detail) ? outer.detail : {};
-    throw new SubmitError(res.status, code, { used: inner.used, limit: inner.limit });
+    throw new SubmitError(res.status, code, { used: inner.used, limit: inner.limit, reason: inner.reason });
   }
 
   if (res.status === 400) {

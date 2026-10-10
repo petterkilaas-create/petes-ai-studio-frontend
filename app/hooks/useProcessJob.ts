@@ -46,6 +46,11 @@ export interface UseProcessJobResult {
    * Teksten hentes fra ordlista (orderError). null uten kode.
    */
   errorCode: string | null;
+  /**
+   * Grunnen ved unsupported_image (TG-NEW-185), f.eks. heic. Raadata fra
+   * backend; teksten lages ved visning (orderErrorText). null ellers.
+   */
+  errorReason: unknown;
   /** Strukturert scene-gate-avslag (TG-NEW-58), eller null. */
   rejection: Rejection | null;
   /** needs_review: code + reasons fra port 1, ellers null. */
@@ -90,6 +95,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitErrorCode, setSubmitErrorCode] = useState<string | null>(null);
+  const [submitErrorReason, setSubmitErrorReason] = useState<unknown>(null);
 
   // Object-URL for sync-blob holdes i ref slik at vi kan revokere den
   // ved ny kjoering, reset og avmontering (poll-resultatet eier useJobStatus).
@@ -120,6 +126,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
       setJobId(null);
       setSubmitError(null);
       setSubmitErrorCode(null);
+      setSubmitErrorReason(null);
       lastRunRef.current = { file, service, params };
       setIsSubmitting(true);
 
@@ -142,6 +149,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
         if (err instanceof SubmitError) {
           setSubmitError(err.message);
           setSubmitErrorCode(err.code);
+          setSubmitErrorReason(err.detail.reason ?? null);
           if (err.code === "free_quota_exhausted") {
             onQuota?.({ kind: "exhausted", ...err.detail });
           }
@@ -173,6 +181,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
     setJobId(null);
     setSubmitError(null);
     setSubmitErrorCode(null);
+    setSubmitErrorReason(null);
     setIsSubmitting(false);
     lastRunRef.current = null;
     orderKeysRef.current?.clear();
@@ -191,6 +200,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
     imageUrl: syncResultUrl ?? job.imageUrl,
     error: submitError ?? job.error,
     errorCode: submitErrorCode,
+    errorReason: submitErrorReason,
     rejection: job.rejection,
     review: job.review,
     reviewerReason: job.reviewerReason,

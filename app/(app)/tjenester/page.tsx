@@ -23,7 +23,7 @@ import { ReviewerRejectedPanel } from "@/app/components/ReviewerRejectedPanel";
 import { OpenReviewLink } from "@/app/components/OpenReviewLink";
 import { DuskChoicePicker } from "@/app/components/DuskChoicePicker";
 import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "@/app/lib/dusk";
-import { codeText, t } from "@/app/lib/i18n";
+import { orderErrorText, t } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import { expressCategories, SERVICE_PARAM, toolFromParam } from "@/app/lib/services";
 import { Button } from "@/app/components/ui/Button";
@@ -357,7 +357,7 @@ function ExpressContent() {
               (TG-NEW-149) har egen tekst; uten kode, eller med ukjent kode,
               den generiske meldingen. */}
           {showSubmitError && (
-            <ErrorPanel message={codeText(locale, "orderError", job.errorCode)} />
+            <ErrorPanel message={orderErrorText(locale, job.errorCode, job.errorReason)} />
           )}
 
           {job.status === "needs_review" && job.review && (

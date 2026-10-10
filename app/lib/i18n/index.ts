@@ -34,7 +34,8 @@ export type CodeGroup =
   | "disclosureBase"
   | "disclosureTime"
   | "disclosureEdited"
-  | "orderError";
+  | "orderError"
+  | "unsupportedImage";
 
 const nbUi = {
   "review.title": "Kontroll av bildet",
@@ -433,6 +434,15 @@ const nb: Dictionary = {
       job_create_failed: "Bestillingen kunne ikke startes. Ingen gratisbilder er brukt.",
       duplicate_request: "Bestillingen er allerede mottatt. Du finner den i Historikk.",
       invalid_idempotency_key: "Bestillingen kunne ikke startes. Last siden på nytt og prøv igjen.",
+      // TG-NEW-185: grunnen står i unsupportedImage; denne er for ukjent grunn.
+      unsupported_image: "Bildet kan ikke brukes. Lagre det som JPEG eller PNG og velg det på nytt.",
+    },
+    // TG-NEW-185: grunnen (reason) når bestillingen gir 400 unsupported_image.
+    unsupportedImage: {
+      heic: "Bilder i HEIC-format kan ikke brukes. Lagre bildet som JPEG eller PNG og velg det på nytt.",
+      clap: "Bildet kan ikke brukes slik det er lagret. Lagre det som JPEG og velg det på nytt.",
+      unreadable: "Bildet kunne ikke leses. Det kan være skadet. Prøv en annen kopi av bildet.",
+      format: "Dette bildeformatet kan ikke brukes. Lagre bildet som JPEG eller PNG og velg det på nytt.",
     },
   },
   generic: {
@@ -454,6 +464,7 @@ const nb: Dictionary = {
     disclosureTime: "Merketeksten kunne ikke lages.",
     disclosureEdited: "Merketeksten kunne ikke lages.",
     orderError: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
+    unsupportedImage: "Bildet kan ikke brukes. Lagre det som JPEG eller PNG og velg det på nytt.",
   },
 };
 
@@ -823,6 +834,13 @@ const en: Dictionary = {
       job_create_failed: "The order could not be started. No free images were used.",
       duplicate_request: "The order has already been received. You can find it in History.",
       invalid_idempotency_key: "The order could not be started. Reload the page and try again.",
+      unsupported_image: "The image cannot be used. Save it as JPEG or PNG and choose it again.",
+    },
+    unsupportedImage: {
+      heic: "HEIC images cannot be used. Save the image as JPEG or PNG and choose it again.",
+      clap: "The image cannot be used the way it is saved. Save it as JPEG and choose it again.",
+      unreadable: "The image could not be read. It may be damaged. Try another copy of the image.",
+      format: "This image format cannot be used. Save the image as JPEG or PNG and choose it again.",
     },
   },
   generic: {
@@ -844,6 +862,7 @@ const en: Dictionary = {
     disclosureTime: "The disclosure text could not be created.",
     disclosureEdited: "The disclosure text could not be created.",
     orderError: "The image could not be processed. Please try again, or contact us.",
+    unsupportedImage: "The image cannot be used. Save it as JPEG or PNG and choose it again.",
   },
 };
 
@@ -887,6 +906,17 @@ export function codeText(locale: Locale, group: CodeGroup, code: unknown): strin
     return table[code];
   }
   return dict.generic[group];
+}
+
+/**
+ * Tekst for en feilet bestilling (TG-NEW-185). unsupported_image vises etter
+ * grunnen (heic, clap, unreadable, format); ukjent eller manglende grunn gir
+ * teksten for ukjent grunn. Andre koder som codeText(..., "orderError", ...).
+ * Lages ved visning, saa teksten foelger spraakbytte.
+ */
+export function orderErrorText(locale: Locale, code: unknown, reason: unknown): string {
+  if (code === "unsupported_image") return codeText(locale, "unsupportedImage", reason);
+  return codeText(locale, "orderError", code);
 }
 
 /** Melding som enten er en ui-noekkel eller en kode fra backend. */
