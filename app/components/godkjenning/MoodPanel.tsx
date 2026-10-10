@@ -1,7 +1,7 @@
 "use client";
 
 import type { JobReviewDetail } from "../../lib/api";
-import { duskFacts } from "../../lib/dusk";
+import { duskFacts, duskLine } from "../../lib/dusk";
 import { codeText, t, type Locale } from "../../lib/i18n";
 import { lightNames, litLights } from "../../lib/lightsView";
 import { fireplaceAnswerKey } from "../../lib/review";
@@ -17,18 +17,26 @@ const CARD = cardClass("md");
  * sone (TG-NEW-148). Ingen analyse her (brief §3 punkt 6), og ingen
  * plassering fra analysen (fritekst, D2c); den ligger i «Detaljer». Himmelen vises
  * ikke som valg naar den ikke ble brukt (sky_applied false).
+ *
+ * Megleren (`admin` false, TG-NEW-193) ser valgene i én kort linje
+ * («Tidlig skumring · Klar blå time»), uten «ikke brukt» om himmelen og uten
+ * peisen. Admin ser alt som foer.
  */
 export function MoodPanel({
   review,
+  admin,
   locale,
 }: {
   review: Pick<JobReviewDetail, "dusk" | "lights" | "fireplace">;
+  admin: boolean;
   locale: Locale;
 }) {
-  const facts = duskFacts(review.dusk);
+  const facts = admin ? duskFacts(review.dusk) : null;
+  const line = admin ? null : duskLine(review.dusk);
   const lit = litLights(review.lights);
   const nameOf = lightNames(review.lights);
-  const fire = review.fireplace.answer === "yes" || review.fireplace.answer === "no" ? review.fireplace.answer : null;
+  const fire =
+    admin && (review.fireplace.answer === "yes" || review.fireplace.answer === "no") ? review.fireplace.answer : null;
   return (
     <section className={`${CARD} flex flex-col gap-4`}>
       <p className={`${LABEL} mb-0`}>{t(locale, "review.moodTitle")}</p>
@@ -47,6 +55,16 @@ export function MoodPanel({
             </p>
           </div>
         </div>
+      )}
+      {line !== null && (
+        <p className="text-sm text-ink">
+          {[
+            line.time === null ? null : codeText(locale, "duskTime", line.time),
+            line.sky === null ? null : codeText(locale, "duskSky", line.sky),
+          ]
+            .filter((s): s is string => s !== null)
+            .join(" · ")}
+        </p>
       )}
       {fire !== null && (
         <div>

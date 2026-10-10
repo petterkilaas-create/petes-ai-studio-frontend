@@ -9,6 +9,9 @@ import {
 } from "./compare.ts";
 import type { ReviewRound, RoundChoices } from "./api";
 
+/** Admin-etiketten med valgene (dagens oppfoersel); megleren faar { choices: false } (TG-NEW-193). */
+const ADMIN = { choices: true };
+
 /** Variantene fra images.rounds (D2a, KONTRAKT_RUNDER). */
 
 const CHOICES: RoundChoices = {
@@ -59,15 +62,15 @@ test("«nå» staar bare paa gjeldende runde, og den vises foerst", () => {
   const vs = compareVariants(images([round(0), round(1, { current: true })]), { isAdmin: false });
   assert.deepEqual(vs.map((v) => v.current), [true, false]);
   assert.equal(defaultVariant(vs)?.id, "r1");
-  assert.equal(variantLabel("nb", vs[0]), "Runde 2 · nå (tidlig, lette skyer)");
-  assert.equal(variantLabel("nb", vs[1]), "Runde 1 (tidlig, lette skyer)");
+  assert.equal(variantLabel("nb", vs[0], ADMIN), "Runde 2 · nå (tidlig, lette skyer)");
+  assert.equal(variantLabel("nb", vs[1], ADMIN), "Runde 1 (tidlig, lette skyer)");
 });
 
 test("uten gjeldende runde (running): ingen «nå», og den nyeste vises", () => {
   const vs = compareVariants(images([round(0), round(1)]), { isAdmin: false });
   assert.ok(vs.every((v) => !v.current));
   assert.equal(defaultVariant(vs)?.id, "r1");
-  assert.ok(!variantLabel("nb", vs[0]).includes("nå"));
+  assert.ok(!variantLabel("nb", vs[0], ADMIN).includes("nå"));
 });
 
 test("selectedVariant: ukjent id gir gjeldende runde", () => {
@@ -83,19 +86,19 @@ test("etikettene lages fra choices, paa nb og en", () => {
     compareVariants(images([round(0, { current: true, choices: { ...CHOICES, ...choices } })]), {
       isAdmin: false,
     })[0];
-  assert.equal(variantLabel("nb", r({ sky: "clear" })), "Runde 1 · nå (tidlig, klar blå time)");
-  assert.equal(variantLabel("en", r({ sky: "clear" })), "Round 1 · now (early, clear blue hour)");
-  assert.equal(variantLabel("nb", r({ time: "late", sky: "starry" })), "Runde 1 · nå (sen, stjernehimmel)");
-  assert.equal(variantLabel("nb", r({ skyApplied: false })), "Runde 1 · nå (tidlig, uten himmel)");
-  assert.equal(variantLabel("en", r({ skyApplied: false })), "Round 1 · now (early, no sky)");
-  assert.equal(variantLabel("nb", r({ lightsChanged: true })), "Runde 1 · nå (tidlig, lette skyer, lys justert)");
-  assert.equal(variantLabel("en", r({ lightsChanged: true })), "Round 1 · now (early, light clouds, lights adjusted)");
-  assert.equal(variantLabel("nb", r({ fireplaceFire: "yes" })), "Runde 1 · nå (tidlig, lette skyer, peis tent)");
-  assert.equal(variantLabel("nb", r({ fireplaceFire: "no" })), "Runde 1 · nå (tidlig, lette skyer, peis ikke tent)");
+  assert.equal(variantLabel("nb", r({ sky: "clear" }), ADMIN), "Runde 1 · nå (tidlig, klar blå time)");
+  assert.equal(variantLabel("en", r({ sky: "clear" }), ADMIN), "Round 1 · now (early, clear blue hour)");
+  assert.equal(variantLabel("nb", r({ time: "late", sky: "starry" }), ADMIN), "Runde 1 · nå (sen, stjernehimmel)");
+  assert.equal(variantLabel("nb", r({ skyApplied: false }), ADMIN), "Runde 1 · nå (tidlig, uten himmel)");
+  assert.equal(variantLabel("en", r({ skyApplied: false }), ADMIN), "Round 1 · now (early, no sky)");
+  assert.equal(variantLabel("nb", r({ lightsChanged: true }), ADMIN), "Runde 1 · nå (tidlig, lette skyer, lys justert)");
+  assert.equal(variantLabel("en", r({ lightsChanged: true }), ADMIN), "Round 1 · now (early, light clouds, lights adjusted)");
+  assert.equal(variantLabel("nb", r({ fireplaceFire: "yes" }), ADMIN), "Runde 1 · nå (tidlig, lette skyer, peis tent)");
+  assert.equal(variantLabel("nb", r({ fireplaceFire: "no" }), ADMIN), "Runde 1 · nå (tidlig, lette skyer, peis ikke tent)");
   // Ukjent kode gir generisk tekst, aldri koden selv.
-  assert.equal(variantLabel("nb", r({ sky: "neon" })), "Runde 1 · nå (tidlig, ukjent himmel)");
+  assert.equal(variantLabel("nb", r({ sky: "neon" }), ADMIN), "Runde 1 · nå (tidlig, ukjent himmel)");
   const none = compareVariants(images([round(0, { current: true, choices: null })]), { isAdmin: false })[0];
-  assert.equal(variantLabel("nb", none), "Runde 1 · nå");
+  assert.equal(variantLabel("nb", none, ADMIN), "Runde 1 · nå");
 });
 
 test("rått bare for admin, nyeste foerst etter de vanlige rundene", () => {
@@ -106,8 +109,8 @@ test("rått bare for admin, nyeste foerst etter de vanlige rundene", () => {
   const admin = compareVariants(images(rounds), { isAdmin: true });
   assert.deepEqual(admin.map((v) => v.id), ["r1", "r0", "r1-raw", "r0-raw"]);
   assert.deepEqual(urls(admin), ["p1.jpg", "p0.jpg", "raw1.jpg", "raw0.jpg"]);
-  assert.equal(variantLabel("nb", admin[2]), "Runde 2 · rått fra modellen");
-  assert.equal(variantLabel("en", admin[3]), "Round 1 · raw from the model");
+  assert.equal(variantLabel("nb", admin[2], ADMIN), "Runde 2 · rått fra modellen");
+  assert.equal(variantLabel("en", admin[3], ADMIN), "Round 1 · raw from the model");
   assert.equal(defaultVariant(admin)?.id, "r1", "rått er aldri standard");
   // Megler: ingen rå variant, ogsaa om backend skulle sende en lenke.
   const owner = compareVariants(images(rounds), { isAdmin: false });
@@ -133,8 +136,8 @@ test("gamle jobber uten rounds bruker de merkede feltene som foer", () => {
   const owner = compareVariants(images(null, { rawPreviewUrl: null }), { isAdmin: false });
   assert.deepEqual(owner.map((v) => v.id), ["legacy-lifted", "legacy-previous"]);
   assert.deepEqual(urls(owner), ["legacy:lifted", "legacy:previous"]);
-  assert.equal(variantLabel("nb", owner[0]), "Løftet");
-  assert.equal(variantLabel("nb", owner[1]), "Forrige runde");
+  assert.equal(variantLabel("nb", owner[0], ADMIN), "Løftet");
+  assert.equal(variantLabel("nb", owner[1], ADMIN), "Forrige runde");
   // Uten forrige runde: bare gjeldende bilde, og ingen velger.
   const first = compareVariants(images(null, { rawPreviewUrl: null, previous: null }), { isAdmin: false });
   assert.deepEqual(first.map((v) => v.id), ["legacy-lifted"]);
@@ -142,5 +145,5 @@ test("gamle jobber uten rounds bruker de merkede feltene som foer", () => {
   assert.ok(!compareVariants(images(null), { isAdmin: false }).some((v) => v.raw));
   const admin = compareVariants(images(null), { isAdmin: true });
   assert.deepEqual(admin.map((v) => v.id), ["legacy-lifted", "legacy-raw", "legacy-previous"]);
-  assert.equal(variantLabel("en", admin[1]), "Raw");
+  assert.equal(variantLabel("en", admin[1], ADMIN), "Raw");
 });

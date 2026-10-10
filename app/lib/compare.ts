@@ -114,13 +114,14 @@ function choiceParts(locale: Locale, choices: RoundChoices): string[] {
 /**
  * Etiketten, f.eks. «Runde 2 · nå (tidlig, lette skyer)» eller «Runde 1 ·
  * rått fra modellen». Nummeret er `round + 1` fra backend, aldri plassen i
- * lista (hull kan forekomme).
+ * lista (hull kan forekomme). Valgene i parentes bare med `choices`
+ * (admin, TG-NEW-193); megleren ser «Runde 2 · nå».
  */
-export function variantLabel(locale: Locale, variant: CompareVariant): string {
+export function variantLabel(locale: Locale, variant: CompareVariant, opts: { choices: boolean }): string {
   if (variant.source.kind === "legacy") return t(locale, LEGACY_LABEL[variant.source.variant]);
   const base = t(locale, "compare.round", { n: (variant.round ?? 0) + 1 });
   if (variant.raw) return `${base} · ${t(locale, "compare.raw")}`;
   const head = variant.current ? `${base} · ${t(locale, "compare.now")}` : base;
-  const parts = variant.choices === null ? [] : choiceParts(locale, variant.choices);
+  const parts = !opts.choices || variant.choices === null ? [] : choiceParts(locale, variant.choices);
   return parts.length > 0 ? `${head} (${parts.join(", ")})` : head;
 }
