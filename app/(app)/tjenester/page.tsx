@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type ChangeEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { Check, Clock, Eraser, LayoutGrid, type LucideIcon } from "lucide-react";
 import { TOOL_ICONS } from "@/app/components/toolIcons";
@@ -118,6 +118,14 @@ function ExpressContent() {
     setSceneType("auto");
     setForceSceneType(false);
     setDusk(DEFAULT_DUSK);
+    job.reset();
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (isProcessing) return;
+    preview.onInputChange(e);
+    // Nytt bilde: feilen, avslaget og et gammelt resultat hoerer til det
+    // forrige. Skumringsvalgene og bildetypen staar (TG-NEW-187).
     job.reset();
   };
 
@@ -264,7 +272,7 @@ function ExpressContent() {
               id="express-file"
               type="file"
               accept="image/*"
-              onChange={preview.onInputChange}
+              onChange={handleFileChange}
               disabled={isProcessing}
               className={`block w-full rounded-button text-sm text-ink-2 file:mr-4 file:min-h-11 file:px-4 file:rounded-button file:border-0 file:text-sm file:font-medium file:bg-primary file:text-on-primary hover:file:opacity-90 file:cursor-pointer ${FOCUS}`}
             />
