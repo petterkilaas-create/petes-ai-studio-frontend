@@ -93,3 +93,15 @@ export function duskFacts(dusk: ReviewDusk | null): DuskFacts | null {
     sky: dusk.skyApplied === false ? { kind: "not_applied" } : { kind: "code", code: dusk.sky },
   };
 }
+
+/**
+ * Den korte linja for megleren (TG-NEW-193): bare valgene, som koder, f.eks.
+ * «Tidlig skumring · Klar blå time». Himmelen utelates naar den ikke ble brukt
+ * (sky_applied false), og et felt som mangler, utelates. null: ingen linje.
+ */
+export function duskLine(dusk: ReviewDusk | null): { time: string | null; sky: string | null } | null {
+  if (dusk === null) return null;
+  const sky = dusk.skyApplied === false ? null : dusk.sky;
+  if (dusk.time === null && sky === null) return null;
+  return { time: dusk.time, sky };
+}

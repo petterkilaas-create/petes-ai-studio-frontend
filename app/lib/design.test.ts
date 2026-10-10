@@ -570,7 +570,8 @@ test("D2b: analysen staar bare i DetailsPanel (megleren ser den ikke)", () => {
 test("D2b: rettingen er én flat liste med «Usikker», uten grunner, tidspunkt eller himmel", () => {
   const panel = withoutComments(read("components/godkjenning/CorrectionPanel.tsx"));
   assert.match(panel, /const rows = flatLights\(lights\);/);
-  assert.match(panel, /<LightLabel light=\{light\} name=\{nameOf\(light\)\} locale=\{locale\} uncertain=\{uncertain\} state \/>/);
+  // «Usikker» bare for admin (TG-NEW-193).
+  assert.match(panel, /<LightLabel light=\{light\} name=\{nameOf\(light\)\} locale=\{locale\} uncertain=\{admin && uncertain\} state \/>/);
   assert.match(panel, /onToggle\(light, uncertain, e\.target\.checked\)/);
   // Ingen grunn fra analysen, og ingen valg av tidspunkt eller himmel (TG-NEW-145).
   assert.doesNotMatch(panel, /\breason\b|lightReason/);
@@ -678,7 +679,7 @@ test("TG-NEW-166: markoerene brukes bare av godkjenningssiden, aldri av glideren
   assert.equal(src.match(/<LightMarkers\s/g)?.length, 1);
   assert.match(
     src,
-    /lightsView=\{\s*canShowMarkers\(review\) && review\.images\.originalUrl !== null \? \(\s*<LightMarkers\s+url=\{review\.images\.originalUrl\}\s+lights=\{review\.lights\}\s+inputOrientation=\{review\.inputOrientation\}\s+locale=\{locale\}\s*\/>\s*\) : null\s*\}/
+    /lightsView=\{\s*canShowMarkers\(review, \{ litOnly: !admin \}\) && review\.images\.originalUrl !== null \? \(\s*<LightMarkers\s+url=\{review\.images\.originalUrl\}\s+lights=\{review\.lights\}\s+inputOrientation=\{review\.inputOrientation\}\s+litOnly=\{!admin\}\s+locale=\{locale\}\s*\/>\s*\) : null\s*\}/
   );
   // Glideren faar aldri visningen.
   const viewer = withoutComments(read("components/godkjenning/CompareViewer.tsx"));

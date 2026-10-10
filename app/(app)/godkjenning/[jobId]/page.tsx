@@ -25,7 +25,7 @@ import {
   shouldPoll,
   type FireplaceAnswer,
 } from "@/app/lib/review";
-import { isReadOnlyOther, showDetails } from "@/app/lib/roles";
+import { adminView, isReadOnlyOther, showDetails } from "@/app/lib/roles";
 import {
   buildCorrection,
   canSubmitCorrection,
@@ -91,6 +91,11 @@ import { FOCUS } from "@/app/components/godkjenning/classes";
  * banner med datoen og én boks med «Bildet er slettet» i stedet for bildene,
  * varianter og lysstyrke. Backend sender tom `allowed_actions`, og
  * nedlastingen skjules (canDownload). «Tekst til annonsen» staar.
+ *
+ * Megleren ser bare det hen maa ta stilling til (TG-NEW-193, Petter 10.10):
+ * uten view_all skjules job-id, grunnen til at jobben venter, valgene i
+ * rundeetiketten, usikre lys (rettingen og markoerene), peisen og «ikke
+ * brukt» om himmelen. Admin (adminView) ser alt som foer.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -194,6 +199,8 @@ export default function GodkjenningPage({
 
   const polling = activePollId !== null && !pollDone;
   const locked = busy || blocked || polling;
+  // TG-NEW-193: samme view_all-sjekk som «Detaljer».
+  const admin = adminView(caps);
 
   const decide = (action: DecisionAction, brightnessStep: BrightnessStep | null) => {
     if (locked || load.kind !== "ok") return;
@@ -348,7 +355,7 @@ export default function GodkjenningPage({
           <h1 className="font-display text-[32px] md:text-[40px] leading-tight text-ink mt-2 mb-1">
             {t(locale, "review.title")}
           </h1>
-          <p className="text-ink-2 text-xs font-mono break-all">{jobId}</p>
+          {admin && <p className="text-ink-2 text-xs font-mono break-all">{jobId}</p>}
         </div>
 
         {load.kind === "loading" && (
@@ -408,8 +415,8 @@ export default function GodkjenningPage({
               shown === null
                 ? ""
                 : stepShown !== null
-                  ? `${variantLabel(locale, shown)} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
-                  : variantLabel(locale, shown);
+                  ? `${variantLabel(locale, shown, { choices: admin })} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
+                  : variantLabel(locale, shown, { choices: admin });
             const correction = correctionControls(review);
             const canCorrect = correction.show && !limitReached && done === null;
             const isEditing = editing && canCorrect;
@@ -462,6 +469,7 @@ export default function GodkjenningPage({
                           variants={variants}
                           selectedId={shown?.id ?? null}
                           onSelect={setVariantId}
+                          choices={admin}
                           locale={locale}
                         />
                         <CompareViewer
@@ -470,11 +478,12 @@ export default function GodkjenningPage({
                           placeholder={<PreviewPlaceholder />}
                           onResultLoad={() => setResultLoaded(true)}
                           lightsView={
-                            canShowMarkers(review) && review.images.originalUrl !== null ? (
+                            canShowMarkers(review, { litOnly: !admin }) && review.images.originalUrl !== null ? (
                               <LightMarkers
                                 url={review.images.originalUrl}
                                 lights={review.lights}
                                 inputOrientation={review.inputOrientation}
+                                litOnly={!admin}
                                 locale={locale}
                               />
                             ) : null
@@ -522,7 +531,7 @@ export default function GodkjenningPage({
                       </section>
                     ) : (
                       <DecisionCard
-                        reviewCode={review.code}
+                        reviewCode={admin ? review.code : null}
                         controls={controls}
                         canCorrect={canCorrect}
                         roundFailed={correction.roundFailed}
@@ -559,6 +568,7 @@ export default function GodkjenningPage({
                               onSubmit={submitCorrection}
                               onCancel={cancelCorrection}
                               locked={locked}
+                              admin={admin}
                               locale={locale}
                             />
                           ) : null
@@ -568,7 +578,7 @@ export default function GodkjenningPage({
                       />
                     )}
 
-                    <MoodPanel review={review} locale={locale} />
+                    <MoodPanel review={review} admin={admin} locale={locale} />
 
                     {/* Analysen bare for admin (brief §3 punkt 6). */}
                     {showDetails(caps) && <DetailsPanel review={review} locale={locale} />}

@@ -14,11 +14,14 @@ export function VariantPicker({
   variants,
   selectedId,
   onSelect,
+  choices,
   locale,
 }: {
   variants: CompareVariant[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Valgene i etiketten (admin, TG-NEW-193). */
+  choices: boolean;
   locale: Locale;
 }) {
   const headingId = useId();
@@ -37,7 +40,7 @@ export function VariantPicker({
             aria-pressed={selectedId === v.id}
             className={choiceClass(selectedId === v.id, "rounded-button text-left")}
           >
-            {variantLabel(locale, v)}
+            {variantLabel(locale, v, { choices })}
           </button>
         ))}
       </div>

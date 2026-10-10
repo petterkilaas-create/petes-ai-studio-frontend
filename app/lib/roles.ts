@@ -85,5 +85,16 @@ export function scopeFallback(
  * trenger et eget signal fra backend (Petter 01.10). Mangler svaret: false.
  */
 export function showDetails(caps: Capabilities | null): boolean {
+  return adminView(caps);
+}
+
+/**
+ * Admin-visningen av godkjenningssiden (TG-NEW-193, Petter 10.10): samme
+ * view_all-sjekk som «Detaljer». Uten den (megler, og redaktoer uten
+ * view_all) skjules job-id, grunnen til at jobben venter, valgene i
+ * rundeetiketten, usikre lys, peisen og «ikke brukt» om himmelen. Mangler
+ * svaret: false.
+ */
+export function adminView(caps: Capabilities | null): boolean {
   return caps?.viewAll === true;
 }

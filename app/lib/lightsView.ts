@@ -174,15 +174,26 @@ export function markerPosition(box: LightBox): { x: number; y: number; width: nu
 }
 
 /**
+ * Lysene markoerene gjelder (TG-NEW-193). Admin: hele den flate lista, med
+ * «Usikker». `litOnly` (megleren): bare lysene i «Lys som tennes» (litLights),
+ * og ingen er usikre.
+ */
+function markerRows(lights: Lights, litOnly: boolean): FlatLight[] {
+  const rows = flatLights(lights);
+  return litOnly ? rows.filter((f) => initialOn(f.light)).map((f) => ({ light: f.light, uncertain: false })) : rows;
+}
+
+/**
  * Markoerene i rekkefoelgen fra den flate lista, med merke A, B, C ... i den
  * rekkefoelgen, og hvor mange lys som ikke har boks (de har navn i lista, men
- * ingen markoer og intet merke).
+ * ingen markoer og intet merke). Navnene (nummer og sone) telles alltid over
+ * hele lista, saa «Pendel 2» er den samme lampen for megler og admin.
  */
-export function lightMarkers(lights: Lights): { markers: LightMarker[]; withoutBox: number } {
+export function lightMarkers(lights: Lights, opts: { litOnly: boolean }): { markers: LightMarker[]; withoutBox: number } {
   const nameOf = lightNames(lights);
   const markers: LightMarker[] = [];
   let withoutBox = 0;
-  for (const { light, uncertain } of flatLights(lights)) {
+  for (const { light, uncertain } of markerRows(lights, opts.litOnly)) {
     if (light.box === null) {
       withoutBox += 1;
       continue;
@@ -219,14 +230,16 @@ export function badgePlacement(m: Pick<LightMarker, "x" | "y" | "height">): Badg
 
 /**
  * Knappen «Vis lampene i bildet» (TG-NEW-166): bare naar originalen finnes,
- * bildene ikke er slettet (TG-NEW-117) og minst ett lys har boks.
+ * bildene ikke er slettet (TG-NEW-117) og minst ett lys har boks. Med
+ * `litOnly` (megleren, TG-NEW-193) maa et av lysene som tennes ha boks.
  */
 export function canShowMarkers(
-  review: Pick<JobReviewDetail, "images" | "lights" | "mediaDeletedAt">
+  review: Pick<JobReviewDetail, "images" | "lights" | "mediaDeletedAt">,
+  opts: { litOnly: boolean }
 ): boolean {
   return (
     review.images.originalUrl !== null &&
     !mediaDeleted(review) &&
-    flatLights(review.lights).some((f) => f.light.box !== null)
+    markerRows(review.lights, opts.litOnly).some((f) => f.light.box !== null)
   );
 }

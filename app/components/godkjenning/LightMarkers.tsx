@@ -22,6 +22,9 @@ import { markersGate } from "../../lib/orientation";
  * rammen (badgePlacement), og forklaringen under bildet har det samme merket
  * og navnet fra lista. Laget paa bildet er skjult for skjermlesere;
  * forklaringen er lista de leser. To stiler (valg 2 A): fylt og stiplet.
+ *
+ * Megleren (`litOnly`, TG-NEW-193) ser bare lampene som tennes, alle fylt,
+ * uten forklaringen av stilene og uten «Lamper uten plassering».
  */
 
 /** Rammen rundt boksen. Lys kant med moerk ring, saa den synes paa lyse og moerke bilder. */
@@ -52,11 +55,14 @@ export function LightMarkers({
   url,
   lights,
   inputOrientation,
+  litOnly,
   locale,
 }: {
   url: string;
   lights: Lights;
   inputOrientation: InputOrientation | null;
+  /** Bare lampene som tennes (megleren); false er admin. */
+  litOnly: boolean;
   locale: Locale;
 }) {
   // Resultatet gjelder bare URL-en det ble hentet for. Avhenger av om feltet
@@ -74,7 +80,7 @@ export function LightMarkers({
   }, [url, known]);
   const allowed = checked !== null && checked.url === url ? checked.ok : null;
 
-  const { markers, withoutBox } = lightMarkers(lights);
+  const { markers, withoutBox } = lightMarkers(lights, { litOnly });
   return (
     <div className="flex flex-col gap-2">
       <div className="relative overflow-hidden rounded-button border border-line">
@@ -123,17 +129,19 @@ export function LightMarkers({
               );
             })}
           </ol>
-          <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2">
-            <span className="flex items-center gap-1.5">
-              <span aria-hidden="true" className={`h-3.5 w-3.5 rounded-pill ${badgeClass(false)}`} />
-              {t(locale, "markers.styleSure")}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span aria-hidden="true" className={`h-3.5 w-3.5 rounded-pill ${badgeClass(true)}`} />
-              {t(locale, "markers.styleUncertain")}
-            </span>
-          </p>
-          {withoutBox > 0 && <p className="text-xs text-ink-2">{t(locale, "markers.noBox", { n: withoutBox })}</p>}
+          {!litOnly && (
+            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-2">
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden="true" className={`h-3.5 w-3.5 rounded-pill ${badgeClass(false)}`} />
+                {t(locale, "markers.styleSure")}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden="true" className={`h-3.5 w-3.5 rounded-pill ${badgeClass(true)}`} />
+                {t(locale, "markers.styleUncertain")}
+              </span>
+            </p>
+          )}
+          {!litOnly && withoutBox > 0 && <p className="text-xs text-ink-2">{t(locale, "markers.noBox", { n: withoutBox })}</p>}
         </>
       )}
     </div>

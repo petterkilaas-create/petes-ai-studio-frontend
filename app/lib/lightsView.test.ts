@@ -16,6 +16,9 @@ import {
 import { buildCorrection, initialToggles, isOn, setToggle, type Lights } from "./correction.ts";
 import type { LightBox, LightState, ReviewLight } from "./api.ts";
 
+/** Admin ser alle lysene som markoerer (dagens oppfoersel); megleren faar { litOnly: true } (TG-NEW-193). */
+const ALL = { litOnly: false };
+
 /** Lysene slik megleren ser dem (D2b, avvik 3 A). Body bygges uendret av buildCorrection. */
 
 function light(key: string, id: string, run: number | null, state: LightState): ReviewLight {
@@ -269,7 +272,7 @@ test("markoerene har samme nummer og sone som lista, merke A, B, C i rekkefoelge
     rejected: [boxed("r1:L4", "pendant", null), boxed("r1:L5", "spotlight", [10, 10, 20, 20])],
   };
   const nameOf = lightNames(l);
-  const { markers, withoutBox } = lightMarkers(l);
+  const { markers, withoutBox } = lightMarkers(l, ALL);
   assert.equal(withoutBox, 1);
   assert.deepEqual(
     markers.map((m) => [m.light.key, m.letter, m.uncertain, m.name.number]),
@@ -290,11 +293,11 @@ test("knappen vises bare med original, uten sletting og med minst én boks", () 
   const noBox: Lights = { approved: [boxed("L1", "pendant", null)], unstable: [], rejected: [] };
   const review = (originalUrl: string | null, lights: Lights, mediaDeletedAt: string | null = null) =>
     ({ images: { originalUrl }, lights, mediaDeletedAt }) as Parameters<typeof canShowMarkers>[0];
-  assert.equal(canShowMarkers(review("https://x/o.jpg", withBox)), true);
-  assert.equal(canShowMarkers(review(null, withBox)), false);
-  assert.equal(canShowMarkers(review("https://x/o.jpg", withBox, "2026-10-01T00:00:00Z")), false);
-  assert.equal(canShowMarkers(review("https://x/o.jpg", noBox)), false);
-  assert.equal(canShowMarkers(review("https://x/o.jpg", { approved: [], unstable: [], rejected: [] })), false);
+  assert.equal(canShowMarkers(review("https://x/o.jpg", withBox), ALL), true);
+  assert.equal(canShowMarkers(review(null, withBox), ALL), false);
+  assert.equal(canShowMarkers(review("https://x/o.jpg", withBox, "2026-10-01T00:00:00Z"), ALL), false);
+  assert.equal(canShowMarkers(review("https://x/o.jpg", noBox), ALL), false);
+  assert.equal(canShowMarkers(review("https://x/o.jpg", { approved: [], unstable: [], rejected: [] }), ALL), false);
 });
 
 test("TG-166-oppfoelging: merket er A-Z, saa AA, AB ... (valg 1 A)", () => {
@@ -303,7 +306,7 @@ test("TG-166-oppfoelging: merket er A-Z, saa AA, AB ... (valg 1 A)", () => {
 
 test("TG-166-oppfoelging: en lampe alene om typen har ikke nummer, men faar likevel et merke", () => {
   const l: Lights = { approved: [boxed("L1", "pendant", [100, 100, 200, 200])], unstable: [], rejected: [] };
-  const [m] = lightMarkers(l).markers;
+  const [m] = lightMarkers(l, ALL).markers;
   assert.equal(m.name.number, null);
   assert.equal(m.letter, "A");
 });

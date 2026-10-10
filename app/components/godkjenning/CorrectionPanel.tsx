@@ -20,6 +20,9 @@ const BTN_SECONDARY = buttonClass("secondary");
  * avviste har merkelappen «Usikker» og starter som av. Peisspoersmaalet som
  * foer. Tidspunkt og himmel kan ikke endres her ennaa (TG-NEW-145), saa de
  * vises ikke. Body bygges av buildCorrection paa siden, uendret.
+ *
+ * Merkelappen «Usikker» bare for admin (`admin`, TG-NEW-193). Bryterne og
+ * kandidat-flagget mot backend er de samme for alle.
  */
 export function CorrectionPanel({
   lights,
@@ -36,6 +39,7 @@ export function CorrectionPanel({
   onSubmit,
   onCancel,
   locked,
+  admin,
   locale,
 }: {
   lights: Lights;
@@ -53,6 +57,8 @@ export function CorrectionPanel({
   onSubmit: () => void;
   onCancel: () => void;
   locked: boolean;
+  /** Vis «Usikker» (admin). */
+  admin: boolean;
   locale: Locale;
 }) {
   const rows = flatLights(lights);
@@ -91,7 +97,7 @@ export function CorrectionPanel({
                       className={`w-5 h-5 shrink-0 accent-primary ${FOCUS}`}
                     />
                     <span className="flex-1">
-                      <LightLabel light={light} name={nameOf(light)} locale={locale} uncertain={uncertain} state />
+                      <LightLabel light={light} name={nameOf(light)} locale={locale} uncertain={admin && uncertain} state />
                     </span>
                     <span className="text-[13px] text-ink-2">
                       {editable
