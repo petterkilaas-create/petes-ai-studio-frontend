@@ -31,6 +31,7 @@ const ORDER_CODES = [
   "job_create_failed",
   "duplicate_request",
   "invalid_idempotency_key",
+  "unsupported_image",
 ];
 
 const image = () => new File([new Uint8Array([1])], "a.jpg", { type: "image/jpeg" });
@@ -198,7 +199,7 @@ test("TG149: antallet gratisbilder er ikke skrevet inn i ordlista, komponenten e
   assert.doesNotMatch(page, /\b(limit|remaining|used)\s*[:=]\s*\d/);
   assert.doesNotMatch(page, /\b(av|of) \d+ (gratis|free)/);
   assert.match(page, /<QuotaNotice view=\{quotaShown\}/);
-  assert.match(page, /codeText\(locale, "orderError", job\.errorCode\)/);
+  assert.match(page, /orderErrorText\(locale, job\.errorCode, job\.errorReason\)/);
 });
 
 // --- Idempotency-Key ------------------------------------------------------------
