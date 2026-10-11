@@ -1,5 +1,5 @@
 // Bare typer, pluss den rene quota.ts (.ts-endelse: testes med node --test).
-import type { DuskSky, DuskTime, ReviewDusk } from "./dusk";
+import type { DuskSky, DuskStyle, DuskTime, ReviewDusk, ReviewStyle } from "./dusk";
 import type { ReviewDisclosure } from "./disclosure";
 import { parseQuota, type Quota } from "./quota.ts";
 import { getWithRetry, isNetworkError, isRetryableStatus, TransientError } from "./retry.ts";
@@ -31,9 +31,10 @@ export interface ProcessParams {
   force_scene_type?: boolean;
   preset_id?: string;
   quality_tier?: string;
-  /** Skumringsvalg (2f-b): sendes alltid begge for skumring, ellers aldri. */
+  /** Skumringsvalg (2f-b, TG-NEW-189): sendes alltid alle tre for skumring, ellers aldri. */
   dusk_time?: DuskTime;
   dusk_sky?: DuskSky;
+  dusk_style?: DuskStyle;
 }
 
 /**
@@ -882,6 +883,11 @@ export interface JobReviewDetail {
   skyVisibility: RunValue;
   /** Skumringsvalgene (2f-a); null naar backend ikke sender feltet. */
   dusk: ReviewDusk | null;
+  /**
+   * Stilen jobben ba om og stilen gjeldende runde ble laget med (TG-NEW-189).
+   * Mangler feltet (backend foer Stil v2 PR 4): standard bestilt, ingen brukt.
+   */
+  style: ReviewStyle;
   /** Kodene til merketeksten (merking PR 1); null naar ikke skumring eller feltet mangler. */
   disclosure: ReviewDisclosure | null;
   lights: { approved: ReviewLight[]; unstable: ReviewLight[]; rejected: ReviewLight[] };
@@ -970,6 +976,14 @@ function toDusk(raw: unknown): ReviewDusk | null {
     time: stringOrNull(raw.time),
     sky: stringOrNull(raw.sky),
     skyApplied: typeof raw.sky_applied === "boolean" ? raw.sky_applied : null,
+  };
+}
+
+function toStyle(raw: unknown): ReviewStyle {
+  const style = isRecord(raw) ? raw : {};
+  return {
+    requested: stringOrNull(style.requested) ?? "nordic_blue_hour_v1",
+    applied: stringOrNull(style.applied),
   };
 }
 
@@ -1108,6 +1122,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     imageType: toRunValue(r.image_type),
     skyVisibility: toRunValue(r.sky_visibility),
     dusk: toDusk(r.dusk),
+    style: toStyle(r.style),
     disclosure: toDisclosure(r.disclosure),
     lights: {
       approved: records(lights.approved).map(toLight),

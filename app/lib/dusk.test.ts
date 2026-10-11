@@ -18,14 +18,14 @@ test("lovlige himmelvalg per tidspunkt, i riktig rekkefoelge", () => {
   assert.deepEqual(DUSK_SKY_BY_TIME.early, ["clear", "light_clouds", "pink_clouds"]);
   assert.deepEqual(DUSK_SKY_BY_TIME.late, ["dark", "starry"]);
   assert.deepEqual(DUSK_TIMES, ["early", "late"]);
-  assert.deepEqual(DEFAULT_DUSK, { time: "early", sky: "clear" });
+  assert.deepEqual(DEFAULT_DUSK, { time: "early", sky: "clear", style: "nordic_blue_hour_v1" });
 });
 
 test("bytte av tidspunkt nullstiller himmelen til standarden", () => {
-  const pink: DuskChoice = { time: "early", sky: "pink_clouds" };
-  assert.deepEqual(changeTime(pink, "late"), { time: "late", sky: "dark" });
-  const starry: DuskChoice = { time: "late", sky: "starry" };
-  assert.deepEqual(changeTime(starry, "early"), { time: "early", sky: "clear" });
+  const pink: DuskChoice = { time: "early", sky: "pink_clouds", style: "nordic_blue_hour_v1" };
+  assert.deepEqual(changeTime(pink, "late"), { time: "late", sky: "dark", style: "nordic_blue_hour_v1" });
+  const starry: DuskChoice = { time: "late", sky: "starry", style: "nordic_blue_hour_v1" };
+  assert.deepEqual(changeTime(starry, "early"), { time: "early", sky: "clear", style: "nordic_blue_hour_v1" });
   // Samme tidspunkt beholder himmelen.
   assert.deepEqual(changeTime(pink, "early"), pink);
 });
@@ -35,9 +35,9 @@ test("et ugyldig par kan ikke velges eller bygges", () => {
   assert.equal(isValidPair("early", "starry"), false);
   assert.equal(isValidPair("early", "aurora"), false);
   assert.equal(isValidPair("__proto__", "clear"), false);
-  const late: DuskChoice = { time: "late", sky: "dark" };
+  const late: DuskChoice = { time: "late", sky: "dark", style: "nordic_blue_hour_v1" };
   assert.deepEqual(changeSky(late, "pink_clouds"), late);
-  assert.deepEqual(changeSky(late, "starry"), { time: "late", sky: "starry" });
+  assert.deepEqual(changeSky(late, "starry"), { time: "late", sky: "starry", style: "nordic_blue_hour_v1" });
   assert.throws(() =>
     duskParams("scene_transform", "skumring", { time: "late", sky: "pink_clouds" } as DuskChoice)
   );
@@ -46,21 +46,23 @@ test("et ugyldig par kan ikke velges eller bygges", () => {
   );
 });
 
-test("params_json: skumring har alltid begge feltene", () => {
+// TG-NEW-189: dusk_style sendes alltid for skumring, ogsaa standardstilen.
+test("params_json: skumring har alltid alle tre feltene", () => {
   for (const preset of ["skumring", "skumring_interior"]) {
     assert.deepEqual(duskParams("scene_transform", preset, DEFAULT_DUSK), {
       dusk_time: "early",
       dusk_sky: "clear",
+      dusk_style: "nordic_blue_hour_v1",
     });
-    assert.deepEqual(duskParams("scene_transform", preset, { time: "late", sky: "starry" }), {
-      dusk_time: "late",
-      dusk_sky: "starry",
-    });
+    assert.deepEqual(
+      duskParams("scene_transform", preset, { time: "late", sky: "starry", style: "nordic_blue_hour_v1" }),
+      { dusk_time: "late", dusk_sky: "starry", dusk_style: "nordic_blue_hour_v1" }
+    );
   }
 });
 
 test("params_json: andre tjenester og presets faar ingen av feltene", () => {
-  const late: DuskChoice = { time: "late", sky: "starry" };
+  const late: DuskChoice = { time: "late", sky: "starry", style: "warm_dusk_v2" };
   for (const [service, preset] of [
     ["scene_transform", "klart_vaer"],
     ["scene_transform", undefined],
@@ -69,7 +71,7 @@ test("params_json: andre tjenester og presets faar ingen av feltene", () => {
   ] as const) {
     const params = duskParams(service, preset, late);
     assert.deepEqual(params, {}, `${service}/${preset}`);
-    assert.equal("dusk_time" in params || "dusk_sky" in params, false);
+    assert.equal("dusk_time" in params || "dusk_sky" in params || "dusk_style" in params, false);
   }
 });
 

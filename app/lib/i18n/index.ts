@@ -29,6 +29,7 @@ export type CodeGroup =
   | "overrideCode"
   | "duskTime"
   | "duskSky"
+  | "duskStyle"
   | "roundTime"
   | "roundSky"
   | "disclosureBase"
@@ -122,6 +123,15 @@ const nbUi = {
   "dusk.time": "Tidspunkt",
   "dusk.sky": "Himmel",
   "dusk.hint": "Himmelen brukes bare hvis bildet har synlig himmel.",
+  // Stil v2 (TG-NEW-189): «(test)» bare på knappen, ikke i kodegruppen duskStyle.
+  "dusk.style": "Stil",
+  "dusk.styleStandard": "Standard",
+  "dusk.styleWarm": "Varm skumring (test)",
+  "dusk.styleHint": "For utebilder med synlig himmel og minst én lampe",
+  "dusk.styleFallbackNote": "Tidspunkt og himmel brukes hvis varm skumring ikke passer bildet",
+  "review.style": "Stil",
+  "review.styleOrdered": "{applied} (bestilt: {requested})",
+  "review.styleFellBack": "Varm skumring passet ikke dette bildet, så standardstilen ble brukt.",
   "review.duskTitle": "Valgt stemning",
   "review.duskSkyNotApplied": "ikke brukt (ingen himmel i bildet)",
   "review.analysisTitle": "Analyse",
@@ -395,6 +405,12 @@ const nb: Dictionary = {
       pink_clouds: "Rosa skyer",
       dark: "Mørk kveldshimmel",
       starry: "Stjernehimmel",
+      // Stil v2: himmelen backend viser for en runde laget med varm skumring.
+      warm_dusk: "Varm skumring",
+    },
+    duskStyle: {
+      nordic_blue_hour_v1: "Standard",
+      warm_dusk_v2: "Varm skumring",
     },
     // D2a: tidspunkt og himmel i etiketten til en runde, med liten forbokstav.
     roundTime: {
@@ -407,6 +423,7 @@ const nb: Dictionary = {
       pink_clouds: "rosa skyer",
       dark: "mørk kveldshimmel",
       starry: "stjernehimmel",
+      warm_dusk: "varm skumring",
     },
     // Merketeksten (merking PR 2). Settes sammen i app/lib/disclosure.ts,
     // som aldri bruker den generiske teksten: ukjent kode gir ingen tekst.
@@ -458,6 +475,7 @@ const nb: Dictionary = {
     overrideCode: "Valgene kunne ikke brukes. Last siden på nytt og prøv igjen.",
     duskTime: "Ukjent tidspunkt",
     duskSky: "Ukjent himmel",
+    duskStyle: "Ukjent stil",
     roundTime: "ukjent tidspunkt",
     roundSky: "ukjent himmel",
     disclosureBase: "Merketeksten kunne ikke lages.",
@@ -553,6 +571,14 @@ const en: Dictionary = {
     "dusk.time": "Time",
     "dusk.sky": "Sky",
     "dusk.hint": "The sky is only used if the image has visible sky.",
+    "dusk.style": "Style",
+    "dusk.styleStandard": "Standard",
+    "dusk.styleWarm": "Warm dusk (test)",
+    "dusk.styleHint": "For exterior photos with visible sky and at least one lamp",
+    "dusk.styleFallbackNote": "Time and sky are used if warm dusk does not suit the image",
+    "review.style": "Style",
+    "review.styleOrdered": "{applied} (ordered: {requested})",
+    "review.styleFellBack": "Warm dusk did not suit this image, so the standard style was used.",
     "review.duskTitle": "Chosen mood",
     "review.duskSkyNotApplied": "not used (no sky in the image)",
     "review.analysisTitle": "Analysis",
@@ -798,6 +824,11 @@ const en: Dictionary = {
       pink_clouds: "Pink clouds",
       dark: "Dark evening sky",
       starry: "Starry sky",
+      warm_dusk: "Warm dusk",
+    },
+    duskStyle: {
+      nordic_blue_hour_v1: "Standard",
+      warm_dusk_v2: "Warm dusk",
     },
     // D2a: tidspunkt og himmel i etiketten til en runde, med liten forbokstav.
     roundTime: {
@@ -810,6 +841,7 @@ const en: Dictionary = {
       pink_clouds: "pink clouds",
       dark: "dark evening sky",
       starry: "starry sky",
+      warm_dusk: "warm dusk",
     },
     disclosureBase: {
       evening_from_day: "Evening image created with AI from a daytime photo.",
@@ -856,6 +888,7 @@ const en: Dictionary = {
     overrideCode: "Your choices could not be used. Reload the page and try again.",
     duskTime: "Unknown time",
     duskSky: "Unknown sky",
+    duskStyle: "Unknown style",
     roundTime: "unknown time",
     roundSky: "unknown sky",
     disclosureBase: "The disclosure text could not be created.",
