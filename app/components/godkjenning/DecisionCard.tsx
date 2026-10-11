@@ -91,6 +91,9 @@ export function DecisionCard({
             <FireplaceChoice answer={answer} onChange={onAnswer} disabled={locked} locale={locale} />
           )}
 
+          {/* TG-NEW-199: til den automatiske kontrollen er paa plass. Bare naar «Godkjenn» vises. */}
+          {controls.approve && <p className="text-sm text-ink">{t(locale, "action.checkAdded")}</p>}
+
           {controls.none ? (
             // Linja om bare lesing sier det samme lenger opp.
             !readOnly && <p className="text-sm text-ink-2">{t(locale, "action.noneAllowed")}</p>
