@@ -72,7 +72,7 @@ function ExpressContent() {
   // Scene-type-gate-kontroller (kun for scene_transform-kort).
   const [sceneType, setSceneType] = useState<SceneType>("auto");
   const [forceSceneType, setForceSceneType] = useState(false);
-  // Skumringsvalg (2f-b): tidspunkt og himmel, alltid et gyldig par.
+  // Skumringsvalg (2f-b): tidspunkt og himmel, alltid et gyldig par, og stilen (TG-NEW-189).
   const [dusk, setDusk] = useState<DuskChoice>(DEFAULT_DUSK);
 
   const locale = useLocale();
@@ -148,7 +148,7 @@ function ExpressContent() {
         ...(showSceneControls
           ? { scene_type: sceneType, force_scene_type: forceSceneType }
           : {}),
-        // Skumring: alltid begge feltene; andre kort: ingen (2f-b).
+        // Skumring: alltid tid, himmel og stil; andre kort: ingen (2f-b, TG-NEW-189).
         ...duskParams(selectedTool.service, selectedTool.presetId, dusk),
       });
     } else {
