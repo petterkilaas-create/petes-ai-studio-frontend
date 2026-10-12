@@ -1,4 +1,4 @@
-import type { BrightnessStep, DecisionAction, DecisionRequest, JobReviewDetail } from "./api";
+import type { AdditionsLevel, BrightnessStep, DecisionAction, DecisionRequest, JobReviewDetail } from "./api";
 import type { UiKey } from "./i18n";
 
 /**
@@ -79,18 +79,30 @@ export function reasonTooLong(text: string): boolean {
 }
 
 /**
+ * Sendes `additions_acknowledged: true` (TG-NEW-199)? Bare ved approve, bare
+ * ved `warning` og bare naar krysset er satt. Med andre handlinger gir
+ * feltet 422.
+ */
+export function sendAcknowledged(action: DecisionAction, level: AdditionsLevel, acknowledged: boolean): boolean {
+  return action === "approve" && level === "warning" && acknowledged;
+}
+
+/**
  * Body for POST …/decision. Begrunnelse sendes bare ved reject og bare
  * naar den ikke er tom; peissvar bare ved continue. `expected_version` er
  * versjonen i review-svaret siden viser (TG-NEW-130), utelatt uten version.
  * `brightness_step` bare ved approve og bare naar slideren vises
- * (TG-NEW-147); null gir samme body som foer.
+ * (TG-NEW-147); null gir samme body som foer. `additions_acknowledged`
+ * bare ved approve naar kontrollen ga `warning` og krysset er satt
+ * (TG-NEW-199); med andre handlinger gir feltet 422.
  */
 export function buildDecision(
   action: DecisionAction,
   reason: string,
   answer: FireplaceAnswer,
-  review: Pick<JobReviewDetail, "version">,
-  brightnessStep: BrightnessStep | null = null
+  review: Pick<JobReviewDetail, "version"> & Partial<Pick<JobReviewDetail, "additionsCheck">>,
+  brightnessStep: BrightnessStep | null = null,
+  acknowledged = false
 ): DecisionRequest {
   const body: DecisionRequest = { action };
   const trimmed = reason.trim();
@@ -98,6 +110,9 @@ export function buildDecision(
   if (action === "continue" && answer !== null) body.fireplace_fire = answer;
   if (review.version !== null) body.expected_version = review.version;
   if (action === "approve" && brightnessStep !== null) body.brightness_step = brightnessStep;
+  if (sendAcknowledged(action, review.additionsCheck?.level ?? "unchecked", acknowledged)) {
+    body.additions_acknowledged = true;
+  }
   return body;
 }
 

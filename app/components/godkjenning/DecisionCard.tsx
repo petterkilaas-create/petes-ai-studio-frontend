@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { REASON_MAX_LEN, type DecisionAction } from "../../lib/api";
+import { REASON_MAX_LEN, type AdditionsCheck, type DecisionAction } from "../../lib/api";
+import { additionsSentences, additionsView, approveEnabled } from "../../lib/additions";
 import { codeText, t, type Locale } from "../../lib/i18n";
 import {
   reasonLength,
@@ -25,6 +26,10 @@ const BTN_DANGER = buttonClass("danger");
  * `allowed_actions` (via decisionControls). «Korriger bildet» aapner
  * rettingen (`correction`) i samme kort. Avvisning med begrunnelse og
  * peisspoersmaalet for «Send videre» som foer.
+ *
+ * Kontrollen av tillegg (TG-NEW-199 PR 4): over sjekklista staar advarselen,
+ * merknaden eller «Ikke kontrollert», og ved advarsel et kryss som maa
+ * settes foer «Godkjenn». Alt bare naar «Godkjenn» vises, og ikke i rettingen.
  */
 export function DecisionCard({
   reviewCode,
@@ -45,6 +50,9 @@ export function DecisionCard({
   onDecide,
   onStartCorrection,
   correction,
+  additions,
+  acknowledged,
+  onAcknowledged,
   message,
   locale,
 }: {
@@ -69,10 +77,17 @@ export function DecisionCard({
   onStartCorrection: () => void;
   /** CorrectionPanel naar brukeren retter, ellers null. */
   correction: ReactNode | null;
+  /** Kontrollen av tillegg for gjeldende runde. */
+  additions: AdditionsCheck;
+  /** Krysset «Jeg har sjekket de markerte stedene.» (bare ved advarsel). */
+  acknowledged: boolean;
+  onAcknowledged: (on: boolean) => void;
   message: string | null;
   locale: Locale;
 }) {
   const tooLong = reasonTooLong(reasonText);
+  const view = additionsView(additions.level);
+  const sentences = additionsSentences(locale, additions);
   return (
     <section className={`${CARD} flex flex-col gap-4`}>
       {roundFailed && (
@@ -91,8 +106,40 @@ export function DecisionCard({
             <FireplaceChoice answer={answer} onChange={onAnswer} disabled={locked} locale={locale} />
           )}
 
-          {/* TG-NEW-199: til den automatiske kontrollen er paa plass. Bare naar «Godkjenn» vises. */}
-          {controls.approve && <p className="text-sm text-ink">{t(locale, "action.checkAdded")}</p>}
+          {/* TG-NEW-199: kontrollen, sjekklista og krysset. Bare naar «Godkjenn» vises. */}
+          {controls.approve && (
+            <div className="flex flex-col gap-3">
+              {view.notice === "warning" && (
+                <div className="flex flex-col gap-2 text-sm text-red-fg bg-red-bg rounded-button p-3 break-words" role="alert">
+                  <p>{sentences.warning}</p>
+                  {sentences.note !== null && <p>{sentences.note}</p>}
+                </div>
+              )}
+              {view.notice === "note" && (
+                <p className="text-sm text-amber-fg bg-amber-bg rounded-button p-3 break-words" role="status">
+                  {sentences.note}
+                </p>
+              )}
+              {view.notice === "unchecked" && (
+                <p className="text-sm text-ink-2" role="status">
+                  {t(locale, "additions.unchecked")}
+                </p>
+              )}
+              <p className="text-sm text-ink">{t(locale, "action.checkAdded")}</p>
+              {view.needsAck && (
+                <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={acknowledged}
+                    disabled={locked}
+                    onChange={(e) => onAcknowledged(e.target.checked)}
+                    className={`w-5 h-5 mt-0.5 shrink-0 accent-primary ${FOCUS}`}
+                  />
+                  <span>{t(locale, "additions.ack")}</span>
+                </label>
+              )}
+            </div>
+          )}
 
           {controls.none ? (
             // Linja om bare lesing sier det samme lenger opp.
@@ -102,7 +149,7 @@ export function DecisionCard({
               {controls.approve && (
                 <button
                   onClick={() => onDecide("approve")}
-                  disabled={locked}
+                  disabled={locked || !approveEnabled(additions.level, acknowledged)}
                   aria-busy={approving}
                   className={BTN_PRIMARY}
                 >

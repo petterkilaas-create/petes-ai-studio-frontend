@@ -118,7 +118,9 @@ const STEP_RETRY_CODES: ReadonlySet<string> = new Set(["raw_missing", "raw_misma
 /**
  * KONTRAKT_LYSSTYRKE §3. 422 og trinn som ikke kan lages, laaser ikke
  * knappene, saa megleren kan velge et annet trinn. `brightness_unavailable`
- * henter siden paa nytt. Andre 409 laaser som foer.
+ * henter siden paa nytt. `additions_not_acknowledged` (TG-NEW-199): krysset
+ * manglet ved advarsel; siden hentes paa nytt og laases ikke. Andre 409
+ * laaser som foer.
  */
 export function blockedResult(out: Extract<DecisionOutcome, { kind: "blocked" }>): BlockedResult {
   if (out.code === "invalid_decision" && out.fields.includes("brightness_step")) {
@@ -128,5 +130,6 @@ export function blockedResult(out: Extract<DecisionOutcome, { kind: "blocked" }>
   if (out.code === "invalid_decision") return { message, block: false, refetch: false };
   if (out.code !== null && STEP_RETRY_CODES.has(out.code)) return { message, block: false, refetch: false };
   if (out.code === "brightness_unavailable") return { message, block: false, refetch: true };
+  if (out.code === "additions_not_acknowledged") return { message, block: false, refetch: true };
   return { message, block: true, refetch: false };
 }

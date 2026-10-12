@@ -23,6 +23,8 @@ export type CodeGroup =
   | "lightType"
   | "lightReason"
   | "lightZone"
+  | "additionType"
+  | "additionTypePlural"
   | "imageType"
   | "skyVisibility"
   | "decisionError"
@@ -96,6 +98,17 @@ const nbUi = {
   "action.correct": "Korriger bildet",
   "action.makeNewImage": "Lag nytt bilde",
   "action.checkAdded": "Sjekk at bildet ikke har fått nye vinduer, dører, lamper eller glass i dører. Sammenlign med originalen.",
+  // TG-NEW-199 PR 4: kontrollen av tillegg (Petter 12.10, V1 A, V2 A, V3 A).
+  "additions.warning": "Kontrollen fant mulige tillegg: {list}. Se markeringene i bildet.",
+  "additions.note": "Kontrollen fant noe du bør se på: {list}.",
+  "additions.unchecked": "Ikke kontrollert automatisk.",
+  "additions.ack": "Jeg har sjekket de markerte stedene.",
+  "additions.and": "og",
+  "additions.show": "Vis mulige tillegg",
+  "additions.listLabel": "Mulige tillegg i bildet",
+  "additions.noBox": "Uten plassering i bildet: {n}",
+  "additions.kindWarning": "advarsel",
+  "additions.kindNote": "merknad",
   "correct.title": "Korriger lyskildene",
   "correct.hint": "Slå lysene av eller på nedenfor.",
   "correct.roundsLeft": "Runder igjen: {n}",
@@ -392,6 +405,8 @@ const nb: Dictionary = {
       brightness_failed: "Bildet med valgt lysstyrke kunne ikke lages. Ingenting er endret. Prøv igjen.",
       // TG-NEW-117: en fane som stod åpen mens bildene ble slettet.
       media_deleted: "Bildene er slettet, så jobben kan ikke godkjennes eller rettes lenger.",
+      // TG-NEW-199 PR 4: «Godkjenn» ved advarsel uten krysset.
+      additions_not_acknowledged: "Kryss av for at du har sjekket de markerte stedene, og godkjenn på nytt.",
     },
     overrideCode: {
       too_many_lights: "For mange lyskilder er slått på. Slå av noen og prøv igjen.",
@@ -444,6 +459,27 @@ const nb: Dictionary = {
       candles: "stearinlys",
       fireplace_fire: "ild i peisen",
     },
+    // TG-NEW-199 PR 4: typene fra kontrollen av tillegg, i listene (additions.ts).
+    additionType: {
+      new_window: "nytt vindu",
+      glass_in_door: "glass i dør",
+      new_door: "ny dør",
+      new_lamp: "ny lampe",
+      new_opening: "ny åpning",
+      other_structure: "annen endring i bygget",
+      changed_lamp: "endret lampe",
+      light_through_opening: "lys gjennom åpning",
+    },
+    additionTypePlural: {
+      new_window: "{n} nye vinduer",
+      glass_in_door: "glass i {n} dører",
+      new_door: "{n} nye dører",
+      new_lamp: "{n} nye lamper",
+      new_opening: "{n} nye åpninger",
+      other_structure: "{n} andre endringer i bygget",
+      changed_lamp: "{n} endrede lamper",
+      light_through_opening: "lys gjennom {n} åpninger",
+    },
     // TG-NEW-149 (KONTRAKT_KVOTE): feil fra bestillingen, POST /v1/process.
     orderError: {
       free_quota_exhausted: "Du har brukt alle gratisbildene dine. Du kan ikke bestille flere kveldsbilder nå.",
@@ -470,6 +506,8 @@ const nb: Dictionary = {
     lightType: "Lyskilde",
     lightReason: "Ikke godkjent",
     lightZone: "ukjent plassering",
+    additionType: "annen endring",
+    additionTypePlural: "{n} andre endringer",
     imageType: "Ukjent bildetype",
     skyVisibility: "Ukjent",
     decisionError: "Noe gikk galt. Prøv igjen senere.",
@@ -546,6 +584,16 @@ const en: Dictionary = {
     "action.correct": "Correct image",
     "action.makeNewImage": "Create new image",
     "action.checkAdded": "Check that the image has no new windows, doors, lamps or glass in doors. Compare with the original.",
+    "additions.warning": "The check found possible additions: {list}. See the markings in the image.",
+    "additions.note": "The check found something you should look at: {list}.",
+    "additions.unchecked": "Not checked automatically.",
+    "additions.ack": "I have checked the marked places.",
+    "additions.and": "and",
+    "additions.show": "Show possible additions",
+    "additions.listLabel": "Possible additions in the image",
+    "additions.noBox": "Without a position in the image: {n}",
+    "additions.kindWarning": "warning",
+    "additions.kindNote": "note",
     "correct.title": "Correct the light sources",
     "correct.hint": "Turn the lights on or off below.",
     "correct.roundsLeft": "Rounds left: {n}",
@@ -812,6 +860,7 @@ const en: Dictionary = {
       raw_mismatch: "This step cannot be created right now. Choose the step the image started on, or try again later.",
       brightness_failed: "The image with the chosen brightness could not be created. Nothing was changed. Please try again.",
       media_deleted: "The images have been deleted, so the job can no longer be approved or corrected.",
+      additions_not_acknowledged: "Tick the box to confirm you have checked the marked places, then approve again.",
     },
     overrideCode: {
       too_many_lights: "Too many light sources are turned on. Turn some off and try again.",
@@ -861,6 +910,26 @@ const en: Dictionary = {
       candles: "candles",
       fireplace_fire: "fire in the fireplace",
     },
+    additionType: {
+      new_window: "new window",
+      glass_in_door: "glass in door",
+      new_door: "new door",
+      new_lamp: "new lamp",
+      new_opening: "new opening",
+      other_structure: "other change to the building",
+      changed_lamp: "changed lamp",
+      light_through_opening: "light through opening",
+    },
+    additionTypePlural: {
+      new_window: "{n} new windows",
+      glass_in_door: "glass in {n} doors",
+      new_door: "{n} new doors",
+      new_lamp: "{n} new lamps",
+      new_opening: "{n} new openings",
+      other_structure: "{n} other changes to the building",
+      changed_lamp: "{n} changed lamps",
+      light_through_opening: "light through {n} openings",
+    },
     orderError: {
       free_quota_exhausted: "You have used all your free images. You cannot order more dusk images right now.",
       daily_capacity_reached: "We are not accepting more free orders today. Please try again later.",
@@ -884,6 +953,8 @@ const en: Dictionary = {
     lightType: "Light source",
     lightReason: "Not approved",
     lightZone: "unknown position",
+    additionType: "other change",
+    additionTypePlural: "{n} other changes",
     imageType: "Unknown image type",
     skyVisibility: "Unknown",
     decisionError: "Something went wrong. Please try again later.",

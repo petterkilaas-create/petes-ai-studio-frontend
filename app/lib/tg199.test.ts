@@ -7,10 +7,11 @@ import { t } from "./i18n/index.ts";
 import { decisionControls } from "./review.ts";
 import type { DecisionAction } from "./api.ts";
 
-// TG-NEW-199 (Petter 11.10, valg A): til den automatiske kontrollen er paa
-// plass, minner godkjenningssiden megleren paa aa sjekke at bildemodellen
-// ikke har lagt til noe. Én linje over knappene, bare naar «Godkjenn» vises,
-// for begge stiler og begge roller. Ingen avkrysning.
+// TG-NEW-199 (Petter 11.10, valg A): godkjenningssiden minner megleren paa
+// aa sjekke at bildemodellen ikke har lagt til noe. Én linje over knappene,
+// bare naar «Godkjenn» vises, for begge stiler og begge roller. Linja staar
+// ogsaa etter PR 4, under advarselen eller merknaden fra kontrollen
+// (tg199pr4.test.ts), fordi kontrollen ikke ser alt.
 const APP = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(join(APP, rel), "utf8");
 /** Uten kommentarer, saa en kommentar ikke kan oppfylle eller bryte en sjekk. */
@@ -30,10 +31,11 @@ test("TG199: teksten paa norsk og engelsk", () => {
 test("TG199: linja vises bare sammen med «Godkjenn» (controls.approve)", () => {
   const uses = card.match(/"action\.checkAdded"/g) ?? [];
   assert.equal(uses.length, 1, "linja står én gang i kortet");
-  assert.match(
-    card,
-    /\{controls\.approve && <p className="text-sm text-ink">\{t\(locale, "action\.checkAdded"\)\}<\/p>\}/
-  );
+  // Linja står i blokka som bare vises med controls.approve, og blokka slutter etter linja.
+  const block = card.indexOf("{controls.approve && (\n            <div");
+  const line = card.indexOf('<p className="text-sm text-ink">{t(locale, "action.checkAdded")}</p>');
+  const blockEnd = card.indexOf("</div>\n          )}", block);
+  assert.ok(block !== -1 && line > block && line < blockEnd, "linja er inne i controls.approve-blokka");
   // Samme vern som knappen.
   assert.match(card, /\{controls\.approve && \(\s*<button\s+onClick=\{\(\) => onDecide\("approve"\)\}/);
 });

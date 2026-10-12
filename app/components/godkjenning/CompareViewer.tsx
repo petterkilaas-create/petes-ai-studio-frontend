@@ -20,9 +20,14 @@ import { choiceClass, FOCUS, LABEL } from "./classes";
  * med visningsknappene og viser `lightsView` (originalen med markoerer) i
  * stedet for glideren. Siden lager visningen; denne fila importerer den ikke,
  * saa markoerene aldri tegnes paa glideren.
+ *
+ * «Vis mulige tillegg» (TG-NEW-199 PR 4) virker paa samme maate med
+ * `additionsView` (resultatbildet med boksene fra kontrollen). De to
+ * visningene utelukker hverandre.
  */
 
 type Mode = "slider" | "side" | "result";
+type Overlay = "lights" | "additions" | null;
 
 const MODES: { mode: Mode; key: "compare.mode.slider" | "compare.mode.side" | "compare.mode.result" }[] = [
   { mode: "slider", key: "compare.mode.slider" },
@@ -159,6 +164,7 @@ export function CompareViewer({
   placeholder,
   onResultLoad,
   lightsView = null,
+  additionsView = null,
   locale,
 }: {
   originalUrl: string | null;
@@ -170,17 +176,21 @@ export function CompareViewer({
   onResultLoad?: () => void;
   /** Originalen med markoerer (TG-NEW-166); null skjuler knappen. */
   lightsView?: ReactNode;
+  /** Resultatbildet med boksene fra kontrollen av tillegg (TG-NEW-199); null skjuler knappen. */
+  additionsView?: ReactNode;
   locale: Locale;
 }) {
   const [mode, setMode] = useState<Mode>("slider");
-  const [lightsOn, setLightsOn] = useState(false);
-  const showLights = lightsOn && lightsView !== null;
+  const [overlay, setOverlay] = useState<Overlay>(null);
+  const showLights = overlay === "lights" && lightsView !== null;
+  const showAdditions = overlay === "additions" && additionsView !== null;
+  const toggle = (o: Exclude<Overlay, null>) => setOverlay(overlay === o ? null : o);
 
   const lightsButton =
     lightsView === null ? null : (
       <button
         type="button"
-        onClick={() => setLightsOn(!lightsOn)}
+        onClick={() => toggle("lights")}
         aria-pressed={showLights}
         className={choiceClass(showLights, "rounded-pill")}
       >
@@ -188,14 +198,27 @@ export function CompareViewer({
       </button>
     );
 
+  const additionsButton =
+    additionsView === null ? null : (
+      <button
+        type="button"
+        onClick={() => toggle("additions")}
+        aria-pressed={showAdditions}
+        className={choiceClass(showAdditions, "rounded-pill")}
+      >
+        {t(locale, "additions.show")}
+      </button>
+    );
+
   if (result === null) {
-    if (lightsButton === null) return <OriginalImage url={originalUrl} locale={locale} />;
+    if (lightsButton === null && additionsButton === null) return <OriginalImage url={originalUrl} locale={locale} />;
     return (
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-2" role="group" aria-label={t(locale, "compare.mode")}>
           {lightsButton}
+          {additionsButton}
         </div>
-        {showLights ? lightsView : <OriginalImage url={originalUrl} locale={locale} />}
+        {showLights ? lightsView : showAdditions ? additionsView : <OriginalImage url={originalUrl} locale={locale} />}
       </div>
     );
   }
@@ -214,21 +237,26 @@ export function CompareViewer({
             type="button"
             onClick={() => {
               setMode(m);
-              setLightsOn(false);
+              setOverlay(null);
             }}
             disabled={m === "slider" && !canSlide}
-            aria-pressed={!showLights && shown === m}
-            className={choiceClass(!showLights && shown === m, "rounded-pill disabled:cursor-not-allowed disabled:opacity-50")}
+            aria-pressed={!showLights && !showAdditions && shown === m}
+            className={choiceClass(
+              !showLights && !showAdditions && shown === m,
+              "rounded-pill disabled:cursor-not-allowed disabled:opacity-50"
+            )}
           >
             {t(locale, key)}
           </button>
         ))}
         {lightsButton}
+        {additionsButton}
       </div>
 
       {showLights && lightsView}
+      {showAdditions && additionsView}
 
-      {!showLights && shown === "slider" && originalUrl !== null && result.url !== null && (
+      {!showLights && !showAdditions && shown === "slider" && originalUrl !== null && result.url !== null && (
         <Slider
           originalUrl={originalUrl}
           aiUrl={result.url}
@@ -238,7 +266,7 @@ export function CompareViewer({
         />
       )}
 
-      {!showLights && shown === "side" && (
+      {!showLights && !showAdditions && shown === "side" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className={`${LABEL} mb-2`}>{t(locale, "review.original")}</p>
@@ -251,7 +279,7 @@ export function CompareViewer({
         </div>
       )}
 
-      {!showLights && shown === "result" && (
+      {!showLights && !showAdditions && shown === "result" && (
         <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} onLoad={onResultLoad} />
       )}
     </div>
