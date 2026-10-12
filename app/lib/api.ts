@@ -838,6 +838,31 @@ export interface ReviewBrightness {
   steps: ReviewBrightnessStep[];
 }
 
+/**
+ * Kontrollen av tillegg (TG-NEW-199, backend #174): mulige tillegg i
+ * resultatbildet for gjeldende runde. Frontend styrer bare paa `level`;
+ * backend har regnet det ut. Ukjent eller manglende nivaa blir `unchecked`.
+ */
+export type AdditionsLevel = "warning" | "note" | "none" | "unchecked";
+
+export interface AdditionItem {
+  kind: "warning" | "note";
+  /** Kode, f.eks. "new_window"; ukjent type gir «annen endring». */
+  type: string | null;
+  /** `[ymin, xmin, ymax, xmax]` (0-1000) i resultatbildet, ikke originalen; null uten boks. */
+  box: LightBox | null;
+  confidence: string | null;
+  /** Fritekst fra modellen (engelsk). Vises bare for admin. */
+  location: string | null;
+}
+
+export interface AdditionsCheck {
+  /** Bare for logg og feilsoeking; visningen bruker `level`. */
+  status: string | null;
+  level: AdditionsLevel;
+  items: AdditionItem[];
+}
+
 export interface RunValue {
   value: string | null;
   runValues: string[];
@@ -926,6 +951,8 @@ export interface JobReviewDetail {
    * Da sjekker markoerene retningen i originalen selv (orientation.ts).
    */
   inputOrientation: InputOrientation | null;
+  /** Kontrollen av tillegg for gjeldende runde (TG-NEW-199). Mangler feltet: `unchecked`. */
+  additionsCheck: AdditionsCheck;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1085,6 +1112,35 @@ export function toInputOrientation(raw: unknown): InputOrientation | null {
   return { value, applied: raw.applied };
 }
 
+const ADDITIONS_LEVELS: ReadonlySet<string> = new Set(["warning", "note", "none", "unchecked"]);
+
+/**
+ * `additions_check` (TG-NEW-199): strengt lest. Ukjent nivaa gir `unchecked`,
+ * poster med ukjent `kind` hoppes over, og en ugyldig boks blir null (posten
+ * vises da bare i lista).
+ */
+export function toAdditionsCheck(raw: unknown): AdditionsCheck {
+  if (!isRecord(raw)) return { status: null, level: "unchecked", items: [] };
+  const level = stringOrNull(raw.level);
+  return {
+    status: stringOrNull(raw.status),
+    level: level !== null && ADDITIONS_LEVELS.has(level) ? (level as AdditionsLevel) : "unchecked",
+    items: records(raw.items).flatMap((item): AdditionItem[] =>
+      item.kind === "warning" || item.kind === "note"
+        ? [
+            {
+              kind: item.kind,
+              type: stringOrNull(item.type),
+              box: toLightBox(item.box),
+              confidence: stringOrNull(item.confidence),
+              location: stringOrNull(item.location),
+            },
+          ]
+        : []
+    ),
+  };
+}
+
 function toRunValue(raw: unknown): RunValue {
   const r = isRecord(raw) ? raw : {};
   return { value: stringOrNull(r.value), runValues: stringList(r.run_values) };
@@ -1155,6 +1211,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     brightness: toBrightness(r.brightness),
     mediaDeletedAt: nonEmptyString(r.media_deleted_at),
     inputOrientation: toInputOrientation(r.input_orientation),
+    additionsCheck: toAdditionsCheck(r.additions_check),
   };
 }
 
@@ -1239,6 +1296,8 @@ export interface DecisionRequest {
   expected_version?: number;
   /** Bare ved approve naar lysstyrke finnes (TG-NEW-147). */
   brightness_step?: BrightnessStep;
+  /** Bare ved approve naar kontrollen ga `warning` (TG-NEW-199); ellers 422. */
+  additions_acknowledged?: boolean;
 }
 
 /**
@@ -1251,6 +1310,7 @@ export interface DecisionRequest {
  * - blocked (409 action_not_allowed/original_missing/correction_limit/
  *   media_deleted, 422 invalid_decision med eventuell override_code):
  *   vis melding. media_deleted (TG-NEW-117): bildene er slettet.
+ *   additions_not_acknowledged (TG-NEW-199): krysset mangler ved advarsel.
  * - unavailable (503): archive_failed eller backend uten database; trygt aa
  *   proeve igjen.
  * - not_found (404), error (alt annet).

@@ -43,6 +43,7 @@ import { canDownload } from "@/app/lib/download";
 import { formatDate } from "@/app/lib/dates";
 import { compareVariants, selectedVariant, variantLabel } from "@/app/lib/compare";
 import { canShowMarkers } from "@/app/lib/lightsView";
+import { canShowAdditions } from "@/app/lib/additions";
 import {
   blockedResult,
   brightnessResultUrl,
@@ -58,6 +59,7 @@ import { buttonClass } from "@/app/components/ui/Button";
 import { cardClass } from "@/app/components/ui/Card";
 import { CompareViewer } from "@/app/components/godkjenning/CompareViewer";
 import { LightMarkers } from "@/app/components/godkjenning/LightMarkers";
+import { AdditionMarkers } from "@/app/components/godkjenning/AdditionMarkers";
 import { VariantPicker } from "@/app/components/godkjenning/VariantPicker";
 import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
 import { CorrectionPanel } from "@/app/components/godkjenning/CorrectionPanel";
@@ -96,6 +98,10 @@ import { FOCUS } from "@/app/components/godkjenning/classes";
  * uten view_all skjules job-id, grunnen til at jobben venter, valgene i
  * rundeetiketten, usikre lys (rettingen og markoerene), peisen og «ikke
  * brukt» om himmelen. Admin (adminView) ser alt som foer.
+ *
+ * Kontrollen av tillegg (TG-NEW-199 PR 4): ved `warning` maa krysset settes
+ * foer «Godkjenn», og det sendes med som `additions_acknowledged`. Krysset
+ * nullstilles ved hver ny henting (ny runde, eller 409 uten kryss).
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -137,6 +143,8 @@ export default function GodkjenningPage({
   const [correctAnswer, setCorrectAnswer] = useState<FireplaceAnswer>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
+  // «Jeg har sjekket de markerte stedene.» (TG-NEW-199). Gjelder bare runden siden viser.
+  const [acknowledged, setAcknowledged] = useState(false);
   // Synkront vern mot dobbeltklikk; busy-state rekker ikke aa oppdatere
   // mellom to raske klikk. Backend har ogsaa eget vern.
   const inFlight = useRef(false);
@@ -165,6 +173,7 @@ export default function GodkjenningPage({
     setVariantId(null);
     setChosenStep(null);
     setResultLoaded(false);
+    setAcknowledged(false);
   }, [jobId, getToken]);
 
   useEffect(() => {
@@ -210,7 +219,7 @@ export default function GodkjenningPage({
       send: () =>
         postDecision({
           jobId,
-          decision: buildDecision(action, reasonText, answer, review, brightnessStep),
+          decision: buildDecision(action, reasonText, answer, review, brightnessStep, acknowledged),
           getToken,
         }),
       // Etter 200 og 409 status_changed (ny versjon, TG-NEW-130).
@@ -488,6 +497,16 @@ export default function GodkjenningPage({
                               />
                             ) : null
                           }
+                          additionsView={
+                            canShowAdditions(review) && review.images.previewUrl !== null ? (
+                              <AdditionMarkers
+                                url={review.images.previewUrl}
+                                items={review.additionsCheck.items}
+                                admin={admin}
+                                locale={locale}
+                              />
+                            ) : null
+                          }
                           locale={locale}
                         />
                         {brightness.kind === "control" && step !== null && (
@@ -573,6 +592,9 @@ export default function GodkjenningPage({
                             />
                           ) : null
                         }
+                        additions={review.additionsCheck}
+                        acknowledged={acknowledged}
+                        onAcknowledged={setAcknowledged}
                         message={messageText}
                         locale={locale}
                       />

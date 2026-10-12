@@ -648,8 +648,12 @@ test("TG-NEW-148: bare «Detaljer» (admin) viser analysens plassering; alle vis
     for (const use of usesOf(f)) assert.match(use, /name=\{nameOf\(light\)\}/, f);
     assert.match(src, /const nameOf = lightNames\((review\.)?lights\);/, f);
   }
-  // Ingen andre steder leser plasseringen direkte.
-  for (const f of ["(app)/godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("LightLabel.tsx"))]) {
+  // Ingen andre steder leser plasseringen direkte. AdditionMarkers viser
+  // kontrollens plassering bare for admin (TG-NEW-199 PR 4, testet i tg199pr4.test.ts).
+  for (const f of [
+    "(app)/godkjenning/[jobId]/page.tsx",
+    ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("LightLabel.tsx") && !f.endsWith("AdditionMarkers.tsx")),
+  ]) {
     assert.doesNotMatch(withoutComments(read(f)), /\.location\b/, f);
   }
   // Typenavnet kommer bare via lightText (nummeret), ikke direkte fra ordlista.
@@ -685,8 +689,8 @@ test("TG-NEW-166: markoerene brukes bare av godkjenningssiden, aldri av glideren
   const viewer = withoutComments(read("components/godkjenning/CompareViewer.tsx"));
   const slider = viewer.slice(viewer.indexOf("function Slider("), viewer.indexOf("export function CompareViewer("));
   assert.ok(slider.length > 0);
-  assert.doesNotMatch(slider, /lightsView|showLights/);
-  assert.match(viewer, /\{!showLights && shown === "slider" && /);
+  assert.doesNotMatch(slider, /lightsView|showLights|additionsView|showAdditions/);
+  assert.match(viewer, /\{!showLights && !showAdditions && shown === "slider" && /);
   assert.match(viewer, /aria-pressed=\{showLights\}/);
   assert.match(viewer, /t\(locale, "markers\.show"\)/);
 });
@@ -916,7 +920,7 @@ test("TG147: siden skjuler «Rått», viser kontrollen under bildet og sender tr
   assert.match(page, /locked=\{locked\}\s*preload=\{preloadUrls\(brightness\.steps, step\)\}/);
   // Godkjenningen: trinnet med, gjennom runDecision (vern mot dobbeltklikk).
   assert.match(page, /onDecide=\{\(action\) => decide\(action, step\)\}/);
-  assert.match(page, /buildDecision\(action, reasonText, answer, review, brightnessStep\)/);
+  assert.match(page, /buildDecision\(action, reasonText, answer, review, brightnessStep, acknowledged\)/);
   assert.match(page, /void runDecision\(\{\s*inFlight,/);
   assert.match(page, /approving=\{isApproving\(pending\)\}/);
   // Ny henting (ny runde) starter paa default_step igjen.
@@ -930,7 +934,7 @@ test("TG147: Godkjenn-knappen viser «Godkjenner …» og er laast mens kallet p
   const card = withoutComments(read("components/godkjenning/DecisionCard.tsx"));
   assert.match(
     card,
-    /onClick=\{\(\) => onDecide\("approve"\)\}\s*disabled=\{locked\}\s*aria-busy=\{approving\}[\s\S]*?\{approving \? t\(locale, "action\.approving"\) : t\(locale, "action\.approve"\)\}/
+    /onClick=\{\(\) => onDecide\("approve"\)\}\s*disabled=\{locked \|\| !approveEnabled\(additions\.level, acknowledged\)\}\s*aria-busy=\{approving\}[\s\S]*?\{approving \? t\(locale, "action\.approving"\) : t\(locale, "action\.approve"\)\}/
   );
 });
 
