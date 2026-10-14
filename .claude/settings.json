@@ -1,9 +1,34 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git fetch *)",
+      "Bash(git rev-parse *)",
+      "Bash(shasum *)",
+      "Bash(cmp *)",
+      "Bash(file *)",
+      "Bash(wc *)",
+      "Bash(npm test *)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npm run lint)"
+    ],
     "deny": [
       "Bash(git push*)",
       "Read(**/.env)",
-      "Read(**/.env.*)"
+      "Read(**/.env.*)",
+      "Bash(gh *)",
+      "Bash(rm *)",
+      "Bash(git clean *)",
+      "Bash(git worktree remove *)",
+      "Bash(git branch -d *)",
+      "Bash(git branch -D *)",
+      "Bash(git reset --hard *)",
+      "Bash(git restore *)",
+      "Bash(git checkout -- *)",
+      "Bash(git checkout .*)"
     ]
   }
 }
