@@ -52,7 +52,12 @@ utover det som staar her.
   maa `/no` ogsaa tas ut av matcheren i `proxy.ts`; testen sjekker det).
 
 ## Kommandoer
-- Ved oppstart av oekt: `git checkout main && git pull`.
+- Ved oppstart av oekt i hovedmappa: `git checkout main && git pull`. I en
+  ekstra worktree-mappe (`~/dev/petes-ai-studio-frontend-2`): `git fetch origin
+  && git status` (`main` kan ikke sjekkes ut der), ny branch med
+  `git switch --no-track -c dagNN-<kort-beskrivelse> origin/main`, og
+  `node_modules` lages der med `npm ci` (aldri lenkes). Bare en dev-server om
+  gangen.
 - Installer fra lockfila med `npm ci`. `npm install` kan endre
   `package-lock.json` - commit aldri lockfil-endringer du ikke ble bedt om.
 - Typesjekk (porten lokalt): `npx tsc --noEmit` - forventet rent.
@@ -102,14 +107,28 @@ utover det som staar her.
 2. Next.js-konvensjoner: les relevant guide i `node_modules/next/dist/docs/`
    (se AGENTS.md) og speil eksisterende sider i repoet heller enn aa anta.
 3. Egen branch `dagNN-<kort-beskrivelse>`. Smaa PR-er, en ting per PR.
-4. `npx tsc --noEmit` rent -> commit -> vis Petter diff-oppsummering. STOPP.
-5. Petter pusher, lager PR og merger med "Create a merge commit" (aldri squash).
-6. Stage-gate: Vercel-deploy groenn + LIVE-sjekk foer neste PR. Groenn deploy
-   beviser ikke at det virker.
+4. Nivaa staar oeverst i hvert oppdrag fra Cowork-Claude og bestemmer stoppene.
+   AVVIK stopper alltid, paa alle nivaaer. Groenn (dokumentasjon, nye tester
+   alene, audit, tekst uten logikk): ingen stopp. Gul (ny kode bak et flagg som
+   er av, eller kode som ikke er tatt i bruk): ett stopp foer commit, med tre
+   linjer: AVVIK (ingen), testene (tallet) og filene (de oppdraget nevner).
+   Roed (betaling og kvote, innlogging og roller, sletting, env/deploy,
+   `.claude/settings.json`, auth/middleware, API-kontrakten mot backend,
+   personvern, aa slaa paa et flagg): stopp etter audit, foer commit og etter
+   PR-utkastet. Et oppdrag uten nivaa behandles som roedt.
+5. `npx tsc --noEmit` rent og `npm test` groent -> commit -> PR-utkast til
+   `tmp/<branch>.md` i repoet (foerste linje `## <tittel>`, saa en tom linje, saa
+   teksten). Groenn og gul: avslutt med PR-linja fra oppdraget, ferdig utfylt.
+   Roed: skriv "VENT: Cowork-Claude leser foerst" og gi ikke PR-linja.
+6. Petter kjoerer PR-linja (push og `gh pr create`) i en vanlig terminal og
+   merger med "Create a merge commit" (aldri squash). `gh` brukes bare av Petter.
+   En PR om gangen per arbeidsmappe.
+7. Stage-gate: Vercel-deploy groenn + LIVE-sjekk etter nivaaet foer neste PR i
+   samme mappe. Groenn deploy beviser ikke at det virker.
 
 ## PR-beskrivelser
-Norsk. Inkluder en komponent/ansvar-tabell (fil -> hva endres -> hvorfor) og
-hvordan live-sjekken gjoeres.
+Norsk, i `tmp/<branch>.md` (arbeidsflyt 5). Inkluder en komponent/ansvar-tabell
+(fil -> hva endres -> hvorfor) og hvordan live-sjekken gjoeres.
 
 ## Filer og konvensjoner
 - Tech debt for begge repoer logges i `TECHNICAL_DEBT.md` i BACKEND-repoet
