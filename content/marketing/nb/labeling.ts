@@ -4,6 +4,7 @@ import type { LabelingPage } from "../schema.ts";
 // med endringene i MS5_TEKSTER_SVAR.md). Kildene staar i MS5_TEKSTER.md.
 // Bildet, eksempelet paa teksten og guiden hentes fra home.labeling, og lista
 // over hva som kan vaere redigert fra ordlista (codes.disclosureEdited).
+// Punktene om merket i bildet endret 15.10 (TG-NEW-55, V3s).
 export const labelingPage = {
   _type: "labelingPage",
   seo: {
@@ -17,9 +18,9 @@ export const labelingPage = {
     title: "Merket i bildet",
     points: [
       {
-        text: "Nede til venstre i bildet står et rundt AI-merke. Det er det eneste som er lagt på bildet: ingen logo og ingen annen tekst.",
+        text: "Nede til venstre i bildet står et lite, gjennomsiktig AI-merke med en kort setning: «Bearbeidet kveldsversjon av originalfotoet.» Ingen logo og ingenting annet er lagt på bildet.",
       },
-      { text: "Merket står på bildet du laster ned, og på forhåndsvisningene i appen." },
+      { text: "Merket med setningen står på bildet du laster ned. Forhåndsvisningene i appen har bare AI-ikonet." },
     ],
   },
   adText: {
