@@ -124,14 +124,6 @@ const CATEGORIES: Category[] = [
     titleKey: "express.category.timetraveler",
     items: [
       {
-        id: "klart_vaer",
-        service: "scene_transform",
-        presetId: "klart_vaer",
-        kind: "scene",
-        titleKey: "express.tool.klart_vaer.title",
-        descKey: "express.tool.klart_vaer.desc",
-      },
-      {
         id: "skumring",
         service: "scene_transform",
         presetId: "skumring",
@@ -139,6 +131,15 @@ const CATEGORIES: Category[] = [
         sceneGate: false,
         titleKey: "service.scene_transform",
         descKey: "express.tool.skumring.desc",
+      },
+      // Etter kveldsbildet (dag 45): vises som «Kommer» til den er merket.
+      {
+        id: "klart_vaer",
+        service: "scene_transform",
+        presetId: "klart_vaer",
+        kind: "scene",
+        titleKey: "express.tool.klart_vaer.title",
+        descKey: "express.tool.klart_vaer.desc",
       },
     ],
   },
@@ -178,6 +179,44 @@ const CATEGORIES: Category[] = [
       //   title: "Pool Cleanup",
       //   desc: "Clean murky pool water into inviting, crystal-clear light blue.",
       // },
+    ],
+  },
+  // «Kommer»-kortene (dag 45, demo-porten): vises paa Tjenester, men kan
+  // ikke bestilles. Id-ene er ikke i ENABLED, saa isServiceEnabled gir av.
+  {
+    id: "furnishing",
+    titleKey: "express.category.furnishing",
+    items: [
+      // Id-en er digital_styling, ikke virtual_stage (Petter 15.10): da
+      // styres kortet ikke av ENABLED.virtual_stage og /staging, og blir
+      // aldri klikkbart ved et uhell. Skrives om naar tjenesten kommer.
+      {
+        id: "digital_styling",
+        service: "virtual_stage",
+        kind: "simple",
+        titleKey: "service.virtual_stage",
+        descKey: "express.tool.digital_styling.desc",
+      },
+    ],
+  },
+  {
+    id: "more",
+    titleKey: "express.category.more",
+    items: [
+      {
+        id: "video",
+        service: "video",
+        kind: "simple",
+        titleKey: "express.tool.video.title",
+        descKey: "express.tool.video.desc",
+      },
+      {
+        id: "copywriter",
+        service: "copywriter",
+        kind: "simple",
+        titleKey: "express.tool.copywriter.title",
+        descKey: "express.tool.copywriter.desc",
+      },
     ],
   },
   // Hele Atmosphere-kategorien skjult: alle kortene er backend-stubber uten
@@ -225,6 +264,21 @@ export function expressCategories(): Category[] {
     ...c,
     items: c.items.filter((tool) => isServiceEnabled(tool.id)),
   })).filter((c) => c.items.length > 0);
+}
+
+/** Et kort paa Tjenester: orderable false gir «Kommer» og ingen klikk. */
+export type VisibleTool = Tool & { orderable: boolean };
+
+/**
+ * Alle kategoriene og kortene paa Tjenester, ogsaa de som ikke kan bestilles
+ * (dag 45, demo-porten). Hva som kan bestilles, styres fortsatt av ENABLED
+ * via expressCategories, orderableTools og toolFromParam.
+ */
+export function visibleCategories(): (Omit<Category, "items"> & { items: VisibleTool[] })[] {
+  return CATEGORIES.map((c) => ({
+    ...c,
+    items: c.items.map((tool) => ({ ...tool, orderable: isServiceEnabled(tool.id) })),
+  }));
 }
 
 /** Tjenestene som kan bestilles, i samme rekkefoelge som paa Tjenester. */

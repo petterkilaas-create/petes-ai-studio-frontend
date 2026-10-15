@@ -1,4 +1,16 @@
-import { Eraser, ScanFace, Sun, Sunset, type LucideIcon } from "lucide-react";
+import {
+  Armchair,
+  Clock,
+  Ellipsis,
+  Eraser,
+  FileText,
+  ScanFace,
+  Sofa,
+  Sun,
+  Sunset,
+  Video,
+  type LucideIcon,
+} from "lucide-react";
 
 /**
  * Ikonet for hvert verktoey (id-en i ENABLED, lib/services.ts), delt av
@@ -9,4 +21,16 @@ export const TOOL_ICONS: Record<string, LucideIcon> = {
   privacy_blur: ScanFace,
   klart_vaer: Sun,
   skumring: Sunset,
+  // «Kommer»-kortene (dag 45).
+  digital_styling: Sofa,
+  video: Video,
+  copywriter: FileText,
+};
+
+/** Ikonet for hver kategori paa Tjenester (flyttet fra tjenester/page.tsx). Ukjent id: ingen ikon. */
+export const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  timetraveler: Clock,
+  fixit: Eraser,
+  furnishing: Armchair,
+  more: Ellipsis,
 };

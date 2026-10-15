@@ -2,8 +2,8 @@
 
 import { Suspense, useEffect, useState, type ChangeEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, Clock, Eraser, LayoutGrid, type LucideIcon } from "lucide-react";
-import { TOOL_ICONS } from "@/app/components/toolIcons";
+import { Check, LayoutGrid } from "lucide-react";
+import { CATEGORY_ICONS, TOOL_ICONS } from "@/app/components/toolIcons";
 import { useImagePreview } from "@/app/hooks/useImagePreview";
 import { useProcessJob } from "@/app/hooks/useProcessJob";
 import { useQuota } from "@/app/hooks/useQuota";
@@ -25,16 +25,16 @@ import { DuskChoicePicker } from "@/app/components/DuskChoicePicker";
 import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "@/app/lib/dusk";
 import { orderErrorText, t } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
-import { expressCategories, SERVICE_PARAM, toolFromParam } from "@/app/lib/services";
+import { SERVICE_PARAM, toolFromParam, visibleCategories } from "@/app/lib/services";
 import { Button } from "@/app/components/ui/Button";
 import { Card, cardClass } from "@/app/components/ui/Card";
+import { Pill } from "@/app/components/ui/Pill";
 import { PageHeader } from "@/app/components/ui/PageHeader";
 
-// Tjenestevalget ligger i lib/services.ts, filtrert paa ENABLED (TG-NEW-136).
-const CATEGORIES = expressCategories();
-
-// Lucide i stedet for emojiene i services.ts (D1). Ukjent id: ingen ikon.
-const CATEGORY_ICONS: Record<string, LucideIcon> = { fixit: Eraser, timetraveler: Clock };
+// Tjenestevalget ligger i lib/services.ts. Alle kortene vises; de som ikke er
+// slaatt paa i ENABLED (TG-NEW-136), har orderable false og vises som
+// «Kommer» uten klikk (dag 45). Ikonene ligger i components/toolIcons.ts.
+const CATEGORIES = visibleCategories();
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
@@ -84,8 +84,9 @@ function ExpressContent() {
 
   const activeCategory =
     CATEGORIES.find((c) => c.id === activeCategoryId) ?? CATEGORIES[0];
+  // Bare et kort som kan bestilles, kan vaere valgt (dag 45).
   const selectedTool =
-    CATEGORIES.flatMap((c) => c.items).find((t) => t.id === selectedToolId) ??
+    CATEGORIES.flatMap((c) => c.items).find((t) => t.orderable && t.id === selectedToolId) ??
     null;
 
   const isProcessing = job.isProcessing;
@@ -217,6 +218,34 @@ function ExpressContent() {
           {activeCategory.items.map((tool) => {
             const selected = tool.id === selectedToolId;
             const Icon = TOOL_ICONS[tool.id];
+            if (!tool.orderable) {
+              // «Kommer» (dag 45): ingen knapp og ingen onClick, ikke i
+              // tab-rekkefoelgen. Ingen opacity, saa teksten holder kontrasten.
+              return (
+                <div
+                  key={tool.id}
+                  role="group"
+                  aria-disabled="true"
+                  aria-labelledby={`coming-${tool.id}`}
+                  className="rounded-card border border-dashed border-line-strong bg-paper p-6 text-left flex flex-col h-full"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    {Icon && (
+                      <span aria-hidden className="flex size-11 items-center justify-center rounded-button bg-surface-2 text-ink-2">
+                        <Icon className="size-5" strokeWidth={1.75} />
+                      </span>
+                    )}
+                    <span className="ml-auto">
+                      <Pill tone="neutral">{t(locale, "express.coming")}</Pill>
+                    </span>
+                  </div>
+                  <h3 id={`coming-${tool.id}`} className="text-[15px] font-medium text-ink-2 mb-1">
+                    {t(locale, tool.titleKey)}
+                  </h3>
+                  <p className="text-ink-2 text-[13px] leading-relaxed flex-1">{t(locale, tool.descKey)}</p>
+                </div>
+              );
+            }
             return (
               <button
                 key={tool.id}
