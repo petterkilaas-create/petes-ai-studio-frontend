@@ -61,7 +61,7 @@ utover det som staar her.
 - Installer fra lockfila med `npm ci`. `npm install` kan endre
   `package-lock.json` - commit aldri lockfil-endringer du ikke ble bedt om.
 - Typesjekk (porten lokalt): `npx tsc --noEmit` - forventet rent.
-- `npm test` (node --test) - 566 tester per 2026-10-14, forventet groent.
+- `npm test` (node --test) - 571 tester per 2026-10-15, forventet groent.
 - Dev-server: `npm run dev`, aapne http://localhost:3000 - aldri 127.0.0.1
   (Clerk-cookies og cross-origin oppfoerer seg annerledes).
 - `npm run build` gaar gjennom lokalt (verifisert 2026-10-05, etter

@@ -12,8 +12,12 @@ import {
   isPageEnabled,
   isServiceEnabled,
   navLinks,
+  orderableTools,
+  toolFromParam,
+  visibleCategories,
 } from "./services.ts";
 import { DICTIONARIES, type UiKey } from "./i18n/index.ts";
+import { withoutComments } from "./testing/jsxText.ts";
 
 // TG-NEW-136 (L0): Klart vaer, Magic Cleanup og Virtual Staging er skjult til
 // de er merket. Privacy Blur og skumring er som foer.
@@ -327,4 +331,88 @@ test("TG-153: menyen viser bare ikonet under 640 px, og Start er ikke et hus", (
   assert.match(nav, /start: LayoutDashboard,/);
   assert.match(nav, /services: LayoutGrid,/);
   assert.doesNotMatch(nav, /\b(House|Home)\b/);
+});
+
+// ---------------------------------------------------------------------------
+// Dag 45, demo-porten: Tjenester viser alle tjenestene. De som ikke er slaatt
+// paa, vises som «Kommer» og kan ikke bestilles. ENABLED er uendret.
+// ---------------------------------------------------------------------------
+
+test("dag 45: visibleCategories gir alle kortene i rekkefoelge, fem «Kommer» og to bestillbare", () => {
+  const cats = visibleCategories();
+  assert.deepEqual(
+    cats.map((c) => [c.id, c.items.map((t) => t.id)]),
+    [
+      ["timetraveler", ["skumring", "klart_vaer"]],
+      ["fixit", ["magic_cleanup", "privacy_blur"]],
+      ["furnishing", ["digital_styling"]],
+      ["more", ["video", "copywriter"]],
+    ]
+  );
+  const tools = cats.flatMap((c) => c.items);
+  assert.deepEqual(tools.filter((t) => t.orderable).map((t) => t.id), ["skumring", "privacy_blur"]);
+  assert.deepEqual(
+    tools.filter((t) => !t.orderable).map((t) => t.id),
+    ["klart_vaer", "magic_cleanup", "digital_styling", "video", "copywriter"]
+  );
+  // Ingen tom kategori, og orderable er det samme som ENABLED.
+  for (const c of cats) assert.ok(c.items.length > 0, c.id);
+  for (const t of tools) assert.equal(t.orderable, isServiceEnabled(t.id), t.id);
+});
+
+test("dag 45: det som kan bestilles og ?tjeneste= er uendret", () => {
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "privacy_blur"]);
+  assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "fixit"]);
+  for (const id of ["klart_vaer", "magic_cleanup", "digital_styling", "virtual_stage", "video", "copywriter"]) {
+    assert.equal(toolFromParam(id), null, id);
+  }
+  // De nye id-ene er ikke lagt inn i ENABLED, heller ikke som false.
+  for (const id of ["digital_styling", "video", "copywriter"]) {
+    assert.ok(!Object.keys(ENABLED).includes(id), id);
+  }
+});
+
+test("dag 45: digital styling-kortet er uavhengig av ENABLED.virtual_stage og /staging", () => {
+  const card = visibleCategories().flatMap((c) => c.items).find((t) => t.service === "virtual_stage");
+  assert.ok(card);
+  assert.equal(card.id, "digital_styling");
+  assert.equal(card.kind, "simple");
+  assert.equal(card.titleKey, "service.virtual_stage");
+  assert.equal(card.orderable, false);
+});
+
+test("dag 45: hvert kort og hver kategori har tekst paa nb og en, og et ikon", () => {
+  const icons = withoutComments(read("components/toolIcons.ts"));
+  for (const c of visibleCategories()) {
+    assert.match(icons, new RegExp(`^\\s*${c.id}: [A-Z]\\w+,$`, "m"), c.id);
+    for (const t of c.items) {
+      assert.match(icons, new RegExp(`^\\s*${t.id}: [A-Z]\\w+,$`, "m"), t.id);
+      for (const locale of ["nb", "en"] as const) {
+        const ui = DICTIONARIES[locale].ui;
+        assert.ok(ui[t.titleKey].trim().length > 0, `${locale} ${t.titleKey}`);
+        assert.ok(ui[t.descKey].trim().length > 0, `${locale} ${t.descKey}`);
+      }
+    }
+    for (const locale of ["nb", "en"] as const) {
+      assert.ok(DICTIONARIES[locale].ui[c.titleKey].trim().length > 0, `${locale} ${c.titleKey}`);
+    }
+  }
+  assert.equal(DICTIONARIES.nb.ui["express.coming"], "Kommer");
+  assert.equal(DICTIONARIES.en.ui["express.coming"], "Coming");
+});
+
+test("dag 45: «Kommer»-kortet er ikke en knapp, og bare bestillbare kort kan velges", () => {
+  const page = withoutComments(read("(app)/tjenester/page.tsx"));
+  assert.match(page, /const CATEGORIES = visibleCategories\(\);/);
+  assert.doesNotMatch(page, /expressCategories/);
+  // Valget slaas bare opp blant kortene som kan bestilles.
+  assert.match(page, /\.find\(\(t\) => t\.orderable && t\.id === selectedToolId\)/);
+  // Grenen for «Kommer» kommer foer knappen og har ingen onClick eller knapp.
+  const start = page.indexOf("if (!tool.orderable) {");
+  assert.ok(start > 0);
+  const branch = page.slice(start, page.indexOf("return (", page.indexOf("</div>\n              );", start)));
+  assert.match(branch, /role="group"/);
+  assert.match(branch, /aria-disabled="true"/);
+  assert.match(branch, /t\(locale, "express\.coming"\)/);
+  assert.doesNotMatch(branch, /onClick|<button|href=|tabIndex|opacity-/);
 });

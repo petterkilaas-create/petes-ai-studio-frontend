@@ -403,7 +403,8 @@ test("D1c: services.ts har bare noekler til ordlista, ingen tekst eller emoji", 
   const count = (re: RegExp) => code.match(re)?.length ?? 0;
   const tools = count(/^\s*kind: "(simple|scene)",/gm);
   assert.ok(tools >= 4);
-  assert.equal(count(/^\s*titleKey: "/gm), tools + 2, "hvert verktoey og begge kategoriene");
+  // Fire kategorier etter «Kommer»-kortene (dag 45): Lys og himmel, Rydd og skjul, Innredning, Mer.
+  assert.equal(count(/^\s*titleKey: "/gm), tools + 4, "hvert verktoey og de fire kategoriene");
   assert.equal(count(/^\s*descKey: "/gm), tools);
 });
 
@@ -434,6 +435,14 @@ test("D1c: ordlista har ordene til Tjenester paa nb og en", () => {
     "express.forceExteriorHint",
     "express.forceExteriorTitle",
     "express.forceExteriorLocked",
+    "express.coming",
+    "express.category.furnishing",
+    "express.category.more",
+    "express.tool.digital_styling.desc",
+    "express.tool.video.title",
+    "express.tool.video.desc",
+    "express.tool.copywriter.title",
+    "express.tool.copywriter.desc",
   ];
   for (const locale of ["nb", "en"] as const) {
     const ui = DICTIONARIES[locale].ui as Record<string, string>;
@@ -445,6 +454,8 @@ test("D1c: ordlista har ordene til Tjenester paa nb og en", () => {
   assert.equal(nb["express.category.fixit"], "Rydd og skjul");
   assert.equal(nb["express.category.timetraveler"], "Lys og himmel");
   assert.equal(nb["express.noImage"], "Ikke noe bilde valgt");
+  assert.equal(nb["express.coming"], "Kommer");
+  assert.equal(DICTIONARIES.en.ui["express.coming"], "Coming");
 });
 
 test("D1c: Kveldsbilde sender det samme som foer (id, service, preset, ingen bildetype-valg)", () => {
