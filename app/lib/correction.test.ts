@@ -12,7 +12,7 @@ import {
   setToggle,
   type Lights,
 } from "./correction.ts";
-import type { LightState, ReviewLight } from "./api.ts";
+import type { DecisionAction, LightState, ReviewLight } from "./api.ts";
 
 function light(
   key: string,
@@ -195,4 +195,24 @@ test("tolkning av svarene paa «Lag nytt bilde»", () => {
     kind: "retry", message: { group: "decisionError", code: null },
   });
   assert.deepEqual(correctionResult({ kind: "not_found" }), { kind: "not_found" });
+});
+
+test("G3: uten peispanelet sendes aldri peissvar, og Rett bare med correct-panelet", () => {
+  const l = lights();
+  const t = initialToggles(l);
+  const empty = { promote: [], disable: [], add: [] };
+  assert.deepEqual(buildCorrection({ lights: l, version: null, reviewPanels: ["lights", "correct"] }, t, true, "yes"), {
+    action: "correct",
+    overrides: empty,
+  });
+  assert.deepEqual(buildCorrection({ lights: l, version: null, reviewPanels: null }, t, true, "yes"), {
+    action: "correct",
+    overrides: empty,
+    fireplace_fire: "yes",
+  });
+  const correction = { roundsLeft: 1, lastRoundFailed: false };
+  const allowedActions: DecisionAction[] = ["approve", "correct"];
+  assert.equal(correctionControls({ allowedActions, correction, reviewPanels: ["lights"] }).show, false);
+  assert.equal(correctionControls({ allowedActions, correction, reviewPanels: ["correct"] }).show, true);
+  assert.equal(correctionControls({ allowedActions, correction, reviewPanels: null }).show, true);
 });

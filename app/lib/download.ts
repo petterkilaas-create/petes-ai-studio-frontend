@@ -1,5 +1,6 @@
 import type { JobReviewDetail } from "./api";
 import type { UiKey } from "./i18n";
+import { presetFileSlug } from "./presets.ts";
 import { mediaDeleted } from "./review.ts";
 
 /**
@@ -20,11 +21,14 @@ export function canDownload(review: Pick<JobReviewDetail, "status" | "isOwner" |
 
 /**
  * Filnavnet lages i frontend (Content-Disposition er ikke eksponert i CORS):
- * kveldsbilde-ai_<de 8 foerste tegnene i jobId>.jpg. Bare a-z og 0-9 beholdes.
+ * <slug>-ai_<de 8 foerste tegnene i jobId>.jpg. Bare a-z og 0-9 beholdes.
+ * Slugen kommer fra oppskriften (G3, presets.ts): skumring og reserven
+ * (ingen oppskrift) gir kveldsbilde, som foer.
  */
-export function downloadFileName(jobId: string): string {
+export function downloadFileName(jobId: string, presetId?: string | null): string {
+  const slug = presetFileSlug(presetId);
   const short = jobId.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
-  return short ? `kveldsbilde-ai_${short}.jpg` : "kveldsbilde-ai.jpg";
+  return short ? `${slug}-ai_${short}.jpg` : `${slug}-ai.jpg`;
 }
 
 /** Kodene der fila selv mangler eller ikke kan merkes: brukeren boer kontakte oss. */
@@ -49,11 +53,13 @@ export type DownloadResult = { kind: "ok"; fileName: string } | { kind: "error";
 
 export async function downloadMarkedImage(opts: {
   jobId: string;
+  /** Oppskriften fra review-svaret (G3); bestemmer filnavnet. */
+  presetId?: string | null;
   /** Henter svaret med token (fetchJobDownload i api.ts). */
   fetchFile: () => Promise<Response>;
   save?: (blob: Blob, fileName: string) => void;
 }): Promise<DownloadResult> {
-  const { jobId, fetchFile, save = saveBlob } = opts;
+  const { jobId, presetId, fetchFile, save = saveBlob } = opts;
   let res: Response;
   try {
     res = await fetchFile();
@@ -64,7 +70,7 @@ export async function downloadMarkedImage(opts: {
   if (res.status !== 200) {
     return { kind: "error", key: downloadErrorKey(res.status, await readJson(res)) };
   }
-  const fileName = downloadFileName(jobId);
+  const fileName = downloadFileName(jobId, presetId);
   try {
     save(await res.blob(), fileName);
   } catch {

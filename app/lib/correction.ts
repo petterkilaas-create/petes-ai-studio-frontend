@@ -7,6 +7,7 @@ import type {
 } from "./api";
 import type { CodeGroup } from "./i18n";
 import type { FireplaceAnswer } from "./review";
+import { panelShown } from "./presets.ts";
 
 /**
  * Rene regler for «Rett» paa godkjenningssiden (2d-2b), skilt ut saa de kan
@@ -102,17 +103,18 @@ export function previousFireplaceAnswer(fireplace: JobReviewDetail["fireplace"])
 }
 
 /**
- * Body for «Lag nytt bilde». Peissvaret er bare med naar spoersmaalet vises.
+ * Body for «Lag nytt bilde». Peissvaret er bare med naar spoersmaalet vises,
+ * og aldri naar oppskriften mangler peispanelet (G3; backend avviser det).
  * `expected_version` er versjonen i review-svaret (TG-NEW-130), utelatt uten version.
  */
 export function buildCorrection(
-  review: Pick<JobReviewDetail, "lights" | "version">,
+  review: Pick<JobReviewDetail, "lights" | "version"> & Partial<Pick<JobReviewDetail, "reviewPanels">>,
   toggles: Toggles,
   fireplaceShown: boolean,
   answer: FireplaceAnswer
 ): DecisionRequest {
   const body: DecisionRequest = { action: "correct", overrides: buildOverrides(review.lights, toggles) };
-  if (fireplaceShown && answer !== null) body.fireplace_fire = answer;
+  if (fireplaceShown && panelShown(review, "fireplace") && answer !== null) body.fireplace_fire = answer;
   if (review.version !== null) body.expected_version = review.version;
   return body;
 }
@@ -144,12 +146,13 @@ export interface CorrectionControls {
   roundFailed: boolean;
 }
 
+/** «Rett» bare naar oppskriften har panelet (G3); uten `reviewPanels` som foer. */
 export function correctionControls(
-  review: Pick<JobReviewDetail, "allowedActions" | "correction">
+  review: Pick<JobReviewDetail, "allowedActions" | "correction"> & Partial<Pick<JobReviewDetail, "reviewPanels">>
 ): CorrectionControls {
   const { roundsLeft, lastRoundFailed } = review.correction;
   return {
-    show: review.allowedActions.includes("correct") && roundsLeft > 0,
+    show: review.allowedActions.includes("correct") && roundsLeft > 0 && panelShown(review, "correct"),
     roundsLeft,
     roundFailed: lastRoundFailed,
   };

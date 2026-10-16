@@ -5,9 +5,9 @@ import {
   isRejectedByReviewer,
   openLinkKey,
   REVIEWER_REJECTED_TONE,
-  serviceLabelKey,
   statusVariant,
 } from "../lib/statusVariants";
+import { presetLabelKey } from "../lib/presets";
 import { OpenReviewLink } from "./OpenReviewLink";
 import { JobMedia } from "./JobMedia";
 import { cardNote, mediaView } from "../lib/jobMedia";
@@ -29,13 +29,14 @@ import { ownerBadge, rejectedLabelKey } from "../lib/roles";
  * thumbSrc(job) selv.
  */
 
-// Tjenestenavnene staar i ordlista (brief §7). Ukjente faller tilbake til en
-// prettifisert utgave av den raa enum-verdien, saa nye tjenester rendres
-// lesbart uten kode-endring her.
-function serviceLabel(locale: Locale, service: string): string {
-  const key = serviceLabelKey(service);
+// Tjenestenavnene staar i ordlista (brief §7) og slaas opp paa (service,
+// oppskrift) (G3, presets.ts). Ukjente faller tilbake til en prettifisert
+// utgave av den raa verdien (oppskriften naar den finnes, ellers tjenesten),
+// saa nye tjenester rendres lesbart uten kode-endring her.
+function serviceLabel(locale: Locale, service: string, presetId: string | null): string {
+  const key = presetLabelKey(service, presetId);
   if (key !== null) return t(locale, key);
-  const pretty = service.replace(/_/g, " ");
+  const pretty = (presetId ?? service).replace(/_/g, " ");
   return pretty.charAt(0).toUpperCase() + pretty.slice(1);
 }
 
@@ -76,14 +77,14 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
       {/* Ventebildet: resultatet (thumbSrc), ellers dagsbildet dempet med status, ellers plassholder. */}
       <JobMedia
         view={mediaView(job, thumb)}
-        resultAlt={serviceLabel(locale, job.service)}
+        resultAlt={serviceLabel(locale, job.service, job.presetId)}
         locale={locale}
       />
 
       <div className="p-5 flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <span className="font-medium text-ink text-[15px] truncate">
-            {serviceLabel(locale, job.service)}
+            {serviceLabel(locale, job.service, job.presetId)}
           </span>
           <StatusPill
             status={job.status}

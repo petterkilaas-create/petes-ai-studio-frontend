@@ -856,3 +856,39 @@ test("TG-NEW-170: kombinasjoner som ikke henger sammen gir null (applied bare fo
     assert.equal(api.toInputOrientation(raw), null, JSON.stringify(raw));
   }
 });
+
+// ---- G3: preset_id og review_panels ------------------------------------------
+
+test("G3: listJobs leser preset_id strengt (tom streng, tall og manglende felt gir null)", async () => {
+  const row = { service: "scene_transform", status: "running", created_at: null, error: null };
+  mockFetch(200, [
+    { ...row, job_id: "a", preset_id: "skumring" },
+    { ...row, job_id: "b", preset_id: null },
+    { ...row, job_id: "c" },
+    { ...row, job_id: "d", preset_id: "" },
+    { ...row, job_id: "e", preset_id: 7 },
+  ]);
+  const rows = await api.listJobs({ getToken });
+  assert.deepEqual(rows.map((r) => r.presetId), ["skumring", null, null, null, null]);
+});
+
+test("G3: normalizeReview leser preset_id strengt", () => {
+  assert.equal(api.normalizeReview({ ...REVIEW_BODY, preset_id: "skumring_interior" }, "j1").presetId, "skumring_interior");
+  assert.equal(api.normalizeReview({ ...REVIEW_BODY, preset_id: null }, "j1").presetId, null);
+  assert.equal(api.normalizeReview(REVIEW_BODY, "j1").presetId, null);
+  assert.equal(api.normalizeReview({ ...REVIEW_BODY, preset_id: 3 }, "j1").presetId, null);
+});
+
+test("G3: review_panels leses strengt: verdi, null, ukjent navn droppet, ikke-liste gir null", () => {
+  const panels = (value: unknown) => api.normalizeReview({ ...REVIEW_BODY, review_panels: value }, "j1").reviewPanels;
+  assert.deepEqual(panels(["fireplace", "dusk", "style", "lights", "correct"]), [
+    "fireplace", "dusk", "style", "lights", "correct",
+  ]);
+  assert.deepEqual(panels(["dusk", "sky_magic", 4, null, "lights"]), ["dusk", "lights"]);
+  assert.deepEqual(panels([]), []);
+  assert.deepEqual(panels(["toString"]), []);
+  assert.equal(panels(null), null);
+  assert.equal(panels("dusk"), null);
+  assert.equal(panels({ dusk: true }), null);
+  assert.equal(api.normalizeReview(REVIEW_BODY, "j1").reviewPanels, null);
+});

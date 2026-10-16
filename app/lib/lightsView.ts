@@ -1,6 +1,7 @@
 import type { JobReviewDetail, LightBox, ReviewLight } from "./api";
 import { initialOn, type Lights } from "./correction.ts";
 import { codeText, type Locale } from "./i18n/index.ts";
+import { panelShown } from "./presets.ts";
 import { mediaDeleted } from "./review.ts";
 
 /**
@@ -232,12 +233,14 @@ export function badgePlacement(m: Pick<LightMarker, "x" | "y" | "height">): Badg
  * Knappen «Vis lampene i bildet» (TG-NEW-166): bare naar originalen finnes,
  * bildene ikke er slettet (TG-NEW-117) og minst ett lys har boks. Med
  * `litOnly` (megleren, TG-NEW-193) maa et av lysene som tennes ha boks.
+ * Aldri naar oppskriften mangler lyspanelet (G3); uten `reviewPanels` som foer.
  */
 export function canShowMarkers(
-  review: Pick<JobReviewDetail, "images" | "lights" | "mediaDeletedAt">,
+  review: Pick<JobReviewDetail, "images" | "lights" | "mediaDeletedAt"> & Partial<Pick<JobReviewDetail, "reviewPanels">>,
   opts: { litOnly: boolean }
 ): boolean {
   return (
+    panelShown(review, "lights") &&
     review.images.originalUrl !== null &&
     !mediaDeleted(review) &&
     markerRows(review.lights, opts.litOnly).some((f) => f.light.box !== null)
