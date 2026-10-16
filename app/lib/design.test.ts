@@ -1010,7 +1010,7 @@ test("ventebilde: «Ingen forhåndsvisning» finnes ingen steder i koden", () =>
 
 test("ventebilde: Tjenester viser samme symbol mens jobben lages, og resultatet som foer", () => {
   const page = withoutComments(read("(app)/tjenester/page.tsx"));
-  assert.match(page, /\) : isProcessing \? \(\s*<JobMedia\s*view=\{workingView\(selectedTool\.service\)\}/);
+  assert.match(page, /\) : isProcessing \? \(\s*<JobMedia\s*view=\{workingView\(selectedTool\.service, selectedTool\.presetId\)\}/);
   assert.match(page, /aspect="square"/);
   assert.match(page, /outputView\(job\.status, job\.imageUrl\)/);
 });

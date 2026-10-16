@@ -49,6 +49,7 @@ function job(overrides: Partial<JobSummary> = {}): JobSummary {
     reason: null,
     isOwner: true,
     ownerShort: null,
+    presetId: null,
     ...overrides,
   };
 }

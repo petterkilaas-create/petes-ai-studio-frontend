@@ -23,12 +23,16 @@ const BTN_SECONDARY = buttonClass("secondary");
  *
  * Merkelappen «Usikker» bare for admin (`admin`, TG-NEW-193). Bryterne og
  * kandidat-flagget mot backend er de samme for alle.
+ *
+ * Uten lyspanelet i oppskriften (`lightsShown` false, G3) vises verken
+ * bryterne eller hintet om dem. Uten propen er alt som foer.
  */
 export function CorrectionPanel({
   lights,
   toggles,
   onToggle,
   fireplaceShown,
+  lightsShown = true,
   answer,
   onAnswer,
   confirmNeeded,
@@ -47,6 +51,8 @@ export function CorrectionPanel({
   /** `uncertain` er kandidat-flagget til setToggle. */
   onToggle: (light: ReviewLight, uncertain: boolean, on: boolean) => void;
   fireplaceShown: boolean;
+  /** Lysbryterne og hintet om dem; false naar oppskriften mangler lyspanelet (G3). */
+  lightsShown?: boolean;
   answer: FireplaceAnswer;
   onAnswer: (answer: "yes" | "no") => void;
   confirmNeeded: boolean;
@@ -67,50 +73,52 @@ export function CorrectionPanel({
     <div className="flex flex-col gap-4">
       <div>
         <p className="text-sm text-ink font-bold">{t(locale, "correct.title")}</p>
-        <p className="text-xs text-ink-2 mt-1">{t(locale, "correct.hint")}</p>
+        {lightsShown && <p className="text-xs text-ink-2 mt-1">{t(locale, "correct.hint")}</p>}
       </div>
 
-      <div>
-        <p className="text-xs font-bold text-ink mb-2">{t(locale, "correct.lightsTitle")}</p>
-        {rows.length === 0 ? (
-          <p className="text-xs text-ink-2">{t(locale, "review.lightsEmpty")}</p>
-        ) : (
-          <ul className="space-y-2 text-xs text-ink">
-            {rows.map(({ light, uncertain }, i) => {
-              const editable = canToggle(light, uncertain);
-              const on = isOn(light, toggles);
-              // Ekte bryter (checkbox med role=switch) med hele raden som
-              // etikett, minst 44 px hoey for tommel paa mobil.
-              return (
-                <li key={`${light.key ?? light.id ?? "x"}-${i}`}>
-                  <label
-                    className={`flex items-center gap-3 min-h-11 px-3 py-2 rounded-button border ${
-                      editable ? "border-line-strong cursor-pointer" : "border-line opacity-60"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      role="switch"
-                      checked={on}
-                      disabled={!editable || locked}
-                      onChange={(e) => onToggle(light, uncertain, e.target.checked)}
-                      className={`w-5 h-5 shrink-0 accent-primary ${FOCUS}`}
-                    />
-                    <span className="flex-1">
-                      <LightLabel light={light} name={nameOf(light)} locale={locale} uncertain={admin && uncertain} state />
-                    </span>
-                    <span className="text-[13px] text-ink-2">
-                      {editable
-                        ? t(locale, on ? "correct.lightOn" : "correct.lightOff")
-                        : t(locale, "correct.locked")}
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+      {lightsShown && (
+        <div>
+          <p className="text-xs font-bold text-ink mb-2">{t(locale, "correct.lightsTitle")}</p>
+          {rows.length === 0 ? (
+            <p className="text-xs text-ink-2">{t(locale, "review.lightsEmpty")}</p>
+          ) : (
+            <ul className="space-y-2 text-xs text-ink">
+              {rows.map(({ light, uncertain }, i) => {
+                const editable = canToggle(light, uncertain);
+                const on = isOn(light, toggles);
+                // Ekte bryter (checkbox med role=switch) med hele raden som
+                // etikett, minst 44 px hoey for tommel paa mobil.
+                return (
+                  <li key={`${light.key ?? light.id ?? "x"}-${i}`}>
+                    <label
+                      className={`flex items-center gap-3 min-h-11 px-3 py-2 rounded-button border ${
+                        editable ? "border-line-strong cursor-pointer" : "border-line opacity-60"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={on}
+                        disabled={!editable || locked}
+                        onChange={(e) => onToggle(light, uncertain, e.target.checked)}
+                        className={`w-5 h-5 shrink-0 accent-primary ${FOCUS}`}
+                      />
+                      <span className="flex-1">
+                        <LightLabel light={light} name={nameOf(light)} locale={locale} uncertain={admin && uncertain} state />
+                      </span>
+                      <span className="text-[13px] text-ink-2">
+                        {editable
+                          ? t(locale, on ? "correct.lightOn" : "correct.lightOff")
+                          : t(locale, "correct.locked")}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
 
       {fireplaceShown && (
         <FireplaceChoice answer={answer} onChange={onAnswer} disabled={locked} locale={locale} />

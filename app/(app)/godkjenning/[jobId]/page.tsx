@@ -43,6 +43,7 @@ import { canDownload } from "@/app/lib/download";
 import { formatDate } from "@/app/lib/dates";
 import { compareVariants, selectedVariant, variantLabel } from "@/app/lib/compare";
 import { canShowMarkers } from "@/app/lib/lightsView";
+import { panelShown } from "@/app/lib/presets";
 import { canShowAdditions } from "@/app/lib/additions";
 import {
   blockedResult,
@@ -429,7 +430,8 @@ export default function GodkjenningPage({
             const correction = correctionControls(review);
             const canCorrect = correction.show && !limitReached && done === null;
             const isEditing = editing && canCorrect;
-            const fireplaceShown = correctionFireplaceShown(review.fireplace);
+            // Panelene per oppskrift (G3): uten peispanelet ingen peisspoersmaal.
+            const fireplaceShown = correctionFireplaceShown(review.fireplace) && panelShown(review, "fireplace");
             const correctionBody = buildCorrection(review, toggles, fireplaceShown, correctAnswer);
             const overrides = correctionBody.overrides ?? { promote: [], disable: [], add: [] };
             const confirmNeeded = needsConfirmation(overrides);
@@ -535,7 +537,7 @@ export default function GodkjenningPage({
                             {t(locale, "review.reasonLabel")}: {done.reason}
                           </p>
                         )}
-                        {canDownload(review) && <DownloadButton jobId={review.jobId} locale={locale} />}
+                        {canDownload(review) && <DownloadButton jobId={review.jobId} presetId={review.presetId} locale={locale} />}
                         {review.status === "succeeded" && (
                           <DisclosureBlock disclosure={review.disclosure} locale={locale} />
                         )}
@@ -577,6 +579,7 @@ export default function GodkjenningPage({
                                 setToggles((prev) => setToggle(prev, light, uncertain, on))
                               }
                               fireplaceShown={fireplaceShown}
+                              lightsShown={panelShown(review, "lights")}
                               answer={correctAnswer}
                               onAnswer={setCorrectAnswer}
                               confirmNeeded={confirmNeeded}

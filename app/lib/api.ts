@@ -513,6 +513,8 @@ interface JobSummaryWire {
   media_deleted_at?: unknown;
   /** TG-NEW-117: naar den merkede miniatyren ble slettet, eller null. */
   thumb_deleted_at?: unknown;
+  /** G1b: oppskriften (f.eks. "skumring"), eller null mens jobben kjoerer. */
+  preset_id?: unknown;
 }
 
 /**
@@ -600,6 +602,12 @@ export interface JobSummary {
   mediaDeletedAt?: string | null;
   /** TG-NEW-117: naar den merkede miniatyren ble slettet. null og undefined: ikke slettet. */
   thumbDeletedAt?: string | null;
+  /**
+   * G1b: oppskriften jobben ble laget med (f.eks. "skumring"). null mens
+   * jobben kjoerer, og naar feltet mangler (eldre backend); etiketten
+   * bruker da reserven (presets.ts).
+   */
+  presetId: string | null;
 }
 
 /** Statusene i filteret «Venter paa meg» (GET /v1/jobs?status=, 2d-1a). */
@@ -697,6 +705,7 @@ export async function listJobs(opts: {
     ownerShort: nonEmptyString(row.owner_short),
     mediaDeletedAt: nonEmptyString(row.media_deleted_at),
     thumbDeletedAt: nonEmptyString(row.thumb_deleted_at),
+    presetId: nonEmptyString(row.preset_id),
   }));
 }
 
@@ -953,6 +962,27 @@ export interface JobReviewDetail {
   inputOrientation: InputOrientation | null;
   /** Kontrollen av tillegg for gjeldende runde (TG-NEW-199). Mangler feltet: `unchecked`. */
   additionsCheck: AdditionsCheck;
+  /** G1b: oppskriften jobben ble laget med, eller null (feltet mangler eller er tomt). */
+  presetId: string | null;
+  /**
+   * G1c: panelene oppskriften bruker. null naar feltet mangler (backend foer
+   * G1c): da vises alle fem, som foer (presets.ts).
+   */
+  reviewPanels: ReviewPanel[] | null;
+}
+
+/** Panelene paa godkjenningssiden som en oppskrift kan bruke (G1c). */
+export type ReviewPanel = "fireplace" | "dusk" | "style" | "lights" | "correct";
+
+const REVIEW_PANELS: ReadonlySet<string> = new Set(["fireplace", "dusk", "style", "lights", "correct"]);
+
+/**
+ * `review_panels` (G1c): strengt lest. Ikke en liste (eller feltet mangler)
+ * gir null; ukjente navn droppes, og en tom liste er `[]`.
+ */
+export function toReviewPanels(raw: unknown): ReviewPanel[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter((v): v is ReviewPanel => typeof v === "string" && REVIEW_PANELS.has(v));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1212,6 +1242,8 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     mediaDeletedAt: nonEmptyString(r.media_deleted_at),
     inputOrientation: toInputOrientation(r.input_orientation),
     additionsCheck: toAdditionsCheck(r.additions_check),
+    presetId: nonEmptyString(r.preset_id),
+    reviewPanels: toReviewPanels(r.review_panels),
   };
 }
 

@@ -14,7 +14,16 @@ const BTN_PRIMARY = buttonClass("primary");
  * eieren (canDownload); backend avviser admin paa andres jobb. Ved feil vises
  * en kort melding ut fra koden, aldri raa tekst.
  */
-export function DownloadButton({ jobId, locale }: { jobId: string; locale: Locale }) {
+export function DownloadButton({
+  jobId,
+  presetId,
+  locale,
+}: {
+  jobId: string;
+  /** Oppskriften fra review-svaret (G3); bestemmer filnavnet. */
+  presetId: string | null;
+  locale: Locale;
+}) {
   const { getToken } = useAuth();
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<UiKey | null>(null);
@@ -29,6 +38,7 @@ export function DownloadButton({ jobId, locale }: { jobId: string; locale: Local
     try {
       const result = await downloadMarkedImage({
         jobId,
+        presetId,
         fetchFile: () => fetchJobDownload({ jobId, getToken }),
       });
       if (result.kind === "error") setError(result.key);

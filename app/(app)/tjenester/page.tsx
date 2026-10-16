@@ -449,7 +449,7 @@ function ExpressContent() {
             ) : isProcessing ? (
               // Ventebildet (Petter 02.10, valg A): samme rolige symbol som i Historikk.
               <JobMedia
-                view={workingView(selectedTool.service)}
+                view={workingView(selectedTool.service, selectedTool.presetId)}
                 resultAlt={t(locale, "review.result")}
                 aspect="square"
                 frame="rounded-button border border-dashed border-line-strong"

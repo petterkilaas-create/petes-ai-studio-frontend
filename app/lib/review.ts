@@ -1,5 +1,6 @@
 import type { AdditionsLevel, BrightnessStep, DecisionAction, DecisionRequest, JobReviewDetail } from "./api";
 import type { UiKey } from "./i18n";
+import { panelShown } from "./presets.ts";
 
 /**
  * Rene regler for godkjenningssiden (2d-1), skilt ut saa de kan testes uten
@@ -42,14 +43,21 @@ export interface DecisionControls {
   none: boolean;
 }
 
+/**
+ * Peisspoersmaalet bare naar oppskriften har peispanelet (G3); uten
+ * `reviewPanels` som foer. Uten panelet er «Send videre» som om
+ * spoersmaalet ikke finnes.
+ */
 export function decisionControls(
-  review: Pick<JobReviewDetail, "allowedActions" | "fireplace">,
+  review: Pick<JobReviewDetail, "allowedActions" | "fireplace"> & Partial<Pick<JobReviewDetail, "reviewPanels">>,
   answer: FireplaceAnswer
 ): DecisionControls {
   const allowed = new Set<DecisionAction>(review.allowedActions);
   const canContinue = allowed.has("continue");
   const fireplaceQuestion =
-    canContinue && (review.fireplace.present || review.fireplace.disagreement);
+    canContinue &&
+    panelShown(review, "fireplace") &&
+    (review.fireplace.present || review.fireplace.disagreement);
   return {
     approve: allowed.has("approve"),
     reject: allowed.has("reject"),

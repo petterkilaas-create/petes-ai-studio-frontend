@@ -153,3 +153,17 @@ test("shouldPoll: bare queued og running", () => {
     assert.equal(shouldPoll(s), false, s);
   }
 });
+
+test("G3: uten peispanelet ingen peisspoersmaal, og Send videre som uten peis", () => {
+  const r = { ...review(["continue", "reject"], true, true), reviewPanels: ["dusk" as const, "lights" as const] };
+  const c = decisionControls(r, null);
+  assert.equal(c.continue, true);
+  assert.equal(c.fireplaceQuestion, false);
+  assert.equal(c.continueEnabled, true);
+  // Med peispanelet, eller uten panellista (backend foer G1c), som foer.
+  for (const reviewPanels of [["fireplace" as const], null]) {
+    const withFire = decisionControls({ ...review(["continue", "reject"], true), reviewPanels }, null);
+    assert.equal(withFire.fireplaceQuestion, true);
+    assert.equal(withFire.continueEnabled, false);
+  }
+});

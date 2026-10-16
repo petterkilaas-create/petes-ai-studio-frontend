@@ -1,5 +1,6 @@
 import type { JobSummary } from "./api";
 import type { UiKey } from "./i18n/index.ts";
+import { presetWorkingKey } from "./presets.ts";
 import { hasResultImage } from "./statusVariants.ts";
 
 /**
@@ -51,16 +52,13 @@ const FIREPLACE_CODES: ReadonlySet<string> = new Set([
   "fireplace_answer_missing",
 ]);
 
-/** «Lager kveldsbilde …» etter tjenesten, fra ordlista. Ukjent tjeneste: «Lager bildet …». */
-export function workingKey(service: string | null | undefined): UiKey {
-  switch (service) {
-    case "scene_transform":
-      return "media.working.scene_transform";
-    case "privacy_blur":
-      return "media.working.privacy_blur";
-    default:
-      return "media.working.generic";
-  }
+/**
+ * «Lager kveldsbilde …» etter tjenesten og oppskriften (G3, presets.ts), fra
+ * ordlista. Ukjent tjeneste eller oppskrift: «Lager bildet …». Uten
+ * oppskrift (null, jobben kjoerer) brukes reserven.
+ */
+export function workingKey(service: string | null | undefined, presetId?: string | null): UiKey {
+  return presetWorkingKey(service, presetId);
 }
 
 /**
@@ -68,8 +66,10 @@ export function workingKey(service: string | null | undefined): UiKey {
  * jobben lages og ved peisspoersmaalet. Avvist, feilet og de andre
  * statusene staar i merket ved tittelen, ikke to ganger.
  */
-export function overlayFor(job: Pick<JobSummary, "status" | "service" | "code">): MediaOverlay | null {
-  if (isWorking(job.status)) return { key: workingKey(job.service), working: true };
+export function overlayFor(
+  job: Pick<JobSummary, "status" | "service" | "code"> & Partial<Pick<JobSummary, "presetId">>
+): MediaOverlay | null {
+  if (isWorking(job.status)) return { key: workingKey(job.service, job.presetId), working: true };
   if (job.status === "needs_review" && job.code !== null && FIREPLACE_CODES.has(job.code)) {
     return { key: "media.fireplaceQuestion", working: false };
   }
@@ -81,7 +81,9 @@ export function overlayFor(job: Pick<JobSummary, "status" | "service" | "code">)
  * `thumbSrc(job)` (Lekkasjen L2); finnes det, vises det og ingenting annet.
  */
 export function mediaView(
-  job: Pick<JobSummary, "status" | "service" | "code" | "originalThumbUrl"> & Deleted,
+  job: Pick<JobSummary, "status" | "service" | "code" | "originalThumbUrl"> &
+    Partial<Pick<JobSummary, "presetId">> &
+    Deleted,
   thumb: string | null
 ): MediaView {
   if (job.thumbDeletedAt != null) return { kind: "deleted", overlay: null };
@@ -111,8 +113,8 @@ export function placeholderKey(reason: PlaceholderReason): UiKey {
 }
 
 /** Express mens jobben lages: plassholderen med symbolet (Petter 02.10, valg A). */
-export function workingView(service: string | null | undefined): MediaView {
-  return { kind: "placeholder", overlay: { key: workingKey(service), working: true } };
+export function workingView(service: string | null | undefined, presetId?: string | null): MediaView {
+  return { kind: "placeholder", overlay: { key: workingKey(service, presetId), working: true } };
 }
 
 /**
@@ -125,6 +127,7 @@ function sameView(a: JobSummary, b: JobSummary): boolean {
   return (
     a.status === b.status &&
     a.service === b.service &&
+    a.presetId === b.presetId &&
     a.code === b.code &&
     a.reason === b.reason &&
     a.isOwner === b.isOwner &&
