@@ -17,9 +17,10 @@ utover det som staar her.
   problemer du ikke er sikker paa.
 
 ## Stack (kort)
-- Next.js 16 (16.2.1 per 2026-09-23) med App Router, paa Vercel.
+- Next.js 16 (16.3.8 per 2026-10-16) med App Router, paa Vercel.
   Push til `main` deployer prod.
-- Clerk-auth (dev-instans i prod inntil TG-NEW-71 er gjort).
+- Clerk-auth, prod-instansen (clerk.husvy.com; TG-NEW-71 lukket).
+  Brukerne fra dev-instansen er et eget punkt (TG-NEW-163).
 - Backend: FastAPI paa Cloud Run via `NEXT_PUBLIC_API_BASE` (paakrevd, appen
   kaster feil hvis den mangler; settes i `.env.local` lokalt og i Vercel
   Environment Variables). All ny kode snakker med backend via `/v1`
