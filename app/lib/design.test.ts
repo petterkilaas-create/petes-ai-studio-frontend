@@ -568,10 +568,18 @@ test("D2b: «Detaljer» vises bare naar showDetails(caps) er sann", () => {
 /** Ord og koder fra analysen som bare hoerer hjemme i «Detaljer». */
 const ANALYSIS = /review\.lightsUnstable|review\.lightsRejected|review\.lightsApproved|"lightReason"|"reasonCode"|"flagCode"|review\.runValues|review\.analysisTitle|review\.analysisLocation|review\.noValidRuns|(?<![.\w])reason(?=[\s/>])/;
 
+// TG-NEW-219 (Petter 19.10): megleren ser grunnen for de tre kodene i MEGLER_REASON_CODES, via meglerReason.
+const TG219_REASON = '{reason !== null && <p className="text-sm text-ink">{codeText(locale, "reasonCode", reason)}</p>}';
+
 test("D2b: analysen staar bare i DetailsPanel (megleren ser den ikke)", () => {
   const files = ["(app)/godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("DetailsPanel.tsx") && !f.endsWith("LightLabel.tsx"))];
   for (const f of files) {
-    assert.doesNotMatch(withoutComments(read(f)), ANALYSIS, f);
+    let src = withoutComments(read(f));
+    if (f.endsWith("DecisionCard.tsx")) {
+      assert.equal(src.split(TG219_REASON).length, 2, "TG-NEW-219-linja en gang i DecisionCard");
+      src = src.replace(TG219_REASON, "");
+    }
+    assert.doesNotMatch(src, ANALYSIS, f);
   }
   const details = read("components/godkjenning/DetailsPanel.tsx");
   for (const key of ["review.lightsUnstable", "review.lightsRejected", '"reasonCode"', '"flagCode"']) {

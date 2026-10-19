@@ -20,6 +20,7 @@ import {
   buildDecision,
   decisionControls,
   mediaDeleted,
+  meglerReason,
   outcome,
   resultImageUrl,
   shouldPoll,
@@ -553,6 +554,8 @@ export default function GodkjenningPage({
                     ) : (
                       <DecisionCard
                         reviewCode={admin ? review.code : null}
+                        // TG-NEW-219: grunnen ved stopp i port 1, for alle roller.
+                        reason={meglerReason(review)}
                         controls={controls}
                         canCorrect={canCorrect}
                         roundFailed={correction.roundFailed}
