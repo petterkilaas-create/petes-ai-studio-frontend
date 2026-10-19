@@ -6,11 +6,12 @@ import type { FaqItem, FaqPage } from "../schema.ts";
 // (offer.ts), og «tre» er blitt «{bundleCount} kveldsbilder» (Petter 02.10,
 // valg D). Svar som venter, er merket med pending.
 export const faq = [
+  // TG-NEW-223 (Petter 19.10): svaret bygger på Forbrukertilsynets veileder
+  // for boligannonser (2026); ikke juridisk vurdert.
   {
     id: "lov",
     q: "Er det lov å bruke AI-redigerte bilder i boligannonser?",
-    a: "Ja, så lenge bildet ikke gir et feil inntrykk av boligen og det går tydelig fram at det er redigert. Derfor har hvert bilde et synlig AI-merke, og du får en ferdig tekst til annonsen.",
-    pending: "legal",
+    a: "Ja, så lenge bildet ikke gir et feil inntrykk av boligen og det går tydelig fram hva som er redigert. Forbrukertilsynets veileder sier at et redigert bilde skal ha en tydelig forklaring om at og hva som er redigert. Det holder ikke å skrive at AI er brukt. Derfor har hvert bilde et synlig AI-merke, og du får en ferdig tekst som sier konkret hva som er endret. Ansvaret for annonsen ligger hos megleren.",
     showOnHome: true,
   },
   {
