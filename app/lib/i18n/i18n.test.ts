@@ -23,9 +23,31 @@ test("kodene fra audit 2d §8 har norsk tekst", () => {
     "Analysen var uenig om hva slags bilde dette er."
   );
   assert.equal(codeText("nb", "reasonCode", "valid_runs_insufficient"), "Analysen ga ufullstendig svar.");
-  assert.equal(codeText("nb", "reasonCode", "image_type_untested"), "Denne bildetypen støttes ikke ennå.");
+  assert.equal(codeText("nb", "reasonCode", "image_type_untested"), "Denne bildetypen er ikke testet ennå.");
   assert.equal(t("nb", "status.rejectedByYou"), "Avvist av deg");
   assert.equal(t("en", "status.rejectedByYou"), "Rejected by you");
+});
+
+test("K3: grunnene for Klart vaer har tekst paa nb og en, og image_type_untested er noeytral", () => {
+  const expected = {
+    nb: {
+      image_type_not_supported: "Blå himmel kan ikke brukes på bilder tatt innendørs.",
+      sky_missing: "Bildet har ingen himmel som kan byttes.",
+      sky_through_windows_only: "Himmelen synes bare gjennom vinduer.",
+      image_type_untested: "Denne bildetypen er ikke testet ennå.",
+    },
+    en: {
+      image_type_not_supported: "Blue sky can't be used on indoor photos.",
+      sky_missing: "The image has no sky to replace.",
+      sky_through_windows_only: "The sky is only visible through windows.",
+      image_type_untested: "This image type has not been tested yet.",
+    },
+  } as const;
+  for (const locale of ["nb", "en"] as const) {
+    for (const [code, text] of Object.entries(expected[locale])) {
+      assert.equal(codeText(locale, "reasonCode", code), text, `${locale}/${code}`);
+    }
+  }
 });
 
 test("ukjent, tom og rar kode gir generisk tekst, aldri krasj", () => {

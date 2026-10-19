@@ -160,8 +160,8 @@ test("K2: skumring og reserven er fortsatt «Kveldsbilde» og kveldsbilde-ai", (
   }
 });
 
-test("K2: klart_vaer kan fortsatt ikke bestilles, og faar ingen skumringsfelt", () => {
-  assert.equal(isServiceEnabled("klart_vaer"), false);
+test("K2/K3: klart_vaer kan bestilles (aapnet i K3), og faar ingen skumringsfelt", () => {
+  assert.equal(isServiceEnabled("klart_vaer"), true);
   assert.deepEqual(duskParams("scene_transform", "klart_vaer", DEFAULT_DUSK), {});
 });
 

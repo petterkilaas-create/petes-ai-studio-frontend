@@ -7,7 +7,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { brandCssVars, DEFAULT_BRAND, HOUSE_ICON, resolveBrand } from "./brand.ts";
 import { DICTIONARIES, t } from "./i18n/index.ts";
-import { ENABLED, expressCategories, type NavId } from "./services.ts";
+import { expressCategories, orderableTools, type NavId } from "./services.ts";
 import { jsxBlocks, literalTexts, literalTextsInFile, withoutComments } from "./testing/jsxText.ts";
 
 // Redesign D0 (brief v4 §8, §13). node --test kan ikke laste .tsx, saa
@@ -1095,8 +1095,9 @@ const TEXT_EXCEPTIONS: { file: string; texts: string[]; why: string; hidden: () 
       "Eksteriør-presets passer ikke for interiørbilder. Hvis du er sikker på at dette faktisk er et eksteriørbilde, kan du overstyre vurderingen:",
       "Klassifisereren klarte ikke avgjøre scene-typen. Hvis dette er et eksteriørbilde, kan du fortsette med eksplisitt overstyring:",
     ],
-    why: "avslaget fra den gamle porten kommer bare fra klart_vaer, som er av; tekstene tas i TG-NEW-159",
-    hidden: () => !ENABLED.klart_vaer,
+    why:
+      "avslaget fra den gamle porten naas bare av et bestillbart kort med bildetypevelger (scene, sceneGate ikke false); skumring og Klart vaer gaar nivaa 2-veien (K3); tekstene tas i TG-NEW-159",
+    hidden: () => !orderableTools().some((tool) => tool.kind === "scene" && tool.sceneGate !== false),
   },
 ];
 
