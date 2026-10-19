@@ -32,8 +32,9 @@ utover det som staar her.
   `redirects()` i `next.config.ts`; ordlista bruker fortsatt `express.*`
   for sidens tekster (valg B1). `/scene-transform-debug` er slettet (L0,
   2026-09-30).
-- Tjenester av/paa: `ENABLED` i `app/lib/services.ts`. Klart vaer, Magic
-  Cleanup, Virtual Staging og `/express-v2` er av til de er merket (TG-NEW-136).
+- Tjenester av/paa: `ENABLED` i `app/lib/services.ts`. Magic Cleanup,
+  Virtual Staging og `/express-v2` er av til de er merket (TG-NEW-136).
+  Klart vaer («Blaa himmel») ble aapnet i K3 (Dag 47), nivaa 2.
 - Mappestruktur (MS1, 2026-10-02): app-sidene og rot-layouten (ClerkProvider)
   ligger i route group `app/(app)/`; URL-ene er uten `(app)`. Felles kode
   (`lib/`, `components/`, `hooks/`, `globals.css`, `icon.svg`,
@@ -62,7 +63,7 @@ utover det som staar her.
 - Installer fra lockfila med `npm ci`. `npm install` kan endre
   `package-lock.json` - commit aldri lockfil-endringer du ikke ble bedt om.
 - Typesjekk (porten lokalt): `npx tsc --noEmit` - forventet rent.
-- `npm test` (node --test) - 600 tester per 2026-10-19, forventet groent.
+- `npm test` (node --test) - 604 tester per 2026-10-19, forventet groent.
 - Dev-server: `npm run dev`, aapne http://localhost:3000 - aldri 127.0.0.1
   (Clerk-cookies og cross-origin oppfoerer seg annerledes).
 - `npm run build` gaar gjennom lokalt (verifisert 2026-10-05, etter

@@ -16,11 +16,13 @@ import {
   toolFromParam,
   visibleCategories,
 } from "./services.ts";
+import { DEFAULT_DUSK, duskParams, isDuskOrder } from "./dusk.ts";
 import { DICTIONARIES, type UiKey } from "./i18n/index.ts";
 import { withoutComments } from "./testing/jsxText.ts";
 
-// TG-NEW-136 (L0): Klart vaer, Magic Cleanup og Virtual Staging er skjult til
-// de er merket. Privacy Blur og skumring er som foer.
+// TG-NEW-136 (L0): Magic Cleanup og Virtual Staging er skjult til de er
+// merket. Privacy Blur og skumring er som foer. Klart vaer er aapnet i K3
+// (Dag 47), merket i G2.
 
 const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
 
@@ -57,12 +59,13 @@ function repoCodeFiles(dir = ROOT_DIR): string[] {
   return out;
 }
 
-test("konstanten: de tre tjenestene er av, privacy_blur og skumring er paa", () => {
-  for (const id of ["klart_vaer", "magic_cleanup", "virtual_stage", "express_v2"]) {
+test("konstanten: de tre tjenestene er av, privacy_blur, skumring og klart_vaer er paa", () => {
+  for (const id of ["magic_cleanup", "virtual_stage", "express_v2"]) {
     assert.equal(isServiceEnabled(id), false, id);
   }
   assert.equal(isServiceEnabled("privacy_blur"), true);
   assert.equal(isServiceEnabled("skumring"), true);
+  assert.equal(isServiceEnabled("klart_vaer"), true);
   assert.equal(ENABLED.magic_cleanup, false);
 });
 
@@ -72,16 +75,16 @@ test("ukjent tjeneste er av", () => {
   assert.equal(isServiceEnabled("toString"), false);
 });
 
-test("Tjenester har ikke Klart vaer eller Magic Cleanup, men har Privacy Blur og skumring", () => {
+test("Tjenester har ikke Magic Cleanup, men har Privacy Blur, skumring og Klart vaer", () => {
   const tools = expressCategories().flatMap((c) => c.items);
   const ids = tools.map((t) => t.id);
-  assert.ok(!ids.includes("klart_vaer"));
   assert.ok(!ids.includes("magic_cleanup"));
   assert.ok(!ids.includes("virtual_stage"));
   assert.ok(ids.includes("privacy_blur"));
   assert.ok(ids.includes("skumring"));
-  // Ingen scene_transform-kort med preset klart_vaer (nivaa 1) under et annet navn.
-  assert.ok(!tools.some((t) => t.presetId === "klart_vaer"));
+  assert.ok(ids.includes("klart_vaer"));
+  // Bare ett kort med preset klart_vaer, og det er Blaa himmel-kortet.
+  assert.deepEqual(tools.filter((t) => t.presetId === "klart_vaer").map((t) => t.id), ["klart_vaer"]);
   // Skumring sendes som foer.
   const dusk = tools.find((t) => t.id === "skumring");
   assert.equal(dusk?.service, "scene_transform");
@@ -338,7 +341,7 @@ test("TG-153: menyen viser bare ikonet under 640 px, og Start er ikke et hus", (
 // paa, vises som «Kommer» og kan ikke bestilles. ENABLED er uendret.
 // ---------------------------------------------------------------------------
 
-test("dag 45: visibleCategories gir alle kortene i rekkefoelge, fem «Kommer» og to bestillbare", () => {
+test("dag 45: visibleCategories gir alle kortene i rekkefoelge, fire «Kommer» og tre bestillbare", () => {
   const cats = visibleCategories();
   assert.deepEqual(
     cats.map((c) => [c.id, c.items.map((t) => t.id)]),
@@ -350,20 +353,21 @@ test("dag 45: visibleCategories gir alle kortene i rekkefoelge, fem «Kommer» o
     ]
   );
   const tools = cats.flatMap((c) => c.items);
-  assert.deepEqual(tools.filter((t) => t.orderable).map((t) => t.id), ["skumring", "privacy_blur"]);
+  assert.deepEqual(tools.filter((t) => t.orderable).map((t) => t.id), ["skumring", "klart_vaer", "privacy_blur"]);
   assert.deepEqual(
     tools.filter((t) => !t.orderable).map((t) => t.id),
-    ["klart_vaer", "magic_cleanup", "digital_styling", "video", "copywriter"]
+    ["magic_cleanup", "digital_styling", "video", "copywriter"]
   );
   // Ingen tom kategori, og orderable er det samme som ENABLED.
   for (const c of cats) assert.ok(c.items.length > 0, c.id);
   for (const t of tools) assert.equal(t.orderable, isServiceEnabled(t.id), t.id);
 });
 
-test("dag 45: det som kan bestilles og ?tjeneste= er uendret", () => {
-  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "privacy_blur"]);
+test("dag 45: det som kan bestilles og ?tjeneste= (Klart vaer aapnet i K3)", () => {
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "privacy_blur"]);
   assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "fixit"]);
-  for (const id of ["klart_vaer", "magic_cleanup", "digital_styling", "virtual_stage", "video", "copywriter"]) {
+  assert.deepEqual(toolFromParam("klart_vaer"), { categoryId: "timetraveler", toolId: "klart_vaer" });
+  for (const id of ["magic_cleanup", "digital_styling", "virtual_stage", "video", "copywriter"]) {
     assert.equal(toolFromParam(id), null, id);
   }
   // De nye id-ene er ikke lagt inn i ENABLED, heller ikke som false.
@@ -415,4 +419,72 @@ test("dag 45: «Kommer»-kortet er ikke en knapp, og bare bestillbare kort kan v
   assert.match(branch, /aria-disabled="true"/);
   assert.match(branch, /t\(locale, "express\.coming"\)/);
   assert.doesNotMatch(branch, /onClick|<button|href=|tabIndex|opacity-/);
+});
+
+// ---------------------------------------------------------------------------
+// K3 (Dag 47): Klart vaer («Blaa himmel») er aapnet og gaar nivaa 2-veien.
+// Port 1 og gate_kv i backend avgjoer bildetypen: ingen bildetypevelger og
+// ingen skumringsvalg, og bestillingen sender bare preset_id.
+// ---------------------------------------------------------------------------
+
+test("K3: Klart vaer-kortet er bestillbart, uten bildetypevelger", () => {
+  const tool = orderableTools().find((t) => t.id === "klart_vaer");
+  assert.ok(tool);
+  assert.equal(tool.service, "scene_transform");
+  assert.equal(tool.presetId, "klart_vaer");
+  assert.equal(tool.kind, "scene");
+  assert.equal(tool.sceneGate, false);
+  assert.equal(tool.titleKey, "express.tool.klart_vaer.title");
+  assert.equal(DICTIONARIES.nb.ui[tool.titleKey], "Blå himmel");
+  // Ingen skumringsvalg: ingen dusk_* i params_json.
+  assert.equal(isDuskOrder(tool.service, tool.presetId), false);
+  assert.deepEqual(duskParams(tool.service, tool.presetId, DEFAULT_DUSK), {});
+});
+
+test("K3: magic_cleanup, virtual_stage og express_v2 er fortsatt av", () => {
+  assert.equal(ENABLED.magic_cleanup, false);
+  assert.equal(ENABLED.virtual_stage, false);
+  assert.equal(ENABLED.express_v2, false);
+  const ids = orderableTools().map((t) => t.id);
+  for (const id of ["magic_cleanup", "virtual_stage", "digital_styling"]) assert.ok(!ids.includes(id), id);
+});
+
+test("K3: bestillingen paa Tjenester sender bare preset_id for et kort uten bildetypevelger", () => {
+  const page = withoutComments(read("(app)/tjenester/page.tsx"));
+  // Bildetypevelgeren (og scene-feltene) bare naar sceneGate ikke er false.
+  assert.match(
+    page,
+    /const showSceneControls =\s*selectedTool\?\.kind === "scene" && selectedTool\.sceneGate !== false;/
+  );
+  // Skumringsvalgene bare for skumringspresetene (isDuskOrder).
+  assert.match(
+    page,
+    /const showDuskControls =\s*selectedTool !== null && isDuskOrder\(selectedTool\.service, selectedTool\.presetId\);/
+  );
+  // Det handleRun sender for scene-kort: preset_id, scene-feltene bak
+  // showSceneControls og duskParams. Ingen andre felt (model, dusk_* direkte).
+  const start = page.indexOf("job.run(preview.file, selectedTool.service, {");
+  assert.ok(start > 0);
+  const body = page.slice(start, page.indexOf("});", start));
+  const fields = body.replace(/\s+/g, " ");
+  assert.match(fields, /\.\.\.\(selectedTool\.presetId \? \{ preset_id: selectedTool\.presetId \} : \{\}\),/);
+  assert.match(
+    fields,
+    /\.\.\.\(showSceneControls \? \{ scene_type: sceneType, force_scene_type: forceSceneType \} : \{\}\),/
+  );
+  assert.match(fields, /\.\.\.duskParams\(selectedTool\.service, selectedTool\.presetId, dusk\),/);
+  assert.deepEqual(
+    [...body.matchAll(/\b([a-z_]+):/g)].map((m) => m[1]),
+    ["preset_id", "scene_type", "force_scene_type"]
+  );
+  // Med Klart vaer-kortet blir det { preset_id: "klart_vaer" } og ingenting annet.
+  const tool = orderableTools().find((t) => t.id === "klart_vaer");
+  assert.ok(tool);
+  const showScene = tool.kind === "scene" && tool.sceneGate !== false;
+  const params = {
+    ...(tool.presetId ? { preset_id: tool.presetId } : {}),
+    ...(showScene ? { scene_type: "auto", force_scene_type: false } : {}),
+    ...duskParams(tool.service, tool.presetId, DEFAULT_DUSK),
+  };
+  assert.deepEqual(params, { preset_id: "klart_vaer" });
 });

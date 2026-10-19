@@ -1,9 +1,9 @@
 /**
  * Hvilke tjenester og sider som er slaatt paa (TG-NEW-136, L0, Petter
- * 29.09/30.09). Bare skumring har merket vei (EU-ikonet). Klart vaer, Magic
- * Cleanup og Virtual Staging gir bare den umerkede PNG-en, saa de er skjult
- * for alle, ogsaa admin, til de er merket. Privacy Blur regnes ikke som
- * KI-endring.
+ * 29.09/30.09). Skumring og Klart vaer (K3, Dag 47) har merket vei
+ * (EU-ikonet). Magic Cleanup og Virtual Staging gir bare den umerkede
+ * PNG-en, saa de er skjult for alle, ogsaa admin, til de er merket. Privacy
+ * Blur regnes ikke som KI-endring.
  *
  * Slaa en tjeneste paa igjen ved aa endre EN linje i ENABLED. Koden for
  * tjenestene og sidene er beholdt. Backend har sin egen tillatelsesliste
@@ -17,7 +17,8 @@ import type { UiKey } from "./i18n";
 import { START_PATH } from "./marketingAccess.ts";
 
 export const ENABLED = {
-  klart_vaer: false,
+  /** Aapnet i K3 (Dag 47), merket i G2. Nivaa 2: ingen bildetypevelger. */
+  klart_vaer: true,
   magic_cleanup: false,
   virtual_stage: false,
   /** Proof-of-concept-siden /express-v2, ikke en tjeneste. */
@@ -92,14 +93,15 @@ export function navLinks(): NavLink[] {
 export type ToolKind = "simple" | "scene";
 
 export interface Tool {
-  /** Id-en i ENABLED. Skiller Klart vaer (nivaa 1) fra skumring (nivaa 2). */
+  /** Id-en i ENABLED. Skiller Klart vaer fra skumring (samme service). */
   id: string;
   service: string;
   presetId?: string;
   kind: ToolKind;
   /**
    * Scene-type-velger + "Tving eksterioer" for scene-kort. Standard true;
-   * false der backend bestemmer bildetypen selv (skumring, nivaa 2).
+   * false der backend bestemmer bildetypen selv (nivaa 2: skumring og
+   * Klart vaer).
    */
   sceneGate?: boolean;
   /** Tekstene staar i ordlista (D1c, brief §7); ikonet i tjenester/page.tsx. */
@@ -132,12 +134,14 @@ const CATEGORIES: Category[] = [
         titleKey: "service.scene_transform",
         descKey: "express.tool.skumring.desc",
       },
-      // Etter kveldsbildet (dag 45): vises som «Kommer» til den er merket.
+      // Etter kveldsbildet (dag 45). Aapnet i K3 (Dag 47): nivaa 2, port 1
+      // avgjoer bildetypen, saa ingen bildetypevelger og ingen skumringsvalg.
       {
         id: "klart_vaer",
         service: "scene_transform",
         presetId: "klart_vaer",
         kind: "scene",
+        sceneGate: false,
         titleKey: "express.tool.klart_vaer.title",
         descKey: "express.tool.klart_vaer.desc",
       },

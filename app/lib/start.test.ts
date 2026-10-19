@@ -104,8 +104,8 @@ test("TG-153 start: den automatiske hentingen gaar bare mens en jobb lages", () 
 // ---------------------------------------------------------------------------
 
 test("TG-153: snarveiene viser bare tjenester som kan bestilles i prod", () => {
-  // Speiler services/enabled.py i backend (TG-NEW-138): privacy_blur og skumring.
-  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "privacy_blur"]);
+  // Speiler services/enabled.py i backend (TG-NEW-138): skumring, klart_vaer (K3) og privacy_blur.
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "privacy_blur"]);
   for (const tool of orderableTools()) assert.equal(ENABLED[tool.id as keyof typeof ENABLED], true, tool.id);
 });
 
@@ -115,7 +115,8 @@ test("TG-153: forhaandsvalget godtar bare tjenester som er slaatt paa", () => {
   assert.ok(serviceHref("x").startsWith(`${SERVICES_PATH}?`));
   assert.deepEqual(toolFromParam("skumring"), { categoryId: "timetraveler", toolId: "skumring" });
   assert.deepEqual(toolFromParam("privacy_blur"), { categoryId: "fixit", toolId: "privacy_blur" });
-  for (const hidden of ["klart_vaer", "magic_cleanup", "virtual_stage", "express_v2", "video", "", "SKUMRING"]) {
+  assert.deepEqual(toolFromParam("klart_vaer"), { categoryId: "timetraveler", toolId: "klart_vaer" });
+  for (const hidden of ["magic_cleanup", "virtual_stage", "express_v2", "video", "", "SKUMRING", "KLART_VAER"]) {
     assert.equal(toolFromParam(hidden), null, hidden);
   }
   assert.equal(toolFromParam(null), null);
