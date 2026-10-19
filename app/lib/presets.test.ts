@@ -13,6 +13,8 @@ import { downloadFileName, downloadMarkedImage } from "./download.ts";
 import { mergeRefresh, overlayFor, workingKey, workingView } from "./jobMedia.ts";
 import { canShowMarkers } from "./lightsView.ts";
 import { DICTIONARIES } from "./i18n/index.ts";
+import { isServiceEnabled } from "./services.ts";
+import { DEFAULT_DUSK, duskParams } from "./dusk.ts";
 import type { JobReviewDetail, JobSummary, ReviewLight } from "./api.ts";
 
 /*
@@ -22,6 +24,7 @@ import type { JobReviewDetail, JobSummary, ReviewLight } from "./api.ts";
  */
 
 const nb = DICTIONARIES.nb.ui;
+const en = DICTIONARIES.en.ui;
 const JOB = "250dccaf-1234-4abc-9def-000000000000";
 
 // --- Etiketten ---------------------------------------------------------------
@@ -35,7 +38,7 @@ test("G3: skumring, skumring_interior og reserven (null) heter «Kveldsbilde»",
 });
 
 test("G3: ukjent oppskrift under scene_transform gir null, aldri «Kveldsbilde»", () => {
-  assert.equal(presetLabelKey("scene_transform", "klart_vaer"), null);
+  assert.equal(presetLabelKey("scene_transform", "ukjent_oppskrift"), null);
   assert.equal(presetLabelKey("scene_transform", "toString"), null);
   assert.equal(presetLabelKey("scene_transform", "__proto__"), null);
 });
@@ -54,10 +57,10 @@ test("G3: ventetekst per oppskrift; reserven og skumring er «Lager kveldsbilde 
     assert.equal(presetWorkingKey("scene_transform", preset), "media.working.scene_transform");
     assert.equal(workingKey("scene_transform", preset), "media.working.scene_transform");
   }
-  assert.equal(workingKey("scene_transform", "klart_vaer"), "media.working.generic");
+  assert.equal(workingKey("scene_transform", "ukjent_oppskrift"), "media.working.generic");
   assert.equal(workingKey("privacy_blur", null), "media.working.privacy_blur");
   assert.equal(workingKey("noe_nytt", "skumring"), "media.working.generic");
-  assert.deepEqual(workingView("scene_transform", "klart_vaer"), {
+  assert.deepEqual(workingView("scene_transform", "ukjent_oppskrift"), {
     kind: "placeholder",
     overlay: { key: "media.working.generic", working: true },
   });
@@ -71,7 +74,7 @@ test("G3: kortet mens jobben kjoerer bruker oppskriften, og null som reserve", (
   const job = (presetId: string | null) => ({ status: "running" as const, service: "scene_transform", code: null, presetId });
   assert.deepEqual(overlayFor(job(null)), { key: "media.working.scene_transform", working: true });
   assert.deepEqual(overlayFor(job("skumring")), { key: "media.working.scene_transform", working: true });
-  assert.deepEqual(overlayFor(job("klart_vaer")), { key: "media.working.generic", working: true });
+  assert.deepEqual(overlayFor(job("ukjent_oppskrift")), { key: "media.working.generic", working: true });
 });
 
 test("G3: automatisk henting bytter kortet naar oppskriften kommer", () => {
@@ -106,9 +109,9 @@ test("G3: filnavnet er kveldsbilde-ai_<8>.jpg for skumring og reserven, som foer
 });
 
 test("G3: ukjent oppskrift gir id-en renset til a-z0-9 i filnavnet", () => {
-  assert.equal(downloadFileName(JOB, "klart_vaer"), "klartvaer-ai_250dccaf.jpg");
+  assert.equal(downloadFileName(JOB, "ukjent_oppskrift"), "ukjentoppskrift-ai_250dccaf.jpg");
   assert.equal(downloadFileName(JOB, "Ny/../Tjeneste-2"), "nytjeneste2-ai_250dccaf.jpg");
-  assert.equal(downloadFileName("", "klart_vaer"), "klartvaer-ai.jpg");
+  assert.equal(downloadFileName("", "ukjent_oppskrift"), "ukjentoppskrift-ai.jpg");
   // Ingenting igjen etter rensing: «bilde», aldri «kveldsbilde».
   assert.equal(downloadFileName(JOB, "øæå"), "bilde-ai_250dccaf.jpg");
 });
@@ -117,12 +120,56 @@ test("G3: nedlastingen bruker oppskriften i filnavnet", async () => {
   const saved: string[] = [];
   const result = await downloadMarkedImage({
     jobId: JOB,
-    presetId: "klart_vaer",
+    presetId: "ukjent_oppskrift",
     fetchFile: async () => new Response(new Uint8Array([0xff, 0xd8]), { status: 200 }),
     save: (_blob, name) => saved.push(name),
   });
-  assert.deepEqual(result, { kind: "ok", fileName: "klartvaer-ai_250dccaf.jpg" });
-  assert.deepEqual(saved, ["klartvaer-ai_250dccaf.jpg"]);
+  assert.deepEqual(result, { kind: "ok", fileName: "ukjentoppskrift-ai_250dccaf.jpg" });
+  assert.deepEqual(saved, ["ukjentoppskrift-ai_250dccaf.jpg"]);
+});
+
+// --- Klart vaer (K2) ------------------------------------------------------------
+
+test("K2: klart_vaer heter «Blå himmel», kortets tittel, paa nb og en", () => {
+  const key = presetLabelKey("scene_transform", "klart_vaer");
+  assert.equal(key, "express.tool.klart_vaer.title");
+  assert.equal(nb[key!], "Blå himmel");
+  assert.equal(en[key!], "Blue sky");
+});
+
+test("K2: ventetekst for klart_vaer er «Bytter himmelen …»", () => {
+  assert.equal(presetWorkingKey("scene_transform", "klart_vaer"), "media.working.klart_vaer");
+  assert.equal(workingKey("scene_transform", "klart_vaer"), "media.working.klart_vaer");
+  const job = { status: "running" as const, service: "scene_transform", code: null, presetId: "klart_vaer" };
+  assert.deepEqual(overlayFor(job), { key: "media.working.klart_vaer", working: true });
+  assert.equal(nb["media.working.klart_vaer"], "Bytter himmelen …");
+  assert.equal(en["media.working.klart_vaer"], "Replacing the sky …");
+});
+
+test("K2: filnavnet for klart_vaer er blaahimmel-ai_<8>.jpg", () => {
+  assert.equal(presetFileSlug("klart_vaer"), "blaahimmel");
+  assert.equal(downloadFileName(JOB, "klart_vaer"), "blaahimmel-ai_250dccaf.jpg");
+  assert.equal(downloadFileName("", "klart_vaer"), "blaahimmel-ai.jpg");
+});
+
+test("K2: skumring og reserven er fortsatt «Kveldsbilde» og kveldsbilde-ai", () => {
+  for (const preset of ["skumring", null]) {
+    assert.equal(nb[presetLabelKey("scene_transform", preset)!], "Kveldsbilde");
+    assert.equal(presetWorkingKey("scene_transform", preset), "media.working.scene_transform");
+    assert.equal(downloadFileName(JOB, preset), "kveldsbilde-ai_250dccaf.jpg");
+  }
+});
+
+test("K2: klart_vaer kan fortsatt ikke bestilles, og faar ingen skumringsfelt", () => {
+  assert.equal(isServiceEnabled("klart_vaer"), false);
+  assert.deepEqual(duskParams("scene_transform", "klart_vaer", DEFAULT_DUSK), {});
+});
+
+test("K2: beskrivelsen av Blå himmel lover ikke dagslys", () => {
+  assert.equal(nb["express.tool.klart_vaer.desc"], "Bytter grå himmel med klar, blå himmel.");
+  assert.equal(en["express.tool.klart_vaer.desc"], "Replaces a grey sky with a clear blue sky.");
+  assert.doesNotMatch(nb["express.tool.klart_vaer.desc"], /dagslys/i);
+  assert.doesNotMatch(en["express.tool.klart_vaer.desc"], /daylight/i);
 });
 
 // --- Paneler -------------------------------------------------------------------
