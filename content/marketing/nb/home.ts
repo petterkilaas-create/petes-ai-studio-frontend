@@ -234,7 +234,9 @@ export const home = {
 
   // Linje 247-266. Eksempelteksten lages av kodene med produktets funksjon
   // (app/lib/disclosure.ts) og blir «Kveldsbilde laget med AI fra dagsbilde.
-  // Himmel og lamper i rommet er redigert.» Bildet er en plassholder (valg C).
+  // Himmel, lys i nabohus og stearinlys er redigert.» Bildet er ekte (jobb
+  // 2f6c3c5b, beslutning 4, 19.10), og kodene er det jobben fikk (XMP
+  // pas:Edited i nedlastingen), saa teksten stemmer med bildet.
   labeling: {
     _type: "labeling",
     anchor: "merking",
@@ -247,19 +249,19 @@ export const home = {
       // teksten faar megleren paa godkjenningssiden.
       { text: "Teksten til annonsen får du når du godkjenner bildet." },
       { text: "Originalen lagres urørt, og du ser den ved siden av kveldsbildet før du godkjenner." },
-      { text: "Laget for EUs krav om åpenhet rundt AI-innhold.", pending: "legal" },
+      { text: "Laget med tanke på EUs åpenhetskrav for AI-innhold og Forbrukertilsynets veiledning." },
     ],
     guide: { label: "Les guiden: AI-bilder i boligannonsen" },
     more: { label: "Les mer om merkingen", href: "/no/merking" },
-    picture: ph(
-      "Stue som kveldsbilde med AI-merket",
-      "Stue som kveldsbilde laget med AI, med AI-merket synlig nede til venstre"
-    ),
+    picture: {
+      image: "merkingEvening",
+      alt: "Stue med åpen balkongdør som kveldsbilde laget med AI, med AI-merket og setningen nede til venstre",
+    },
     example: {
       title: "Tekst til annonsen",
       base: "evening_from_day",
       time: "early",
-      edited: ["sky", "interior_lamps"],
+      edited: ["sky", "neighbour_window_lights", "candles"],
       note: "Klar til å kopiere når bildet er godkjent.",
     },
   },

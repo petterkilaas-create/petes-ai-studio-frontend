@@ -10,7 +10,7 @@
  */
 
 /** Nøklene til bildene i images.ts (den eneste fila med bildeimport). */
-export type ImageKey = "heroOriginal" | "heroEvening";
+export type ImageKey = "heroOriginal" | "heroEvening" | "merkingEvening";
 
 /**
  * Det som venter paa avklaring foer lansering (MS3, regel 3 og 4). Mens
