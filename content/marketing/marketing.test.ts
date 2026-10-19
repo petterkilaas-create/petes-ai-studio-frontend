@@ -170,19 +170,24 @@ test("MS2: bildene har alt-tekst og finnes i images.ts, og bare images.ts import
   for (const m of images.matchAll(/^import \w+ from "\.\/(images\/[\w-]+\.jpg)";$/gm)) {
     assert.ok(existsSync(join(CONTENT_DIR, m[1])), m[1]);
   }
-  assert.equal([...images.matchAll(/^import \w+ from "\.\/images\//gm)].length, 2);
+  assert.equal([...images.matchAll(/^import \w+ from "\.\/images\//gm)].length, 3);
   for (const f of filesIn("content").filter((f) => f !== "content/marketing/images.ts")) {
     assert.doesNotMatch(read(f), /\.(jpe?g|png|webp|avif)"/, f);
   }
-  // JPG i 1536x1024 (Petter 02.10). SOF0/SOF2: hoeyde og bredde etter markoeren.
-  for (const name of ["hero-original.jpg", "hero-kveld.jpg"]) {
+  // JPG i 1536x1024 (Petter 02.10); merkebildet er 1536x1040 (beslutning 4,
+  // 19.10). SOF0/SOF2: hoeyde og bredde etter markoeren.
+  for (const [name, size] of [
+    ["hero-original.jpg", [1536, 1024]],
+    ["hero-kveld.jpg", [1536, 1024]],
+    ["merking-kveld.jpg", [1536, 1040]],
+  ] as const) {
     const jpg = readFileSync(join(CONTENT_DIR, "images", name));
     assert.equal(jpg.readUInt16BE(0), 0xffd8, name);
     let i = 2;
     while (i < jpg.length && !(jpg[i] === 0xff && (jpg[i + 1] === 0xc0 || jpg[i + 1] === 0xc2))) {
       i += 2 + jpg.readUInt16BE(i + 2);
     }
-    assert.deepEqual([jpg.readUInt16BE(i + 7), jpg.readUInt16BE(i + 5)], [1536, 1024], name);
+    assert.deepEqual([jpg.readUInt16BE(i + 7), jpg.readUInt16BE(i + 5)], size, name);
   }
 });
 
@@ -558,13 +563,10 @@ const PENDING_NOW = [
   ["home.hero.before", "image"],
   ["home.hero.after", "image"],
   ["home.trustStrip.items[3]", "dataRegion"],
-  ["home.labeling.points[3]", "legal"],
   ["faq[0]", "legal"],
   ["faq[3].slots.time", "time"],
   ["faq[6]", "trainingAnswer"],
   ["faq[7]", "storageAnswer"],
-  // MS5a: linja om EUs krav paa merkesiden (samme paastand som paa forsiden).
-  ["labelingPage.rules.points[0]", "legal"],
 ];
 
 test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () => {
@@ -573,10 +575,11 @@ test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () =>
     assert.deepEqual(items, [], "MARKETING_PUBLIC er true, men noe i innholdet venter fortsatt");
   }
   // Lista i dag (oppdateres bevisst etter hvert som ting avklares). Alle
-  // eksempelbildene er plassholdere eller midlertidige.
+  // eksempelbildene er plassholdere eller midlertidige, unntatt merkebildet
+  // (beslutning 4).
   const notPictures = items.filter((i) => i.key !== "image" || i.path.startsWith("home.hero"));
   assert.deepEqual(notPictures.map((i) => [i.path, i.key]), PENDING_NOW);
-  assert.ok(items.filter((i) => i.key === "image").length >= 2 + 14 + 5 + 2 + 1);
+  assert.ok(items.filter((i) => i.key === "image").length >= 2 + 14 + 5 + 2);
   // Hver noekkel har en merkelapp.
   for (const i of items) assert.ok(site.pendingLabels[i.key].startsWith("["), i.key);
 });
@@ -764,7 +767,7 @@ test("MS3b: eksempelet paa annonseteksten lages med produktets funksjon og er li
   );
   assert.deepEqual(result, {
     kind: "text",
-    text: "Kveldsbilde laget med AI fra dagsbilde. Himmel og lamper i rommet er redigert.",
+    text: "Kveldsbilde laget med AI fra dagsbilde. Himmel, lys i nabohus og stearinlys er redigert.",
   });
   const src = withoutComments(read("app/components/marketing/Labeling.tsx"));
   assert.match(src, /const disclosure = disclosureText\(\s*DISCLOSURE_LOCALE,/);
@@ -1023,4 +1026,29 @@ test("MS5a: kontaktsiden har e-post og selskapsnavn fra site, og ikke noe skjema
   assert.doesNotMatch(src, /<form|<input|<textarea/);
   for (const g of contactPage.groups) assert.match(g.text, /\{email\}/, g.title);
   assert.doesNotMatch(JSON.stringify(contactPage), /@|telefon|org\.?nr|\badresse\b/i);
+});
+
+test("Beslutning 4: merkebildet er ekte, EU-setningen er ny og venter ikke, og [E-POST] staar", () => {
+  // Bildet: jobb 2f6c3c5b, statisk importert, uten pending; merkesiden henter det fra forsiden.
+  assert.deepEqual(home.labeling.picture, {
+    image: "merkingEvening",
+    alt: "Stue med åpen balkongdør som kveldsbilde laget med AI, med AI-merket og setningen nede til venstre",
+  });
+  const images = read("content/marketing/images.ts");
+  assert.match(images, /^import merkingEvening from "\.\/images\/merking-kveld\.jpg";$/m);
+  assert.match(images, /^  merkingEvening,$/m);
+  assert.match(withoutComments(read("app/components/marketing/LabelingPage.tsx")), /picture=\{labeling\.picture\}/);
+  // Kodene er det jobben fikk (XMP pas:Edited).
+  assert.deepEqual([...home.labeling.example.edited], ["sky", "neighbour_window_lights", "candles"]);
+  // EU-setningen ordrett begge steder, uten pending.
+  const eu = "Laget med tanke på EUs åpenhetskrav for AI-innhold og Forbrukertilsynets veiledning.";
+  assert.deepEqual(home.labeling.points[3], { text: eu });
+  assert.deepEqual(labelingPage.rules.points[0], { text: eu });
+  for (const f of ["content/marketing/nb/home.ts", "content/marketing/nb/labeling.ts"]) {
+    assert.doesNotMatch(read(f), /pending: "legal"/, f);
+    assert.doesNotMatch(read(f), /Laget for EUs krav/, f);
+  }
+  // E-posten venter fortsatt (lappen [E-POST]).
+  assert.deepEqual(site.contact.email, { pending: "email" });
+  assert.equal(site.pendingLabels.email, "[E-POST]");
 });

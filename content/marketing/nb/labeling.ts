@@ -52,7 +52,7 @@ export const labelingPage = {
   },
   rules: {
     title: "Reglene",
-    points: [{ text: "Laget for EUs krav om åpenhet rundt AI-innhold.", pending: "legal" }],
+    points: [{ text: "Laget med tanke på EUs åpenhetskrav for AI-innhold og Forbrukertilsynets veiledning." }],
     faqId: "lov",
   },
 } as const satisfies LabelingPage;
