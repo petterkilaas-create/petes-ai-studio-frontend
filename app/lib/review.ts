@@ -197,3 +197,17 @@ export function outcome(
       return { key: "review.statusOther", reason: null };
   }
 }
+
+/** TG-NEW-219: grunnene megleren ser ved stopp i port 1, i denne rekkefølgen. */
+export const MEGLER_REASON_CODES = ["image_type_not_supported", "sky_missing", "sky_through_windows_only"] as const;
+
+/**
+ * Grunnen megleren ser over knappene (TG-NEW-219, Petter 19.10): den foerste
+ * koden fra MEGLER_REASON_CODES som finnes i `reasonCodes`, bare ved stopp i
+ * port 1 (needs_review + gate_review). Ellers null. Andre grunner er bare
+ * for admin (DetailsPanel). `includes` paa lista, ikke `in` paa et objekt.
+ */
+export function meglerReason(review: Pick<JobReviewDetail, "status" | "code" | "reasonCodes">): string | null {
+  if (review.status !== "needs_review" || review.code !== "gate_review") return null;
+  return MEGLER_REASON_CODES.find((code) => review.reasonCodes.includes(code)) ?? null;
+}

@@ -33,6 +33,7 @@ const BTN_DANGER = buttonClass("danger");
  */
 export function DecisionCard({
   reviewCode,
+  reason,
   controls,
   canCorrect,
   roundFailed,
@@ -58,6 +59,8 @@ export function DecisionCard({
 }: {
   /** Hvorfor jobben venter (gate_review, fireplace_answer_missing), som kode. */
   reviewCode: string | null;
+  /** TG-NEW-219: grunnen megleren ser, som kode. */
+  reason: string | null;
   controls: DecisionControls;
   canCorrect: boolean;
   roundFailed: boolean;
@@ -101,6 +104,7 @@ export function DecisionCard({
       ) : (
         <>
           {reviewCode !== null && <p className="text-sm text-ink">{codeText(locale, "reviewCode", reviewCode)}</p>}
+          {reason !== null && <p className="text-sm text-ink">{codeText(locale, "reasonCode", reason)}</p>}
 
           {controls.fireplaceQuestion && (
             <FireplaceChoice answer={answer} onChange={onAnswer} disabled={locked} locale={locale} />
