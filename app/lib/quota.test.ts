@@ -99,7 +99,7 @@ test("TG149: remaining = 0 stenger bestilling av kveldsbilde og viser meldingen"
   assert.equal(canOrder("scene_transform", null), true);
   assert.equal(
     t("nb", "quota.exhausted", { limit: 3 }),
-    "Du har brukt de 3 gratis bildene dine. Du kan ikke bestille flere kveldsbilder nå."
+    "Du har brukt de 3 gratis bildene dine. Du kan ikke bestille flere bilder nå."
   );
 });
 

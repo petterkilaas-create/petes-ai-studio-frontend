@@ -199,7 +199,7 @@ test("MS2: antallet gratisbilder staar ett sted (offer.freeImages), ikke i tekst
   }
   assert.equal(
     fill(home.hero.freeNote, { n: site.offer.freeImages }),
-    "3 gratis kveldsbilder når du registrerer deg. Uten kort."
+    "3 gratis bilder når du registrerer deg. Uten kort."
   );
   assert.ok(read("app/components/marketing/Hero.tsx").includes("fill(hero.freeNote, { n: site.offer.freeImages })"));
 });
@@ -563,7 +563,6 @@ const PENDING_NOW = [
   ["home.hero.before", "image"],
   ["home.hero.after", "image"],
   ["home.trustStrip.items[3]", "dataRegion"],
-  ["faq[0]", "legal"],
   ["faq[3].slots.time", "time"],
   ["faq[6]", "trainingAnswer"],
   ["faq[7]", "storageAnswer"],
@@ -1051,4 +1050,47 @@ test("Beslutning 4: merkebildet er ekte, EU-setningen er ny og venter ikke, og [
   // E-posten venter fortsatt (lappen [E-POST]).
   assert.deepEqual(site.contact.email, { pending: "email" });
   assert.equal(site.pendingLabels.email, "[E-POST]");
+});
+
+test("TG-NEW-220: gratisbildene heter «gratis bilder», de betalte produktene er fortsatt kveldsbilder", () => {
+  // Blaa himmel trekker ogsaa fra gratisbildene (Petter 19.10).
+  const nb = DICTIONARIES.nb;
+  const en = DICTIONARIES.en;
+  const free = {
+    freeNote: home.hero.freeNote,
+    "free.text": home.pricing.free.text,
+    "finalCta.text": home.finalCta.text,
+    "quota.exhausted": nb.ui["quota.exhausted"],
+    free_quota_exhausted: nb.codes.orderError.free_quota_exhausted,
+  };
+  assert.deepEqual(free, {
+    freeNote: "{n} gratis bilder når du registrerer deg. Uten kort.",
+    "free.text": "{n} bilder når du registrerer deg. Nok til en hel annonse. Uten kort.",
+    "finalCta.text": "{n} gratis bilder når du registrerer deg. Uten kort.",
+    "quota.exhausted": "Du har brukt de {limit} gratis bildene dine. Du kan ikke bestille flere bilder nå.",
+    free_quota_exhausted: "Du har brukt alle gratisbildene dine. Du kan ikke bestille flere bilder nå.",
+  });
+  for (const [key, text] of Object.entries(free)) assert.doesNotMatch(text, /kveldsbild/i, key);
+  assert.equal(en.ui["quota.exhausted"], "You have used your {limit} free images. You cannot order more images right now.");
+  assert.equal(
+    en.codes.orderError.free_quota_exhausted,
+    "You have used all your free images. You cannot order more images right now."
+  );
+  // De betalte produktene gjelder kveldsbildet og staar.
+  assert.equal(home.pricing.single.name, "Kveldsbilde");
+  assert.equal(home.pricing.bundle.name, "{n} kveldsbilder");
+});
+
+test("TG-NEW-223: svaret om lov staar ordrett, uten lapp og uten tall", () => {
+  const lov = faq[0];
+  assert.equal(lov.id, "lov");
+  assert.equal("pending" in lov, false);
+  assert.equal(
+    lov.a,
+    "Ja, så lenge bildet ikke gir et feil inntrykk av boligen og det går tydelig fram hva som er redigert. Forbrukertilsynets veileder sier at et redigert bilde skal ha en tydelig forklaring om at og hva som er redigert. Det holder ikke å skrive at AI er brukt. Derfor har hvert bilde et synlig AI-merke, og du får en ferdig tekst som sier konkret hva som er endret. Ansvaret for annonsen ligger hos megleren."
+  );
+  assert.doesNotMatch(lov.a ?? "", /\d/);
+  assert.ok(lov.showOnHome);
+  // Merkesiden lenker til det samme svaret.
+  assert.equal(labelingPage.rules.faqId, lov.id);
 });

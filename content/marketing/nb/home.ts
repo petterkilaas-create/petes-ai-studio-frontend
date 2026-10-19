@@ -27,7 +27,7 @@ export const home = {
     title: "Kveldsbilder av dagsbildene dine.",
     lead: "Du velger stemningen og godkjenner resultatet. Hvert bilde får synlig AI-merke og ferdig tekst til annonsen. Originalen røres aldri.",
     secondary: { label: "Se eksempler", href: "#eksempler" },
-    freeNote: "{n} gratis kveldsbilder når du registrerer deg. Uten kort.",
+    freeNote: "{n} gratis bilder når du registrerer deg. Uten kort.",
     before: { image: "heroOriginal", alt: "Originalbildet av stua, tatt på dagtid", pending: "image" },
     after: {
       image: "heroEvening",
@@ -289,7 +289,7 @@ export const home = {
     priceFormat: "{price} kr",
     free: {
       name: "Prøv gratis",
-      text: "{n} kveldsbilder når du registrerer deg. Nok til en hel annonse. Uten kort.",
+      text: "{n} bilder når du registrerer deg. Nok til en hel annonse. Uten kort.",
       features: ["Samme bilde som betalende får", "AI-merke og tekst til annonsen"],
     },
     single: {
@@ -335,7 +335,7 @@ export const home = {
   finalCta: {
     _type: "finalCta",
     title: "Se ditt eget bilde i kveldslys.",
-    text: "{n} gratis kveldsbilder når du registrerer deg. Uten kort.",
+    text: "{n} gratis bilder når du registrerer deg. Uten kort.",
     secondary: { label: "Kjede eller partner? Snakk med oss", href: "#kjeder" },
   },
 } as const satisfies Home;

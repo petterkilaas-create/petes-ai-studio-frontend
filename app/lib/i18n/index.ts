@@ -131,7 +131,7 @@ const nbUi = {
   "job.rejected": "Bildet passet ikke for dette verktøyet og ble ikke laget.",
   // TG-NEW-149: antallet kommer alltid fra backend ({limit}), aldri herfra.
   "quota.counter": "{remaining} av {limit} gratis bilder igjen",
-  "quota.exhausted": "Du har brukt de {limit} gratis bildene dine. Du kan ikke bestille flere kveldsbilder nå.",
+  "quota.exhausted": "Du har brukt de {limit} gratis bildene dine. Du kan ikke bestille flere bilder nå.",
   "history.loadError": "Noe gikk galt. Prøv igjen om litt.",
   "dusk.title": "Stemning",
   "dusk.time": "Tidspunkt",
@@ -496,7 +496,7 @@ const nb: Dictionary = {
     },
     // TG-NEW-149 (KONTRAKT_KVOTE): feil fra bestillingen, POST /v1/process.
     orderError: {
-      free_quota_exhausted: "Du har brukt alle gratisbildene dine. Du kan ikke bestille flere kveldsbilder nå.",
+      free_quota_exhausted: "Du har brukt alle gratisbildene dine. Du kan ikke bestille flere bilder nå.",
       daily_capacity_reached: "Vi tar ikke imot flere gratisbestillinger i dag. Prøv igjen senere.",
       quota_unavailable: "Vi får ikke sjekket gratisbildene dine akkurat nå. Prøv igjen om litt.",
       job_create_failed: "Bestillingen kunne ikke startes. Ingen gratisbilder er brukt.",
@@ -629,7 +629,7 @@ const en: Dictionary = {
     "job.failed": "The image could not be processed. Please try again, or contact us.",
     "job.rejected": "The image did not suit this tool and was not created.",
     "quota.counter": "{remaining} of {limit} free images left",
-    "quota.exhausted": "You have used your {limit} free images. You cannot order more dusk images right now.",
+    "quota.exhausted": "You have used your {limit} free images. You cannot order more images right now.",
     "history.loadError": "Something went wrong. Please try again shortly.",
     "dusk.title": "Mood",
     "dusk.time": "Time",
@@ -958,7 +958,7 @@ const en: Dictionary = {
       light_through_opening: "light through {n} openings",
     },
     orderError: {
-      free_quota_exhausted: "You have used all your free images. You cannot order more dusk images right now.",
+      free_quota_exhausted: "You have used all your free images. You cannot order more images right now.",
       daily_capacity_reached: "We are not accepting more free orders today. Please try again later.",
       quota_unavailable: "We can't check your free images right now. Please try again shortly.",
       job_create_failed: "The order could not be started. No free images were used.",

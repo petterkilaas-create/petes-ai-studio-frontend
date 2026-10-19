@@ -80,7 +80,7 @@ export type Site = {
    * er maler; «ca. 116 kr per bilde» og svaret om pris regnes ut i offer.ts.
    */
   offer: {
-    /** Antall gratis kveldsbilder ved registrering. */
+    /** Antall gratis bilder ved registrering (gjelder alle tjenestene). */
     freeImages: number;
     /** Antall kveldsbilder i pakken. */
     bundleCount: number;
