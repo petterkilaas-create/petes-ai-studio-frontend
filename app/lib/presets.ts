@@ -24,13 +24,23 @@ interface ScenePreset {
   fileSlug: string;
 }
 
-/** Oppskriftene under `scene_transform`. K2 legger til klart_vaer. */
+/**
+ * Oppskriftene under `scene_transform`. Klart vaer (K2) gjenbruker kortets
+ * tittel som etikett, saa «Blå himmel» har en kilde; den kan ikke bestilles
+ * foer `ENABLED.klart_vaer` slaas paa (K3).
+ */
 const SCENE_PRESETS: readonly ScenePreset[] = [
   {
     ids: ["skumring", "skumring_interior"],
     labelKey: "service.scene_transform",
     workingKey: "media.working.scene_transform",
     fileSlug: "kveldsbilde",
+  },
+  {
+    ids: ["klart_vaer"],
+    labelKey: "express.tool.klart_vaer.title",
+    workingKey: "media.working.klart_vaer",
+    fileSlug: "blaahimmel",
   },
 ];
 
