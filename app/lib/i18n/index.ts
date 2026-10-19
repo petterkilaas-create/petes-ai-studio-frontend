@@ -455,6 +455,7 @@ const nb: Dictionary = {
     // som aldri bruker den generiske teksten: ukjent kode gir ingen tekst.
     disclosureBase: {
       evening_from_day: "Kveldsbilde laget med AI fra dagsbilde.",
+      sky_replaced: "Bildet er redigert med AI: himmelen er byttet til klar himmel.",
     },
     disclosureTime: {
       early: "Tidspunkt: tidlig skumring.",
@@ -915,6 +916,7 @@ const en: Dictionary = {
     },
     disclosureBase: {
       evening_from_day: "Evening image created with AI from a daytime photo.",
+      sky_replaced: "The image has been edited with AI: the sky has been replaced with a clear sky.",
     },
     disclosureTime: {
       early: "Time of day: early dusk.",

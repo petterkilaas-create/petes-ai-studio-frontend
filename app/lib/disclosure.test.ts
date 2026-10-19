@@ -123,3 +123,34 @@ test("tidspunktet sjekkes bare naar det vises", () => {
   assert.equal(disclosureText("nb", job, "edited")?.kind, "text");
   assert.deepEqual(disclosureText("nb", job, "full"), { kind: "missing" });
 });
+
+const SKY_NB = "Bildet er redigert med AI: himmelen er byttet til klar himmel.";
+const SKY_EN = "The image has been edited with AI: the sky has been replaced with a clear sky.";
+
+function sky(edited: string[] | null, extra: Partial<ReviewDisclosure> = {}): ReviewDisclosure {
+  return d(edited, { base: "sky_replaced", time: null, source: null, ...extra });
+}
+
+test("Klart vaer (sky_replaced): bare grunnsetningen, nb og en, paa alle detaljnivaa (Petter 19.10)", () => {
+  for (const detail of ["base", "edited", "full"] as const) {
+    assert.deepEqual(disclosureText("nb", sky([]), detail), { kind: "text", text: SKY_NB });
+    assert.deepEqual(disclosureText("en", sky([]), detail), { kind: "text", text: SKY_EN });
+  }
+});
+
+test("Klart vaer: ukjent kode i lista, ugyldig liste og status som ikke er ok gir ingen tekst", () => {
+  const missing = { kind: "missing" };
+  for (const detail of ["base", "edited", "full"] as const) {
+    assert.deepEqual(disclosureText("nb", sky(["pool_lights"]), detail), missing);
+    assert.deepEqual(disclosureText("nb", sky(null), detail), missing);
+    for (const status of ["unverified", "OK", null]) {
+      assert.deepEqual(disclosureText("nb", sky([], { status }), detail), missing);
+    }
+  }
+});
+
+test("skumring er uendret: manglende tidspunkt gir fortsatt ingen tekst med full", () => {
+  assert.equal(text(disclosureText("nb", d([], { time: null }), "edited")), BASE_NB);
+  assert.deepEqual(disclosureText("nb", d([], { time: null }), "full"), { kind: "missing" });
+  assert.equal(text(disclosureText("nb", d([]), "full")), `${BASE_NB} Tidspunkt: sen kveld.`);
+});

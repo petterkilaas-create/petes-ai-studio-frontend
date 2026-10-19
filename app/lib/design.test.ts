@@ -347,8 +347,9 @@ test("D1: testene for annonseteksten og lekkasjevernet er uendret", () => {
   // sha256 fra main foer D1 (249cee3). Endres de, maa det vaere et eget valg.
   // MS1 (dag 35): previews.test.ts fikk nye stier til sidene i (app)/, ellers uendret.
   // TG-NEW-153 (dag 38): to stier fra (app)/express til (app)/tjenester, ellers uendret (Petter 05.10).
+  // G2 (dag 47): tre nye tester for Klart vaer nederst i disclosure.test.ts, de gamle uendret (Petter 19.10).
   const expected: Record<string, string> = {
-    "lib/disclosure.test.ts": "8acedaed814203b88c6395209b43ffe7798734b58d888b63985f9126937769ce",
+    "lib/disclosure.test.ts": "48e1ccea99e2edddc76545fefb0196481d2167aaddfd7c52540e93e0bf275ae2",
     "lib/previews.test.ts": "e78901bf96250efc8fca3f5eea49d985abc6bf7213870dac66c528182a65b4d4",
     "lib/jobState.test.ts": "cac4d79a9ed60e6307f4cdd0118fcba43c22b8aa8ba7a783ba4c0e1522a818c5",
   };
