@@ -142,9 +142,12 @@ test("MS2: innholdet har alle feltene, og alle har tekst", () => {
     "site.notFound.toHome.label",
     "home.hero.eyebrow",
     "home.hero.title",
+    "home.hero.titleEmphasis",
     "home.hero.lead",
     "home.hero.secondary.label",
     "home.hero.freeNote",
+    "home.hero.mosaic.label",
+    "home.hero.aiLabel",
     "home.hero.before.alt",
     "home.hero.after.alt",
     "home.hero.labels.original",
@@ -255,7 +258,28 @@ test("MS2: lenkene i innholdet er ankre, /start eller markedssidene", () => {
 // Merket
 // ---------------------------------------------------------------------------
 
-test("MS2: verken merkenavnet eller «Studio» staar i content/ eller i markedskomponentene", () => {
+/**
+ * «studio» (F3, Petter 20.10): forsiden deles i Bildestudio, Filmstudio osv.,
+ * og overlinja er «AI-studio for eiendomsmeglere». Fortsatt forbudt, fordi
+ * siden er white label (navnet kommer fra brand.ts): det gamle navnet «The
+ * Studio» (uansett store og smaa bokstaver) og «Studio» med stor S brukt som
+ * navn, altsaa som eget ord og ikke etter bindestrek. Samme regel som i
+ * design.test.ts.
+ */
+function usesOldStudioName(text: string): boolean {
+  return /the studio/i.test(text) || /(?<![-\p{L}\p{N}_])Studio(?![\p{L}\p{N}_])/u.test(text);
+}
+
+test("F3: «studio»-regelen stopper «The Studio» og «Studio» som navn, men godtar «AI-studio» og «Bildestudio»", () => {
+  for (const bad of ["The Studio", "the studio", "THE STUDIO", "Studio for meglere", "Velkommen til Studio.", "(Studio)"]) {
+    assert.ok(usesOldStudioName(bad), bad);
+  }
+  for (const ok of ["AI-studio for eiendomsmeglere", "Bildestudio", "Filmstudio og Tekststudio", "studioet", "AI-Studio"]) {
+    assert.ok(!usesOldStudioName(ok), ok);
+  }
+});
+
+test("MS2: verken merkenavnet, «The Studio» eller «Studio» som navn staar i content/ eller i markedskomponentene", () => {
   const files = [...filesIn("content"), ...MARKETING_TSX, ...filesIn("app/components/marketing")];
   assert.ok(files.length >= 10);
   for (const f of files) {
@@ -263,8 +287,10 @@ test("MS2: verken merkenavnet eller «Studio» staar i content/ eller i markedsk
     for (const name of [DEFAULT_BRAND.displayName, "Husvy", "The Studio"]) {
       assert.ok(!src.toLowerCase().includes(name.toLowerCase()), `${f}: ${name}`);
     }
-    assert.doesNotMatch(src, /\bstudio\b/i, f);
+    assert.ok(!usesOldStudioName(src), f);
   }
+  // F3: «AI-studio» er tillatt og staar i overlinja og fanetittelen.
+  assert.ok(home.hero.eyebrow.includes("AI-studio") && site.seo.title.includes("AI-studio"));
 });
 
 test("MS2: markedssiden og 404 bruker standardmerket via BrandMark, aldri resolveBrand", () => {
@@ -408,8 +434,6 @@ test("MS2: toppbildet har hoey prioritet og faste maal, originalen lastes uten h
   // Faste maal: fill i en boks med fast forhold.
   assert.match(src, /className="relative aspect-\[3\/2\] w-full/);
   assert.match(src, /const SIZES = "\(min-width: 1320px\) 780px, \(min-width: 1024px\) 60vw, 100vw";/);
-  // Bildene er statisk importert (bredde og hoeyde fra next/image).
-  assert.match(read("app/components/marketing/Hero.tsx"), /src: IMAGES\[hero\.after\.image\]/);
 });
 
 test("MS2: slideren kan styres uten aa dra (WCAG 2.5.7) og har AI-merkelappen", () => {
@@ -584,6 +608,11 @@ test("MS3a: tjenestene heter det samme som i appen", () => {
 const PENDING_NOW = [
   ["site.contact.email", "email"],
   ["site.footer.companyName", "companyName"],
+  // F3: mosaikken. Kveldsbildet (tiles[0]) er ekte og venter ikke.
+  ["home.hero.mosaic.tiles[1].image", "image"],
+  ["home.hero.mosaic.tiles[3].image", "image"],
+  ["home.hero.mosaic.tiles[4].video", "image"],
+  // Feltene til slideren, ubrukt paa siden til F5 (Stue i eksemplene har de samme bildene).
   ["home.hero.before", "image"],
   ["home.hero.after", "image"],
   ["home.trustStrip.items[3]", "dataRegion"],
@@ -609,7 +638,11 @@ test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () =>
 
 test("MS3a: det som venter, vises med merkelapp der det staar", () => {
   assert.match(read("app/components/marketing/TrustStrip.tsx"), /item\.pending && <PendingMark label=\{site\.pendingLabels\[item\.pending\]\} \/>/);
-  assert.match(read("app/components/marketing/Hero.tsx"), /\(hero\.before\.pending \|\| hero\.after\.pending\) && <PendingMark label=\{site\.pendingLabels\.image\} \/>/);
+  // F3: en lapp under mosaikken hvis noen rute venter (foer: under slideren).
+  assert.match(
+    withoutComments(read("app/components/marketing/HeroMosaic.tsx")),
+    /\{pending && \(\s*<p[^>]*>\s*<PendingMark label=\{site\.pendingLabels\.image\} \/>/
+  );
   const pic = withoutComments(read("app/components/marketing/MarketingPicture.tsx"));
   assert.match(pic, /<PendingMark label=\{pendingLabel\} \/>/);
   assert.match(pic, /\{picture\.pending && \(/);
@@ -715,6 +748,13 @@ test("MS3a: bare toppbildet har hoey prioritet; alle andre bilder lastes lat", (
     let src = withoutComments(read(f));
     // F1: videoene laster ingenting foer de spilles; bare preload="none" er lov, og bare der.
     if (f.endsWith("MarketingVideo.tsx")) src = src.replaceAll('preload="none"', "");
+    // F3: kveldsbildet i mosaikken er toppbildet (LCP), en gang og bare det (testen i F3 under).
+    if (f.endsWith("HeroMosaic.tsx")) {
+      for (const attr of ['loading="eager"', 'fetchPriority="high"']) {
+        assert.equal(src.split(attr).length - 1, 1, `${f}: ${attr}`);
+        src = src.replace(attr, "");
+      }
+    }
     assert.doesNotMatch(src, /fetchPriority|loading="eager"|\bpriority\b|\bpreload\b/, f);
   }
   // Seksjonene er serverkomponenter; bare fanene, stemningene og mobilmenyen
@@ -1289,4 +1329,119 @@ test("F2: Film.tsx er en serverkomponent paa night, uten tekst i JSX, med filmen
   const mv = withoutComments(read("app/components/marketing/MarketingVideo.tsx"));
   assert.match(mv, /describedBy\?: string;/);
   assert.match(mv, /aria-describedby=\{describedBy\}/);
+});
+
+// ---------------------------------------------------------------------------
+// F3: toppen med mosaikken, «AI-studio» og ny SEO-tittel (Petter og Cowork 20.10).
+// ---------------------------------------------------------------------------
+
+test("F3: toppen har tekstene Petter bestemte, og freeNote og «Prøv gratis» er uendret", () => {
+  const { hero } = home;
+  assert.equal(hero.eyebrow, "AI-studio for eiendomsmeglere");
+  assert.equal(hero.title, "Bilder, film og tekst til boligannonsen.");
+  assert.equal(hero.titleEmphasis, "Ett sted.");
+  assert.equal(
+    hero.lead,
+    "Gjør dagsbilder til kveldsbilder, rydd og møbler rommene, lag film og skriv annonseteksten. Du godkjenner alt, og hvert bilde får synlig AI-merke og ferdig tekst til annonsen."
+  );
+  assert.deepEqual(hero.secondary, { label: "Se filmen", href: "#film" });
+  assert.equal(hero.freeNote, "{n} gratis bilder når du registrerer deg. Uten kort.");
+  assert.equal(hero.aiLabel, "AI");
+  // Designets tekster som ikke brukes (Cowork 20.10).
+  for (const [path, text] of strings(home, "home")) {
+    assert.ok(!text.includes("Prøv gratis med") && !text.includes("Uten kort. Originalen"), path);
+  }
+});
+
+test("F3: mosaikken har fem ruter, kveldsbildet foerst og ekte, de andre med pending «image»", () => {
+  const { tiles } = home.hero.mosaic;
+  assert.deepEqual(
+    tiles.map((t) => t.label),
+    ["Kveldsbilde", "Rydd opp", "Annonsetekst", "Digital styling", "Film"]
+  );
+  // Det foerste bildet er det ekte kveldsbildet med AI-merket, uten lapp (LCP).
+  assert.deepEqual(tiles[0], {
+    label: "Kveldsbilde",
+    image: { image: "pairEveningResult", alt: "Stue som kveldsbilde laget med AI, med AI-merket nede til venstre" },
+  });
+  assert.ok(!("pending" in tiles[0].image), "kveldsbildet er ekte");
+  // Alle andre resultatbilder og videoen er midlertidige.
+  const rest = tiles
+    .slice(1)
+    .flatMap((t): { pending?: string }[] => ("image" in t ? [t.image] : "video" in t ? [t.video] : []));
+  assert.equal(rest.length, 3);
+  for (const media of rest) assert.equal(media.pending, "image", JSON.stringify(media));
+  assert.deepEqual(tiles.map((t) => ("image" in t ? t.image.image : null)), [
+    "pairEveningResult",
+    "pairCleanupResult",
+    null,
+    "pairStylingResult",
+    null,
+  ]);
+  assert.deepEqual(tiles[2], { label: "Annonsetekst", quote: "«Lys hjørnestue med utgang til vestvendt balkong …»" });
+  assert.deepEqual(tiles[4], {
+    label: "Film",
+    video: { video: "loop", label: "Utdrag fra produktfilmen", pending: "image" },
+  });
+});
+
+test("F3: HeroMosaic er en serverkomponent uten tekst i JSX, med kveldsbildet nede til venstre og hoey prioritet", () => {
+  const f = "app/components/marketing/HeroMosaic.tsx";
+  assert.ok(MARKETING_TSX.includes(f), f);
+  assert.deepEqual(literalTextsInFile(read(f)), [], f);
+  const src = withoutComments(read(f));
+  assert.doesNotMatch(src, /^"use client";/);
+  assert.doesNotMatch(src, /#[0-9a-fA-F]{3,8}\b/);
+  // Rutenettet: 6 kolonner fra 768 px, to under, kveldsbildet 4x3 og i full bredde paa mobil.
+  assert.match(src, /className="grid grid-cols-2 [^"]*md:grid-cols-6 md:grid-rows-5/);
+  assert.match(src, /role="group"\s+aria-label=\{mosaic\.label\}/);
+  const areas = [...src.matchAll(/area: "([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(
+    areas.map((a) => a.match(/md:col-span-\d md:row-span-\d/)?.[0]),
+    ["md:col-span-4 md:row-span-3", "md:col-span-2 md:row-span-2", "md:col-span-2 md:row-span-1", "md:col-span-3 md:row-span-2", "md:col-span-3 md:row-span-2"]
+  );
+  assert.match(areas[0], /^col-span-2 /);
+  // To <Image>: det foerste (kveldsbildet, i === 0) med hoey prioritet og utsnittet nede til venstre.
+  assert.match(src, /const lead = i === 0;/);
+  const images = [...src.matchAll(/<Image\n([\s\S]*?)\/>/g)].map((m) => m[1]);
+  assert.equal(images.length, 2);
+  const [lead, other] = images;
+  for (const attr of ['loading="eager"', 'fetchPriority="high"', "object-left-bottom", "sizes={sizes}", "fill"]) {
+    assert.ok(lead.includes(attr), `kveldsbildet: ${attr}`);
+  }
+  for (const attr of ["loading=", "fetchPriority", "object-left-bottom", "priority"]) {
+    assert.ok(!other.includes(attr), `de andre bildene: ${attr}`);
+  }
+  for (const img of images) {
+    assert.match(img, /src=\{IMAGES\[tile\.image\.image\]\}/);
+    assert.match(img, /alt=\{tile\.image\.alt\}/);
+  }
+  // AI-lappen (CSS) bare paa de andre bildene; etiketten oeverst til venstre.
+  assert.match(src, /\{!lead && \(\s*<span aria-hidden="true" className=\{AI_TAG\}>\s*\{aiLabel\}/);
+  assert.match(src, /const AI_TAG =\s*"[^"]*bottom-2\.5 left-2\.5/);
+  assert.match(src, /const TAG =\s*"[^"]*left-2\.5 top-2\.5/);
+  // Loekka: MarketingVideo i loop-modus med plakaten og knappetekstene.
+  const video = src.slice(src.indexOf("<MarketingVideo"), src.indexOf("/>", src.indexOf("<MarketingVideo")));
+  for (const attr of ["src={VIDEOS.loop.src}", "poster={IMAGES.loopPoster.src}", "label={tile.video.label}", 'mode="loop"', "labels={site.video}"]) {
+    assert.ok(video.includes(attr), attr);
+  }
+  // Annonseteksten: moerk rute med sitatet i font-display.
+  assert.match(src, /bg-ink [^"`]*text-paper/);
+  assert.match(src, /className="[^"]*font-display[^"]*">\{tile\.quote\}/);
+});
+
+test("F3: Hero.tsx viser mosaikken, ikke slideren, med kursiv titleEmphasis og ikonet paa «Se filmen»", () => {
+  const src = withoutComments(read("app/components/marketing/Hero.tsx"));
+  assert.doesNotMatch(src, /HeroSlider/);
+  assert.match(src, /<HeroMosaic mosaic=\{hero\.mosaic\} aiLabel=\{hero\.aiLabel\} site=\{site\} \/>/);
+  assert.match(src, /\{hero\.title\} <em className="italic">\{hero\.titleEmphasis\}<\/em>/);
+  // Ekte kursiv i Instrument Serif (Petter 20.10, valg B), ikke en skraa variant fra nettleseren.
+  assert.match(read("app/lib/fonts.ts"), /Instrument_Serif\(\{[^}]*style: \["normal", "italic"\],/);
+  assert.match(src, /import \{ ArrowRight, Check, CirclePlay \} from "lucide-react";/);
+  assert.match(src, /<CirclePlay aria-hidden="true"[^>]*\/>\s*\{hero\.secondary\.label\}/);
+  // Slideren blir staaende til F5 (foer/etter-fanene), men ingen side bruker den.
+  assert.ok(existsSync(join(REPO_DIR, "app/components/marketing/HeroSlider.tsx")));
+  for (const f of MARKETING_TSX) {
+    if (!f.endsWith("HeroSlider.tsx")) assert.doesNotMatch(withoutComments(read(f)), /<HeroSlider|from "\.\/HeroSlider"/, f);
+  }
 });

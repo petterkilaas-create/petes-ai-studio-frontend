@@ -1,17 +1,17 @@
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, CirclePlay } from "lucide-react";
 import { fill } from "../../../content/marketing/fill";
-import { IMAGES } from "../../../content/marketing/images";
 import type { Hero as HeroContent, Site } from "../../../content/marketing/schema";
-import { HeroSlider } from "./HeroSlider";
-import { PendingMark } from "./PendingMark";
+import { HeroMosaic } from "./HeroMosaic";
 import { CONTAINER, FOCUS } from "./classes";
 
 /**
  * Toppen paa markedssiden (MS2, utkastet linje 47-73): overlinje,
- * overskrift, ingress, knappene, merknaden om gratisbilder og slideren.
- * Serverkomponent; bare slideren kjoerer i nettleseren. All tekst kommer
- * fra innholdet. «Prøv gratis» er site.cta (samme som i topplinjen), og
- * antallet gratisbilder er site.offer.freeImages.
+ * overskrift, ingress, knappene, merknaden om gratisbilder og til hoeyre
+ * mosaikken (F3, designet Main.dc.html linje 49-92; foer var det slideren,
+ * som F5 bruker i foer/etter-fanene). Serverkomponent; bare videoloekka i
+ * mosaikken kjoerer i nettleseren. All tekst kommer fra innholdet. «Prøv
+ * gratis» er site.cta (samme som i topplinjen), og antallet gratisbilder er
+ * site.offer.freeImages. Slutten av overskriften (titleEmphasis) er i kursiv.
  */
 const BIG_BUTTON = `flex h-[54px] items-center rounded-[12px] text-[16.5px] font-semibold no-underline ${FOCUS}`;
 
@@ -25,7 +25,7 @@ export function Hero({ hero, site }: { hero: HeroContent; site: Site }) {
             {hero.eyebrow}
           </p>
           <h1 className="m-0 text-balance font-display text-[clamp(46px,5.4vw,78px)] font-normal leading-none tracking-[-0.015em] text-ink">
-            {hero.title}
+            {hero.title} <em className="italic">{hero.titleEmphasis}</em>
           </h1>
           <p className="m-0 max-w-[32em] text-pretty text-[clamp(17px,1.35vw,19px)] leading-[1.55] text-ink-2">
             {hero.lead}
@@ -36,7 +36,11 @@ export function Hero({ hero, site }: { hero: HeroContent; site: Site }) {
                 {site.cta.label}
                 <ArrowRight aria-hidden="true" className="size-[18px]" strokeWidth={2} />
               </a>
-              <a href={hero.secondary.href} className={`${BIG_BUTTON} border border-line-strong px-[22px] text-ink hover:bg-surface-2`}>
+              <a
+                href={hero.secondary.href}
+                className={`${BIG_BUTTON} gap-2.5 border border-line-strong bg-surface px-[22px] text-ink hover:bg-surface-2`}
+              >
+                <CirclePlay aria-hidden="true" className="size-5" strokeWidth={1.8} />
                 {hero.secondary.label}
               </a>
             </div>
@@ -46,20 +50,7 @@ export function Hero({ hero, site }: { hero: HeroContent; site: Site }) {
             </p>
           </div>
         </div>
-        <figure className="m-0 flex min-w-0 flex-[2_1_560px] flex-col gap-3">
-          <HeroSlider
-            before={{ src: IMAGES[hero.before.image], alt: hero.before.alt }}
-            after={{ src: IMAGES[hero.after.image], alt: hero.after.alt }}
-            labels={hero.labels}
-            sliderLabel={hero.sliderLabel}
-            sliderValue={hero.sliderValue}
-          />
-          <figcaption className="text-[13.5px] leading-[1.5] text-ink-2">
-            {hero.caption}
-            {/* MS3: bildene er midlertidige (pending "image") til de ekte eksemplene er laget. */}
-            {(hero.before.pending || hero.after.pending) && <PendingMark label={site.pendingLabels.image} />}
-          </figcaption>
-        </figure>
+        <HeroMosaic mosaic={hero.mosaic} aiLabel={hero.aiLabel} site={site} />
       </div>
     </section>
   );

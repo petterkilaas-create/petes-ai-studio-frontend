@@ -74,10 +74,14 @@ export type Site = {
   seo: {
     /** Fanetittelen paa markedssiden. Mal med {brand}. */
     title: string;
+    /** Beskrivelsen til soekemotorer og deling (F3; foer var det hero.lead). 50-160 tegn. */
+    description: string;
     /**
-     * Alt-teksten til delingsbildet (MS4). Mal med {brand} og {title} =
-     * hero.title, som er teksten i bildet. Beskrivelsen er hero.lead.
+     * Overskriften i delingsbildet (F3; foer var det hero.title). Staar paa
+     * en linje i bildet, saa testen har en lengdegrense.
      */
+    ogTitle: string;
+    /** Alt-teksten til delingsbildet (MS4). Mal med {brand} og {title} = ogTitle. */
     ogImageAlt: string;
   };
   topBar: {
@@ -136,16 +140,37 @@ export type Site = {
   };
 };
 
+/**
+ * En rute i mosaikken i toppen (F3, designet Main.dc.html linje 70-90).
+ * `label` er etiketten oeverst til venstre. Plassen i rutenettet foelger
+ * rekkefoelgen (HeroMosaic.tsx); den foerste ruta er det store bildet.
+ */
+export type MosaicTile =
+  | { label: string; image: ImageRef }
+  | { label: string; quote: string }
+  | { label: string; video: VideoRef };
+
 export type Hero = {
   _type: "hero";
   /** Ankeret topplinjen peker paa (logoen). */
   anchor: string;
   eyebrow: string;
   title: string;
+  /** Vises i kursiv i samme overskrift, etter et mellomrom (F3). */
+  titleEmphasis: string;
   lead: string;
   secondary: Link;
   /** Merknaden under knappene. Mal med {n} = offer.freeImages. */
   freeNote: string;
+  /** Mosaikken til hoeyre (F3). `label` er aria-label paa gruppen. */
+  mosaic: { label: string; tiles: readonly MosaicTile[] };
+  /** Merkelappen paa resultatbildene i mosaikken (ikke paa bildet med AI-merket i bildet). */
+  aiLabel: string;
+  /*
+   * Slideren (MS2) er ikke lenger i toppen (F3). Feltene under brukes ikke
+   * paa siden til F5 (foer/etter-fanene), men blir staaende fordi fanen Stue
+   * i eksemplene har de samme bildene (testen sjekker det).
+   */
   before: ImageRef;
   after: ImageRef;
   labels: { original: string; result: string; ai: string };
