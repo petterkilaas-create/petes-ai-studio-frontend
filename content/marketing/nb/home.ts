@@ -1,4 +1,4 @@
-import type { Home, ImagePlaceholder } from "../schema.ts";
+import type { Home } from "../schema.ts";
 
 // Forsiden, ordrett fra det godkjente utkastet (MARKEDSSIDE_UTKAST.dc.html).
 // Linjenumrene staar ved hver seksjon.
@@ -13,15 +13,11 @@ import type { Home, ImagePlaceholder } from "../schema.ts";
 // tre faner. Feltene til slideren er flyttet fra toppen til examples.slider
 // (verdien er som i D2).
 //
-// MS3a: tillitsstripen, eksemplene, stemningene, tre steg og tjenestene.
+// MS3a: tillitsstripen, eksemplene og tjenestene.
 // MS3b: merkingen, den aerlige versjonen, prisene, spoersmaal og svar (selve
 // spoersmaalene i faq.ts) og siste knapp. Ingen tall i tekstene: prisene og
 // antallene fylles fra site.offer.
-// Bildene vi ikke har, er plassholdere med tekst fra utkastet. Teksten under
-// stemningene sier ikke «Ekte eksempel» saa lenge bildet er en plassholder.
-
-/** Plassholder for et eksempelbilde. `alt` er alt-teksten bildet skal faa. */
-const ph = (placeholder: string, alt: string): ImagePlaceholder => ({ placeholder, alt, pending: "image" });
+// F7: stemningene, de tre stegene og hjelperen ph (plassholderne) er slettet.
 
 export const home = {
   _type: "home",
@@ -127,88 +123,6 @@ export const home = {
     ],
   },
 
-  // Linje 125-163 og 491-497. Kodene og navnene er appens (lib/dusk.ts og ordlista).
-  moods: {
-    _type: "moods",
-    title: "Du bestemmer stemningen.",
-    lead: "Velg tidspunkt og himmel. Lyset kommer bare fra vinduer og lamper som finnes i bildet.",
-    groups: [
-      {
-        time: "early",
-        label: "Tidlig skumring",
-        groupLabel: "Himmel ved tidlig skumring",
-        items: [
-          {
-            sky: "clear",
-            name: "Klar blå time",
-            note: "Dette er standardvalget.",
-            picture: ph(
-              "Stue, tidlig skumring med klar blå time",
-              "Stue som kveldsbilde med klar blå time, laget med AI, med AI-merke nede til venstre"
-            ),
-          },
-          {
-            sky: "light_clouds",
-            name: "Lette skyer",
-            picture: ph(
-              "Stue, tidlig skumring med lette skyer",
-              "Stue som kveldsbilde med lette skyer, laget med AI, med AI-merke nede til venstre"
-            ),
-          },
-          {
-            sky: "pink_clouds",
-            name: "Rosa skyer",
-            note: "Rosa bare i tynne skyer, horisonten forblir lyseblå.",
-            picture: ph(
-              "Stue, tidlig skumring med rosa skyer",
-              "Stue som kveldsbilde med rosa skyer, laget med AI, med AI-merke nede til venstre"
-            ),
-          },
-        ],
-      },
-      {
-        time: "late",
-        label: "Sen kveld",
-        groupLabel: "Himmel ved sen kveld",
-        items: [
-          {
-            sky: "dark",
-            name: "Mørk kveldshimmel",
-            note: "Standardvalget for sen kveld.",
-            picture: ph(
-              "Fasade, sen kveld med mørk kveldshimmel",
-              "Fasade som kveldsbilde med mørk kveldshimmel, laget med AI, med AI-merke nede til venstre"
-            ),
-          },
-          {
-            sky: "starry",
-            name: "Stjernehimmel",
-            picture: ph(
-              "Fasade, sen kveld med stjernehimmel",
-              "Fasade som kveldsbilde med stjernehimmel og lys i vinduene, laget med AI, med AI-merke nede til venstre"
-            ),
-          },
-        ],
-      },
-    ],
-    fireplaceNote: "Har rommet peis, velger du om den skal være tent.",
-    placeholderCaption: "Eksempel kommer.",
-  },
-
-  // Linje 169-186.
-  steps: {
-    _type: "steps",
-    title: "Fra dagsbilde til annonse i tre steg.",
-    items: [
-      { title: "Last opp", text: "Last opp dagsbildene fra fotografen. Originalene lagres urørt." },
-      { title: "Velg stemning", text: "Velg tidspunkt og himmel. Bildet lages mens du jobber videre med annonsen." },
-      {
-        title: "Godkjenn og last ned",
-        text: "Sammenlign med originalen og godkjenn, eller be om en ny runde. Du laster ned bildet med AI-merket og kopierer den ferdige teksten til annonsen.",
-      },
-    ],
-  },
-
   // F4: tjenestene som seks kort i studioer (designet Main.dc.html linje
   // 104-256). Alle vises som om de er klare (Petter dag 48); de som ikke er
   // det, har «Få tidlig tilgang» til kontaktsiden (20.10, 2b). Skjul ansikter
@@ -309,7 +223,7 @@ export const home = {
   // steg 4 og ingressen sier at teksten kopieres (MS5a AVVIK 1: teksten
   // foelger ikke med fila), og linja under filmen sier at det er en
   // illustrasjon. Filmen viser styling-bildet, saa lappen staar til det er
-  // byttet. Stemningene og de tre stegene over er ikke paa siden (F7 sletter dem).
+  // byttet.
   film: {
     _type: "film",
     anchor: "film",

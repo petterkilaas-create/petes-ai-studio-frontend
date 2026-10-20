@@ -11,8 +11,6 @@
 
 /** Nøklene til bildene i images.ts (den eneste fila med bildeimport). */
 export type ImageKey =
-  | "heroOriginal"
-  | "heroEvening"
   | "merkingEvening"
   | "pairEveningOriginal"
   | "pairEveningResult"
@@ -199,33 +197,6 @@ export type Examples = {
     value: string;
   };
   tabs: readonly { id: string; label: string; result: string; before: ImageRef; after: ImageRef; caption: Claim }[];
-};
-
-/**
- * Stemningene (MS3, utkastet linje 125-163 og 491-497). `time` og `sky` er
- * kodene fra appen (lib/dusk.ts); navnene er de samme som i appens ordliste
- * (testen sjekker det).
- */
-export type Moods = {
-  _type: "moods";
-  title: string;
-  lead: string;
-  groups: readonly {
-    time: string;
-    label: string;
-    groupLabel: string;
-    items: readonly { sky: string; name: string; note?: string; picture: Picture }[];
-  }[];
-  fireplaceNote: string;
-  /** Foran notatet under bildet mens bildet er en plassholder. */
-  placeholderCaption: string;
-};
-
-/** Tre steg (MS3, utkastet linje 169-186). Nummeret lages av rekkefoelgen. */
-export type Steps = {
-  _type: "steps";
-  title: string;
-  items: readonly { title: string; text: string }[];
 };
 
 /**
@@ -437,8 +408,6 @@ export type Home = {
   hero: Hero;
   trustStrip: TrustStrip;
   examples: Examples;
-  moods: Moods;
-  steps: Steps;
   services: Services;
   film: Film;
   labeling: Labeling;
