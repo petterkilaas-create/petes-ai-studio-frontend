@@ -32,11 +32,12 @@ const faq = getFaq("no").filter((item) => item.showOnHome);
 const brand = DEFAULT_BRAND;
 const anchors = contentAnchors({ home, footer: site.footer });
 
-// MS4: tittelen og beskrivelsen (ingressen i toppen) fra innholdet. Open
-// Graph og Twitter arver tittel, beskrivelse og bilde (opengraph-image.tsx).
+// MS4: tittelen og beskrivelsen fra innholdet (F3: egen beskrivelse, ikke
+// lenger ingressen i toppen). Open Graph og Twitter arver tittel,
+// beskrivelse og bilde (opengraph-image.tsx).
 export const metadata: Metadata = {
   title: fill(site.seo.title, { brand: brand.displayName }),
-  description: home.hero.lead,
+  description: site.seo.description,
   alternates: { canonical: MARKETING_HOME },
   openGraph: { type: "website", url: MARKETING_HOME, siteName: brand.displayName, locale: "nb_NO" },
   twitter: { card: "summary_large_image" },

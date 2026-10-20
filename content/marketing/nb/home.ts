@@ -7,6 +7,12 @@ import type { Home, ImagePlaceholder } from "../schema.ts";
 // etter utkastets stue-variant (linje 464 og 466). sliderValue er som i D2.
 // Bildene er midlertidige (originalen er ogsaa laget med AI), saa de er
 // merket pending "image" (Petter 02.10, valg E).
+// F3 (den nye forsiden, designet Main.dc.html linje 49-92): ny overlinje,
+// overskrift og ingress, «Se filmen» og mosaikken i stedet for slideren
+// (Petter og Cowork 20.10). Kveldsbildet i mosaikken er ekte; rydd opp,
+// styling og loekka er midlertidige (pending "image"). freeNote er laast
+// (TG-NEW-220). Feltene til slideren (before til caption) brukes ikke paa
+// siden til F5, men Stue i eksemplene har de samme bildene.
 //
 // MS3a: tillitsstripen, eksemplene, stemningene, tre steg og tjenestene.
 // MS3b: merkingen, den aerlige versjonen, prisene, spoersmaal og svar (selve
@@ -23,11 +29,36 @@ export const home = {
   hero: {
     _type: "hero",
     anchor: "topp",
-    eyebrow: "AI-redigering for eiendomsmeglere",
-    title: "Kveldsbilder av dagsbildene dine.",
-    lead: "Du velger stemningen og godkjenner resultatet. Hvert bilde får synlig AI-merke og ferdig tekst til annonsen. Originalen røres aldri.",
-    secondary: { label: "Se eksempler", href: "#eksempler" },
+    eyebrow: "AI-studio for eiendomsmeglere",
+    title: "Bilder, film og tekst til boligannonsen.",
+    titleEmphasis: "Ett sted.",
+    lead: "Gjør dagsbilder til kveldsbilder, rydd og møbler rommene, lag film og skriv annonseteksten. Du godkjenner alt, og hvert bilde får synlig AI-merke og ferdig tekst til annonsen.",
+    secondary: { label: "Se filmen", href: "#film" },
     freeNote: "{n} gratis bilder når du registrerer deg. Uten kort.",
+    mosaic: {
+      label: "Eksempler på bilder, film og annonsetekst",
+      tiles: [
+        {
+          label: "Kveldsbilde",
+          image: { image: "pairEveningResult", alt: "Stue som kveldsbilde laget med AI, med AI-merket nede til venstre" },
+        },
+        {
+          label: "Rydd opp",
+          image: { image: "pairCleanupResult", alt: "Spiseplass etter at rotet er fjernet, laget med AI", pending: "image" },
+        },
+        { label: "Annonsetekst", quote: "«Lys hjørnestue med utgang til vestvendt balkong …»" },
+        {
+          label: "Digital styling",
+          image: {
+            image: "pairStylingResult",
+            alt: "Tom stue møblert digitalt i skandinavisk stil, laget med AI",
+            pending: "image",
+          },
+        },
+        { label: "Film", video: { video: "loop", label: "Utdrag fra produktfilmen", pending: "image" } },
+      ],
+    },
+    aiLabel: "AI",
     before: { image: "heroOriginal", alt: "Originalbildet av stua, tatt på dagtid", pending: "image" },
     after: {
       image: "heroEvening",

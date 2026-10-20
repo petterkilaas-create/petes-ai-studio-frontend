@@ -134,12 +134,17 @@ test("MS4: metadataBase er SITE_URL, og canonical og og:url er /no (blir https:/
 
 test("MS4: tittel og beskrivelse kommer fra innholdet, uten plassholder og uten noe som venter", () => {
   assert.match(page, /title: fill\(site\.seo\.title, \{ brand: brand\.displayName \}\),/);
-  assert.match(page, /description: home\.hero\.lead,/);
+  // F3: egen beskrivelse (site.seo.description), ikke lenger ingressen i toppen.
+  assert.match(page, /description: site\.seo\.description,/);
   assert.ok(site.seo.title.includes("{brand}"));
   assert.ok(!site.seo.title.includes(brand), "merket skal komme via {brand}");
   const title = fill(site.seo.title, { brand });
-  assert.equal(title, "Husvy – kveldsbilder for eiendomsmeglere");
-  const description = home.hero.lead;
+  assert.equal(title, "Husvy – AI-studio for eiendomsmeglere");
+  const description = site.seo.description;
+  assert.equal(
+    description,
+    "Kveldsbilder, digital styling, boligfilm og annonsetekst for eiendomsmeglere. Synlig AI-merke på hvert bilde, og du godkjenner alt før levering."
+  );
   const waiting = pendingTexts({ site, home, faq: getFaq("no") });
   assert.ok(waiting.length > 0, "fant ingen tekst som venter");
   for (const text of [title, description]) {
@@ -148,7 +153,7 @@ test("MS4: tittel og beskrivelse kommer fra innholdet, uten plassholder og uten 
     for (const w of waiting) assert.ok(!text.includes(w), `${text} har en paastand som venter: ${w}`);
   }
   // Feltene selv venter ikke.
-  assert.deepEqual(pendingItems({ seo: site.seo, title: home.hero.title, lead: home.hero.lead }), []);
+  assert.deepEqual(pendingItems({ seo: site.seo, eyebrow: home.hero.eyebrow }), []);
   assert.ok(description.length >= 50 && description.length <= 160, String(description.length));
 });
 
@@ -161,15 +166,18 @@ const og = read("app/(marketing)/no/opengraph-image.tsx");
 test("MS4: delingsbildet er 1200x630 med alt-tekst fra innholdet og ingen tekst skrevet rett inn", () => {
   assert.match(og, /export const size = \{ width: 1200, height: 630 \};/);
   assert.match(og, /export const contentType = "image\/png";/);
-  assert.match(og, /export const alt = fill\(site\.seo\.ogImageAlt, \{ brand: brand\.displayName, title: hero\.title \}\);/);
-  assert.match(og, /new ImageResponse\(<Card brand=\{brand\} hero=\{hero\} \/>, size\)/);
-  assert.match(og, /\{ogText\(hero\.eyebrow\)\}/);
-  assert.match(og, /\{ogText\(hero\.title\)\}/);
+  // F3: overskriften i bildet og alt-teksten er site.seo.ogTitle (foer hero.title); linja over er fortsatt hero.eyebrow.
+  assert.match(og, /export const alt = fill\(site\.seo\.ogImageAlt, \{ brand: brand\.displayName, title: site\.seo\.ogTitle \}\);/);
+  assert.match(og, /new ImageResponse\(<Card brand=\{brand\} eyebrow=\{hero\.eyebrow\} title=\{site\.seo\.ogTitle\} \/>, size\)/);
+  assert.match(og, /\{ogText\(eyebrow\)\}/);
+  assert.match(og, /\{ogText\(title\)\}/);
+  assert.doesNotMatch(og, /hero\.title/);
   assert.match(og, /\{ogText\(brand\.displayName\)\}/);
   assert.deepEqual(literalTextsInFile(og), []);
   assert.ok(site.seo.ogImageAlt.includes("{brand}"));
-  const alt = fill(site.seo.ogImageAlt, { brand, title: home.hero.title });
-  assert.equal(alt, "Husvy: Kveldsbilder av dagsbildene dine.");
+  assert.equal(site.seo.ogTitle, "Bilder, film og tekst. Ett sted.");
+  const alt = fill(site.seo.ogImageAlt, { brand, title: site.seo.ogTitle });
+  assert.equal(alt, "Husvy: Bilder, film og tekst. Ett sted.");
   assert.doesNotMatch(alt, /[[\]{}]/);
   // Uten foto (bildene venter) og uten egen fontfil (A1: Geist fra next/og).
   assert.doesNotMatch(og, /readFile|fonts:|fetch\(|images\.ts|\.jpe?g|\.png"/);
@@ -179,7 +187,7 @@ test("MS4: teksten i delingsbildet har bare tegn Geist har (ellers henter next/o
   // Verifisert 02.10: bokstavene, æøå, – ’ og «» gir ingen nettkall; symboler som → og ✓ gjoer det.
   // U+200B (usynlig bruddpunkt) mangler ogsaa. Sjekket paa teksten slik den tegnes (etter ogText).
   const geist = /^[\p{Script=Latin}0-9 \u00a0.,:;!?'’\-–«»()%]+$/u;
-  for (const text of [brand, home.hero.eyebrow, home.hero.title]) {
+  for (const text of [brand, home.hero.eyebrow, site.seo.ogTitle]) {
     assert.match(text, geist, text);
     assert.match(ogText(text), geist, text);
   }
@@ -189,15 +197,16 @@ test("MS4: teksten i delingsbildet har bare tegn Geist har (ellers henter next/o
 
 test("MS4: ogText gir riktige mellomrom, og teksten faar plass paa en linje", () => {
   assert.equal(ogText("Kveldsbilder av dagsbildene"), "Kveldsbilder\u00a0av\u00a0dagsbildene");
-  for (const text of [brand, home.hero.eyebrow, home.hero.title]) {
+  for (const text of [brand, home.hero.eyebrow, site.seo.ogTitle]) {
     const out = ogText(text);
     assert.ok(!out.includes(" "), out);
     assert.equal(out.replace(/\u00a0/g, " "), text);
   }
   // ogText bryter ikke linja, saa teksten maa faa plass paa en linje (1040 px):
-  // overskriften er 33 tegn og ca. 900 px ved 64 px (verifisert 02.10).
+  // overskriften var 33 tegn og ca. 900 px ved 64 px (verifisert 02.10). F3:
+  // grensen gjelder ogTitle (32 tegn).
   assert.match(og, /fontSize: 64, lineHeight: 1\.05, letterSpacing: -2/);
-  assert.ok(home.hero.title.length <= 36, `overskriften er ${home.hero.title.length} tegn, maks 36 paa en linje i delingsbildet`);
+  assert.ok(site.seo.ogTitle.length <= 36, `overskriften er ${site.seo.ogTitle.length} tegn, maks 36 paa en linje i delingsbildet`);
   assert.ok(home.hero.eyebrow.length <= 60, `linja over er ${home.hero.eyebrow.length} tegn, maks 60`);
   // Alt-teksten er vanlig tekst.
   assert.match(og, /export const alt = fill\(site\.seo\.ogImageAlt/);

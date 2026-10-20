@@ -13,11 +13,15 @@ import type { Site } from "../schema.ts";
 // (Petter 02.10). MS5a: hjelpesidene (MS5_TEKSTER.md §4, godkjent av Petter
 // 04.10) og skjermleserteksten paa merket paa undersidene. F1: knappen som
 // pauser og spiller av videoloekka (MarketingVideo). F2: «Se filmen» i
-// menyen, til filmseksjonen (#film).
+// menyen, til filmseksjonen (#film). F3: ny fanetittel, egen beskrivelse og
+// egen overskrift i delingsbildet (ogTitle), ikke lenger fra toppen.
 export const site = {
   _type: "site",
   seo: {
-    title: "{brand} – kveldsbilder for eiendomsmeglere",
+    title: "{brand} – AI-studio for eiendomsmeglere",
+    description:
+      "Kveldsbilder, digital styling, boligfilm og annonsetekst for eiendomsmeglere. Synlig AI-merke på hvert bilde, og du godkjenner alt før levering.",
+    ogTitle: "Bilder, film og tekst. Ett sted.",
     ogImageAlt: "{brand}: {title}",
   },
   topBar: {

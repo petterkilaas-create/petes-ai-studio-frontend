@@ -3,10 +3,9 @@ import { DEFAULT_BRAND, PAPER, type Brand } from "@/app/lib/brand";
 import { ogText } from "@/app/lib/seo";
 import { fill } from "@/content/marketing/fill";
 import { getHome, getSite } from "@/content/marketing";
-import type { Hero } from "@/content/marketing/schema";
 
-// Delingsbildet for /no (MS4): merket, linja over overskriften og
-// overskriften fra innholdet, i fargene fra merket. Uten foto til
+// Delingsbildet for /no (MS4): merket, linja over overskriften i toppen og
+// overskriften til delingsbildet (site.seo.ogTitle, F3), i fargene fra merket. Uten foto til
 // eksempelbildene er klare (originalen er laget med AI). Fonten er Geist,
 // som next/og har med seg (Petter 02.10, valg A1). Bygges statisk. Teksten
 // gaar gjennom ogText, ellers blir mellomrommene for brede (seo.ts), og
@@ -17,11 +16,11 @@ const site = getSite("no");
 const { hero } = getHome("no");
 const brand = DEFAULT_BRAND;
 
-export const alt = fill(site.seo.ogImageAlt, { brand: brand.displayName, title: hero.title });
+export const alt = fill(site.seo.ogImageAlt, { brand: brand.displayName, title: site.seo.ogTitle });
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-function Card({ brand, hero }: { brand: Brand; hero: Hero }) {
+function Card({ brand, eyebrow, title }: { brand: Brand; eyebrow: string; title: string }) {
   const ink = brand.colors.primary;
   const icon = brand.logo.icon;
   return (
@@ -60,13 +59,13 @@ function Card({ brand, hero }: { brand: Brand; hero: Hero }) {
         {ogText(brand.displayName)}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-        <div style={{ display: "flex", fontSize: 32, opacity: 0.7 }}>{ogText(hero.eyebrow)}</div>
-        <div style={{ display: "flex", fontSize: 64, lineHeight: 1.05, letterSpacing: -2 }}>{ogText(hero.title)}</div>
+        <div style={{ display: "flex", fontSize: 32, opacity: 0.7 }}>{ogText(eyebrow)}</div>
+        <div style={{ display: "flex", fontSize: 64, lineHeight: 1.05, letterSpacing: -2 }}>{ogText(title)}</div>
       </div>
     </div>
   );
 }
 
 export default function OpengraphImage() {
-  return new ImageResponse(<Card brand={brand} hero={hero} />, size);
+  return new ImageResponse(<Card brand={brand} eyebrow={hero.eyebrow} title={site.seo.ogTitle} />, size);
 }

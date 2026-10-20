@@ -796,15 +796,28 @@ test("D2c: overskriften heter «Lys som tennes» i alle tilstander", () => {
 // brand.ts. Et foretak bytter dem uten kodeendring.
 // ---------------------------------------------------------------------------
 
-test("merke: ingen synlig «Studio» i ordlista eller i .tsx", () => {
+/**
+ * «studio» (F3, Petter 20.10): «AI-studio», «Bildestudio» og «studioet» er
+ * lov. Fortsatt forbudt (white label, navnet kommer fra brand.ts): det gamle
+ * navnet «The Studio» (uansett store og smaa bokstaver) og «Studio» med stor
+ * S som eget ord, ikke etter bindestrek. Samme regel som i marketing.test.ts.
+ */
+function usesOldStudioName(text: string): boolean {
+  return /the studio/i.test(text) || /(?<![-\p{L}\p{N}_])Studio(?![\p{L}\p{N}_])/u.test(text);
+}
+
+test("merke: ingen «The Studio» eller «Studio» som navn i ordlista eller i .tsx", () => {
+  // Regelen virker begge veier.
+  for (const bad of ["The Studio", "Studio for meglere"]) assert.ok(usesOldStudioName(bad), bad);
+  for (const ok of ["AI-studio", "Bildestudio"]) assert.ok(!usesOldStudioName(ok), ok);
   for (const locale of ["nb", "en"] as const) {
     for (const [key, text] of Object.entries(DICTIONARIES[locale].ui)) {
-      assert.doesNotMatch(text, /\bstudio\b/i, `${locale} ${key}`);
+      assert.ok(!usesOldStudioName(text), `${locale} ${key}`);
     }
   }
   // Uten kommentarer. Navn som openCanvasStudio er ikke et eget ord.
   for (const f of sourceFiles().filter((f) => f.endsWith(".tsx"))) {
-    assert.doesNotMatch(withoutComments(readFileSync(f, "utf8")), /\bstudio\b/i, relative(APP_DIR, f));
+    assert.ok(!usesOldStudioName(withoutComments(readFileSync(f, "utf8"))), relative(APP_DIR, f));
   }
 });
 
