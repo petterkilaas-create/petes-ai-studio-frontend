@@ -229,22 +229,61 @@ export type Steps = {
   items: readonly { title: string; text: string }[];
 };
 
-/** Tjenestene (MS3, utkastet linje 192-240). `id` er tjenestens kode i appen. */
+/**
+ * Mediet oeverst i et tjenestekort (F4, designet Main.dc.html linje 104-256).
+ * `kind` skiller dem (Services.tsx).
+ */
+export type ServiceMedia =
+  | {
+      kind: "split";
+      /** Resultatet, til venstre: AI-merket i bildet staar nede til venstre (auditen §3). */
+      after: ImageRef;
+      /** Originalen, klippet til hoeyre halvdel. */
+      before: ImageRef;
+      labels: { after: string; before: string };
+    }
+  | { kind: "video"; video: VideoRef; label: string }
+  | { kind: "ad"; image: ImageRef; label: string; title: string; excerpt: string }
+  | {
+      kind: "plan";
+      /** aria-label paa tegningen (PlanIllustration.tsx). */
+      label: string;
+      /** Rommene staar i rekkefoelgen tegningen plasserer dem. */
+      sketch: { caption: string; rooms: readonly string[] };
+      plan: { caption: string; rooms: readonly string[] };
+    };
+
+type ServiceItem = {
+  /** Tjenestens kode i appen (ordlista `service.<id>`), eller en egen id paa markedssiden. */
+  id: string;
+  /** Overlinja paa kortet (Petter 20.10, 2a). */
+  studio: string;
+  title: string;
+  text: string;
+  media: ServiceMedia;
+};
+
+/**
+ * Tjenestene som kort i studioer (F4, designet Main.dc.html linje 104-256).
+ * Alle vises som om de er klare (Petter dag 48): en `available` har
+ * bestillingslenken (`orderLabel` til site.cta), en `soon` har
+ * `earlyAccess` (kontaktsiden).
+ */
 export type Services = {
   _type: "services";
   anchor: string;
   title: string;
   lead: string;
-  availableLabel: string;
-  soonLabel: string;
-  items: readonly {
-    id: string;
-    title: string;
-    text: string;
-    status: "available" | "soon";
-    picture?: Picture;
-    more?: MaybeLink;
-  }[];
+  /** Lappen oeverst til venstre paa resultatbildene i de delte bildene. */
+  aiLabel: string;
+  /** «Få tidlig tilgang» paa tjenestene som ikke er klare (Petter 20.10, 2b). */
+  earlyAccess: Link;
+  /** Linja under kortene. */
+  also: { label: string; text: string };
+  items: readonly (
+    | (ServiceItem & { status: "available"; orderLabel: string })
+    | (ServiceItem & { status: "soon" })
+  )[];
 };
 
 /**
