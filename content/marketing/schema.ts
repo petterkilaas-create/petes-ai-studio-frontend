@@ -40,7 +40,8 @@ export type PendingKey =
   | "time"
   | "trainingAnswer"
   | "storageAnswer"
-  | "image";
+  | "image"
+  | "price";
 
 /** Et bilde fra images.ts. `pending: "image"`: midlertidig bilde som skal byttes (Petter 02.10, valg E). */
 export type ImageRef = { image: ImageKey; alt: string; pending?: "image" };
@@ -338,8 +339,10 @@ export type Honest = {
 };
 
 /**
- * Prisene (MS3b, utkastet linje 287-339). Ingen tall i tekstene: {price},
- * {n} og {perImage} fylles fra site.offer (offer.ts).
+ * Prisene (MS3b, utkastet linje 287-339; F6a, designet Main.dc.html linje
+ * 331-366). Ingen tall i tekstene: {price}, {n} og {perImage} fylles fra
+ * site.offer (offer.ts). Skjul ansikter og skilt er ikke paa forsiden
+ * (Petter 20.10, 2e), og kjedene er en egen seksjon (Chains).
  */
 export type Pricing = {
   _type: "pricing";
@@ -360,16 +363,24 @@ export type Pricing = {
     features: readonly string[];
     ctaLabel: string;
   };
-  /** Mal med {price}. */
-  addOn: string;
-  chains: {
-    anchor: string;
-    eyebrow: string;
-    title: string;
-    text: string;
-    points: readonly string[];
-    cta: Link;
-  };
+  /** Navnet foran prisen i linja under kortene. Mal med {name}. */
+  otherFormat: string;
+  /**
+   * Tjenestene uten pris ennaa (Petter 20.10, 2c): lappen [PRIS] staar til
+   * prisen er satt, og hindrer lansering (pending.ts).
+   */
+  others: readonly { name: string; price: PendingValue }[];
+};
+
+/** Kjeder og partnere (F6a, designet Main.dc.html linje 368-378), paa ink. */
+export type Chains = {
+  _type: "chains";
+  anchor: string;
+  eyebrow: string;
+  title: string;
+  text: string;
+  points: readonly string[];
+  cta: Link;
 };
 
 /** Spoersmaal og svar paa forsiden (MS3b). Spoersmaalene ligger i faq.ts. */
@@ -431,6 +442,7 @@ export type Home = {
   labeling: Labeling;
   honest: Honest;
   pricing: Pricing;
+  chains: Chains;
   faq: FaqBlock;
   finalCta: FinalCta;
 };

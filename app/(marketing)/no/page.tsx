@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DEFAULT_BRAND } from "@/app/lib/brand";
 import { MARKETING_HOME } from "@/app/lib/marketingAccess";
+import { Chains } from "@/app/components/marketing/Chains";
 import { Examples } from "@/app/components/marketing/Examples";
 import { Faq } from "@/app/components/marketing/Faq";
 import { Film } from "@/app/components/marketing/Film";
@@ -21,7 +22,8 @@ import { contentAnchors, visibleLinks } from "@/content/marketing/links";
 // eksemplene og tjenestene. MS3b: merkingen, den aerlige versjonen, prisene,
 // spoersmaal og svar, siste knapp og bunnen. F2 (den nye forsiden,
 // TG-NEW-230): tjenestene og saa filmseksjonen, som i designet; stemningene
-// og de tre stegene er ikke lenger paa siden (F7 sletter dem). Lenkene til
+// og de tre stegene er ikke lenger paa siden (F7 sletter dem). F6a: kjedene
+// er en egen seksjon etter prisene. Lenkene til
 // ankre vises bare naar seksjonen finnes (links.ts); bunnen er med fordi den
 // har #kontakt. Fast mappe no/
 // (Petter 02.10); spraakversjonene kan flytte til [lang] senere.
@@ -56,6 +58,7 @@ export default function MarketingHome() {
         <Labeling labeling={home.labeling} site={site} />
         <Honest honest={home.honest} />
         <Pricing pricing={home.pricing} site={site} />
+        <Chains chains={home.chains} />
         <Faq block={home.faq} items={faq} site={site} />
         <FinalCta finalCta={home.finalCta} site={site} />
       </main>
