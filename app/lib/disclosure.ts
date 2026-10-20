@@ -35,10 +35,11 @@ export const DISCLOSURE_DETAIL: DisclosureDetail = "edited";
 export const DISCLOSURE_LOCALE: Locale = "nb";
 
 /**
- * Baser der tidspunktet ikke er en del av teksten (Klart vaer, Petter 19.10):
- * med "full" legges det ikke til, og manglende tidspunkt gir ikke "missing".
+ * Baser der tidspunktet ikke er en del av teksten (Klart vaer, Petter 19.10;
+ * Digital styling, GS): med "full" legges det ikke til, og manglende
+ * tidspunkt gir ikke "missing".
  */
-const BASES_WITHOUT_TIME: ReadonlySet<string | null> = new Set(["sky_replaced"]);
+const BASES_WITHOUT_TIME: ReadonlySet<string | null> = new Set(["sky_replaced", "furniture_added"]);
 
 export type DisclosureResult = { kind: "text"; text: string } | { kind: "missing" };
 
@@ -65,7 +66,7 @@ function editedSentence(locale: Locale, items: string[]): string {
 
 /**
  * Merketeksten for en jobb. null naar backend ikke sender disclosure (ikke
- * skumring eller Klart vaer): da vises ingen boks. `base` og `edited` sjekkes alltid, ogsaa
+ * skumring, Klart vaer eller Digital styling): da vises ingen boks. `base` og `edited` sjekkes alltid, ogsaa
  * med "base"; `time` bare naar det vises ("full", ikke for BASES_WITHOUT_TIME).
  */
 export function disclosureText(

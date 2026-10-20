@@ -66,6 +66,10 @@ export function DisclosureBlock({ disclosure, locale }: { disclosure: ReviewDisc
             className={`w-full resize-none bg-surface border border-ink-2 rounded-button p-3 text-sm text-ink ${FOCUS}`}
           />
           <p className="text-xs text-ink-2">{t(locale, "review.disclosureHelp")}</p>
+          {/* «Original foerst» (GS, S1-auditen §8): utenfor tekstfeltet, saa den ikke kopieres inn i annonsen. */}
+          {disclosure?.base === "furniture_added" && (
+            <p className="text-sm text-ink">{t(locale, "review.originalFirst")}</p>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <button onClick={() => onCopy(result.text)} className={BTN_SECONDARY}>
               {t(locale, copy === "copied" ? "review.copied" : "action.copy")}

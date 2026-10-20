@@ -197,6 +197,7 @@ const nbUi = {
   "review.disclosureTitle": "Tekst til annonsen",
   "review.disclosureHelp": "Lim den inn i annonsen sammen med bildet.",
   "review.disclosureMissing": "Merketeksten kunne ikke lages. Kontakt oss.",
+  "review.originalFirst": "Bruk originalbildet som hovedbilde i annonsen, ikke det møblerte.",
   "action.copy": "Kopier",
   "review.copied": "Kopiert",
   "review.copyFailed": "Kunne ikke kopiere. Marker teksten og kopier den selv.",
@@ -459,6 +460,7 @@ const nb: Dictionary = {
     disclosureBase: {
       evening_from_day: "Kveldsbilde laget med AI fra dagsbilde.",
       sky_replaced: "Bildet er redigert med AI: himmelen er byttet til klar himmel.",
+      furniture_added: "Bildet er redigert med AI: rommet er møblert digitalt.",
     },
     disclosureTime: {
       early: "Tidspunkt: tidlig skumring.",
@@ -692,6 +694,7 @@ const en: Dictionary = {
     "review.disclosureTitle": "Text for the listing",
     "review.disclosureHelp": "Paste it into the listing together with the image.",
     "review.disclosureMissing": "The disclosure text could not be created. Please contact us.",
+    "review.originalFirst": "Use the original photo as the main image in the listing, not the furnished one.",
     "action.copy": "Copy",
     "review.copied": "Copied",
     "review.copyFailed": "Could not copy. Select the text and copy it yourself.",
@@ -923,6 +926,7 @@ const en: Dictionary = {
     disclosureBase: {
       evening_from_day: "Evening image created with AI from a daytime photo.",
       sky_replaced: "The image has been edited with AI: the sky has been replaced with a clear sky.",
+      furniture_added: "The image has been edited with AI: the room has been furnished digitally.",
     },
     disclosureTime: {
       early: "Time of day: early dusk.",

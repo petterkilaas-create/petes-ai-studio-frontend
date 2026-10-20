@@ -154,3 +154,37 @@ test("skumring er uendret: manglende tidspunkt gir fortsatt ingen tekst med full
   assert.deepEqual(disclosureText("nb", d([], { time: null }), "full"), { kind: "missing" });
   assert.equal(text(disclosureText("nb", d([]), "full")), `${BASE_NB} Tidspunkt: sen kveld.`);
 });
+
+const FURNITURE_NB = "Bildet er redigert med AI: rommet er møblert digitalt.";
+const FURNITURE_EN = "The image has been edited with AI: the room has been furnished digitally.";
+
+function furniture(edited: string[] | null, extra: Partial<ReviewDisclosure> = {}): ReviewDisclosure {
+  return d(edited, { base: "furniture_added", time: null, source: null, ...extra });
+}
+
+test("Digital styling (furniture_added): bare grunnsetningen, nb og en, paa alle detaljnivaa (Petter dag 47)", () => {
+  for (const detail of ["base", "edited", "full"] as const) {
+    assert.deepEqual(disclosureText("nb", furniture([]), detail), { kind: "text", text: FURNITURE_NB });
+    assert.deepEqual(disclosureText("en", furniture([]), detail), { kind: "text", text: FURNITURE_EN });
+  }
+});
+
+test("Digital styling: ukjent kode i lista, ugyldig liste og status som ikke er ok gir ingen tekst", () => {
+  const missing = { kind: "missing" };
+  for (const detail of ["base", "edited", "full"] as const) {
+    assert.deepEqual(disclosureText("nb", furniture(["sofa"]), detail), missing);
+    assert.deepEqual(disclosureText("nb", furniture(null), detail), missing);
+    for (const status of ["unverified", "OK", null]) {
+      assert.deepEqual(disclosureText("nb", furniture([], { status }), detail), missing);
+    }
+  }
+});
+
+test("Digital styling endrer ikke skumring og Klart vaer", () => {
+  for (const detail of ["base", "edited", "full"] as const) {
+    assert.deepEqual(disclosureText("nb", sky([]), detail), { kind: "text", text: SKY_NB });
+  }
+  assert.equal(text(disclosureText("nb", d(["sky"]), "edited")), `${BASE_NB} Himmel er redigert.`);
+  assert.equal(text(disclosureText("nb", d([]), "full")), `${BASE_NB} Tidspunkt: sen kveld.`);
+  assert.deepEqual(disclosureText("nb", d([], { time: null }), "full"), { kind: "missing" });
+});
