@@ -149,14 +149,15 @@ test("MS2: innholdet har alle feltene, og alle har tekst", () => {
     "home.hero.freeNote",
     "home.hero.mosaic.label",
     "home.hero.aiLabel",
-    "home.hero.before.alt",
-    "home.hero.after.alt",
-    "home.hero.labels.original",
-    "home.hero.labels.result",
-    "home.hero.labels.ai",
-    "home.hero.sliderLabel",
-    "home.hero.sliderValue",
-    "home.hero.caption",
+    // F5: slideren staar i eksemplene.
+    "home.examples.lead",
+    "home.examples.aiLabel",
+    "home.examples.slider.original",
+    "home.examples.slider.label",
+    "home.examples.slider.value",
+    ...home.examples.tabs.flatMap((_, i) =>
+      ["label", "result", "before.alt", "after.alt", "caption.text"].map((k) => `home.examples.tabs[${i}].${k}`)
+    ),
   ]) {
     assert.ok(all.some(([p]) => p === key), key);
   }
@@ -169,7 +170,7 @@ test("MS2: innholdet har alle feltene, og alle har tekst", () => {
 
 test("MS2: bildene har alt-tekst og finnes i images.ts, og bare images.ts importerer bilder", () => {
   const images = read("content/marketing/images.ts");
-  for (const ref of [home.hero.before, home.hero.after]) {
+  for (const ref of home.examples.tabs.flatMap((t) => [t.before, t.after])) {
     assert.ok(ref.alt.trim().length > 10, ref.image);
     assert.match(images, new RegExp(`^  ${ref.image},$`, "m"), ref.image);
   }
@@ -414,27 +415,26 @@ test("MS2: markedssiden har ingen ClerkProvider og ingen import fra @clerk/*", (
   assert.doesNotMatch(layout, /AppNav|UserButton/);
 });
 
-test("MS2: toppbildet har hoey prioritet og faste maal, originalen lastes uten hoey prioritet", () => {
+test("F5: slideren lastes lat og har faste maal og sizes som prop", () => {
   const src = withoutComments(read("app/components/marketing/HeroSlider.tsx"));
   const images = [...src.matchAll(/<Image\n([\s\S]*?)\/>/g)].map((m) => m[1]);
   assert.equal(images.length, 2);
   const [after, before] = images;
   assert.match(after, /src=\{after\.src\}/);
   assert.match(after, /alt=\{after\.alt\}/);
-  assert.match(after, /loading="eager"/);
-  assert.match(after, /fetchPriority="high"/);
   assert.match(before, /src=\{before\.src\}/);
   assert.match(before, /alt=\{before\.alt\}/);
-  assert.match(before, /loading="eager"/);
-  assert.doesNotMatch(before, /fetchPriority/);
   for (const img of images) {
     assert.match(img, /\bfill\b/);
-    assert.match(img, /sizes=\{SIZES\}/);
-    assert.doesNotMatch(img, /\bpriority\b|\bpreload\b/, "priority er utgaatt i Next 16");
+    assert.match(img, /sizes=\{sizes\}/);
   }
+  // Slideren staar langt nede paa siden: ingen hoey prioritet og ingen eager.
+  assert.doesNotMatch(src, /fetchPriority|loading="eager"|\bpriority\b|\bpreload\b/);
   // Faste maal: fill i en boks med fast forhold.
   assert.match(src, /className="relative aspect-\[3\/2\] w-full/);
-  assert.match(src, /const SIZES = "\(min-width: 1320px\) 780px, \(min-width: 1024px\) 60vw, 100vw";/);
+  // Standardbredden er hele containeren.
+  assert.match(src, /const SIZES = "\(min-width: 1320px\) 1224px, 100vw";/);
+  assert.match(src, /sizes = SIZES,/);
 });
 
 test("MS2: slideren kan styres uten aa dra (WCAG 2.5.7) og har AI-merkelappen", () => {
@@ -450,6 +450,13 @@ test("MS2: slideren kan styres uten aa dra (WCAG 2.5.7) og har AI-merkelappen", 
   assert.ok(src.includes("touch-pan-y"));
   assert.match(src, /\{labels\.ai\}/);
   assert.match(src, /\{labels\.result\}/);
+  // F5: en slider per fane, som monteres paa nytt ved bytte (tilbake til 50 %).
+  const tabs = withoutComments(read("app/components/marketing/ExampleTabs.tsx"));
+  assert.equal(tabs.split("<HeroSlider").length - 1, 1);
+  assert.match(tabs, /<HeroSlider\s+key=\{tab\.id\}/);
+  assert.match(tabs, /labels=\{\{ original: slider\.original, result: tab\.result, ai: labels\.ai \}\}/);
+  assert.match(tabs, /sliderLabel=\{slider\.label\}/);
+  assert.match(tabs, /sliderValue=\{slider\.value\}/);
 });
 
 test("MS2: 404-siden har merket, lenkene og ingen tekst skrevet rett inn", () => {
@@ -523,7 +530,7 @@ test("MS3a: seksjonene finnes i rekkefoelgen paa siden, med tekst og riktig _typ
     "Du godkjenner hvert bilde før levering",
     "Data lagret i EU",
   ]);
-  assert.deepEqual(home.examples.tabs.map((t) => t.label), ["Stue", "Kjøkken", "Soverom", "Balkong", "Hage", "Fasade", "Hytte"]);
+  assert.deepEqual(home.examples.tabs.map((t) => t.label), ["Kveldsbilde", "Rydd opp", "Digital styling"]);
   assert.deepEqual(home.steps.items.map((s) => s.title), ["Last opp", "Velg stemning", "Godkjenn og last ned"]);
   // F4: seks kort i studioer (Petter og Cowork 20.10). Skjul ansikter og skilt er tatt ut (2e).
   assert.deepEqual(
@@ -552,7 +559,8 @@ function pictures(value: unknown, path = ""): [string, { alt: string; image?: st
 
 test("MS3a: alle bilder og plassholdere har alt-tekst, og plassholderne har tekst og pending «image»", () => {
   const all = pictures(home, "home");
-  assert.ok(all.length >= 2 + 14 + 5 + 2, `fant ${all.length}`);
+  // F5: mosaikken 3, eksemplene 6, stemningene 5, merkingen og tjenestene resten.
+  assert.ok(all.length >= 3 + 6 + 5 + 2, `fant ${all.length}`);
   const images = read("content/marketing/images.ts");
   for (const [path, pic] of all) {
     assert.ok(pic.alt.trim().length > 10, path);
@@ -563,9 +571,17 @@ test("MS3a: alle bilder og plassholdere har alt-tekst, og plassholderne har teks
       assert.match(images, new RegExp(`^  ${pic.image},$`, "m"), path);
     }
   }
-  // Stue bruker bildene fra toppen.
-  assert.deepEqual(home.examples.tabs[0].before, home.hero.before);
-  assert.deepEqual(home.examples.tabs[0].after, home.hero.after);
+  // F5: kveldsbildet er ekte (AI-merket i bildet); rydd opp og styling er midlertidige.
+  const [kveld, rydd, styling] = home.examples.tabs;
+  assert.deepEqual([kveld.before.image, kveld.after.image], ["pairEveningOriginal", "pairEveningResult"]);
+  for (const ref of [kveld.before, kveld.after]) assert.ok(!("pending" in ref), ref.image);
+  assert.ok(!("pending" in kveld.caption));
+  assert.deepEqual([rydd.before.image, rydd.after.image], ["pairCleanupOriginal", "pairCleanupResult"]);
+  assert.deepEqual([styling.before.image, styling.after.image], ["pairStylingOriginal", "pairStylingResult"]);
+  for (const t of [rydd, styling]) {
+    for (const ref of [t.before, t.after]) assert.equal((ref as { pending?: string }).pending, "image", ref.image);
+    assert.equal((t.caption as { pending?: string }).pending, "image", t.id);
+  }
   // Plassholderen viser tekst og merkelapp, og bildet har alt fra innholdet.
   const pic = withoutComments(read("app/components/marketing/MarketingPicture.tsx"));
   assert.match(pic, /if \("placeholder" in picture\)/);
@@ -615,9 +631,6 @@ const PENDING_NOW = [
   ["home.hero.mosaic.tiles[1].image", "image"],
   ["home.hero.mosaic.tiles[3].image", "image"],
   ["home.hero.mosaic.tiles[4].video", "image"],
-  // Feltene til slideren, ubrukt paa siden til F5 (Stue i eksemplene har de samme bildene).
-  ["home.hero.before", "image"],
-  ["home.hero.after", "image"],
   ["home.trustStrip.items[3]", "dataRegion"],
   ["faq[3].slots.time", "time"],
   ["faq[6]", "trainingAnswer"],
@@ -634,7 +647,8 @@ test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () =>
   // (beslutning 4).
   const notPictures = items.filter((i) => i.key !== "image" || i.path.startsWith("home.hero"));
   assert.deepEqual(notPictures.map((i) => [i.path, i.key]), PENDING_NOW);
-  assert.ok(items.filter((i) => i.key === "image").length >= 2 + 14 + 5 + 2);
+  // F5: mosaikken 3, eksemplene 4 bilder og 2 tekster, stemningene 5.
+  assert.ok(items.filter((i) => i.key === "image").length >= 3 + 6 + 5);
   // Hver noekkel har en merkelapp.
   for (const i of items) assert.ok(site.pendingLabels[i.key].startsWith("["), i.key);
 });
@@ -747,7 +761,8 @@ test("MS3a: mobilmenyen har aria-expanded og aria-controls, lukkes med Escape og
 });
 
 test("MS3a: bare toppbildet har hoey prioritet; alle andre bilder lastes lat", () => {
-  for (const f of filesIn("app/components/marketing", /\.tsx$/).filter((f) => !f.endsWith("HeroSlider.tsx"))) {
+  // F5: ogsaa slideren (HeroSlider.tsx), som staar i eksemplene.
+  for (const f of filesIn("app/components/marketing", /\.tsx$/)) {
     let src = withoutComments(read(f));
     // F1: videoene laster ingenting foer de spilles; bare preload="none" er lov, og bare der.
     if (f.endsWith("MarketingVideo.tsx")) src = src.replaceAll('preload="none"', "");
@@ -1442,11 +1457,10 @@ test("F3: Hero.tsx viser mosaikken, ikke slideren, med kursiv titleEmphasis og i
   assert.match(read("app/lib/fonts.ts"), /Instrument_Serif\(\{[^}]*style: \["normal", "italic"\],/);
   assert.match(src, /import \{ ArrowRight, Check, CirclePlay \} from "lucide-react";/);
   assert.match(src, /<CirclePlay aria-hidden="true"[^>]*\/>\s*\{hero\.secondary\.label\}/);
-  // Slideren blir staaende til F5 (foer/etter-fanene), men ingen side bruker den.
+  // F5: slideren staar i eksemplene; bare ExampleTabs.tsx bruker den.
   assert.ok(existsSync(join(REPO_DIR, "app/components/marketing/HeroSlider.tsx")));
-  for (const f of MARKETING_TSX) {
-    if (!f.endsWith("HeroSlider.tsx")) assert.doesNotMatch(withoutComments(read(f)), /<HeroSlider|from "\.\/HeroSlider"/, f);
-  }
+  const users = MARKETING_TSX.filter((f) => /<HeroSlider|from "\.\/HeroSlider"/.test(withoutComments(read(f))));
+  assert.deepEqual(users, ["app/components/marketing/ExampleTabs.tsx"]);
 });
 
 // ---------------------------------------------------------------------------

@@ -52,7 +52,7 @@ export default function MarketingHome() {
         <TrustStrip strip={home.trustStrip} site={site} />
         <Services services={home.services} site={site} />
         <Film film={home.film} site={site} />
-        <Examples examples={home.examples} site={site} />
+        <Examples examples={home.examples} site={site} brand={brand} />
         <Labeling labeling={home.labeling} site={site} />
         <Honest honest={home.honest} />
         <Pricing pricing={home.pricing} site={site} />

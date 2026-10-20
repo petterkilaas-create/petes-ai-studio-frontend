@@ -3,16 +3,15 @@ import type { Home, ImagePlaceholder } from "../schema.ts";
 // Forsiden, ordrett fra det godkjente utkastet (MARKEDSSIDE_UTKAST.dc.html).
 // Linjenumrene staar ved hver seksjon.
 //
-// Toppen (linje 50-71): alt-tekstene er skrevet om for stua (Petter 02.10),
-// etter utkastets stue-variant (linje 464 og 466). sliderValue er som i D2.
-// Bildene er midlertidige (originalen er ogsaa laget med AI), saa de er
-// merket pending "image" (Petter 02.10, valg E).
+// Midlertidige bilder er merket pending "image" (Petter 02.10, valg E).
 // F3 (den nye forsiden, designet Main.dc.html linje 49-92): ny overlinje,
 // overskrift og ingress, «Se filmen» og mosaikken i stedet for slideren
 // (Petter og Cowork 20.10). Kveldsbildet i mosaikken er ekte; rydd opp,
 // styling og loekka er midlertidige (pending "image"). freeNote er laast
-// (TG-NEW-220). Feltene til slideren (before til caption) brukes ikke paa
-// siden til F5, men Stue i eksemplene har de samme bildene.
+// (TG-NEW-220).
+// F5 (designet linje 279-305): slideren fra toppen staar i eksemplene, med
+// tre faner. Feltene til slideren er flyttet fra toppen til examples.slider
+// (verdien er som i D2).
 //
 // MS3a: tillitsstripen, eksemplene, stemningene, tre steg og tjenestene.
 // MS3b: merkingen, den aerlige versjonen, prisene, spoersmaal og svar (selve
@@ -59,16 +58,6 @@ export const home = {
       ],
     },
     aiLabel: "AI",
-    before: { image: "heroOriginal", alt: "Originalbildet av stua, tatt på dagtid", pending: "image" },
-    after: {
-      image: "heroEvening",
-      alt: "Samme stue som kveldsbilde laget med AI, med tente lamper, fyr i peisen og AI-merke nede til venstre",
-      pending: "image",
-    },
-    labels: { original: "Original", result: "Kveldsbilde", ai: "AI" },
-    sliderLabel: "Flytt skillelinjen mellom originalen og kveldsbildet",
-    sliderValue: "{n} % original",
-    caption: "Dra i linjen, klikk i bildet eller bruk piltastene. Ekte eksempel, laget med tjenesten.",
   },
 
   // Linje 76-81.
@@ -84,65 +73,56 @@ export const home = {
     ],
   },
 
-  // Linje 85-121 og 472-480. Stue bruker bildene fra toppen.
+  // Linje 85-121 og 472-480. F5: tre faner med slideren. Kveldsbildet er
+  // ekte og har AI-merket i bildet; rydd opp og styling er midlertidige
+  // (pending "image" paa bildene og teksten under).
   examples: {
     _type: "examples",
     anchor: "eksempler",
     title: "Se forskjellen selv.",
-    lead: "Eksempler laget med tjenesten, vist med AI-merket slik du får dem.",
+    lead: "Dra i linjen, klikk i bildet eller bruk piltastene.",
     tabListLabel: "Velg eksempel",
-    beforeCaption: "Original, tatt på dagtid",
-    afterCaption: "Kveldsbilde laget med AI",
     aiLabel: "AI",
+    slider: {
+      original: "Original",
+      label: "Flytt skillelinjen mellom originalen og resultatet",
+      value: "{n} % original",
+    },
     tabs: [
       {
-        id: "stue",
-        label: "Stue",
-        before: { image: "heroOriginal", alt: "Originalbildet av stua, tatt på dagtid", pending: "image" },
+        id: "kveld",
+        label: "Kveldsbilde",
+        result: "Kveldsbilde",
+        before: { image: "pairEveningOriginal", alt: "Stua tatt på dagtid" },
         after: {
-          image: "heroEvening",
-          alt: "Samme stue som kveldsbilde laget med AI, med tente lamper, fyr i peisen og AI-merke nede til venstre",
+          image: "pairEveningResult",
+          alt: "Samme stue som kveldsbilde laget med AI, med AI-merket nede til venstre",
+        },
+        caption: { text: "Ekte resultat laget med {brand}. AI-merket står nede til venstre i bildet." },
+      },
+      {
+        id: "rydd",
+        label: "Rydd opp",
+        result: "Ryddet",
+        before: { image: "pairCleanupOriginal", alt: "Spiseplass med ting på bordet", pending: "image" },
+        after: {
+          image: "pairCleanupResult",
+          alt: "Samme spiseplass etter at rotet er fjernet, laget med AI",
           pending: "image",
         },
+        caption: { text: "Ekte resultat laget med {brand}.", pending: "image" },
       },
       {
-        id: "kjokken",
-        label: "Kjøkken",
-        before: ph("Kjøkken, dagsbilde", "Originalbildet av kjøkkenet, tatt på dagtid"),
-        after: ph("Kjøkken som kveldsbilde", "Samme kjøkken som kveldsbilde laget med AI, med AI-merke nede til venstre"),
-      },
-      {
-        id: "soverom",
-        label: "Soverom",
-        before: ph("Soverom, dagsbilde", "Originalbildet av soverommet, tatt på dagtid"),
-        after: ph("Soverom som kveldsbilde", "Samme soverom som kveldsbilde laget med AI, med AI-merke nede til venstre"),
-      },
-      {
-        id: "balkong",
-        label: "Balkong",
-        before: ph("Balkong, dagsbilde", "Originalbildet av balkongen, tatt på dagtid"),
-        after: ph("Balkong som kveldsbilde", "Samme balkong som kveldsbilde laget med AI, med AI-merke nede til venstre"),
-      },
-      {
-        id: "hage",
-        label: "Hage",
-        before: ph("Hage, dagsbilde", "Originalbildet av hagen, tatt på dagtid"),
-        after: ph("Hage som kveldsbilde", "Samme hage som kveldsbilde laget med AI, med AI-merke nede til venstre"),
-      },
-      {
-        id: "fasade",
-        label: "Fasade",
-        before: ph("Fasade, dagsbilde", "Originalbildet av fasaden, tatt på dagtid"),
-        after: ph(
-          "Fasade som kveldsbilde",
-          "Samme fasade som kveldsbilde laget med AI, med lys i vinduene og AI-merke nede til venstre"
-        ),
-      },
-      {
-        id: "hytte",
-        label: "Hytte",
-        before: ph("Hytte, dagsbilde", "Originalbildet av hytta, tatt på dagtid"),
-        after: ph("Hytte som kveldsbilde", "Samme hytte som kveldsbilde laget med AI, med AI-merke nede til venstre"),
+        id: "styling",
+        label: "Digital styling",
+        result: "Møblert",
+        before: { image: "pairStylingOriginal", alt: "Tom stue uten møbler", pending: "image" },
+        after: {
+          image: "pairStylingResult",
+          alt: "Samme stue møblert digitalt i skandinavisk stil, laget med AI",
+          pending: "image",
+        },
+        caption: { text: "Ekte resultat laget med {brand}.", pending: "image" },
       },
     ],
   },

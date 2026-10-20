@@ -8,21 +8,21 @@ import { fill } from "../../../content/marketing/fill";
 import { FOCUS } from "./classes";
 
 /**
- * Foer/etter-slideren i toppen av markedssiden (MS2). Samme oppfoersel som
- * slideren paa godkjenningssiden (D2a, CompareViewer): kan dras, men ogsaa
- * styres med tastaturet og med klikk eller trykk paa sporet (WCAG 2.5.7),
- * og siden ruller fortsatt loddrett paa mobil (touch-pan-y).
+ * Foer/etter-slideren i eksemplene paa markedssiden (MS2; F5: en per fane
+ * i ExampleTabs, ikke lenger i toppen). Navnet blir staaende til F7. Samme
+ * oppfoersel som slideren paa godkjenningssiden (D2a, CompareViewer): kan
+ * dras, men ogsaa styres med tastaturet og med klikk eller trykk paa sporet
+ * (WCAG 2.5.7), og siden ruller fortsatt loddrett paa mobil (touch-pan-y).
  *
  * Bildene er next/image med fill i en boks med fast forhold 3:2, saa
- * plassen er satt foer bildene kommer (CLS). Kveldsbildet er det stoerste
- * bildet paa siden (LCP) og lastes med hoey prioritet. Originalen ligger
- * oppaa og kuttes med clip-path; den lastes ogsaa med en gang, men uten hoey
- * prioritet. AI-ikonet nede til venstre i kveldsbildet dekkes av originalen,
- * saa resultatsiden har en egen «AI»-merkelapp.
+ * plassen er satt foer bildene kommer (CLS). Slideren staar langt nede paa
+ * siden, saa begge bildene lastes lat. Originalen ligger oppaa og kuttes med
+ * clip-path. Dras slideren helt til venstre, synes hele resultatet med
+ * AI-merket i bildet; «AI»-merkelappen oeverst til hoeyre synes alltid.
  */
 
-/** Bredden bildet vises i: ca. to tredjedeler av 1320 px, ellers hele skjermen. */
-const SIZES = "(min-width: 1320px) 780px, (min-width: 1024px) 60vw, 100vw";
+/** Standardbredden: hele containeren (1320 px minus luft), ellers hele skjermen. */
+const SIZES = "(min-width: 1320px) 1224px, 100vw";
 
 const CHIP =
   "pointer-events-none absolute top-3.5 inline-flex h-[30px] items-center rounded-pill bg-ink/75 text-[13px] font-semibold text-surface";
@@ -35,6 +35,7 @@ export function HeroSlider({
   labels,
   sliderLabel,
   sliderValue,
+  sizes = SIZES,
 }: {
   before: SliderImage;
   after: SliderImage;
@@ -42,6 +43,8 @@ export function HeroSlider({
   sliderLabel: string;
   /** Mal med {n}. */
   sliderValue: string;
+  /** Bredden bildet vises i (next/image). */
+  sizes?: string;
 }) {
   const [value, setValue] = useState(SLIDER_START);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -88,9 +91,7 @@ export function HeroSlider({
         src={after.src}
         alt={after.alt}
         fill
-        sizes={SIZES}
-        loading="eager"
-        fetchPriority="high"
+        sizes={sizes}
         draggable={false}
         className="object-cover"
       />
@@ -105,8 +106,7 @@ export function HeroSlider({
           src={before.src}
           alt={before.alt}
           fill
-          sizes={SIZES}
-          loading="eager"
+          sizes={sizes}
           draggable={false}
           className="object-cover"
         />
