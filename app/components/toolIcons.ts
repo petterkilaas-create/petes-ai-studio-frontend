@@ -33,4 +33,5 @@ export const CATEGORY_ICONS: Record<string, LucideIcon> = {
   fixit: Eraser,
   furnishing: Armchair,
   more: Ellipsis,
+  privacy: ScanFace,
 };

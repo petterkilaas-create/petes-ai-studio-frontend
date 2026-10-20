@@ -405,8 +405,8 @@ test("D1c: services.ts har bare noekler til ordlista, ingen tekst eller emoji", 
   const count = (re: RegExp) => code.match(re)?.length ?? 0;
   const tools = count(/^\s*kind: "(simple|scene)",/gm);
   assert.ok(tools >= 4);
-  // Fire kategorier etter «Kommer»-kortene (dag 45): Lys og himmel, Rydd og skjul, Innredning, Mer.
-  assert.equal(count(/^\s*titleKey: "/gm), tools + 4, "hvert verktoey og de fire kategoriene");
+  // Fem kategorier etter APP1: Lys og himmel, Rydd, Innredning, Mer og Personvern.
+  assert.equal(count(/^\s*titleKey: "/gm), tools + 5, "hvert verktoey og de fem kategoriene");
   assert.equal(count(/^\s*descKey: "/gm), tools);
 });
 
@@ -453,7 +453,7 @@ test("D1c: ordlista har ordene til Tjenester paa nb og en", () => {
     }
   }
   const nb = DICTIONARIES.nb.ui;
-  assert.equal(nb["express.category.fixit"], "Rydd og skjul");
+  assert.equal(nb["express.category.fixit"], "Rydd");
   assert.equal(nb["express.category.timetraveler"], "Lys og himmel");
   assert.equal(nb["express.noImage"], "Ikke noe bilde valgt");
   assert.equal(nb["express.coming"], "Kommer");

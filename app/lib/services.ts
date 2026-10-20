@@ -158,13 +158,6 @@ const CATEGORIES: Category[] = [
         titleKey: "service.magic_cleanup",
         descKey: "express.tool.magic_cleanup.desc",
       },
-      {
-        id: "privacy_blur",
-        service: "privacy_blur",
-        kind: "simple",
-        titleKey: "service.privacy_blur",
-        descKey: "express.tool.privacy_blur.desc",
-      },
       // Skjult inntil lawn_green-pipeline finnes i backend (Dag 21+)
       // {
       //   id: "lawn_green",
@@ -220,6 +213,21 @@ const CATEGORIES: Category[] = [
         kind: "simple",
         titleKey: "express.tool.copywriter.title",
         descKey: "express.tool.copywriter.desc",
+      },
+    ],
+  },
+  // Skjul ansikter og skilt sist, i egen kategori (APP1, Petter 20.10): den
+  // er tatt ut av forsiden og finnes bare i appen. Flyttet fra fixit uendret.
+  {
+    id: "privacy",
+    titleKey: "express.category.privacy",
+    items: [
+      {
+        id: "privacy_blur",
+        service: "privacy_blur",
+        kind: "simple",
+        titleKey: "service.privacy_blur",
+        descKey: "express.tool.privacy_blur.desc",
       },
     ],
   },
