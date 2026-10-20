@@ -129,6 +129,7 @@ test("merketeksten: nb og en har noeklene og alle kodene fra kontrakten", () => 
     "review.disclosureTitle",
     "review.disclosureHelp",
     "review.disclosureMissing",
+    "review.originalFirst",
     "action.copy",
     "review.copied",
     "review.copyFailed",
@@ -145,12 +146,23 @@ test("merketeksten: nb og en har noeklene og alle kodene fra kontrakten", () => 
   for (const locale of ["nb", "en"] as const) {
     const dict = DICTIONARIES[locale];
     for (const key of keys) assert.ok(dict.ui[key].trim().length > 0, `${locale} ${key}`);
-    assert.deepEqual(Object.keys(dict.codes.disclosureBase), ["evening_from_day", "sky_replaced"]);
+    assert.deepEqual(Object.keys(dict.codes.disclosureBase), ["evening_from_day", "sky_replaced", "furniture_added"]);
     assert.deepEqual(Object.keys(dict.codes.disclosureTime).sort(), ["early", "late"]);
     assert.deepEqual(Object.keys(dict.codes.disclosureEdited), edited);
   }
   assert.equal(t("nb", "review.disclosureHelp"), "Lim den inn i annonsen sammen med bildet.");
   assert.equal(t("nb", "review.copyFailed"), "Kunne ikke kopiere. Marker teksten og kopier den selv.");
+  // GS (Digital styling): annonseteksten og linja «original foerst», ordrett.
+  assert.equal(DICTIONARIES.nb.codes.disclosureBase.furniture_added, "Bildet er redigert med AI: rommet er møblert digitalt.");
+  assert.equal(
+    DICTIONARIES.en.codes.disclosureBase.furniture_added,
+    "The image has been edited with AI: the room has been furnished digitally."
+  );
+  assert.equal(t("nb", "review.originalFirst"), "Bruk originalbildet som hovedbilde i annonsen, ikke det møblerte.");
+  assert.equal(
+    t("en", "review.originalFirst"),
+    "Use the original photo as the main image in the listing, not the furnished one."
+  );
 });
 
 test("nedlastingen (merking PR 4): nb og en har noeklene", () => {

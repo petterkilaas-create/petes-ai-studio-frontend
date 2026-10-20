@@ -348,8 +348,9 @@ test("D1: testene for annonseteksten og lekkasjevernet er uendret", () => {
   // MS1 (dag 35): previews.test.ts fikk nye stier til sidene i (app)/, ellers uendret.
   // TG-NEW-153 (dag 38): to stier fra (app)/express til (app)/tjenester, ellers uendret (Petter 05.10).
   // G2 (dag 47): tre nye tester for Klart vaer nederst i disclosure.test.ts, de gamle uendret (Petter 19.10).
+  // GS (dag 49): tre nye tester for Digital styling nederst i disclosure.test.ts, de gamle uendret.
   const expected: Record<string, string> = {
-    "lib/disclosure.test.ts": "48e1ccea99e2edddc76545fefb0196481d2167aaddfd7c52540e93e0bf275ae2",
+    "lib/disclosure.test.ts": "cd27bce3c31c3e3748040ada64b87c048e5b219066379cd41dbc09060ea9328f",
     "lib/previews.test.ts": "e78901bf96250efc8fca3f5eea49d985abc6bf7213870dac66c528182a65b4d4",
     "lib/jobState.test.ts": "cac4d79a9ed60e6307f4cdd0118fcba43c22b8aa8ba7a783ba4c0e1522a818c5",
   };
@@ -484,6 +485,18 @@ test("D2a: komponentene finnes og er med i D1-sjekkene over", () => {
   ]) {
     assert.ok(GODKJENNING_COMPONENTS.includes(f), f);
   }
+});
+
+test("GS: linja «original foerst» vises bare for furniture_added, og ikke i tekstfeltet som kopieres", () => {
+  const src = withoutComments(read("components/godkjenning/DisclosureBlock.tsx"));
+  assert.equal(src.split('"review.originalFirst"').length, 2, "en gang");
+  assert.match(src, /\{disclosure\?\.base === "furniture_added" && \(\s*<p[^>]*>\{t\(locale, "review\.originalFirst"\)\}<\/p>\s*\)\}/);
+  // I grenen med tekst (etter «missing») og etter tekstfeltet, som bare har result.text.
+  const line = src.indexOf('"review.originalFirst"');
+  assert.ok(src.indexOf('"review.disclosureMissing"') < line);
+  assert.ok(src.indexOf("/>", src.indexOf("<textarea")) < line);
+  assert.match(src, /value=\{result\.text\}/);
+  assert.match(src, /onCopy\(result\.text\)/);
 });
 
 test("D2a: slideren kan styres uten aa dra (WCAG 2.5.7) og har rolle og verdier", () => {
