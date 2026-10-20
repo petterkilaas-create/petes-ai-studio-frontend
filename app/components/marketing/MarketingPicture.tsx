@@ -10,7 +10,7 @@ import { PendingMark } from "./PendingMark";
  * tekst fra innholdet og merkelappen [BILDE]. Midlertidige bilder
  * (pending "image") faar ogsaa merkelappen.
  *
- * Ingen hooks, saa fanene og stemningene (klientdeler) kan bruke den.
+ * Ingen hooks, saa klientdeler kan bruke den.
  */
 export function MarketingPicture({
   picture,

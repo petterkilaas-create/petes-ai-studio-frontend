@@ -17,7 +17,6 @@ import {
   START_PATH,
 } from "../../app/lib/marketingAccess.ts";
 import { literalTextsInFile, withoutComments } from "../../app/lib/testing/jsxText.ts";
-import { DUSK_SKY_BY_TIME, DEFAULT_DUSK } from "../../app/lib/dusk.ts";
 import { DICTIONARIES } from "../../app/lib/i18n/index.ts";
 import { DISCLOSURE_DETAIL, DISCLOSURE_LOCALE, disclosureText } from "../../app/lib/disclosure.ts";
 import { isServiceEnabled } from "../../app/lib/services.ts";
@@ -178,7 +177,8 @@ test("MS2: bildene har alt-tekst og finnes i images.ts, og bare images.ts import
   for (const m of images.matchAll(/^import \w+ from "\.\/(images\/[\w-]+\.jpg)";$/gm)) {
     assert.ok(existsSync(join(CONTENT_DIR, m[1])), m[1]);
   }
-  assert.equal([...images.matchAll(/^import \w+ from "\.\/images\//gm)].length, 11);
+  // F7: de to gamle toppbildene er slettet (11 -> 9).
+  assert.equal([...images.matchAll(/^import \w+ from "\.\/images\//gm)].length, 9);
   for (const f of filesIn("content").filter((f) => f !== "content/marketing/images.ts")) {
     assert.doesNotMatch(read(f), /\.(jpe?g|png|webp|avif)"/, f);
   }
@@ -186,8 +186,6 @@ test("MS2: bildene har alt-tekst og finnes i images.ts, og bare images.ts import
   // 19.10). F1: parene er 1536x1024, plakatene har videoens forhold.
   const sizes: Record<string, readonly number[]> = {};
   for (const [name, size] of [
-    ["hero-original.jpg", [1536, 1024]],
-    ["hero-kveld.jpg", [1536, 1024]],
     ["merking-kveld.jpg", [1536, 1040]],
     ["par-kveld-original.jpg", [1536, 1024]],
     ["par-kveld-resultat.jpg", [1536, 1024]],
@@ -476,17 +474,14 @@ test("MS2: 404-siden har merket, lenkene og ingen tekst skrevet rett inn", () =>
 });
 
 // ---------------------------------------------------------------------------
-// MS3a: tillitsstripen, eksemplene, stemningene, tre steg, tjenestene og
-// mobilmenyen, med det som venter og lenkene (regel 3-6).
+// MS3a: tillitsstripen, eksemplene, tjenestene og mobilmenyen, med det som
+// venter og lenkene (regel 3-6). F7: stemningene og de tre stegene er slettet.
 // ---------------------------------------------------------------------------
 
 const MS3A_TSX = [
   "TrustStrip",
   "Examples",
   "ExampleTabs",
-  "Moods",
-  "MoodPicker",
-  "Steps",
   "Services",
   "MobileMenu",
   "MarketingPicture",
@@ -501,10 +496,10 @@ test("MS3a: de nye komponentene er med i teksttesten (ingen synlig tekst i JSX)"
 });
 
 test("MS3a: seksjonene finnes i rekkefoelgen paa siden, med tekst og riktig _type", () => {
-  // F2: film rett etter tjenestene. Stemningene og de tre stegene ligger i
-  // innholdet, men ikke paa siden, til F7 sletter dem.
+  // F2: film rett etter tjenestene. F7: stemningene og de tre stegene er
+  // slettet fra innholdet.
   // F6a: kjedene er en egen blokk etter prisene.
-  const blocks = ["trustStrip", "examples", "moods", "steps", "services", "film", "labeling", "honest", "pricing", "chains", "faq", "finalCta"] as const;
+  const blocks = ["trustStrip", "examples", "services", "film", "labeling", "honest", "pricing", "chains", "faq", "finalCta"] as const;
   assert.deepEqual(Object.keys(home), ["_type", "hero", ...blocks]);
   for (const key of blocks) assert.equal(home[key]._type, key, key);
   assert.equal(site.footer._type, "footer");
@@ -534,7 +529,6 @@ test("MS3a: seksjonene finnes i rekkefoelgen paa siden, med tekst og riktig _typ
     "Data lagret i EU",
   ]);
   assert.deepEqual(home.examples.tabs.map((t) => t.label), ["Kveldsbilde", "Rydd opp", "Digital styling"]);
-  assert.deepEqual(home.steps.items.map((s) => s.title), ["Last opp", "Velg stemning", "Godkjenn og last ned"]);
   // F4: seks kort i studioer (Petter og Cowork 20.10). Skjul ansikter og skilt er tatt ut (2e).
   assert.deepEqual(
     home.services.items.map((s) => [s.title, s.studio, s.status]),
@@ -547,8 +541,6 @@ test("MS3a: seksjonene finnes i rekkefoelgen paa siden, med tekst og riktig _typ
       ["Plantegning", "Tegnestudio", "soon"],
     ]
   );
-  // Ingen «Ekte eksempel» under en plassholder.
-  for (const [path, text] of strings(home.moods, "moods")) assert.doesNotMatch(text, /Ekte eksempel/, path);
 });
 
 /** Alle bilder og plassholdere i innholdet, med stien. */
@@ -562,8 +554,8 @@ function pictures(value: unknown, path = ""): [string, { alt: string; image?: st
 
 test("MS3a: alle bilder og plassholdere har alt-tekst, og plassholderne har tekst og pending «image»", () => {
   const all = pictures(home, "home");
-  // F5: mosaikken 3, eksemplene 6, stemningene 5, merkingen og tjenestene resten.
-  assert.ok(all.length >= 3 + 6 + 5 + 2, `fant ${all.length}`);
+  // F5: mosaikken 3, eksemplene 6, merkingen og tjenestene resten (F7: uten stemningene).
+  assert.ok(all.length >= 3 + 6 + 2, `fant ${all.length}`);
   const images = read("content/marketing/images.ts");
   for (const [path, pic] of all) {
     assert.ok(pic.alt.trim().length > 10, path);
@@ -591,22 +583,6 @@ test("MS3a: alle bilder og plassholdere har alt-tekst, og plassholderne har teks
   assert.match(pic, /alt=\{picture\.alt\}/);
   assert.match(pic, /\{picture\.placeholder\}/);
   assert.match(pic, /aspect-\[3\/2\]/);
-});
-
-test("MS3a: stemningene har appens koder, navn, grupper og startvalg", () => {
-  const codes = DICTIONARIES.nb.codes;
-  assert.deepEqual(home.moods.groups.map((g) => g.time), ["early", "late"]);
-  for (const g of home.moods.groups) {
-    assert.equal(g.label, codes.duskTime[g.time], g.time);
-    assert.deepEqual(g.items.map((i) => i.sky), [...DUSK_SKY_BY_TIME[g.time as "early" | "late"]], g.time);
-    for (const item of g.items) assert.equal(item.name, codes.duskSky[item.sky], item.sky);
-  }
-  assert.match(withoutComments(read("app/components/marketing/Moods.tsx")), /defaultSky=\{DEFAULT_DUSK\.sky\}/);
-  assert.equal(DEFAULT_DUSK.sky, "clear");
-  const picker = withoutComments(read("app/components/marketing/MoodPicker.tsx"));
-  assert.match(picker, /role="group" aria-label=\{g\.groupLabel\}/);
-  assert.match(picker, /aria-pressed=\{m\.sky === mood\.sky\}/);
-  assert.match(picker, /type="button"/);
 });
 
 test("MS3a: tjenestene heter det samme som i appen", () => {
@@ -659,8 +635,8 @@ test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () =>
   // (beslutning 4).
   const notPictures = items.filter((i) => i.key !== "image" || i.path.startsWith("home.hero"));
   assert.deepEqual(notPictures.map((i) => [i.path, i.key]), PENDING_NOW);
-  // F5: mosaikken 3, eksemplene 4 bilder og 2 tekster, stemningene 5.
-  assert.ok(items.filter((i) => i.key === "image").length >= 3 + 6 + 5);
+  // F5: mosaikken 3, eksemplene 4 bilder og 2 tekster (F7: uten stemningene).
+  assert.ok(items.filter((i) => i.key === "image").length >= 3 + 6);
   // Hver noekkel har en merkelapp.
   for (const i of items) assert.ok(site.pendingLabels[i.key].startsWith("["), i.key);
 });
@@ -787,15 +763,14 @@ test("MS3a: bare toppbildet har hoey prioritet; alle andre bilder lastes lat", (
     }
     assert.doesNotMatch(src, /fetchPriority|loading="eager"|\bpriority\b|\bpreload\b/, f);
   }
-  // Seksjonene er serverkomponenter; bare fanene, stemningene og mobilmenyen
-  // (og slideren og videoen) er klientdeler.
+  // Seksjonene er serverkomponenter; bare fanene og mobilmenyen (og slideren
+  // og videoen) er klientdeler. F7: MoodPicker er slettet.
   const client = filesIn("app/components/marketing", /\.tsx$/).filter((f) => /^"use client";/.test(read(f)));
   assert.deepEqual(client.map((f) => f.split("/").pop()).sort(), [
     "ExampleTabs.tsx",
     "HeroSlider.tsx",
     "MarketingVideo.tsx",
     "MobileMenu.tsx",
-    "MoodPicker.tsx",
   ]);
 });
 
@@ -1110,11 +1085,8 @@ test("MS5a: ingen tekst sier at hele teksten til annonsen foelger med fila (AVVI
   }
   assert.equal(home.labeling.points[1].text, "Teksten til annonsen får du når du godkjenner bildet.");
   assert.equal(home.labeling.example.note, "Klar til å kopiere når bildet er godkjent.");
-  // Petter 04.10 (AVVIK 2 i Fase B): det tredje steget.
-  assert.ok(
-    home.steps.items.some((i) => i.text.endsWith("Du laster ned bildet med AI-merket og kopierer den ferdige teksten til annonsen.")),
-    "tredje steg"
-  );
+  // Petter 04.10 (AVVIK 2 i Fase B). F7: de tre stegene er slettet; filmens
+  // steg sjekkes i F2-testene.
   for (const [path, text] of all) assert.doesNotMatch(text, /laster ned bildet med AI-merke og ferdig tekst/, path);
   assert.match(faq.find((i) => i.id === "merking")?.a ?? "", /Teksten får du når du godkjenner bildet, klar til å kopiere inn i annonsen\.$/);
 });
@@ -1858,4 +1830,33 @@ test("F6b: bunnen har de seks tjenestene og Priser, og linja nederst venter paa 
     { label: "For kjeder og partnere", href: "#kjeder" },
     { label: "Logg inn", href: "/start" },
   ]);
+});
+
+// ---------------------------------------------------------------------------
+// F7: opprydding. Stemningene, de tre stegene og de gamle toppbildene er
+// slettet; ingen fil skal peke paa dem.
+// ---------------------------------------------------------------------------
+
+test("F7: de slettede filene finnes ikke, og ingen fil importerer dem", () => {
+  const gone = [
+    "app/components/marketing/Moods.tsx",
+    "app/components/marketing/MoodPicker.tsx",
+    "app/components/marketing/Steps.tsx",
+    "content/marketing/images/hero-original.jpg",
+    "content/marketing/images/hero-kveld.jpg",
+  ];
+  for (const f of gone) assert.ok(!existsSync(join(REPO_DIR, f)), f);
+  // Kommentarene kan nevne det slettede; koden kan ikke.
+  for (const f of [...filesIn("app"), ...filesIn("content")]) {
+    const src = withoutComments(read(f));
+    assert.doesNotMatch(src, /from "[^"]*\/(Moods|MoodPicker|Steps)"/, f);
+    assert.doesNotMatch(src, /hero-(original|kveld)\.jpg/, f);
+    assert.doesNotMatch(src, /\bhero(Original|Evening)\b/, f);
+  }
+  // Innholdet og typene: ingen stemninger, steg eller hjelperen ph.
+  assert.ok(!("moods" in home) && !("steps" in home));
+  const schema = read("content/marketing/schema.ts");
+  assert.doesNotMatch(schema, /export type (Moods|Steps) =/);
+  assert.doesNotMatch(schema, /^\s*(moods: Moods|steps: Steps);/m);
+  assert.doesNotMatch(read("content/marketing/nb/home.ts"), /\bconst ph\b|\bph\(/);
 });

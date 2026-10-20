@@ -11,7 +11,7 @@ import { CONTAINER, H2 } from "./classes";
  * spilles (MarketingVideo, mode="film"). Den er uten lyd, saa ingressen og
  * stegene er tekstversjonen, og videoen peker paa dem med aria-describedby
  * (WCAG 1.2.1). Nummeret paa stegene lages av rekkefoelgen i en ordnet
- * liste, som i Steps.tsx.
+ * liste.
  */
 export function Film({ film, site }: { film: FilmContent; site: Site }) {
   const titleId = `${film.anchor}-tittel`;

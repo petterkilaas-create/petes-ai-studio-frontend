@@ -22,7 +22,7 @@ import { contentAnchors, visibleLinks } from "@/content/marketing/links";
 // eksemplene og tjenestene. MS3b: merkingen, den aerlige versjonen, prisene,
 // spoersmaal og svar, siste knapp og bunnen. F2 (den nye forsiden,
 // TG-NEW-230): tjenestene og saa filmseksjonen, som i designet; stemningene
-// og de tre stegene er ikke lenger paa siden (F7 sletter dem). F6a: kjedene
+// og de tre stegene er tatt ut (slettet i F7). F6a: kjedene
 // er en egen seksjon etter prisene. F6b: fire spoersmaal (showOnHome), og
 // den siste knappen faar merket, som eksemplene. Lenkene til
 // ankre vises bare naar seksjonen finnes (links.ts); bunnen er med fordi den
