@@ -25,7 +25,7 @@ import { tabKey } from "../../app/lib/tabs.ts";
 import { fill, fillParts } from "./fill.ts";
 import { getContactPage, getFaq, getFaqPage, getHome, getLabelingPage, getSite } from "./index.ts";
 import { contentAnchors, onPage, visibleLinks } from "./links.ts";
-import { formatNok, perImage, priceVars } from "./offer.ts";
+import { perImage, priceVars } from "./offer.ts";
 import { pendingItems } from "./pending.ts";
 import type { VideoKey } from "./schema.ts";
 import { VIDEOS } from "./videos.ts";
@@ -94,6 +94,7 @@ const TEMPLATE_KEYS = [
   "year",
   "companyName",
   "title",
+  "name",
 ];
 
 // ---------------------------------------------------------------------------
@@ -502,7 +503,8 @@ test("MS3a: de nye komponentene er med i teksttesten (ingen synlig tekst i JSX)"
 test("MS3a: seksjonene finnes i rekkefoelgen paa siden, med tekst og riktig _type", () => {
   // F2: film rett etter tjenestene. Stemningene og de tre stegene ligger i
   // innholdet, men ikke paa siden, til F7 sletter dem.
-  const blocks = ["trustStrip", "examples", "moods", "steps", "services", "film", "labeling", "honest", "pricing", "faq", "finalCta"] as const;
+  // F6a: kjedene er en egen blokk etter prisene.
+  const blocks = ["trustStrip", "examples", "moods", "steps", "services", "film", "labeling", "honest", "pricing", "chains", "faq", "finalCta"] as const;
   assert.deepEqual(Object.keys(home), ["_type", "hero", ...blocks]);
   for (const key of blocks) assert.equal(home[key]._type, key, key);
   assert.equal(site.footer._type, "footer");
@@ -517,6 +519,7 @@ test("MS3a: seksjonene finnes i rekkefoelgen paa siden, med tekst og riktig _typ
     "<Labeling ",
     "<Honest ",
     "<Pricing ",
+    "<Chains ",
     "<Faq ",
     "<FinalCta ",
     "</main>",
@@ -632,6 +635,13 @@ const PENDING_NOW = [
   ["home.hero.mosaic.tiles[3].image", "image"],
   ["home.hero.mosaic.tiles[4].video", "image"],
   ["home.trustStrip.items[3]", "dataRegion"],
+  // F6a (Petter 20.10, 2c): tjenestene uten pris.
+  ["home.pricing.others[0].price", "price"],
+  ["home.pricing.others[1].price", "price"],
+  ["home.pricing.others[2].price", "price"],
+  ["home.pricing.others[3].price", "price"],
+  ["home.pricing.others[4].price", "price"],
+  ["home.pricing.others[5].price", "price"],
   ["faq[3].slots.time", "time"],
   ["faq[6]", "trainingAnswer"],
   ["faq[7]", "storageAnswer"],
@@ -792,7 +802,7 @@ test("MS3a: bare toppbildet har hoey prioritet; alle andre bilder lastes lat", (
 // knapp og bunnen, pluss rettelsene fra den lokale sjekken.
 // ---------------------------------------------------------------------------
 
-const MS3B_TSX = ["Labeling", "Honest", "Pricing", "Faq", "FinalCta", "Footer", "TemplateText"].map(
+const MS3B_TSX = ["Labeling", "Honest", "Pricing", "Chains", "Faq", "FinalCta", "Footer", "TemplateText"].map(
   (n) => `app/components/marketing/${n}.tsx`
 );
 
@@ -804,10 +814,11 @@ test("MS3b: de nye komponentene er med i teksttesten, og ingen markedskomponent 
   for (const f of filesIn("app/components/marketing", /\.tsx?$/)) {
     assert.doesNotMatch(read(f), /#[0-9a-f]{3,8}\b/i, f);
   }
-  // Kveldsblaatt er tokenet night (Petter 02.10), brukt i merkingen og kjedekortet.
+  // Kveldsblaatt er tokenet night (Petter 02.10). F6a: merkingen er lys
+  // (SECTION_BAND), og kjedene er en egen seksjon paa ink, som i designet.
   assert.match(read("app/globals.css"), /--color-night: #101A2C;/);
-  assert.match(read("app/components/marketing/Labeling.tsx"), /bg-night/);
-  assert.match(read("app/components/marketing/Pricing.tsx"), /id=\{chains\.anchor\}[\s\S]*?bg-night/);
+  assert.doesNotMatch(withoutComments(read("app/components/marketing/Labeling.tsx")), /bg-night/);
+  assert.match(read("app/components/marketing/Chains.tsx"), /id=\{chains\.anchor\}[\s\S]*?bg-ink/);
 });
 
 test("MS3b: prisene og antallene staar ett sted, og «ca. 116» og svaret om pris er regnet ut", () => {
@@ -823,7 +834,6 @@ test("MS3b: prisene og antallene staar ett sted, og «ca. 116» og svaret om pri
     "Fasade og to rom i samme annonse, for eksempel. Ca. 116 kr per bilde."
   );
   assert.equal(fill(home.pricing.bundle.name, { n: site.offer.bundleCount }), "3 kveldsbilder");
-  assert.equal(fill(home.pricing.addOn, { price: formatNok(29) }), "Skjul ansikter og skilt: 29 kr per bilde.");
   const price = faq.find((i) => i.id === "pris")!;
   assert.equal(
     fill(price.a!, priceVars(site.offer)),
@@ -1647,4 +1657,115 @@ test("F4: Services og PlanIllustration er serverkomponenter uten tekst i JSX og 
   const tokens = [...plan.matchAll(/\b(?:fill|stroke)-([a-z][a-z0-9-]*)/g)].map((m) => m[1]);
   const allowed = new Set(["none", "ink", "ink-2", "surface", "surface-2", "amber-bg", "green-bg", "neutral-bg", "neutral-fg"]);
   for (const t of tokens) assert.ok(allowed.has(t), t);
+});
+
+// ---------------------------------------------------------------------------
+// F6a (Petter 20.10): merkingen lys, den aerlige versjonen som kort blokk,
+// prisene uten Skjul ansikter og skilt og med [PRIS], og kjedene som egen
+// seksjon.
+// ---------------------------------------------------------------------------
+
+test("F6a: merkingen er lys med strek over og under, og tekstene er uendret (A4)", () => {
+  const src = withoutComments(read("app/components/marketing/Labeling.tsx"));
+  assert.doesNotMatch(src, /bg-night|text-paper/);
+  assert.match(src, /import \{ CONTAINER, FOCUS, H2, SECTION_BAND \} from "\.\/classes";/);
+  assert.match(src, /className=\{`\$\{SECTION_BAND\} [^`]*text-ink`\}/);
+  assert.match(src, /<h2 id=\{`\$\{labeling\.anchor\}-tittel`\} className=\{H2\}>/);
+  // Tekstene er laast (A4 2, 3 og 7); de andre testene laaser dem ogsaa.
+  assert.equal(home.labeling.eyebrow, "Merking");
+  assert.equal(home.labeling.title, "Merket riktig. Hver gang.");
+  assert.equal(
+    home.labeling.lead,
+    "Kjøpere skal kunne stole på bildene i annonsen. Derfor har hvert bilde vi lager et synlig AI-merke, og du får en ferdig tekst som sier hva som er endret."
+  );
+  assert.deepEqual(home.labeling.points.map((p) => p.text), [
+    "AI-merket står på bildet, også i forhåndsvisningen.",
+    "Teksten til annonsen får du når du godkjenner bildet.",
+    "Originalen lagres urørt, og du ser den ved siden av kveldsbildet før du godkjenner.",
+    "Laget med tanke på EUs åpenhetskrav for AI-innhold og Forbrukertilsynets veiledning.",
+  ]);
+  assert.deepEqual(home.labeling.more, { label: "Les mer om merkingen", href: "/no/merking" });
+});
+
+test("F6a: den aerlige versjonen er en kort blokk rett etter merkingen, med de samme tekstene (A4 5)", () => {
+  const src = withoutComments(read("app/components/marketing/Honest.tsx"));
+  // Mindre luft og mindre tittel enn en vanlig seksjon, men fortsatt h2.
+  assert.doesNotMatch(src, /\bSECTION_Y\b|\bH2\b/);
+  assert.match(src, /<h2\s+id="aerlig-tittel"/);
+  assert.match(src, /md:grid-cols-2/);
+  const page = withoutComments(read("app/(marketing)/no/page.tsx"));
+  assert.ok(page.indexOf("<Labeling ") < page.indexOf("<Honest ") && page.indexOf("<Honest ") < page.indexOf("<Pricing "));
+  assert.equal(home.honest.title, "Den ærlige versjonen.");
+  assert.equal(home.honest.lead, "AI kan mye. Dette lar vi være, fordi bildene skal vise boligen slik den er.");
+  assert.deepEqual(home.honest.points, [
+    "Vi lager ikke vinduer, rom eller utsikt som ikke finnes.",
+    "Vi endrer ikke arkitektur, materialer eller omgivelser.",
+    "Lyset kommer bare fra vinduer og lamper som allerede er i bildet.",
+    "Vi skjuler ikke skader eller feil ved boligen.",
+  ]);
+});
+
+test("F6a: prisene har ikke Skjul ansikter og skilt, og linja med [PRIS] har de seks tjenestene", () => {
+  // 2e: tillegget er ute av innholdet, typen og komponenten.
+  for (const [path, text] of strings(home.pricing, "pricing")) assert.ok(!text.includes("Skjul ansikter"), path);
+  assert.ok(!("addOn" in home.pricing) && !("chains" in home.pricing));
+  const src = read("app/components/marketing/Pricing.tsx");
+  assert.ok(!src.includes("Skjul ansikter"));
+  assert.doesNotMatch(withoutComments(src), /addOn|privacyBlur|chains/);
+  // 2c: navnet, kolon fra malen og lappen [PRIS].
+  assert.equal(home.pricing.otherFormat, "{name}:");
+  assert.deepEqual(
+    home.pricing.others.map((o) => [o.name, o.price]),
+    ["Digital styling", "Rydd opp", "Blå himmel", "Boligfilm", "Annonsetekst", "Plantegning"].map((n) => [n, { pending: "price" }])
+  );
+  assert.equal(fill(home.pricing.otherFormat, { name: "Blå himmel" }), "Blå himmel:");
+  assert.equal(site.pendingLabels.price, "[PRIS]");
+  const pricing = withoutComments(src);
+  assert.match(pricing, /pricing\.others\.map\(\(o\) => \(/);
+  assert.match(pricing, /\{fill\(pricing\.otherFormat, \{ name: o\.name \}\)\}\s*<PendingMark label=\{site\.pendingLabels\[o\.price\.pending\]\} \/>/);
+  // Kortene er uendret.
+  assert.deepEqual(
+    [home.pricing.free.name, home.pricing.single.name, home.pricing.bundle.name],
+    ["Prøv gratis", "Kveldsbilde", "{n} kveldsbilder"]
+  );
+  assert.equal((pricing.match(/<article className=/g) ?? []).length, 3);
+});
+
+test("F6a: lanseringssperren finner prisene som venter", () => {
+  const items = pendingItems({ site, home, faq, faqPage, labelingPage, contactPage });
+  assert.deepEqual(
+    items.filter((i) => i.key === "price").map((i) => i.path),
+    [0, 1, 2, 3, 4, 5].map((n) => `home.pricing.others[${n}].price`)
+  );
+  // MARKETING_PUBLIC kan ikke vaere true mens noe venter (se MS3a-testen).
+  assert.ok(!MARKETING_PUBLIC);
+});
+
+test("F6a: kjedene er en egen seksjon etter prisene, paa ink, med #kjeder og de samme tekstene", () => {
+  const f = "app/components/marketing/Chains.tsx";
+  assert.ok(MARKETING_TSX.includes(f), f);
+  assert.deepEqual(literalTextsInFile(read(f)), [], f);
+  const src = withoutComments(read(f));
+  assert.doesNotMatch(src, /^"use client";/);
+  assert.doesNotMatch(read(f), /#[0-9a-fA-F]{3,8}\b/);
+  assert.match(src, /<section\s+id=\{chains\.anchor\}\s+aria-labelledby=\{`\$\{chains\.anchor\}-tittel`\}\s+className="bg-ink [^"]*text-paper"/);
+  assert.match(src, /<h2 id=\{`\$\{chains\.anchor\}-tittel`\}/);
+  // Teksten til venstre og knappen til hoeyre fra md, under hverandre paa mobil.
+  assert.match(src, /flex flex-col [^`]*md:flex-row [^`]*md:justify-between/);
+  assert.match(src, /href=\{chains\.cta\.href\}/);
+  assert.match(withoutComments(read("app/(marketing)/no/page.tsx")), /<Chains chains=\{home\.chains\} \/>/);
+  // Samme tekster som kortet i prisene hadde (ingen nye loefter).
+  assert.deepEqual(home.chains, {
+    _type: "chains",
+    anchor: "kjeder",
+    eyebrow: "For kjeder og partnere",
+    title: "Deres merkevare. Vår motor.",
+    text: "Pris etter volum og type konto. Løsningen kan leveres i kjedens egen profil.",
+    points: ["Egen logo, egne farger og egen nettadresse", "Bildene leveres i kjedens profil", "Volumpris for alle kontorene"],
+    cta: { label: "Snakk med oss", href: "#kontakt" },
+  });
+  // Menyen og «Kjede eller partner?» peker hit.
+  const target = `#${home.chains.anchor}`;
+  assert.ok(site.topBar.links.some((l) => l.label === "For kjeder og partnere" && l.href === target));
+  assert.equal(home.finalCta.secondary.href, target);
 });

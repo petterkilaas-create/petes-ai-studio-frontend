@@ -370,6 +370,7 @@ export const home = {
 
   // Linje 287-339. Tallene staar i site.offer; «Ca. {perImage}» regnes ut
   // (offer.ts). «Prøv gratis først» gaar dit «Prøv gratis» gaar (site.cta).
+  // F6a: Skjul ansikter og skilt er tatt ut (2e), og kjedene er flyttet ut.
   pricing: {
     _type: "pricing",
     anchor: "priser",
@@ -396,19 +397,34 @@ export const home = {
       features: ["Alt i Kveldsbilde", "Én ny runde per bilde"],
       ctaLabel: "Prøv gratis først",
     },
-    addOn: "Skjul ansikter og skilt: {price} kr per bilde.",
-    chains: {
-      anchor: "kjeder",
-      eyebrow: "For kjeder og partnere",
-      title: "Deres merkevare. Vår motor.",
-      text: "Pris etter volum og type konto. Løsningen kan leveres i kjedens egen profil.",
-      points: [
-        "Egen logo, egne farger og egen nettadresse",
-        "Bildene leveres i kjedens profil",
-        "Volumpris for alle kontorene",
-      ],
-      cta: { label: "Snakk med oss", href: "#kontakt" },
-    },
+    // F6a (Petter 20.10, 2c): tjenestene uten pris, i rekkefoelgen fra
+    // designet. Blå himmel er med fordi den finnes i appen; prisen er ikke
+    // avklart (TG-227).
+    otherFormat: "{name}:",
+    others: [
+      { name: "Digital styling", price: { pending: "price" } },
+      { name: "Rydd opp", price: { pending: "price" } },
+      { name: "Blå himmel", price: { pending: "price" } },
+      { name: "Boligfilm", price: { pending: "price" } },
+      { name: "Annonsetekst", price: { pending: "price" } },
+      { name: "Plantegning", price: { pending: "price" } },
+    ],
+  },
+
+  // F6a (designet linje 368-378): egen seksjon etter prisene, med de samme
+  // tekstene som kortet i prisene hadde. «Snakk med oss» gaar til bunnen.
+  chains: {
+    _type: "chains",
+    anchor: "kjeder",
+    eyebrow: "For kjeder og partnere",
+    title: "Deres merkevare. Vår motor.",
+    text: "Pris etter volum og type konto. Løsningen kan leveres i kjedens egen profil.",
+    points: [
+      "Egen logo, egne farger og egen nettadresse",
+      "Bildene leveres i kjedens profil",
+      "Volumpris for alle kontorene",
+    ],
+    cta: { label: "Snakk med oss", href: "#kontakt" },
   },
 
   // Linje 345-349. Spoersmaalene ligger i faq.ts (showOnHome).

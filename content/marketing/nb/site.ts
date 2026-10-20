@@ -102,6 +102,7 @@ export const site = {
     trainingAnswer: "[SVAR: avklares mot vilkårene til modell-leverandørene]",
     storageAnswer: "[SVAR: dataregion og lagringstid bekreftes]",
     image: "[BILDE]",
+    price: "[PRIS]",
   },
   imagePlaceholder: "Eksempelbilde kommer",
   video: { play: "Spill av", pause: "Sett på pause" },
