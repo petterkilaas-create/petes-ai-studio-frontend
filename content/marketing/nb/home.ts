@@ -229,37 +229,99 @@ export const home = {
     ],
   },
 
-  // Linje 192-240. «Mer om …» vises som tekst til tjenestesidene finnes (MS5).
+  // F4: tjenestene som seks kort i studioer (designet Main.dc.html linje
+  // 104-256). Alle vises som om de er klare (Petter dag 48); de som ikke er
+  // det, har «Få tidlig tilgang» til kontaktsiden (20.10, 2b). Skjul ansikter
+  // og skilt er tatt ut av forsiden og blir i appen (20.10, 2e). rydd_opp er
+  // en egen id, fordi appen kaller magic_cleanup «Fjern gjenstander» (auditen
+  // §6). I de delte bildene staar resultatet til venstre, saa det ekte
+  // AI-merket nede til venstre i kveldsbildet synes (auditen §3). Styling,
+  // rydd opp og loekka er midlertidige (pending "image").
   services: {
     _type: "services",
     anchor: "tjenester",
-    title: "Tjenester",
-    lead: "To tjenester er klare i dag. Flere kommer.",
-    availableLabel: "Tilgjengelig",
-    soonLabel: "Kommer snart",
+    title: "Alt annonsen trenger, i ett studio.",
+    lead: "Last opp bildene én gang, og velg hva som skal gjøres med hvert av dem. Alt kommer tilbake på samme sted, klart til annonsen.",
+    aiLabel: "AI",
+    earlyAccess: { label: "Få tidlig tilgang", href: "/no/kontakt" },
+    also: { label: "Også i Bildestudio:", text: "Blå himmel, der grå himmel byttes med klar, blå himmel." },
     items: [
       {
         id: "scene_transform",
+        studio: "Bildestudio",
         title: "Kveldsbilde",
         text: "Dagsbildet blir kveldsbilde, med himmel i blåtimen og lys i vinduer og lamper som finnes i bildet.",
         status: "available",
-        picture: ph(
-          "Fasade som kveldsbilde",
-          "Fasade som kveldsbilde laget med AI, med lys i vinduene og AI-merke nede til venstre"
-        ),
-        more: { label: "Mer om kveldsbilder" },
+        orderLabel: "Bestill kveldsbilde",
+        media: {
+          kind: "split",
+          after: { image: "pairEveningResult", alt: "Stue som kveldsbilde laget med AI, med AI-merket nede til venstre" },
+          before: { image: "pairEveningOriginal", alt: "Samme stue tatt på dagtid" },
+          labels: { after: "Kveld", before: "Dag" },
+        },
       },
       {
-        id: "privacy_blur",
-        title: "Skjul ansikter og skilt",
-        text: "Gjør ansikter, familiebilder og bilskilt uskarpe før bildene publiseres. Personvern for selgeren, uten manuell retusj.",
-        status: "available",
-        picture: ph("Bilskilt gjort uskarpt", "Bil med bilskiltet gjort uskarpt før publisering"),
-        more: { label: "Mer om å skjule ansikter og skilt" },
+        id: "virtual_stage",
+        studio: "Bildestudio",
+        title: "Digital styling",
+        text: "Tomme rom møbleres digitalt i en av tre stiler: skandinavisk, familie eller moderne. Vegger, vinduer og dører beholdes, og du godkjenner hvert bilde.",
+        status: "soon",
+        media: {
+          kind: "split",
+          after: { image: "pairStylingResult", alt: "Stue møblert digitalt i skandinavisk stil, laget med AI", pending: "image" },
+          before: { image: "pairStylingOriginal", alt: "Samme stue, tom", pending: "image" },
+          labels: { after: "Møblert", before: "Tomt" },
+        },
       },
-      { id: "virtual_stage", title: "Digital styling", text: "Møbler tomme rom digitalt.", status: "soon" },
-      { id: "video", title: "Video", text: "Korte filmer av boligen fra bildene du har.", status: "soon" },
-      { id: "copywriter", title: "Annonsetekst", text: "Utkast til tekst for boligannonsen, på norsk.", status: "soon" },
+      {
+        id: "rydd_opp",
+        studio: "Bildestudio",
+        title: "Rydd opp",
+        text: "Løse gjenstander på benker, bord og gulv fjernes. Faste ting og pynt blir stående, som kraner, lamper og planter.",
+        status: "soon",
+        media: {
+          kind: "split",
+          after: { image: "pairCleanupResult", alt: "Spiseplass etter at rotet er fjernet, laget med AI", pending: "image" },
+          before: { image: "pairCleanupOriginal", alt: "Samme spiseplass med ting på bordet", pending: "image" },
+          labels: { after: "Ryddet", before: "Før" },
+        },
+      },
+      {
+        id: "video",
+        studio: "Filmstudio",
+        title: "Boligfilm",
+        text: "Korte filmer av boligen, laget fra bildene du allerede har. Klare for annonsen og sosiale medier.",
+        status: "soon",
+        // Vi har ingen ekte boligfilm ennaa: lappen hindrer lansering til den finnes.
+        media: { kind: "video", video: { video: "loop", label: "Utdrag fra produktfilmen", pending: "image" }, label: "Film" },
+      },
+      {
+        id: "copywriter",
+        studio: "Tekststudio",
+        title: "Annonsetekst",
+        text: "Utkast til boligannonsen på norsk, skrevet fra bildene og fakta du legger inn. Du redigerer og godkjenner.",
+        status: "soon",
+        media: {
+          kind: "ad",
+          image: { image: "pairEveningResult", alt: "Stue som kveldsbilde laget med AI" },
+          label: "Utkast, eksempel",
+          title: "Lys hjørnestue med utgang til vestvendt balkong",
+          excerpt: "Store vinduer mot to sider, plass til både sofagruppe og spisebord, og kveldssol på balkongen …",
+        },
+      },
+      {
+        id: "plantegning",
+        studio: "Tegnestudio",
+        title: "Plantegning",
+        text: "Ryddig plantegning fra en enkel skisse eller et bilde av den gamle tegningen.",
+        status: "soon",
+        media: {
+          kind: "plan",
+          label: "En håndtegnet skisse blir til en ryddig plantegning med stue, kjøkken, soverom, bad og gang",
+          sketch: { caption: "Skisse", rooms: ["stue", "sov", "kjøkken", "bad"] },
+          plan: { caption: "Plantegning", rooms: ["Stue", "Sov", "Kjøkken", "Bad", "Gang"] },
+        },
+      },
     ],
   },
 
