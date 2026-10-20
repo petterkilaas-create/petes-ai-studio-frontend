@@ -223,6 +223,23 @@ export type Services = {
 };
 
 /**
+ * Filmseksjonen (F2, designet Main.dc.html linje 258-277), paa kveldsblaatt.
+ * Filmen er uten lyd; ingressen og stegene er tekstversjonen (WCAG 1.2.1).
+ * Nummeret paa stegene lages av rekkefoelgen.
+ */
+export type Film = {
+  _type: "film";
+  anchor: string;
+  eyebrow: string;
+  title: string;
+  lead: string;
+  video: VideoRef;
+  /** Linja under filmen. */
+  caption: string;
+  steps: readonly string[];
+};
+
+/**
  * Merkingen (MS3b, utkastet linje 247-266). Eksempelet paa teksten til
  * annonsen lagres som koder og lages med produktets funksjon
  * (app/lib/disclosure.ts), saa siden aldri viser en annen tekst enn den
@@ -348,6 +365,7 @@ export type Home = {
   moods: Moods;
   steps: Steps;
   services: Services;
+  film: Film;
   labeling: Labeling;
   honest: Honest;
   pricing: Pricing;

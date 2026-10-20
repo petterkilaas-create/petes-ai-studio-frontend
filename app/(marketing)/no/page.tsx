@@ -3,26 +3,27 @@ import { DEFAULT_BRAND } from "@/app/lib/brand";
 import { MARKETING_HOME } from "@/app/lib/marketingAccess";
 import { Examples } from "@/app/components/marketing/Examples";
 import { Faq } from "@/app/components/marketing/Faq";
+import { Film } from "@/app/components/marketing/Film";
 import { FinalCta } from "@/app/components/marketing/FinalCta";
 import { Footer } from "@/app/components/marketing/Footer";
 import { Hero } from "@/app/components/marketing/Hero";
 import { Honest } from "@/app/components/marketing/Honest";
 import { Labeling } from "@/app/components/marketing/Labeling";
 import { MarketingTopBar } from "@/app/components/marketing/MarketingTopBar";
-import { Moods } from "@/app/components/marketing/Moods";
 import { Pricing } from "@/app/components/marketing/Pricing";
 import { Services } from "@/app/components/marketing/Services";
-import { Steps } from "@/app/components/marketing/Steps";
 import { TrustStrip } from "@/app/components/marketing/TrustStrip";
 import { fill } from "@/content/marketing/fill";
 import { getFaq, getHome, getSite } from "@/content/marketing";
 import { contentAnchors, visibleLinks } from "@/content/marketing/links";
 
 // Markedssiden paa norsk (MS2): topplinjen og toppen. MS3a: tillitsstripen,
-// eksemplene, stemningene, tre steg og tjenestene. MS3b: merkingen, den
-// aerlige versjonen, prisene, spoersmaal og svar, siste knapp og bunnen.
-// Rekkefoelgen er utkastets. Lenkene til ankre vises bare naar seksjonen
-// finnes (links.ts); bunnen er med fordi den har #kontakt. Fast mappe no/
+// eksemplene og tjenestene. MS3b: merkingen, den aerlige versjonen, prisene,
+// spoersmaal og svar, siste knapp og bunnen. F2 (den nye forsiden,
+// TG-NEW-230): tjenestene og saa filmseksjonen, som i designet; stemningene
+// og de tre stegene er ikke lenger paa siden (F7 sletter dem). Lenkene til
+// ankre vises bare naar seksjonen finnes (links.ts); bunnen er med fordi den
+// har #kontakt. Fast mappe no/
 // (Petter 02.10); spraakversjonene kan flytte til [lang] senere.
 // Serverkomponent, bygges statisk.
 const site = getSite("no");
@@ -48,10 +49,9 @@ export default function MarketingHome() {
       <main>
         <Hero hero={home.hero} site={site} />
         <TrustStrip strip={home.trustStrip} site={site} />
-        <Examples examples={home.examples} site={site} />
-        <Moods moods={home.moods} site={site} />
-        <Steps steps={home.steps} />
         <Services services={home.services} site={site} />
+        <Film film={home.film} site={site} />
+        <Examples examples={home.examples} site={site} />
         <Labeling labeling={home.labeling} site={site} />
         <Honest honest={home.honest} />
         <Pricing pricing={home.pricing} site={site} />
