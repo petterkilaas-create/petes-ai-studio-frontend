@@ -114,7 +114,7 @@ test("TG-153: forhaandsvalget godtar bare tjenester som er slaatt paa", () => {
   assert.equal(serviceHref("skumring"), "/tjenester?tjeneste=skumring");
   assert.ok(serviceHref("x").startsWith(`${SERVICES_PATH}?`));
   assert.deepEqual(toolFromParam("skumring"), { categoryId: "timetraveler", toolId: "skumring" });
-  assert.deepEqual(toolFromParam("privacy_blur"), { categoryId: "fixit", toolId: "privacy_blur" });
+  assert.deepEqual(toolFromParam("privacy_blur"), { categoryId: "privacy", toolId: "privacy_blur" });
   assert.deepEqual(toolFromParam("klart_vaer"), { categoryId: "timetraveler", toolId: "klart_vaer" });
   for (const hidden of ["magic_cleanup", "virtual_stage", "express_v2", "video", "", "SKUMRING", "KLART_VAER"]) {
     assert.equal(toolFromParam(hidden), null, hidden);
@@ -124,12 +124,12 @@ test("TG-153: forhaandsvalget godtar bare tjenester som er slaatt paa", () => {
 
 test("dag 38: /tjenester uten ?tjeneste= aapner Lys og himmel, uten tjeneste valgt", () => {
   // Standardkategorien er den foerste i lista; ?tjeneste= har forrang, som foer.
-  assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "fixit"]);
+  assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "privacy"]);
   const page = withoutComments(read("(app)/tjenester/page.tsx"));
   assert.match(page, /initial\?\.categoryId \?\? CATEGORIES\[0\]\?\.id \?\? ""/);
   assert.match(page, /useState<string \| null>\(initial\?\.toolId \?\? null\)/);
   assert.equal(toolFromParam(null), null);
-  assert.deepEqual(toolFromParam("privacy_blur"), { categoryId: "fixit", toolId: "privacy_blur" });
+  assert.deepEqual(toolFromParam("privacy_blur"), { categoryId: "privacy", toolId: "privacy_blur" });
 });
 
 test("dag 38: ingressen paa Tjenester sier det samme som home.intro", () => {

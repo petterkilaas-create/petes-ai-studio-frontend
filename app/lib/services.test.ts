@@ -156,8 +156,8 @@ test("meldingen paa stengte sider: nb og en har noeklene", () => {
 
 // ---------------------------------------------------------------------------
 // Dag 33, L0b: Video, Copywriter og Orders ble skjult. TG-NEW-142 (dag 39):
-// sidene, supabaseClient.ts og pakkene er slettet (TG-NEW-72), og forsiden
-// lover bare det som leveres (skumring og Privacy Blur).
+// sidene, supabaseClient.ts og pakkene er slettet (TG-NEW-72). Forsiden viser
+// tjenestene etter status (F4), og Skjul ansikter og skilt staar bare i appen (APP1).
 // ---------------------------------------------------------------------------
 
 test("TG-142: video, copywriter og orders er borte fra ENABLED og menyen", () => {
@@ -347,9 +347,10 @@ test("dag 45: visibleCategories gir alle kortene i rekkefoelge, fire «Kommer» 
     cats.map((c) => [c.id, c.items.map((t) => t.id)]),
     [
       ["timetraveler", ["skumring", "klart_vaer"]],
-      ["fixit", ["magic_cleanup", "privacy_blur"]],
+      ["fixit", ["magic_cleanup"]],
       ["furnishing", ["digital_styling"]],
       ["more", ["video", "copywriter"]],
+      ["privacy", ["privacy_blur"]],
     ]
   );
   const tools = cats.flatMap((c) => c.items);
@@ -365,7 +366,7 @@ test("dag 45: visibleCategories gir alle kortene i rekkefoelge, fire «Kommer» 
 
 test("dag 45: det som kan bestilles og ?tjeneste= (Klart vaer aapnet i K3)", () => {
   assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "privacy_blur"]);
-  assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "fixit"]);
+  assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "privacy"]);
   assert.deepEqual(toolFromParam("klart_vaer"), { categoryId: "timetraveler", toolId: "klart_vaer" });
   for (const id of ["magic_cleanup", "digital_styling", "virtual_stage", "video", "copywriter"]) {
     assert.equal(toolFromParam(id), null, id);
@@ -487,4 +488,67 @@ test("K3: bestillingen paa Tjenester sender bare preset_id for et kort uten bild
     ...duskParams(tool.service, tool.presetId, DEFAULT_DUSK),
   };
   assert.deepEqual(params, { preset_id: "klart_vaer" });
+});
+
+// ---------------------------------------------------------------------------
+// APP1 (Petter 20.10): Skjul ansikter og skilt er tatt ut av forsiden og staar
+// sist paa Tjenester, i egen kategori Personvern. Resten er uendret.
+// ---------------------------------------------------------------------------
+
+test("APP1: Skjul ansikter og skilt er siste tjeneste, i kategorien privacy", () => {
+  const cats = visibleCategories();
+  const last = cats[cats.length - 1];
+  assert.equal(last.id, "privacy");
+  assert.equal(last.titleKey, "express.category.privacy");
+  assert.deepEqual(last.items.map((t) => t.id), ["privacy_blur"]);
+  const tools = cats.flatMap((c) => c.items);
+  assert.equal(tools[tools.length - 1].id, "privacy_blur");
+  // Flyttet uendret: det samme sendes til backend, og den kan bestilles som foer.
+  const tool = last.items[0];
+  assert.equal(tool.service, "privacy_blur");
+  assert.equal(tool.kind, "simple");
+  assert.equal(tool.presetId, undefined);
+  assert.equal(tool.titleKey, "service.privacy_blur");
+  assert.equal(tool.descKey, "express.tool.privacy_blur.desc");
+  assert.equal(tool.orderable, true);
+  // Bare her: ikke lenger i fixit.
+  assert.equal(tools.filter((t) => t.id === "privacy_blur").length, 1);
+  assert.deepEqual(cats.find((c) => c.id === "fixit")?.items.map((t) => t.id), ["magic_cleanup"]);
+});
+
+test("APP1: ?tjeneste=privacy_blur aapner privacy, og startvalget er uendret", () => {
+  assert.deepEqual(toolFromParam("privacy_blur"), { categoryId: "privacy", toolId: "privacy_blur" });
+  assert.equal(visibleCategories()[0].id, "timetraveler");
+  assert.equal(visibleCategories()[0].items[0].id, "skumring");
+  assert.equal(toolFromParam(null), null);
+});
+
+test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENABLED er uendret", () => {
+  assert.deepEqual(
+    visibleCategories()
+      .filter((c) => c.id !== "privacy")
+      .map((c) => [c.id, c.items.map((t) => t.id)]),
+    [
+      ["timetraveler", ["skumring", "klart_vaer"]],
+      ["fixit", ["magic_cleanup"]],
+      ["furnishing", ["digital_styling"]],
+      ["more", ["video", "copywriter"]],
+    ]
+  );
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "privacy_blur"]);
+  assert.deepEqual(ENABLED, {
+    klart_vaer: true,
+    magic_cleanup: false,
+    virtual_stage: false,
+    express_v2: false,
+    privacy_blur: true,
+    skumring: true,
+  });
+});
+
+test("APP1: express.category.privacy finnes paa nb og en, og fixit heter Rydd", () => {
+  assert.equal(DICTIONARIES.nb.ui["express.category.privacy"], "Personvern");
+  assert.equal(DICTIONARIES.en.ui["express.category.privacy"], "Privacy");
+  assert.equal(DICTIONARIES.nb.ui["express.category.fixit"], "Rydd");
+  assert.equal(DICTIONARIES.en.ui["express.category.fixit"], "Clean up");
 });
