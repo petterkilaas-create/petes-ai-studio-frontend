@@ -14,6 +14,8 @@ import { CONTAINER, FOCUS } from "./classes";
  *
  * MS5a: kolonnen «Hjelp» er hjelpelista (site.help, samme som i appen). Paa
  * en underside (homePath satt) gaar ankrene til forsiden (onPage).
+ *
+ * F6b: linja nederst er en Claim, saa lappen [BILDE] vises etter den.
  */
 const LINK = `rounded-button text-ink no-underline hover:underline ${FOCUS}`;
 
@@ -69,7 +71,10 @@ export function Footer({ site, brand, homePath = null }: { site: Site; brand: Br
             site={site}
           />
         </p>
-        <p className="m-0">{footer.note}</p>
+        <p className="m-0">
+          {footer.note.text}
+          {footer.note.pending && <PendingMark label={site.pendingLabels[footer.note.pending]} />}
+        </p>
       </div>
     </footer>
   );

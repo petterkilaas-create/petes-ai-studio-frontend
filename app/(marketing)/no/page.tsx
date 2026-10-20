@@ -23,7 +23,8 @@ import { contentAnchors, visibleLinks } from "@/content/marketing/links";
 // spoersmaal og svar, siste knapp og bunnen. F2 (den nye forsiden,
 // TG-NEW-230): tjenestene og saa filmseksjonen, som i designet; stemningene
 // og de tre stegene er ikke lenger paa siden (F7 sletter dem). F6a: kjedene
-// er en egen seksjon etter prisene. Lenkene til
+// er en egen seksjon etter prisene. F6b: fire spoersmaal (showOnHome), og
+// den siste knappen faar merket, som eksemplene. Lenkene til
 // ankre vises bare naar seksjonen finnes (links.ts); bunnen er med fordi den
 // har #kontakt. Fast mappe no/
 // (Petter 02.10); spraakversjonene kan flytte til [lang] senere.
@@ -60,7 +61,7 @@ export default function MarketingHome() {
         <Pricing pricing={home.pricing} site={site} />
         <Chains chains={home.chains} />
         <Faq block={home.faq} items={faq} site={site} />
-        <FinalCta finalCta={home.finalCta} site={site} />
+        <FinalCta finalCta={home.finalCta} site={site} brand={brand} />
       </main>
       <Footer site={site} brand={brand} />
     </>

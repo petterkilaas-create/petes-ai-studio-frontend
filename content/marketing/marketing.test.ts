@@ -642,9 +642,11 @@ const PENDING_NOW = [
   ["home.pricing.others[3].price", "price"],
   ["home.pricing.others[4].price", "price"],
   ["home.pricing.others[5].price", "price"],
-  ["faq[3].slots.time", "time"],
-  ["faq[6]", "trainingAnswer"],
-  ["faq[7]", "storageAnswer"],
+  // F6b (Petter 20.10, 2f): svaret om eierskap venter paa vilkaarene.
+  ["faq[1]", "legal"],
+  ["faq[4].slots.time", "time"],
+  ["faq[7]", "trainingAnswer"],
+  ["faq[8]", "storageAnswer"],
 ];
 
 test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () => {
@@ -876,6 +878,7 @@ test("MS3b: eksempelet paa annonseteksten lages med produktets funksjon og er li
 test("MS3b: spoersmaal og svar har alle spoersmaalene fra utkastet, med <details>", () => {
   assert.deepEqual(faq.map((i) => i.q), [
     "Er det lov å bruke AI-redigerte bilder i boligannonser?",
+    "Hvem eier bildene?",
     "Hvordan merkes bildene?",
     "Hva koster det?",
     "Hvor lang tid tar det?",
@@ -886,8 +889,9 @@ test("MS3b: spoersmaal og svar har alle spoersmaalene fra utkastet, med <details
     "Kan kjeden få sin egen løsning?",
   ]);
   assert.equal(new Set(faq.map((i) => i.id)).size, faq.length);
+  // F6b: forsiden viser bare fire (testen under); spoersmaalssiden alle.
   for (const i of faq) {
-    assert.ok(i.showOnHome, i.id);
+    assert.equal(typeof i.showOnHome, "boolean", i.id);
     assert.ok(i.a !== null || i.pending !== undefined, `${i.id}: svaret mangler og venter ikke`);
     for (const m of (i.a ?? "").matchAll(/\{(\w+)\}/g)) assert.ok(TEMPLATE_KEYS.includes(m[1]), `${i.id}: {${m[1]}}`);
   }
@@ -1112,7 +1116,7 @@ test("MS5a: ingen tekst sier at hele teksten til annonsen foelger med fila (AVVI
     "tredje steg"
   );
   for (const [path, text] of all) assert.doesNotMatch(text, /laster ned bildet med AI-merke og ferdig tekst/, path);
-  assert.match(faq[1].a ?? "", /Teksten får du når du godkjenner bildet, klar til å kopiere inn i annonsen\.$/);
+  assert.match(faq.find((i) => i.id === "merking")?.a ?? "", /Teksten får du når du godkjenner bildet, klar til å kopiere inn i annonsen\.$/);
 });
 
 test("MS5a: kontaktsiden har e-post og selskapsnavn fra site, og ikke noe skjema", () => {
@@ -1768,4 +1772,90 @@ test("F6a: kjedene er en egen seksjon etter prisene, paa ink, med #kjeder og de 
   const target = `#${home.chains.anchor}`;
   assert.ok(site.topBar.links.some((l) => l.label === "For kjeder og partnere" && l.href === target));
   assert.equal(home.finalCta.secondary.href, target);
+});
+
+// ---------------------------------------------------------------------------
+// F6b (Petter 20.10): fire spoersmaal paa forsiden, «Hvem eier bildene?»
+// med [JURIDISK SJEKK], den siste knappen lys med {brand}, og bunnen med de
+// seks tjenestene. Skjul ansikter og skilt er ikke paa forsiden (2e).
+// ---------------------------------------------------------------------------
+
+test("F6b: forsiden viser fire spoersmaal i rekkefoelgen fra designet, og «Hvem eier bildene?» venter paa juridisk sjekk", () => {
+  assert.deepEqual(faq.filter((i) => i.showOnHome).map((i) => i.id), ["lov", "eierskap", "fornoyd", "lagring"]);
+  // Rett etter svaret om lov, som er uendret (TG-NEW-223-testen laaser teksten).
+  assert.equal(faq[0].id, "lov");
+  const owner = faq[1];
+  assert.deepEqual(owner, {
+    id: "eierskap",
+    q: "Hvem eier bildene?",
+    a: "Ikke vi. Rettighetene til originalfotoet ligger hos deg eller fotografen, som før, og det redigerte bildet kan du bruke på de samme vilkårene som originalen. Du må ha lov til å bruke og redigere bildet du laster opp. Ofte står det i avtalen med fotografen.",
+    pending: "legal",
+    showOnHome: true,
+  });
+  assert.equal(site.pendingLabels.legal, "[JURIDISK SJEKK]");
+  // Svaret og lappen vises etter hverandre (FaqList).
+  const list = withoutComments(read("app/components/marketing/FaqList.tsx"));
+  assert.ok(list.indexOf("item.a !== null &&") < list.indexOf("item.pending &&"));
+});
+
+test("F6b: ingen tekst paa forsiden nevner Skjul ansikter og skilt, men svaret om pris paa spoersmaalssiden gjoer det", () => {
+  // site.offer er bare tall (privacyBlur staar for svaret om pris).
+  const shown = [
+    ...strings(home, "home"),
+    ...strings(site, "site").filter(([p]) => !p.startsWith("site.offer.")),
+    ...strings(faq.filter((i) => i.showOnHome), "faq"),
+  ];
+  assert.ok(shown.length > 100, String(shown.length));
+  for (const [path, text] of shown) assert.ok(!text.includes("Skjul ansikter"), path);
+  const price = faq.find((i) => i.id === "pris")!;
+  assert.ok((price.a ?? "").includes("Skjul ansikter og skilt koster {privacyBlur} kr per bilde."));
+  assert.equal(price.showOnHome, false);
+  assert.equal(typeof site.offer.prices.privacyBlur, "number");
+});
+
+test("F6b: den siste knappen er lys og har {brand} i tittelen", () => {
+  assert.equal(home.finalCta.title, "Prøv {brand} på dine egne bilder.");
+  assert.equal(fill(home.finalCta.title, { brand: DEFAULT_BRAND.displayName }), `Prøv ${DEFAULT_BRAND.displayName} på dine egne bilder.`);
+  assert.equal(home.finalCta.text, "{n} gratis bilder når du registrerer deg. Uten kort.");
+  assert.deepEqual(home.finalCta.secondary, { label: "Kjede eller partner? Snakk med oss", href: "#kjeder" });
+  const src = withoutComments(read("app/components/marketing/FinalCta.tsx"));
+  assert.doesNotMatch(src, /bg-ink|text-paper/);
+  assert.match(src, /className="bg-surface-2 [^"]*text-ink"/);
+  assert.match(src, /\{fill\(finalCta\.title, \{ brand: brand\.displayName \}\)\}/);
+  assert.match(src, /href=\{site\.cta\.href\}\s+className=\{`[^`]*bg-primary [^`]*text-on-primary/);
+  assert.match(withoutComments(read("app/(marketing)/no/page.tsx")), /<FinalCta finalCta=\{home\.finalCta\} site=\{site\} brand=\{brand\} \/>/);
+});
+
+test("F6b: bunnen har de seks tjenestene og Priser, og linja nederst venter paa bildene", () => {
+  assert.equal(site.footer.tagline, "AI-studio for eiendomsmeglere.");
+  const [services] = site.footer.columns;
+  assert.equal(services.title, "Tjenester");
+  assert.deepEqual(services.links, [
+    { label: "Kveldsbilde", href: "#tjenester" },
+    { label: "Digital styling", href: "#tjenester" },
+    { label: "Rydd opp", href: "#tjenester" },
+    { label: "Boligfilm", href: "#tjenester" },
+    { label: "Annonsetekst", href: "#tjenester" },
+    { label: "Plantegning", href: "#tjenester" },
+    { label: "Priser", href: "#priser" },
+    { label: "Guide: AI-bilder i boligannonsen" },
+  ]);
+  // Samme navn som tjenestekortene, i samme rekkefoelge.
+  assert.deepEqual(services.links.slice(0, 6).map((l) => l.label), home.services.items.map((i) => i.title));
+  assert.equal(`#${home.services.anchor}`, "#tjenester");
+  // Paa en underside gaar ankrene til forsiden.
+  assert.deepEqual(
+    onPage(services.links, MARKETING_HOME).map((l) => l.href),
+    [...Array(6).fill("/no#tjenester"), "/no#priser", undefined]
+  );
+  assert.deepEqual(site.footer.note, { text: "Alle eksempelbilder er laget med tjenesten og merket som AI.", pending: "image" });
+  assert.ok(pendingItems({ site }).some((i) => i.path === "site.footer.note" && i.key === "image"));
+  const src = withoutComments(read("app/components/marketing/Footer.tsx"));
+  assert.match(src, /\{footer\.note\.text\}\s*\{footer\.note\.pending && <PendingMark label=\{site\.pendingLabels\[footer\.note\.pending\]\} \/>\}/);
+  // Hjelp, Trygghet og Kontakt er uendret.
+  assert.deepEqual(site.footer.columns.map((c) => c.title), ["Tjenester", "Trygghet"]);
+  assert.deepEqual(site.footer.contact.links, [
+    { label: "For kjeder og partnere", href: "#kjeder" },
+    { label: "Logg inn", href: "/start" },
+  ]);
 });

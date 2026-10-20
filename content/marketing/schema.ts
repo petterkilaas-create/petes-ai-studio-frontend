@@ -408,9 +408,10 @@ export type FaqItem = {
   showOnHome: boolean;
 };
 
-/** Siste knapp (MS3b, utkastet linje 392-398). */
+/** Siste knapp (MS3b, utkastet linje 392-398; F6b, designet Main.dc.html linje 392-402). */
 export type FinalCta = {
   _type: "finalCta";
+  /** Mal med {brand}. */
   title: string;
   /** Mal med {n}. */
   text: string;
@@ -427,7 +428,8 @@ export type Footer = {
   /** Mal med {year} og {companyName}. */
   copyright: string;
   companyName: string | PendingValue;
-  note: string;
+  /** F6b: venter paa bildene ([BILDE]) til probebildene er byttet. */
+  note: Claim;
 };
 
 export type Home = {

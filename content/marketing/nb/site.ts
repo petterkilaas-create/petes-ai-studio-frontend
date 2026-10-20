@@ -53,13 +53,19 @@ export const site = {
   footer: {
     _type: "footer",
     anchor: "kontakt",
-    tagline: "AI-redigering for eiendomsmeglere.",
+    tagline: "AI-studio for eiendomsmeglere.",
     columns: [
       {
         title: "Tjenester",
         links: [
-          { label: "Kveldsbilde" },
-          { label: "Skjul ansikter og skilt" },
+          // F6b: de seks tjenestene som paa forsiden (designet linje 415-422).
+          // Skjul ansikter og skilt er ikke paa forsiden (Petter 20.10, 2e).
+          { label: "Kveldsbilde", href: "#tjenester" },
+          { label: "Digital styling", href: "#tjenester" },
+          { label: "Rydd opp", href: "#tjenester" },
+          { label: "Boligfilm", href: "#tjenester" },
+          { label: "Annonsetekst", href: "#tjenester" },
+          { label: "Plantegning", href: "#tjenester" },
           { label: "Priser", href: "#priser" },
           { label: "Guide: AI-bilder i boligannonsen" },
         ],
@@ -83,7 +89,8 @@ export const site = {
     },
     copyright: "© {year} {companyName}",
     companyName: { pending: "companyName" },
-    note: "Alle eksempelbilder er laget med tjenesten og merket som AI.",
+    // F6b: stemmer foerst naar probebildene er byttet (auditen §3 punkt 3).
+    note: { text: "Alle eksempelbilder er laget med tjenesten og merket som AI.", pending: "image" },
   },
   help: {
     title: "Hjelp",

@@ -437,9 +437,10 @@ export const home = {
   },
 
   // Linje 392-398.
+  // F6b: tittelen fra designet (linje 395), med {brand}.
   finalCta: {
     _type: "finalCta",
-    title: "Se ditt eget bilde i kveldslys.",
+    title: "Prøv {brand} på dine egne bilder.",
     text: "{n} gratis bilder når du registrerer deg. Uten kort.",
     secondary: { label: "Kjede eller partner? Snakk med oss", href: "#kjeder" },
   },
