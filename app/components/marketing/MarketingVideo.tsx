@@ -39,6 +39,7 @@ export function MarketingVideo({
   label,
   mode,
   labels,
+  describedBy,
 }: {
   src: string;
   /** URL til plakaten: IMAGES[VIDEOS[key].poster].src. */
@@ -48,6 +49,8 @@ export function MarketingVideo({
   mode: "loop" | "film";
   /** site.video. */
   labels: { play: string; pause: string };
+  /** id-ene til tekstversjonen av filmen (aria-describedby, WCAG 1.2.1; F2). */
+  describedBy?: string;
 }) {
   if (mode === "film") {
     return (
@@ -55,6 +58,7 @@ export function MarketingVideo({
         src={src}
         poster={poster}
         aria-label={label}
+        aria-describedby={describedBy}
         controls
         playsInline
         preload="none"

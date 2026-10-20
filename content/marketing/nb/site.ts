@@ -12,7 +12,8 @@ import type { Site } from "../schema.ts";
 // MS4: alt-teksten til delingsbildet, satt sammen av merket og overskriften
 // (Petter 02.10). MS5a: hjelpesidene (MS5_TEKSTER.md §4, godkjent av Petter
 // 04.10) og skjermleserteksten paa merket paa undersidene. F1: knappen som
-// pauser og spiller av videoloekka (MarketingVideo).
+// pauser og spiller av videoloekka (MarketingVideo). F2: «Se filmen» i
+// menyen, til filmseksjonen (#film).
 export const site = {
   _type: "site",
   seo: {
@@ -27,6 +28,7 @@ export const site = {
     navLabel: "Hovedmeny",
     links: [
       { label: "Tjenester", href: "#tjenester" },
+      { label: "Se filmen", href: "#film" },
       { label: "Eksempler", href: "#eksempler" },
       { label: "Priser", href: "#priser" },
       { label: "For kjeder og partnere", href: "#kjeder" },

@@ -126,7 +126,7 @@ test("MS2: innholdet har alle feltene, og alle har tekst", () => {
   assert.equal(home.hero._type, "hero");
   assert.deepEqual(
     site.topBar.links.map((l) => l.label),
-    ["Tjenester", "Eksempler", "Priser", "For kjeder og partnere"]
+    ["Tjenester", "Se filmen", "Eksempler", "Priser", "For kjeder og partnere"]
   );
   const all = [...strings(site, "site"), ...strings(home, "home")];
   for (const key of [
@@ -467,19 +467,21 @@ test("MS3a: de nye komponentene er med i teksttesten (ingen synlig tekst i JSX)"
   }
 });
 
-test("MS3a: seksjonene finnes i utkastets rekkefoelge, med tekst og riktig _type", () => {
-  const blocks = ["trustStrip", "examples", "moods", "steps", "services", "labeling", "honest", "pricing", "faq", "finalCta"] as const;
+test("MS3a: seksjonene finnes i rekkefoelgen paa siden, med tekst og riktig _type", () => {
+  // F2: film rett etter tjenestene. Stemningene og de tre stegene ligger i
+  // innholdet, men ikke paa siden, til F7 sletter dem.
+  const blocks = ["trustStrip", "examples", "moods", "steps", "services", "film", "labeling", "honest", "pricing", "faq", "finalCta"] as const;
   assert.deepEqual(Object.keys(home), ["_type", "hero", ...blocks]);
   for (const key of blocks) assert.equal(home[key]._type, key, key);
   assert.equal(site.footer._type, "footer");
   const page = withoutComments(read("app/(marketing)/no/page.tsx"));
+  // F2: designets rekkefoelge (tjenestene og filmen foer eksemplene).
   const order = [
     "<Hero ",
     "<TrustStrip ",
-    "<Examples ",
-    "<Moods ",
-    "<Steps ",
     "<Services ",
+    "<Film ",
+    "<Examples ",
     "<Labeling ",
     "<Honest ",
     "<Pricing ",
@@ -489,6 +491,7 @@ test("MS3a: seksjonene finnes i utkastets rekkefoelge, med tekst og riktig _type
     "<Footer ",
   ].map((tag) => page.indexOf(tag));
   assert.ok(order.every((i, n) => i > 0 && (n === 0 || i > order[n - 1])), `rekkefoelgen: ${order}`);
+  for (const gone of ["<Moods", "<Steps", "/Moods\"", "/Steps\""]) assert.ok(!page.includes(gone), gone);
   assert.deepEqual(home.trustStrip.items.map((i) => i.text), [
     "Synlig AI-merke på hvert bilde",
     "Originalen røres aldri",
@@ -625,7 +628,7 @@ function routeExists(href: string): boolean {
 
 test("MS3a: alle lenker som vises, peker paa et anker paa siden eller en rute som finnes", () => {
   const anchors = contentAnchors({ home, footer: site.footer });
-  assert.deepEqual([...anchors].sort(), ["eksempler", "kjeder", "kontakt", "merking", "priser", "sporsmal", "tjenester", "topp"]);
+  assert.deepEqual([...anchors].sort(), ["eksempler", "film", "kjeder", "kontakt", "merking", "priser", "sporsmal", "tjenester", "topp"]);
   const shown = [
     ...strings(home, "home").filter(([p]) => p.endsWith(".href")),
     ...strings(site.footer, "footer").filter(([p]) => p.endsWith(".href")),
@@ -639,8 +642,8 @@ test("MS3a: alle lenker som vises, peker paa et anker paa siden eller en rute so
     if (href.startsWith("#")) assert.ok(anchors.has(href.slice(1)), `${path}: ${href} finnes ikke paa siden`);
     else assert.ok(href.startsWith("/") && routeExists(href), `${path}: ${href} finnes ikke`);
   }
-  // MS3b: alle seksjonene finnes, saa alle fire lenkene vises. Uten seksjonen vises ikke lenken.
-  assert.deepEqual(visibleLinks(site.topBar.links, anchors).map((l) => l.href), ["#tjenester", "#eksempler", "#priser", "#kjeder"]);
+  // MS3b og F2: alle seksjonene finnes, saa alle fem lenkene vises. Uten seksjonen vises ikke lenken.
+  assert.deepEqual(visibleLinks(site.topBar.links, anchors).map((l) => l.href), ["#tjenester", "#film", "#eksempler", "#priser", "#kjeder"]);
   assert.deepEqual(
     visibleLinks(site.topBar.links, contentAnchors({ hero: home.hero, examples: home.examples, services: home.services })).map((l) => l.href),
     ["#tjenester", "#eksempler"]
@@ -664,6 +667,7 @@ test("MS3a: toppmenyen og mobilmenyen viser bare lenkene siden sender (visibleLi
   // Seksjonene har id fra ankeret.
   assert.match(read("app/components/marketing/Examples.tsx"), /<section id=\{examples\.anchor\}/);
   assert.match(read("app/components/marketing/Services.tsx"), /<section id=\{services\.anchor\}/);
+  assert.match(read("app/components/marketing/Film.tsx"), /<section\s+id=\{film\.anchor\}/);
   // Ingen spraakvelger foer det finnes mer enn ett spraak.
   for (const f of MARKETING_TSX) assert.doesNotMatch(read(f), /hrefLang|Svenska|English \(UK\)/, f);
 });
@@ -945,7 +949,7 @@ test("MS5a: alle lenker paa en underside virker (topplinjen, bunnen, hjelpen og 
   // Paa en underside gaar ankrene til forsiden.
   assert.deepEqual(
     onPage(visibleLinks(site.topBar.links, homeAnchors), MARKETING_HOME).map((l) => l.href),
-    ["/no#tjenester", "/no#eksempler", "/no#priser", "/no#kjeder"]
+    ["/no#tjenester", "/no#film", "/no#eksempler", "/no#priser", "/no#kjeder"]
   );
   assert.deepEqual(onPage(site.topBar.links, null), [...site.topBar.links]);
   // Forsiden lenker videre.
@@ -1224,4 +1228,65 @@ test("F1: midlertidige bilder og videoene har pending «image» der de brukes", 
   );
   // site.video er tekstene til knappen, ikke en VideoRef.
   assert.deepEqual(missingTemporaryLabel({ site, home }), []);
+});
+
+// ---------------------------------------------------------------------------
+// F2: filmseksjonen erstatter stemningene og de tre stegene paa siden.
+// ---------------------------------------------------------------------------
+
+test("F2: filmseksjonen har tekstene Petter bestemte (20.10)", () => {
+  const { film } = home;
+  assert.equal(film._type, "film");
+  assert.equal(film.anchor, "film");
+  assert.deepEqual(site.topBar.links[1], { label: "Se filmen", href: "#film" });
+  assert.deepEqual(film.steps, [
+    "Last opp bildene",
+    "Velg tjeneste per bilde",
+    "Sammenlign og godkjenn",
+    "Last ned bildet og kopier teksten",
+  ]);
+  // MS5a AVVIK 1: teksten foelger ikke med fila; den kopieres.
+  assert.equal(film.steps[3], "Last ned bildet og kopier teksten");
+  assert.match(film.lead, /kopierer teksten/);
+  assert.doesNotMatch(film.lead, /med tekst til annonsen/);
+  for (const step of film.steps) assert.doesNotMatch(step, /med tekst til annonsen/, step);
+  assert.equal(film.caption, "Illustrasjon av arbeidsflyten, uten lyd.");
+  // Filmen viser styling-bildet: lappen staar til det er byttet (vakta fra F1).
+  assert.deepEqual(film.video, { video: "film", label: "Produktfilm: fra opplasting til ferdig annonse", pending: "image" });
+  assert.equal(film.video.pending, "image");
+});
+
+test("F2: Film.tsx er en serverkomponent paa night, uten tekst i JSX, med filmen i 16:9", () => {
+  const f = "app/components/marketing/Film.tsx";
+  assert.ok(MARKETING_TSX.includes(f), f);
+  assert.deepEqual(literalTextsInFile(read(f)), [], f);
+  const src = withoutComments(read(f));
+  assert.doesNotMatch(src, /^"use client";/);
+  assert.match(src, /aria-labelledby=\{titleId\}/);
+  assert.match(src, /className="bg-night [^"]*text-paper"/);
+  assert.match(src, /import \{ CONTAINER, H2 \} from "\.\/classes";/);
+  assert.match(src, /aspect-video[^"]*rounded-card/);
+  assert.doesNotMatch(src, /#[0-9a-fA-F]{3,8}\b/);
+  // Filmen: kontroller, plakat og tekstversjonen (WCAG 1.2.1).
+  const video = src.slice(src.indexOf("<MarketingVideo"), src.indexOf("/>", src.indexOf("<MarketingVideo")));
+  for (const attr of [
+    "src={VIDEOS.film.src}",
+    "poster={IMAGES.filmPoster.src}",
+    "label={film.video.label}",
+    'mode="film"',
+    "labels={site.video}",
+    "describedBy={`${leadId} ${stepsId}`}",
+  ]) {
+    assert.ok(video.includes(attr), attr);
+  }
+  assert.match(src, /<p id=\{leadId\}/);
+  assert.match(src, /<ol id=\{stepsId\}/);
+  // Lappen under filmen, og nummeret paa stegene kommer fra rekkefoelgen.
+  assert.match(src, /\{film\.caption\}\s*\{film\.video\.pending && <PendingMark label=\{site\.pendingLabels\.image\} \/>\}/);
+  assert.match(src, /film\.steps\.map\(\(step, i\) =>/);
+  assert.match(src, /\{i \+ 1\}/);
+  // MarketingVideo sender describedBy videre til filmen.
+  const mv = withoutComments(read("app/components/marketing/MarketingVideo.tsx"));
+  assert.match(mv, /describedBy\?: string;/);
+  assert.match(mv, /aria-describedby=\{describedBy\}/);
 });

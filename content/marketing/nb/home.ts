@@ -232,6 +232,22 @@ export const home = {
     ],
   },
 
+  // F2: filmseksjonen (designet Main.dc.html linje 258-277). Petter 20.10:
+  // steg 4 og ingressen sier at teksten kopieres (MS5a AVVIK 1: teksten
+  // foelger ikke med fila), og linja under filmen sier at det er en
+  // illustrasjon. Filmen viser styling-bildet, saa lappen staar til det er
+  // byttet. Stemningene og de tre stegene over er ikke paa siden (F7 sletter dem).
+  film: {
+    _type: "film",
+    anchor: "film",
+    eyebrow: "Se filmen",
+    title: "Fra opplasting til ferdig annonse.",
+    lead: "Se hvordan en megler laster opp bildene fra fotografen, velger hva som skal gjøres, godkjenner resultatet, laster ned bildene og kopierer teksten til annonsen.",
+    video: { video: "film", label: "Produktfilm: fra opplasting til ferdig annonse", pending: "image" },
+    caption: "Illustrasjon av arbeidsflyten, uten lyd.",
+    steps: ["Last opp bildene", "Velg tjeneste per bilde", "Sammenlign og godkjenn", "Last ned bildet og kopier teksten"],
+  },
+
   // Linje 247-266. Eksempelteksten lages av kodene med produktets funksjon
   // (app/lib/disclosure.ts) og blir «Kveldsbilde laget med AI fra dagsbilde.
   // Himmel, lys i nabohus og stearinlys er redigert.» Bildet er ekte (jobb
