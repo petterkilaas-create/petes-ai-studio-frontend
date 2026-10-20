@@ -166,18 +166,6 @@ export type Hero = {
   mosaic: { label: string; tiles: readonly MosaicTile[] };
   /** Merkelappen paa resultatbildene i mosaikken (ikke paa bildet med AI-merket i bildet). */
   aiLabel: string;
-  /*
-   * Slideren (MS2) er ikke lenger i toppen (F3). Feltene under brukes ikke
-   * paa siden til F5 (foer/etter-fanene), men blir staaende fordi fanen Stue
-   * i eksemplene har de samme bildene (testen sjekker det).
-   */
-  before: ImageRef;
-  after: ImageRef;
-  labels: { original: string; result: string; ai: string };
-  sliderLabel: string;
-  /** Skjermlesertekst for verdien. Mal med {n} = prosent original. */
-  sliderValue: string;
-  caption: string;
 };
 
 /** Tillitsstripen under toppen (MS3, utkastet linje 76-81). */
@@ -189,17 +177,27 @@ export type TrustStrip = {
   aiLabel: string;
 };
 
-/** Eksemplene med faner (MS3, utkastet linje 85-121 og 472-480). */
+/**
+ * Foer og etter med faner (MS3; F5, designet Main.dc.html linje 279-305):
+ * en slider per fane. `result` er etiketten paa resultatsiden, og `caption`
+ * er teksten under slideren (mal med {brand}).
+ */
 export type Examples = {
   _type: "examples";
   anchor: string;
   title: string;
   lead: string;
   tabListLabel: string;
-  beforeCaption: string;
-  afterCaption: string;
   aiLabel: string;
-  tabs: readonly { id: string; label: string; before: Picture; after: Picture }[];
+  slider: {
+    /** Etiketten paa originalsiden. */
+    original: string;
+    /** aria-label paa haandtaket. */
+    label: string;
+    /** Skjermlesertekst for verdien. Mal med {n} = prosent original. */
+    value: string;
+  };
+  tabs: readonly { id: string; label: string; result: string; before: ImageRef; after: ImageRef; caption: Claim }[];
 };
 
 /**
