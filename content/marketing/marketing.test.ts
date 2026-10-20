@@ -26,6 +26,8 @@ import { getContactPage, getFaq, getFaqPage, getHome, getLabelingPage, getSite }
 import { contentAnchors, onPage, visibleLinks } from "./links.ts";
 import { formatNok, perImage, priceVars } from "./offer.ts";
 import { pendingItems } from "./pending.ts";
+import type { VideoKey } from "./schema.ts";
+import { VIDEOS } from "./videos.ts";
 
 // MS2: markedssiden (skall, innholdsfil og toppen), /start, proxyen og 404.
 // node --test kan ikke laste .tsx, saa komponentene og proxy.ts sjekkes som
@@ -170,26 +172,45 @@ test("MS2: bildene har alt-tekst og finnes i images.ts, og bare images.ts import
   for (const m of images.matchAll(/^import \w+ from "\.\/(images\/[\w-]+\.jpg)";$/gm)) {
     assert.ok(existsSync(join(CONTENT_DIR, m[1])), m[1]);
   }
-  assert.equal([...images.matchAll(/^import \w+ from "\.\/images\//gm)].length, 3);
+  assert.equal([...images.matchAll(/^import \w+ from "\.\/images\//gm)].length, 11);
   for (const f of filesIn("content").filter((f) => f !== "content/marketing/images.ts")) {
     assert.doesNotMatch(read(f), /\.(jpe?g|png|webp|avif)"/, f);
   }
   // JPG i 1536x1024 (Petter 02.10); merkebildet er 1536x1040 (beslutning 4,
-  // 19.10). SOF0/SOF2: hoeyde og bredde etter markoeren.
+  // 19.10). F1: parene er 1536x1024, plakatene har videoens forhold.
+  const sizes: Record<string, readonly number[]> = {};
   for (const [name, size] of [
     ["hero-original.jpg", [1536, 1024]],
     ["hero-kveld.jpg", [1536, 1024]],
     ["merking-kveld.jpg", [1536, 1040]],
+    ["par-kveld-original.jpg", [1536, 1024]],
+    ["par-kveld-resultat.jpg", [1536, 1024]],
+    ["par-rydd-original.jpg", [1536, 1024]],
+    ["par-rydd-resultat.jpg", [1536, 1024]],
+    ["par-styling-original.jpg", [1536, 1024]],
+    ["par-styling-resultat.jpg", [1536, 1024]],
+    ["film-plakat.jpg", [1280, 720]],
+    ["lokke-plakat.jpg", [720, 480]],
   ] as const) {
-    const jpg = readFileSync(join(CONTENT_DIR, "images", name));
-    assert.equal(jpg.readUInt16BE(0), 0xffd8, name);
-    let i = 2;
-    while (i < jpg.length && !(jpg[i] === 0xff && (jpg[i + 1] === 0xc0 || jpg[i + 1] === 0xc2))) {
-      i += 2 + jpg.readUInt16BE(i + 2);
-    }
-    assert.deepEqual([jpg.readUInt16BE(i + 7), jpg.readUInt16BE(i + 5)], size, name);
+    sizes[name] = jpgSize(name);
+    assert.deepEqual(sizes[name], size, name);
+  }
+  // Originalen og resultatet i hvert par har samme stoerrelse (samme utsnitt).
+  for (const pair of ["kveld", "rydd", "styling"]) {
+    assert.deepEqual(sizes[`par-${pair}-original.jpg`], sizes[`par-${pair}-resultat.jpg`], pair);
   }
 });
+
+/** Bredde og hoeyde paa en JPG i images/. SOF0/SOF2: hoeyde og bredde etter markoeren. */
+function jpgSize(name: string): [number, number] {
+  const jpg = readFileSync(join(CONTENT_DIR, "images", name));
+  assert.equal(jpg.readUInt16BE(0), 0xffd8, name);
+  let i = 2;
+  while (i < jpg.length && !(jpg[i] === 0xff && (jpg[i + 1] === 0xc0 || jpg[i + 1] === 0xc2))) {
+    i += 2 + jpg.readUInt16BE(i + 2);
+  }
+  return [jpg.readUInt16BE(i + 7), jpg.readUInt16BE(i + 5)];
+}
 
 test("MS2: antallet gratisbilder staar ett sted (offer.freeImages), ikke i teksten", () => {
   assert.equal(site.offer.freeImages, 3);
@@ -687,14 +708,18 @@ test("MS3a: mobilmenyen har aria-expanded og aria-controls, lukkes med Escape og
 
 test("MS3a: bare toppbildet har hoey prioritet; alle andre bilder lastes lat", () => {
   for (const f of filesIn("app/components/marketing", /\.tsx$/).filter((f) => !f.endsWith("HeroSlider.tsx"))) {
-    const src = withoutComments(read(f));
+    let src = withoutComments(read(f));
+    // F1: videoene laster ingenting foer de spilles; bare preload="none" er lov, og bare der.
+    if (f.endsWith("MarketingVideo.tsx")) src = src.replaceAll('preload="none"', "");
     assert.doesNotMatch(src, /fetchPriority|loading="eager"|\bpriority\b|\bpreload\b/, f);
   }
-  // Seksjonene er serverkomponenter; bare fanene, stemningene og mobilmenyen (og slideren) er klientdeler.
+  // Seksjonene er serverkomponenter; bare fanene, stemningene og mobilmenyen
+  // (og slideren og videoen) er klientdeler.
   const client = filesIn("app/components/marketing", /\.tsx$/).filter((f) => /^"use client";/.test(read(f)));
   assert.deepEqual(client.map((f) => f.split("/").pop()).sort(), [
     "ExampleTabs.tsx",
     "HeroSlider.tsx",
+    "MarketingVideo.tsx",
     "MobileMenu.tsx",
     "MoodPicker.tsx",
   ]);
@@ -1093,4 +1118,110 @@ test("TG-NEW-223: svaret om lov staar ordrett, uten lapp og uten tall", () => {
   assert.ok(lov.showOnHome);
   // Merkesiden lenker til det samme svaret.
   assert.equal(labelingPage.rules.faqId, lov.id);
+});
+
+// ---------------------------------------------------------------------------
+// F1 (TG-NEW-230): bildene, videoene og videokomponenten til den nye forsiden.
+// Ingen side bruker dem ennaa (F2-F4).
+// ---------------------------------------------------------------------------
+
+/** Boksene paa toppnivaa i en MP4, i rekkefoelge. */
+function mp4Boxes(file: Buffer): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i + 8 <= file.length) {
+    let size = file.readUInt32BE(i);
+    out.push(file.toString("latin1", i + 4, i + 8));
+    if (size === 1) size = Number(file.readBigUInt64BE(i + 8));
+    if (size === 0) break; // boksen gaar til slutten av fila
+    i += size;
+  }
+  return out;
+}
+
+test("F1: videoene ligger under public/no/, er smaa nok, starter med en gang (faststart) og har plakat", () => {
+  assert.deepEqual(Object.keys(VIDEOS), ["film", "loop"]);
+  const images = read("content/marketing/images.ts");
+  // Tak i byte (desimale MB): filmen 3,5 MB, loekka 0,5 MB.
+  const limits: Record<VideoKey, number> = { film: 3_500_000, loop: 500_000 };
+  for (const key of ["film", "loop"] as const) {
+    const v = VIDEOS[key];
+    // Under /no/, saa isOpenMarketingPath slipper dem gjennom ved lansering.
+    assert.ok(v.src.startsWith("/no/") && isMarketingPath(v.src), v.src);
+    const path = join(REPO_DIR, "public", v.src);
+    assert.ok(existsSync(path), v.src);
+    const file = readFileSync(path);
+    assert.ok(file.length <= limits[key], `${key}: ${file.length} byte`);
+    const boxes = mp4Boxes(file);
+    assert.equal(boxes[0], "ftyp", key);
+    assert.ok(boxes.includes("mdat"), `${key}: ${boxes}`);
+    assert.ok(boxes.includes("moov") && boxes.indexOf("moov") < boxes.indexOf("mdat"), `${key}: ${boxes}`);
+    assert.match(images, new RegExp(`^  ${v.poster},$`, "m"), v.poster);
+  }
+  assert.deepEqual([VIDEOS.film.width, VIDEOS.film.height], [1920, 1080]);
+  assert.deepEqual([VIDEOS.loop.width, VIDEOS.loop.height], [720, 480]);
+});
+
+test("F1: MarketingVideo er stum, inline, laster ingenting foer avspilling og respekterer redusert bevegelse", () => {
+  const src = withoutComments(read("app/components/marketing/MarketingVideo.tsx"));
+  assert.match(src, /^"use client";/);
+  for (const attr of [/^\s+muted$/m, /^\s+loop$/m, /^\s+playsInline$/m, /^\s+controls$/m]) assert.match(src, attr);
+  assert.ok(src.includes('preload="none"'));
+  assert.ok(src.includes("prefers-reduced-motion"));
+  assert.ok(src.includes("new IntersectionObserver("));
+  // Loekka startes med play() naar den er synlig (feilen fanges), aldri med attributtet.
+  assert.match(src, /\.play\(\)\.catch\(/);
+  assert.doesNotMatch(src, /autoplay/i);
+  assert.doesNotMatch(src, /preload="(auto|metadata)"|preload=\{/);
+  // aria-label kommer fra props, aldri en fast tekst.
+  const ariaLabels = [...src.matchAll(/aria-label=(\S+)/g)].map((m) => m[1]);
+  assert.equal(ariaLabels.filter((a) => a === "{label}").length, 2);
+  for (const a of ariaLabels) assert.match(a, /^\{/, a);
+  assert.match(src, /aria-label=\{running \? labels\.pause : labels\.play\}/);
+  // Knappen bruker Lucide-ikonene og fokusrammen fra classes.ts.
+  assert.match(src, /import \{ Pause, Play \} from "lucide-react";/);
+  assert.match(src, /import \{ FOCUS \} from "\.\/classes";/);
+  assert.ok(src.includes("${FOCUS}"));
+  assert.match(src, /type="button"/);
+  // Tekstene paa knappen kommer fra site.video.
+  assert.deepEqual(site.video, { play: "Spill av", pause: "Sett på pause" });
+});
+
+/**
+ * Bildene som er midlertidige (images.ts): rydd opp-paret (probe R0b) og
+ * styling-paret (probe M0), begge uten AI-merke.
+ */
+const TEMPORARY_MEDIA = ["pairCleanupOriginal", "pairCleanupResult", "pairStylingOriginal", "pairStylingResult"];
+
+/**
+ * Stiene til bilder og videoer i innholdet som mangler pending «image»: et
+ * midlertidig bilde (TEMPORARY_MEDIA) eller en video (VideoRef, `video` er en
+ * noekkel). Begge videoene viser styling-bildet (videos.ts).
+ */
+function missingTemporaryLabel(value: unknown, path = ""): string[] {
+  if (Array.isArray(value)) return value.flatMap((v, i) => missingTemporaryLabel(v, `${path}[${i}]`));
+  if (value === null || typeof value !== "object") return [];
+  const r = value as Record<string, unknown>;
+  const temporary = typeof r.image === "string" && TEMPORARY_MEDIA.includes(r.image);
+  const video = typeof r.video === "string";
+  const own = (temporary || video) && r.pending !== "image" ? [path] : [];
+  return [...own, ...Object.entries(r).flatMap(([k, v]) => missingTemporaryLabel(v, path ? `${path}.${k}` : k))];
+}
+
+test("F1: midlertidige bilder og videoene har pending «image» der de brukes", () => {
+  const images = read("content/marketing/images.ts");
+  for (const key of TEMPORARY_MEDIA) assert.match(images, new RegExp(`^  ${key},$`, "m"), key);
+  // Vakta virker: den finner et bilde og en video uten lappen, og godtar dem med lappen.
+  assert.deepEqual(
+    missingTemporaryLabel({
+      a: { image: "pairStylingResult", alt: "x" },
+      b: [{ video: "loop", label: "x" }],
+      c: { image: "pairCleanupOriginal", alt: "x", pending: "image" },
+      d: { video: "film", label: "x", pending: "image" },
+      e: { image: "pairEveningResult", alt: "x" },
+    }),
+    ["a", "b[0]"]
+  );
+  // site.video er tekstene til knappen, ikke en VideoRef.
+  assert.deepEqual(missingTemporaryLabel({ site, home }), []);
 });

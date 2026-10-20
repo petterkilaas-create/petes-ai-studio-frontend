@@ -11,7 +11,8 @@ import type { Site } from "../schema.ts";
 // som tekst uten lenke. Spraakvelgeren vises ikke foer det finnes flere spraak.
 // MS4: alt-teksten til delingsbildet, satt sammen av merket og overskriften
 // (Petter 02.10). MS5a: hjelpesidene (MS5_TEKSTER.md §4, godkjent av Petter
-// 04.10) og skjermleserteksten paa merket paa undersidene.
+// 04.10) og skjermleserteksten paa merket paa undersidene. F1: knappen som
+// pauser og spiller av videoloekka (MarketingVideo).
 export const site = {
   _type: "site",
   seo: {
@@ -97,6 +98,7 @@ export const site = {
     image: "[BILDE]",
   },
   imagePlaceholder: "Eksempelbilde kommer",
+  video: { play: "Spill av", pause: "Sett på pause" },
   notFound: {
     _type: "notFound",
     pageTitle: "Fant ikke siden · {brand}",

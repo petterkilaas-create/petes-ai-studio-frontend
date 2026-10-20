@@ -10,7 +10,21 @@
  */
 
 /** Nøklene til bildene i images.ts (den eneste fila med bildeimport). */
-export type ImageKey = "heroOriginal" | "heroEvening" | "merkingEvening";
+export type ImageKey =
+  | "heroOriginal"
+  | "heroEvening"
+  | "merkingEvening"
+  | "pairEveningOriginal"
+  | "pairEveningResult"
+  | "pairCleanupOriginal"
+  | "pairCleanupResult"
+  | "pairStylingOriginal"
+  | "pairStylingResult"
+  | "filmPoster"
+  | "loopPoster";
+
+/** Nøklene til videoene i videos.ts (filene ligger i public/no/film/). */
+export type VideoKey = "film" | "loop";
 
 /**
  * Det som venter paa avklaring foer lansering (MS3, regel 3 og 4). Mens
@@ -35,6 +49,12 @@ export type ImageRef = { image: ImageKey; alt: string; pending?: "image" };
 export type ImagePlaceholder = { placeholder: string; alt: string; pending: "image" };
 
 export type Picture = ImageRef | ImagePlaceholder;
+
+/**
+ * En video fra videos.ts (F1). `label` er aria-label paa videoen.
+ * `pending: "image"`: videoen viser et midlertidig bilde (styling-bildet).
+ */
+export type VideoRef = { video: VideoKey; label: string; pending?: "image" };
 
 /** En verdi vi ikke har ennaa, for eksempel e-posten ([E-POST]) eller tiden ([TID]). */
 export type PendingValue = { pending: PendingKey };
@@ -103,6 +123,8 @@ export type Site = {
   pendingLabels: Record<PendingKey, string>;
   /** Teksten i en bildeplassholder, over beskrivelsen. */
   imagePlaceholder: string;
+  /** Skjermlesertekstene paa pause- og avspillingsknappen til loekka (F1, MarketingVideo). */
+  video: { play: string; pause: string };
   notFound: {
     _type: "notFound";
     /** Fanetittelen. Mal med {brand}. */
