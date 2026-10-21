@@ -248,6 +248,8 @@ const nbUi = {
   // APP1: Skjul ansikter og skilt sist, i egen kategori.
   "express.category.privacy": "Personvern",
   "express.tool.digital_styling.desc": "Møblerer tomme rom digitalt.",
+  "express.tool.same_furniture_angles.title": "Samme møbler i flere vinkler",
+  "express.tool.same_furniture_angles.desc": "Møbler rommet digitalt én gang, og få de samme møblene i flere bilder av rommet.",
   "express.tool.video.title": "Video",
   "express.tool.video.desc": "Lager en kort video av bildene fra boligen.",
   "express.tool.copywriter.title": "Annonsetekst",
@@ -771,6 +773,8 @@ const en: Dictionary = {
     "express.category.more": "More",
     "express.category.privacy": "Privacy",
     "express.tool.digital_styling.desc": "Furnishes empty rooms digitally.",
+    "express.tool.same_furniture_angles.title": "Same furniture, several angles",
+    "express.tool.same_furniture_angles.desc": "Furnish a room digitally once and get the same furniture in several photos of it.",
     "express.tool.video.title": "Video",
     "express.tool.video.desc": "Creates a short video from the property photos.",
     "express.tool.copywriter.title": "Listing text",

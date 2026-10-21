@@ -198,6 +198,15 @@ const CATEGORIES: Category[] = [
         titleKey: "service.virtual_stage",
         descKey: "express.tool.digital_styling.desc",
       },
+      // «Kommer» (Petter 21.10): ikke med i foerste versjon av Digital
+      // styling. Id-en er ikke i ENABLED, saa kortet kan ikke bestilles.
+      {
+        id: "same_furniture_angles",
+        service: "same_furniture_angles",
+        kind: "simple",
+        titleKey: "express.tool.same_furniture_angles.title",
+        descKey: "express.tool.same_furniture_angles.desc",
+      },
     ],
   },
   {
