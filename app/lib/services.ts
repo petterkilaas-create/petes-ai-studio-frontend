@@ -25,6 +25,8 @@ export const ENABLED = {
   express_v2: false,
   privacy_blur: true,
   skumring: true,
+  /** Digital styling (S2-f): bestillingen er klar, men av til S4 slaar den paa. */
+  digital_styling: false,
 } as const;
 
 /** Ukjent id gir av: en ny tjeneste maa legges inn over foer den vises. */
@@ -88,9 +90,10 @@ export function navLinks(): NavLink[] {
 // Tjenestevalget paa Tjenester (heter fortsatt express* internt, valg B1)
 // ---------------------------------------------------------------------------
 
-// "simple" = service alene (ingen params, backend-defaults gjelder).
-// "scene"  = scene_transform med preset_id + scene-type-gate (TG-NEW-58).
-export type ToolKind = "simple" | "scene";
+// "simple"  = service alene (ingen params, backend-defaults gjelder).
+// "scene"   = scene_transform med preset_id + scene-type-gate (TG-NEW-58).
+// "styling" = Digital styling: egen bestilling med tre stiler (S2-f, POST /v1/orders/styling).
+export type ToolKind = "simple" | "scene" | "styling";
 
 export interface Tool {
   /** Id-en i ENABLED. Skiller Klart vaer fra skumring (samme service). */
@@ -179,18 +182,19 @@ const CATEGORIES: Category[] = [
     ],
   },
   // «Kommer»-kortene (dag 45, demo-porten): vises paa Tjenester, men kan
-  // ikke bestilles. Id-ene er ikke i ENABLED, saa isServiceEnabled gir av.
+  // ikke bestilles. Video og Annonsetekst er ikke i ENABLED, saa
+  // isServiceEnabled gir av; Digital styling styres av ENABLED.digital_styling.
   {
     id: "furnishing",
     titleKey: "express.category.furnishing",
     items: [
-      // Id-en er digital_styling, ikke virtual_stage (Petter 15.10): da
-      // styres kortet ikke av ENABLED.virtual_stage og /staging, og blir
-      // aldri klikkbart ved et uhell. Skrives om naar tjenesten kommer.
+      // Id-en er digital_styling, ikke virtual_stage (Petter 15.10): kortet
+      // styres ikke av ENABLED.virtual_stage og /staging. S2-f: tre stiler
+      // under scene_transform, bestilt i ett kall (kind "styling", ingen presetId).
       {
         id: "digital_styling",
-        service: "virtual_stage",
-        kind: "simple",
+        service: "scene_transform",
+        kind: "styling",
         titleKey: "service.virtual_stage",
         descKey: "express.tool.digital_styling.desc",
       },

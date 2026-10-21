@@ -32,6 +32,11 @@ const ORDER_CODES = [
   "duplicate_request",
   "invalid_idempotency_key",
   "unsupported_image",
+  // S2-f (KONTRAKT_BESTILLING): bestilling av Digital styling.
+  "service_disabled",
+  "invalid_order",
+  "room_empty_not_confirmed",
+  "order_required",
 ];
 
 const image = () => new File([new Uint8Array([1])], "a.jpg", { type: "image/jpeg" });

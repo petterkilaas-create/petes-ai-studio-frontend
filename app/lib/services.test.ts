@@ -371,19 +371,24 @@ test("dag 45: det som kan bestilles og ?tjeneste= (Klart vaer aapnet i K3)", () 
   for (const id of ["magic_cleanup", "digital_styling", "virtual_stage", "video", "copywriter"]) {
     assert.equal(toolFromParam(id), null, id);
   }
-  // De nye id-ene er ikke lagt inn i ENABLED, heller ikke som false.
-  for (const id of ["digital_styling", "video", "copywriter"]) {
+  // Video og Annonsetekst er ikke lagt inn i ENABLED, heller ikke som false.
+  for (const id of ["video", "copywriter"]) {
     assert.ok(!Object.keys(ENABLED).includes(id), id);
   }
+  // Digital styling har egen noekkel fra S2-f, og den er av til S4.
+  assert.equal(ENABLED.digital_styling, false);
 });
 
-test("dag 45: digital styling-kortet er uavhengig av ENABLED.virtual_stage og /staging", () => {
-  const card = visibleCategories().flatMap((c) => c.items).find((t) => t.service === "virtual_stage");
+test("dag 45 / S2-f: digital styling-kortet er scene_transform, uavhengig av ENABLED.virtual_stage og /staging", () => {
+  const card = visibleCategories().flatMap((c) => c.items).find((t) => t.id === "digital_styling");
   assert.ok(card);
-  assert.equal(card.id, "digital_styling");
-  assert.equal(card.kind, "simple");
+  assert.equal(card.service, "scene_transform");
+  assert.equal(card.kind, "styling");
+  assert.equal(card.presetId, undefined);
   assert.equal(card.titleKey, "service.virtual_stage");
   assert.equal(card.orderable, false);
+  // Ingen kort bruker virtual_stage lenger.
+  assert.ok(!visibleCategories().flatMap((c) => c.items).some((t) => t.service === "virtual_stage"));
 });
 
 test("dag 45: hvert kort og hver kategori har tekst paa nb og en, og et ikon", () => {
@@ -543,6 +548,7 @@ test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENA
     express_v2: false,
     privacy_blur: true,
     skumring: true,
+    digital_styling: false,
   });
 });
 

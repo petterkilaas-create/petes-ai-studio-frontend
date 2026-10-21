@@ -38,7 +38,9 @@ export type CodeGroup =
   | "disclosureTime"
   | "disclosureEdited"
   | "orderError"
-  | "unsupportedImage";
+  | "unsupportedImage"
+  | "furnishAs"
+  | "orderNotStarted";
 
 const nbUi = {
   "review.title": "Kontroll av bildet",
@@ -266,6 +268,14 @@ const nbUi = {
   "express.forceExteriorHint": "(hopper over den automatiske vurderingen)",
   "express.forceExteriorTitle": "Hopper over den automatiske vurderingen og behandler bildet som utendørs",
   "express.forceExteriorLocked": "Bare mulig når bildetypen er Utendørs",
+  // Digital styling (S2-f): velgeren, avkrysningen og kortene. Romvalgene står i kodegruppen furnishAs.
+  "styling.furnishAs": "Hva skal rommet møbleres som?",
+  "styling.roomEmpty": "Rommet er tomt for løse møbler",
+  "styling.order": "Bestill",
+  "styling.ordering": "Bestiller …",
+  "styling.preset.skandinavisk": "Digital styling – skandinavisk",
+  "styling.preset.familie": "Digital styling – familie",
+  "styling.preset.moderne": "Digital styling – moderne",
   // Skallet og Historikk (D1, brief §7). Statusene: ett ord per status.
   "nav.label": "Hovedmeny",
   "nav.start": "Start",
@@ -318,6 +328,7 @@ const nbUi = {
   "media.working.klart_vaer": "Bytter himmelen …",
   "media.working.privacy_blur": "Skjuler ansikter og skilt …",
   "media.working.generic": "Lager bildet …",
+  "media.working.styling": "Møblerer rommet …",
   "media.fireplaceQuestion": "Svar på spørsmålet om peisen",
   "media.originalAlt": "Dagsbildet som ble lastet opp",
   // TG-NEW-117: bildene er slettet. Ingen antall dager i tekstene; fristene kan endres.
@@ -360,6 +371,7 @@ const nb: Dictionary = {
       sky_through_windows_only: "Himmelen synes bare gjennom vinduer.",
       fireplace_present: "Analysen fant peis.",
       fireplace_disagreement: "Analysen var uenig om bildet har peis.",
+      furnish_as_mismatch: "Bildet passer ikke til romtypen som ble valgt.",
     },
     flagCode: {
       sky_visibility_disagreement: "Analysen var uenig om hvor mye himmel som synes.",
@@ -508,6 +520,25 @@ const nb: Dictionary = {
       invalid_idempotency_key: "Bestillingen kunne ikke startes. Last siden på nytt og prøv igjen.",
       // TG-NEW-185: grunnen står i unsupportedImage; denne er for ukjent grunn.
       unsupported_image: "Bildet kan ikke brukes. Lagre det som JPEG eller PNG og velg det på nytt.",
+      // S2-f (KONTRAKT_BESTILLING): bestilling av Digital styling.
+      service_disabled: "Tjenesten er ikke tilgjengelig akkurat nå.",
+      invalid_order: "Bestillingen er ikke gyldig. Velg rom og minst én stil.",
+      room_empty_not_confirmed: "Bekreft at rommet er tomt.",
+      order_required: "Denne tjenesten må bestilles fra Tjenester.",
+    },
+    // S2-f: hvorfor en stil i bestillingen ikke ble startet (not_started).
+    orderNotStarted: {
+      capacity: "Denne stilen ble ikke laget fordi tjenesten var travel. Bestillingen teller som én.",
+    },
+    // S2-f: romvalgene. «Møbler som …», aldri bare romnavnet (S1-auditen §2).
+    furnishAs: {
+      living: "Møbler som stue",
+      living_dining: "Møbler som stue og spisestue",
+      bedroom: "Møbler som soverom",
+      kitchen_dining: "Møbler som kjøkken og spisestue",
+      bathroom_decor: "Møbler som bad",
+      hallway: "Møbler som gang",
+      balcony_terrace: "Møbler som balkong eller terrasse",
     },
     // TG-NEW-185: grunnen (reason) når bestillingen gir 400 unsupported_image.
     unsupportedImage: {
@@ -540,6 +571,8 @@ const nb: Dictionary = {
     disclosureEdited: "Merketeksten kunne ikke lages.",
     orderError: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
     unsupportedImage: "Bildet kan ikke brukes. Lagre det som JPEG eller PNG og velg det på nytt.",
+    furnishAs: "Ukjent romtype",
+    orderNotStarted: "Denne stilen ble ikke laget. Bestillingen teller som én.",
   },
 };
 
@@ -758,6 +791,13 @@ const en: Dictionary = {
     "express.forceExteriorHint": "(skips the automatic check)",
     "express.forceExteriorTitle": "Skips the automatic check and treats the image as exterior",
     "express.forceExteriorLocked": "Only available when image type is Exterior",
+    "styling.furnishAs": "What should the room be furnished as?",
+    "styling.roomEmpty": "The room is empty of loose furniture",
+    "styling.order": "Order",
+    "styling.ordering": "Ordering …",
+    "styling.preset.skandinavisk": "Virtual staging – Scandinavian",
+    "styling.preset.familie": "Virtual staging – family",
+    "styling.preset.moderne": "Virtual staging – modern",
     "nav.label": "Main menu",
     "nav.start": "Start",
     "nav.services": "Services",
@@ -807,6 +847,7 @@ const en: Dictionary = {
     "media.working.klart_vaer": "Replacing the sky …",
     "media.working.privacy_blur": "Blurring faces and plates …",
     "media.working.generic": "Creating image …",
+    "media.working.styling": "Furnishing the room …",
     "media.fireplaceQuestion": "Answer the question about the fireplace",
     "media.originalAlt": "The uploaded daytime photo",
     "media.deleted": "Image deleted",
@@ -834,6 +875,7 @@ const en: Dictionary = {
       sky_through_windows_only: "The sky is only visible through windows.",
       fireplace_present: "The analysis found a fireplace.",
       fireplace_disagreement: "The analysis disagreed on whether the image has a fireplace.",
+      furnish_as_mismatch: "The image does not match the chosen room type.",
     },
     flagCode: {
       sky_visibility_disagreement: "The analysis disagreed on how much sky is visible.",
@@ -972,6 +1014,22 @@ const en: Dictionary = {
       duplicate_request: "The order has already been received. You can find it in History.",
       invalid_idempotency_key: "The order could not be started. Reload the page and try again.",
       unsupported_image: "The image cannot be used. Save it as JPEG or PNG and choose it again.",
+      service_disabled: "This service is not available right now.",
+      invalid_order: "The order is not valid. Choose a room and at least one style.",
+      room_empty_not_confirmed: "Please confirm that the room is empty.",
+      order_required: "This service must be ordered from Services.",
+    },
+    orderNotStarted: {
+      capacity: "This style was not made because the service was busy. The order counts as one.",
+    },
+    furnishAs: {
+      living: "Furnish as living room",
+      living_dining: "Furnish as living and dining room",
+      bedroom: "Furnish as bedroom",
+      kitchen_dining: "Furnish as kitchen and dining area",
+      bathroom_decor: "Furnish as bathroom",
+      hallway: "Furnish as hallway",
+      balcony_terrace: "Furnish as balcony or terrace",
     },
     unsupportedImage: {
       heic: "HEIC images cannot be used. Save the image as JPEG or PNG and choose it again.",
@@ -1003,6 +1061,8 @@ const en: Dictionary = {
     disclosureEdited: "The disclosure text could not be created.",
     orderError: "The image could not be processed. Please try again, or contact us.",
     unsupportedImage: "The image cannot be used. Save it as JPEG or PNG and choose it again.",
+    furnishAs: "Unknown room type",
+    orderNotStarted: "This style was not made. The order counts as one.",
   },
 };
 
