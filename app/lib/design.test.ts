@@ -441,6 +441,8 @@ test("D1c: ordlista har ordene til Tjenester paa nb og en", () => {
     "express.category.furnishing",
     "express.category.more",
     "express.tool.digital_styling.desc",
+    "express.tool.same_furniture_angles.title",
+    "express.tool.same_furniture_angles.desc",
     "express.tool.video.title",
     "express.tool.video.desc",
     "express.tool.copywriter.title",

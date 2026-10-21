@@ -4,6 +4,7 @@ import {
   Ellipsis,
   Eraser,
   FileText,
+  Images,
   ScanFace,
   Sofa,
   Sun,
@@ -23,6 +24,7 @@ export const TOOL_ICONS: Record<string, LucideIcon> = {
   skumring: Sunset,
   // «Kommer»-kortene (dag 45).
   digital_styling: Sofa,
+  same_furniture_angles: Images,
   video: Video,
   copywriter: FileText,
 };

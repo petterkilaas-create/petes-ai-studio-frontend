@@ -348,7 +348,7 @@ test("dag 45: visibleCategories gir alle kortene i rekkefoelge, fire «Kommer» 
     [
       ["timetraveler", ["skumring", "klart_vaer"]],
       ["fixit", ["magic_cleanup"]],
-      ["furnishing", ["digital_styling"]],
+      ["furnishing", ["digital_styling", "same_furniture_angles"]],
       ["more", ["video", "copywriter"]],
       ["privacy", ["privacy_blur"]],
     ]
@@ -357,7 +357,7 @@ test("dag 45: visibleCategories gir alle kortene i rekkefoelge, fire «Kommer» 
   assert.deepEqual(tools.filter((t) => t.orderable).map((t) => t.id), ["skumring", "klart_vaer", "privacy_blur"]);
   assert.deepEqual(
     tools.filter((t) => !t.orderable).map((t) => t.id),
-    ["magic_cleanup", "digital_styling", "video", "copywriter"]
+    ["magic_cleanup", "digital_styling", "same_furniture_angles", "video", "copywriter"]
   );
   // Ingen tom kategori, og orderable er det samme som ENABLED.
   for (const c of cats) assert.ok(c.items.length > 0, c.id);
@@ -528,6 +528,30 @@ test("APP1: ?tjeneste=privacy_blur aapner privacy, og startvalget er uendret", (
   assert.equal(toolFromParam(null), null);
 });
 
+test("S3: «Samme møbler i flere vinkler» er et «Kommer»-kort etter Digital styling, og kan ikke bestilles", () => {
+  const furnishing = visibleCategories().find((c) => c.id === "furnishing");
+  assert.ok(furnishing);
+  assert.deepEqual(furnishing.items.map((t) => t.id), ["digital_styling", "same_furniture_angles"]);
+  const card = furnishing.items[1];
+  assert.equal(card.service, "same_furniture_angles");
+  assert.equal(card.kind, "simple");
+  assert.equal(card.titleKey, "express.tool.same_furniture_angles.title");
+  assert.equal(card.descKey, "express.tool.same_furniture_angles.desc");
+  assert.equal(card.orderable, false);
+  assert.equal(isServiceEnabled("same_furniture_angles"), false);
+  assert.ok(!Object.keys(ENABLED).includes("same_furniture_angles"));
+  assert.ok(!orderableTools().some((t) => t.id === "same_furniture_angles"));
+  assert.equal(toolFromParam("same_furniture_angles"), null);
+  assert.equal(DICTIONARIES.nb.ui[card.titleKey], "Samme møbler i flere vinkler");
+  assert.equal(DICTIONARIES.en.ui[card.titleKey], "Same furniture, several angles");
+  // Teksten lover ikke staging eller video.
+  for (const locale of ["nb", "en"] as const) {
+    for (const key of [card.titleKey, card.descKey]) {
+      assert.doesNotMatch(DICTIONARIES[locale].ui[key], /staging|video/i, `${locale} ${key}`);
+    }
+  }
+});
+
 test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENABLED er uendret", () => {
   assert.deepEqual(
     visibleCategories()
@@ -536,7 +560,7 @@ test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENA
     [
       ["timetraveler", ["skumring", "klart_vaer"]],
       ["fixit", ["magic_cleanup"]],
-      ["furnishing", ["digital_styling"]],
+      ["furnishing", ["digital_styling", "same_furniture_angles"]],
       ["more", ["video", "copywriter"]],
     ]
   );
