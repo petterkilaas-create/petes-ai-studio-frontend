@@ -23,6 +23,10 @@ import { ReviewerRejectedPanel } from "@/app/components/ReviewerRejectedPanel";
 import { OpenReviewLink } from "@/app/components/OpenReviewLink";
 import { DuskChoicePicker } from "@/app/components/DuskChoicePicker";
 import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "@/app/lib/dusk";
+import { useOrderJobs } from "@/app/hooks/useOrderJobs";
+import { StylingChoicePicker } from "@/app/components/StylingChoicePicker";
+import { StylingOrderCards } from "@/app/components/StylingOrderCards";
+import { EMPTY_STYLING, stylingParams, type StylingChoice } from "@/app/lib/styling";
 import { orderErrorText, t } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import { SERVICE_PARAM, toolFromParam, visibleCategories } from "@/app/lib/services";
@@ -74,12 +78,16 @@ function ExpressContent() {
   const [forceSceneType, setForceSceneType] = useState(false);
   // Skumringsvalg (2f-b): tidspunkt og himmel, alltid et gyldig par, og stilen (TG-NEW-189).
   const [dusk, setDusk] = useState<DuskChoice>(DEFAULT_DUSK);
+  // Digital styling (S2-f): romtypen og bekreftelsen av tomt rom.
+  const [styling, setStyling] = useState<StylingChoice>(EMPTY_STYLING);
 
   const locale = useLocale();
   const preview = useImagePreview();
   // Kvoten for gratisbilder (TG-NEW-149): fra GET /v1/quota, oppdatert fra bestillingen.
   const quota = useQuota();
   const job = useProcessJob({ onQuota: quota.apply });
+  // Digital styling: én bestilling med tre stiler (bak ENABLED.digital_styling).
+  const order = useOrderJobs({ onQuota: quota.apply });
   const refreshQuota = quota.refresh;
 
   const activeCategory =
@@ -89,7 +97,8 @@ function ExpressContent() {
     CATEGORIES.flatMap((c) => c.items).find((t) => t.orderable && t.id === selectedToolId) ??
     null;
 
-  const isProcessing = job.isProcessing;
+  const isStyling = selectedTool?.kind === "styling";
+  const isProcessing = job.isProcessing || order.isProcessing;
   const output = outputView(job.status, job.imageUrl);
   const showSceneControls =
     selectedTool?.kind === "scene" && selectedTool.sceneGate !== false;
@@ -99,18 +108,31 @@ function ExpressContent() {
     ? quotaView(quota.quota)
     : ({ kind: "hidden" } as const);
   const runDisabled =
-    !selectedTool || !preview.file || isProcessing || !canOrder(selectedTool.service, quota.quota);
+    !selectedTool ||
+    !preview.file ||
+    isProcessing ||
+    !canOrder(selectedTool.service, quota.quota) ||
+    (isStyling && stylingParams(styling) === null);
   // 402 vises av QuotaNotice naar kvoten er kjent; ellers av feilboksen.
   const showSubmitError =
     job.status === "failed" &&
     !job.rejection &&
     !(job.errorCode === "free_quota_exhausted" && quotaShown.kind === "exhausted");
+  const showOrderError =
+    order.failed && !(order.errorCode === "free_quota_exhausted" && quotaShown.kind === "exhausted");
 
   // En jobb som ender failed av teknisk grunn har gitt bildet tilbake:
   // hent tallet paa nytt (KONTRAKT_KVOTE).
   useEffect(() => {
     if (job.status === "failed" && job.jobId !== null) refreshQuota();
   }, [job.status, job.jobId, refreshQuota]);
+
+  // Alle stilene feilet eller ble aldri startet: kvoten kan vaere gitt
+  // tilbake (KONTRAKT_BESTILLING). Hent tallet paa nytt.
+  const orderAllFailed = order.status === "failed" && order.cards.length > 0;
+  useEffect(() => {
+    if (orderAllFailed) refreshQuota();
+  }, [orderAllFailed, refreshQuota]);
 
   const selectTool = (toolId: string) => {
     if (isProcessing) return;
@@ -119,7 +141,9 @@ function ExpressContent() {
     setSceneType("auto");
     setForceSceneType(false);
     setDusk(DEFAULT_DUSK);
+    setStyling(EMPTY_STYLING);
     job.reset();
+    order.reset();
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -128,6 +152,9 @@ function ExpressContent() {
     // Nytt bilde: feilen, avslaget og et gammelt resultat hoerer til det
     // forrige. Skumringsvalgene og bildetypen staar (TG-NEW-187).
     job.reset();
+    // Bekreftelsen av tomt rom gjelder bildet: et nytt bilde maa bekreftes paa nytt.
+    order.reset();
+    setStyling((s) => ({ ...s, roomEmpty: false }));
   };
 
   const handleSceneTypeChange = (value: SceneType) => {
@@ -139,6 +166,12 @@ function ExpressContent() {
 
   const handleRun = () => {
     if (!selectedTool || !preview.file || isProcessing) return;
+    if (selectedTool.kind === "styling") {
+      // Egen bestilling (POST /v1/orders/styling): alle tre stilene, ett trekk.
+      const params = stylingParams(styling);
+      if (params !== null) void order.run(preview.file, params);
+      return;
+    }
     if (selectedTool.kind === "scene") {
       // Param-oppsettet: preset_id sendes alltid for Time Traveler-kort
       // (generativ sti), pluss scene_type + force_scene_type. Ingen quality_tier/aspect_ratio.
@@ -161,9 +194,11 @@ function ExpressContent() {
   const handleReset = () => {
     preview.clear();
     job.reset();
+    order.reset();
     setSceneType("auto");
     setForceSceneType(false);
     setDusk(DEFAULT_DUSK);
+    setStyling(EMPTY_STYLING);
   };
 
   const handleForceExterior = () => {
@@ -187,7 +222,7 @@ function ExpressContent() {
         subtitle={t(locale, "express.subtitle")}
         actions={
           /* Uten error: den raa teksten skal ikke vises (TG-NEW-121). */
-          <StatusBadge status={job.status} service={selectedTool?.service} />
+          <StatusBadge status={isStyling ? order.status : job.status} service={selectedTool?.service} />
         }
       />
 
@@ -365,18 +400,29 @@ function ExpressContent() {
             />
           )}
 
+          {isStyling && (
+            <StylingChoicePicker
+              value={styling}
+              onChange={setStyling}
+              disabled={isProcessing}
+              locale={locale}
+            />
+          )}
+
           <QuotaNotice view={quotaShown} locale={locale} />
 
           <div className="flex flex-wrap gap-3">
             <Button onClick={handleRun} disabled={runDisabled}>
-              {t(locale, isProcessing ? "express.running" : "express.run")}
+              {isStyling
+                ? t(locale, isProcessing ? "styling.ordering" : "styling.order")
+                : t(locale, isProcessing ? "express.running" : "express.run")}
             </Button>
             <Button variant="secondary" onClick={handleReset} disabled={isProcessing}>
               {t(locale, "express.reset")}
             </Button>
           </div>
 
-          {job.waking && (
+          {(job.waking || order.waking) && (
             <p className="text-sm text-ink-2" role="status">
               {t(locale, "net.waking")}
             </p>
@@ -397,6 +443,10 @@ function ExpressContent() {
             <ErrorPanel message={orderErrorText(locale, job.errorCode, job.errorReason)} />
           )}
 
+          {showOrderError && (
+            <ErrorPanel message={orderErrorText(locale, order.errorCode, order.errorReason)} />
+          )}
+
           {job.status === "needs_review" && job.review && (
             <ReviewPanel review={job.review} />
           )}
@@ -415,8 +465,28 @@ function ExpressContent() {
         </Card>
       )}
 
+      {/* --- RESULTAT (Digital styling): originalen og ett kort per stil --- */}
+      {selectedTool && isStyling && (
+        <section className="space-y-6">
+          <Card>
+            <p className="text-sm font-medium text-ink-2 mb-4">{t(locale, "review.original")}</p>
+            {preview.previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={preview.previewUrl}
+                alt={t(locale, "review.original")}
+                className="w-full max-w-md h-auto rounded-button border border-line"
+              />
+            ) : (
+              <p className="text-ink-2 text-sm">{t(locale, "express.noImage")}</p>
+            )}
+          </Card>
+          {order.cards.length > 0 && <StylingOrderCards cards={order.cards} locale={locale} />}
+        </section>
+      )}
+
       {/* --- RESULTAT: input/output side om side --- */}
-      {selectedTool && (
+      {selectedTool && !isStyling && (
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <p className="text-sm font-medium text-ink-2 mb-4">{t(locale, "review.original")}</p>

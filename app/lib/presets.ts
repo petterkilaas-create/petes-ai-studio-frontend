@@ -42,6 +42,27 @@ const SCENE_PRESETS: readonly ScenePreset[] = [
     workingKey: "media.working.klart_vaer",
     fileSlug: "blaahimmel",
   },
+  // Digital styling (S2-f): én oppfoering per stil. Etikett og filnavn nevner
+  // bare stilen, aldri rommet (S1-auditen §2), og ingen tekst lover samme
+  // moebler paa tvers av bilder (§8).
+  {
+    ids: ["styling_skandinavisk"],
+    labelKey: "styling.preset.skandinavisk",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-skandinavisk",
+  },
+  {
+    ids: ["styling_familie"],
+    labelKey: "styling.preset.familie",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-familie",
+  },
+  {
+    ids: ["styling_moderne"],
+    labelKey: "styling.preset.moderne",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-moderne",
+  },
 ];
 
 /** Reserven mens `preset_id` mangler (null): skumring. */

@@ -116,7 +116,7 @@ test("TG-153: forhaandsvalget godtar bare tjenester som er slaatt paa", () => {
   assert.deepEqual(toolFromParam("skumring"), { categoryId: "timetraveler", toolId: "skumring" });
   assert.deepEqual(toolFromParam("privacy_blur"), { categoryId: "privacy", toolId: "privacy_blur" });
   assert.deepEqual(toolFromParam("klart_vaer"), { categoryId: "timetraveler", toolId: "klart_vaer" });
-  for (const hidden of ["magic_cleanup", "virtual_stage", "express_v2", "video", "", "SKUMRING", "KLART_VAER"]) {
+  for (const hidden of ["magic_cleanup", "virtual_stage", "express_v2", "digital_styling", "video", "", "SKUMRING", "KLART_VAER"]) {
     assert.equal(toolFromParam(hidden), null, hidden);
   }
   assert.equal(toolFromParam(null), null);

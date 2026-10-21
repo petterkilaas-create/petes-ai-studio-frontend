@@ -401,6 +401,117 @@ function detailText(body: unknown, raw: string, res: Response): string {
   return JSON.stringify(body);
 }
 
+// ---------------------------------------------------------------------------
+// Bestilling av Digital styling (S2-f, KONTRAKT_BESTILLING)
+// ---------------------------------------------------------------------------
+
+/** `params_json` i POST /v1/orders/styling. Ukjente felt avvises (400 invalid_order). */
+export interface StylingOrderParams {
+  styles: string[];
+  furnish_as: string;
+  /** Megleren bekrefter at rommet er tomt (Petter 3A). Alltid bokstavelig true. */
+  room_empty_confirmed: true;
+}
+
+/**
+ * En rad i `jobs`: én per stil, i rekkefoelgen fra `styles`. `not_started`
+ * har `jobId` null og skal ikke polles; `code` sier hvorfor (capacity,
+ * job_create_failed, submit_error, eller null i et duplikatsvar).
+ */
+export interface OrderJob {
+  presetId: string;
+  jobId: string | null;
+  status: string;
+  code: string | null;
+}
+
+export interface StylingOrderResult {
+  orderId: string;
+  /** Samme Idempotency-Key igjen: samme bestilling, ingen nye jobber og intet nytt trekk. */
+  duplicate: boolean;
+  jobs: OrderJob[];
+  /** Kvoten etter trekket, `{limited: false}` for admin, eller null. */
+  quota: Quota | null;
+}
+
+export const ORDER_NOT_STARTED = "not_started";
+
+/**
+ * 202-svaret fra POST /v1/orders/styling. Strengt: en rad uten `preset_id`
+ * droppes, og `not_started` har alltid `jobId` null, ogsaa om backend
+ * skulle sende en id.
+ */
+export function parseStylingOrder(raw: unknown): StylingOrderResult {
+  const body = isRecord(raw) ? raw : {};
+  const jobs: OrderJob[] = [];
+  for (const row of records(body.jobs)) {
+    const presetId = nonEmptyString(row.preset_id);
+    if (presetId === null) continue;
+    const status = nonEmptyString(row.status) ?? "queued";
+    jobs.push({
+      presetId,
+      jobId: status === ORDER_NOT_STARTED ? null : nonEmptyString(row.job_id),
+      status,
+      code: nonEmptyString(row.code),
+    });
+  }
+  return {
+    orderId: nonEmptyString(body.order_id) ?? "",
+    duplicate: body.duplicate === true,
+    jobs,
+    quota: parseQuota(body.quota),
+  };
+}
+
+/**
+ * POST /v1/orders/styling: ett bilde, én opplasting og én Idempotency-Key
+ * for hele bestillingen (1-3 stiler, én kvote-enhet). Feilene kastes som i
+ * submitJob: kode gir SubmitError, 400 uten kode ValidationError.
+ */
+export async function submitStylingOrder(opts: {
+  image: File;
+  params: StylingOrderParams;
+  /** Én per bestilling, samme ved nytt forsoek og ved dobbeltklikk (orderKey.ts). */
+  idempotencyKey?: string;
+  getToken: GetToken;
+}): Promise<StylingOrderResult> {
+  const { image, params, idempotencyKey, getToken } = opts;
+
+  // Uten `service`: bestillingen er alltid scene_transform.
+  const form = new FormData();
+  form.append("image", image);
+  form.append("params_json", JSON.stringify(params));
+
+  const headers = new Headers(await authHeader(getToken));
+  if (idempotencyKey !== undefined) headers.set("Idempotency-Key", idempotencyKey);
+
+  const res = await fetch(`${API_BASE}/v1/orders/styling`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+
+  if (res.status === 202) {
+    return parseStylingOrder(await res.json().catch(() => null));
+  }
+
+  // Samme feilform som submitJob (KONTRAKT_KVOTE).
+  const raw = await res.text().catch(() => "");
+  const body = parseJsonOrNull(raw);
+  const code = errorCode(body);
+  if (code !== null) {
+    const outer = isRecord(body) ? body : {};
+    const inner = isRecord(outer.detail) ? outer.detail : {};
+    throw new SubmitError(res.status, code, { used: inner.used, limit: inner.limit, reason: inner.reason });
+  }
+
+  if (res.status === 400) {
+    throw new ValidationError(detailText(body, raw, res));
+  }
+
+  throw new Error(`submitStylingOrder failed (${res.status}): ${detailText(body, raw, res)}`);
+}
+
 /**
  * Kvoten for gratisbilder (GET /v1/quota, TG-NEW-149). null ved 503
  * quota_unavailable, nettverksfeil eller ukjent form: da vises ingen
