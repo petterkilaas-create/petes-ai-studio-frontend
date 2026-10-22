@@ -39,6 +39,8 @@ export interface UseProcessJobResult {
    * merkede previewUrl fra poll (Lekkasjen L2/L4). null gir plassholder.
    */
   imageUrl: string | null;
+  /** Sync-bloben (privacy_blur) for nedlastingen, ellers null (dag 51). */
+  resultBlob: Blob | null;
   /** Feilmelding fra bestillingen eller pollingen. Vises ikke paa Tjenester (TG-NEW-121). */
   error: string | null;
   /**
@@ -92,6 +94,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [syncResultUrl, setSyncResultUrl] = useState<string | null>(null);
+  const [syncResultBlob, setSyncResultBlob] = useState<Blob | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitErrorCode, setSubmitErrorCode] = useState<string | null>(null);
@@ -123,6 +126,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
     async (file: File, service: string, params?: ProcessParams) => {
       revokeSyncUrl();
       setSyncResultUrl(null);
+      setSyncResultBlob(null);
       setJobId(null);
       setSubmitError(null);
       setSubmitErrorCode(null);
@@ -141,6 +145,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
           const url = URL.createObjectURL(result.imageBlob);
           syncBlobUrlRef.current = url;
           setSyncResultUrl(url);
+          setSyncResultBlob(result.imageBlob);
         } else {
           onQuota?.({ kind: "accepted", quota: result.quota });
           setJobId(result.jobId);
@@ -178,6 +183,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
   const reset = useCallback(() => {
     revokeSyncUrl();
     setSyncResultUrl(null);
+    setSyncResultBlob(null);
     setJobId(null);
     setSubmitError(null);
     setSubmitErrorCode(null);
@@ -198,6 +204,7 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
   return {
     status,
     imageUrl: syncResultUrl ?? job.imageUrl,
+    resultBlob: syncResultBlob,
     error: submitError ?? job.error,
     errorCode: submitErrorCode,
     errorReason: submitErrorReason,

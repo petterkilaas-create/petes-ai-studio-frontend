@@ -27,6 +27,7 @@ import { useOrderJobs } from "@/app/hooks/useOrderJobs";
 import { StylingChoicePicker } from "@/app/components/StylingChoicePicker";
 import { StylingOrderCards } from "@/app/components/StylingOrderCards";
 import { EMPTY_STYLING, stylingParams, type StylingChoice } from "@/app/lib/styling";
+import { privacyDownload, saveBlob } from "@/app/lib/download";
 import { orderErrorText, t } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import { SERVICE_PARAM, toolFromParam, visibleCategories } from "@/app/lib/services";
@@ -100,6 +101,8 @@ function ExpressContent() {
   const isStyling = selectedTool?.kind === "styling";
   const isProcessing = job.isProcessing || order.isProcessing;
   const output = outputView(job.status, job.imageUrl);
+  // Personvern (dag 51): «Last ned» under Resultat, bare med et resultat.
+  const download = privacyDownload(selectedTool?.service, job.resultBlob, preview.file?.name);
   const showSceneControls =
     selectedTool?.kind === "scene" && selectedTool.sceneGate !== false;
   const showDuskControls =
@@ -528,6 +531,13 @@ function ExpressContent() {
             ) : (
               <div className="aspect-square w-full rounded-button border border-dashed border-line-strong flex items-center justify-center text-ink-2 text-sm">
                 {t(locale, "express.noResult")}
+              </div>
+            )}
+            {download && (
+              <div className="mt-6">
+                <Button onClick={() => saveBlob(download.blob, download.fileName)}>
+                  {t(locale, "express.download")}
+                </Button>
               </div>
             )}
           </Card>

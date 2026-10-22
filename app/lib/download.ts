@@ -79,6 +79,43 @@ export async function downloadMarkedImage(opts: {
   return { kind: "ok", fileName };
 }
 
+/** Endelsen etter formatet backend svarer med. Sync-svaret er PNG i dag (main.py). */
+const EXTENSIONS: Readonly<Record<string, string>> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+/**
+ * Filnavnet for personvern-resultatet (dag 51): <originalnavn uten
+ * endelse>-personvern.<endelse>. Tegn som ikke kan staa i et filnavn
+ * fjernes; uten navn blir det «bilde».
+ */
+export function privacyFileName(originalName: string | null | undefined, mimeType: string): string {
+  const base = (originalName ?? "").split(/[\\/]/).pop() ?? "";
+  const dot = base.lastIndexOf(".");
+  const stem = (dot > 0 ? base.slice(0, dot) : base)
+    .replace(/[\u0000-\u001f<>:"|?*]/g, "")
+    .trim();
+  const ext = EXTENSIONS[mimeType.toLowerCase().split(";")[0].trim()] ?? "png";
+  return `${stem || "bilde"}-personvern.${ext}`;
+}
+
+/**
+ * Nedlastingen av personvern-resultatet, eller null naar knappen ikke skal
+ * vises: bare privacy_blur, og bare med et resultat (sync-bloben fra
+ * useProcessJob). Bildet er ikke KI-endret, saa det gaar ikke gjennom
+ * /download med merking; bloben lagres direkte.
+ */
+export function privacyDownload(
+  service: string | null | undefined,
+  blob: Blob | null,
+  originalName: string | null | undefined
+): { blob: Blob; fileName: string } | null {
+  if (service !== "privacy_blur" || blob === null) return null;
+  return { blob, fileName: privacyFileName(originalName, blob.type) };
+}
+
 /** Lagrer bloben som fil i nettleseren via en midlertidig <a download>. */
 export function saveBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
