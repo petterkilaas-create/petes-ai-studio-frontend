@@ -9,6 +9,8 @@ import {
 } from "../lib/statusVariants";
 import { presetLabelKey } from "../lib/presets";
 import { OpenReviewLink } from "./OpenReviewLink";
+import { PrivacyDownloadButton } from "./PrivacyDownloadButton";
+import { canDownloadPrivacy } from "../lib/download";
 import { JobMedia } from "./JobMedia";
 import { cardNote, mediaView } from "../lib/jobMedia";
 import { formatDate } from "../lib/dates";
@@ -21,8 +23,9 @@ import { ownerBadge, rejectedLabelKey } from "../lib/roles";
 
 /*
  * Kortet for en jobb: bildet (ventebildet), tjenesten, status, dato og
- * «Åpne godkjenning». Flyttet uendret fra /history (TG-NEW-153), saa
- * Historikk og /start viser jobbene likt.
+ * «Åpne godkjenning» (eller «Last ned» for personvern, dag 51). Flyttet
+ * uendret fra /history (TG-NEW-153), saa Historikk og /start viser jobbene
+ * likt.
  *
  * `thumb` er det merkede resultatbildet fra thumbSrc(job), valgt av siden
  * (Lekkasjen L2). Lekkasjevernet i previews.test.ts sjekker at sidene kaller
@@ -125,6 +128,10 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
           <div>
             <OpenReviewLink jobId={job.jobId} labelKey={openKey} />
           </div>
+        )}
+        {canDownloadPrivacy(job) && (
+          // Dag 51: personvern-resultatet, bare for eieren (valg B1 A).
+          <PrivacyDownloadButton jobId={job.jobId} locale={locale} />
         )}
       </div>
     </div>

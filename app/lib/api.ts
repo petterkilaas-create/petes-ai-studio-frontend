@@ -1427,6 +1427,19 @@ export async function fetchJobDownload(opts: {
   return authedFetch(url, { method: "GET" }, opts.getToken);
 }
 
+/**
+ * GET /v1/jobs/{id}/privacy-download (dag 51): personvern-resultatet som PNG
+ * med bytene uendret, bare for eieren. Ikke KI-endret, saa ingen merking;
+ * aldri /download. Svaret tolkes av downloadPrivacyImage i download.ts.
+ */
+export async function fetchPrivacyDownload(opts: {
+  jobId: string;
+  getToken: GetToken;
+}): Promise<Response> {
+  const url = `${API_BASE}/v1/jobs/${encodeURIComponent(opts.jobId)}/privacy-download`;
+  return authedFetch(url, { method: "GET" }, opts.getToken);
+}
+
 export interface DecisionRequest {
   action: DecisionAction;
   /** Valgfri, bare ved reject. Hoeyst REASON_MAX_LEN tegn. */
