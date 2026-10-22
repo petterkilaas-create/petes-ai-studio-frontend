@@ -216,7 +216,7 @@ const nbUi = {
   // Forsiden og Tjenester lover bare det som leveres (dag 33, L0b).
   // Navnet kommer fra brand.ts, aldri fra ordlista (D1, brief §13).
   "home.title": "Velkommen til {brand}",
-  "home.intro": "Redigering av boligfoto: kveldsbilde laget med AI fra dagsbilde, og skjuling av ansikter og bilskilt.",
+  "home.intro": "Redigering av boligfoto: kveldsbilde og blå himmel laget med AI, og skjuling av ansikter.",
   // Startsiden (TG-NEW-153): det som venter, siste jobber og tjenestene. Ingen «oppdrag».
   "start.newOrder": "Ny bestilling",
   "start.waiting.title": "Venter på deg",
@@ -229,7 +229,7 @@ const nbUi = {
   "start.services.open": "Bruk tjenesten",
   "start.loading": "Henter jobbene …",
   "start.loadErrorTitle": "Kunne ikke hente jobbene",
-  "express.subtitle": "Kveldsbilde laget med AI fra dagsbilde, og skjuling av ansikter og bilskilt.",
+  "express.subtitle": "Kveldsbilde og blå himmel laget med AI, og skjuling av ansikter.",
   // D1c: tekstene paa Tjenester (brief §7), uten metaforer og steg-nummer.
   // Noeklene heter fortsatt express.* (TG-NEW-153, valg B1).
   "express.title": "Tjenester",
@@ -239,7 +239,7 @@ const nbUi = {
   "express.tool.klart_vaer.title": "Blå himmel",
   "express.tool.klart_vaer.desc": "Bytter grå himmel med klar, blå himmel.",
   "express.tool.skumring.desc": "Lager et kveldsbilde med AI fra et dagsbilde.",
-  "express.tool.privacy_blur.desc": "Gjør ansikter, familiebilder og bilskilt uskarpe.",
+  "express.tool.privacy_blur.desc": "Gjør ansikter og familiebilder uskarpe.",
   "express.tool.magic_cleanup.desc": "Fjerner flyttekasser, løse ledninger og rot.",
   // «Kommer»-kortene (dag 45): uten dato, og de kan ikke bestilles.
   "express.coming": "Kommer",
@@ -774,7 +774,7 @@ const en: Dictionary = {
     "unavailable.body": "This service is temporarily unavailable.",
     "unavailable.toServices": "Go to Services",
     "home.title": "Welcome to {brand}",
-    "home.intro": "Real estate photo editing: dusk image made with AI from a daytime photo, and blurring of faces and license plates.",
+    "home.intro": "Real estate photo editing: dusk image and blue sky made with AI, and blurring of faces.",
     "start.newOrder": "New order",
     "start.waiting.title": "Waiting for you",
     "start.waiting.empty": "No images are waiting for you.",
@@ -786,7 +786,7 @@ const en: Dictionary = {
     "start.services.open": "Use this service",
     "start.loading": "Loading your jobs …",
     "start.loadErrorTitle": "Could not load your jobs",
-    "express.subtitle": "Dusk image made with AI from a daytime photo, and blurring of faces and license plates.",
+    "express.subtitle": "Dusk image and blue sky made with AI, and blurring of faces.",
     "express.title": "Services",
     "express.chooseService": "Choose a service",
     "express.category.fixit": "Clean up",
@@ -794,7 +794,7 @@ const en: Dictionary = {
     "express.tool.klart_vaer.title": "Blue sky",
     "express.tool.klart_vaer.desc": "Replaces a grey sky with a clear blue sky.",
     "express.tool.skumring.desc": "Creates a dusk image with AI from a daytime photo.",
-    "express.tool.privacy_blur.desc": "Blurs faces, family photos and license plates.",
+    "express.tool.privacy_blur.desc": "Blurs faces and family photos.",
     "express.tool.magic_cleanup.desc": "Removes moving boxes, loose cables and clutter.",
     "express.coming": "Coming",
     "express.category.furnishing": "Furnishing",
