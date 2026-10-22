@@ -34,7 +34,7 @@ export const faq = [
   {
     id: "pris",
     q: "Hva koster det?",
-    a: "Et kveldsbilde koster {single} kr eks. mva., og {bundleCount} kveldsbilder i samme oppdrag koster {bundle} kr. Skjul ansikter og skilt koster {privacyBlur} kr per bilde. Kjeder og partnere får pris etter volum.",
+    a: "Et kveldsbilde koster {single} kr eks. mva., og {bundleCount} kveldsbilder i samme oppdrag koster {bundle} kr. Skjul ansikter koster {privacyBlur} kr per bilde. Kjeder og partnere får pris etter volum.",
     showOnHome: false,
   },
   {

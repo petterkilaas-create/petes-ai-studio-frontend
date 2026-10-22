@@ -35,7 +35,7 @@ test("succeeded: «Godkjent» for kveldsbildet, «Ferdig» for andre tjenester (
 
 test("tjenestenavnene kommer fra ordlista (brief §7)", () => {
   assert.equal(DICTIONARIES.nb.ui[serviceLabelKey("scene_transform")!], "Kveldsbilde");
-  assert.equal(DICTIONARIES.nb.ui[serviceLabelKey("privacy_blur")!], "Skjul ansikter og skilt");
+  assert.equal(DICTIONARIES.nb.ui[serviceLabelKey("privacy_blur")!], "Skjul ansikter");
   assert.equal(DICTIONARIES.nb.ui[serviceLabelKey("virtual_stage")!], "Digital styling");
   assert.equal(DICTIONARIES.en.ui[serviceLabelKey("scene_transform")!], "Dusk image");
   assert.equal(serviceLabelKey("lawn_green"), null);
