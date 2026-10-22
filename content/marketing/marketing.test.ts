@@ -814,7 +814,7 @@ test("MS3b: prisene og antallene staar ett sted, og «ca. 116» og svaret om pri
   const price = faq.find((i) => i.id === "pris")!;
   assert.equal(
     fill(price.a!, priceVars(site.offer)),
-    "Et kveldsbilde koster 149 kr eks. mva., og 3 kveldsbilder i samme oppdrag koster 349 kr. Skjul ansikter og skilt koster 29 kr per bilde. Kjeder og partnere får pris etter volum."
+    "Et kveldsbilde koster 149 kr eks. mva., og 3 kveldsbilder i samme oppdrag koster 349 kr. Skjul ansikter koster 29 kr per bilde. Kjeder og partnere får pris etter volum."
   );
   // Ingen tall i tekstene, heller ikke i spoersmaalene, og ingen tall skrevet inn i komponentene.
   for (const [path, text] of strings(faq, "faq")) assert.doesNotMatch(text, /\d/, path);
@@ -1780,7 +1780,7 @@ test("F6b: ingen tekst paa forsiden nevner Skjul ansikter og skilt, men svaret o
   assert.ok(shown.length > 100, String(shown.length));
   for (const [path, text] of shown) assert.ok(!text.includes("Skjul ansikter"), path);
   const price = faq.find((i) => i.id === "pris")!;
-  assert.ok((price.a ?? "").includes("Skjul ansikter og skilt koster {privacyBlur} kr per bilde."));
+  assert.ok((price.a ?? "").includes("Skjul ansikter koster {privacyBlur} kr per bilde."));
   assert.equal(price.showOnHome, false);
   assert.equal(typeof site.offer.prices.privacyBlur, "number");
 });

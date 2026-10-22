@@ -97,7 +97,7 @@ test("ventebilde: tekst oppå bildet bare mens jobben lages og ved peisspoersmaa
   };
   assert.deepEqual(text(job({ status: "queued", originalThumbUrl: null })), ["Lager kveldsbilde …", true]);
   assert.deepEqual(text(job({ status: "running" })), ["Lager kveldsbilde …", true]);
-  assert.deepEqual(text(job({ status: "running", service: "privacy_blur" })), ["Skjuler ansikter og skilt …", true]);
+  assert.deepEqual(text(job({ status: "running", service: "privacy_blur" })), ["Skjuler ansikter …", true]);
   assert.deepEqual(text(job({ status: "running", service: "noe_nytt" })), ["Lager bildet …", true]);
   for (const code of ["fireplace_present", "fireplace_disagreement", "fireplace_answer_missing"]) {
     assert.deepEqual(text(job({ status: "needs_review", code })), ["Svar på spørsmålet om peisen", false], code);
