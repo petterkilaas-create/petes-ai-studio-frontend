@@ -1,4 +1,4 @@
-import type { JobReviewDetail } from "./api";
+import type { JobReviewDetail, JobSummary } from "./api";
 import type { UiKey } from "./i18n";
 import { presetFileSlug } from "./presets.ts";
 import { mediaDeleted } from "./review.ts";
@@ -114,6 +114,60 @@ export function privacyDownload(
 ): { blob: Blob; fileName: string } | null {
   if (service !== "privacy_blur" || blob === null) return null;
   return { blob, fileName: privacyFileName(originalName, blob.type) };
+}
+
+/**
+ * «Last ned» paa personvern-kortet i Historikk og paa /start (dag 51): bare
+ * egen privacy_blur som er ferdig, og ikke naar bildene er slettet
+ * (TG-NEW-117). Backend avviser alt annet med 404, 409 eller 410.
+ */
+export function canDownloadPrivacy(
+  job: Pick<JobSummary, "service" | "status" | "isOwner" | "mediaDeletedAt">
+): boolean {
+  return (
+    job.service === "privacy_blur" &&
+    job.status === "succeeded" &&
+    job.isOwner === true &&
+    !mediaDeleted(job)
+  );
+}
+
+/**
+ * Filnavnet fra Historikk: originalnavnet finnes ikke i listingen, saa
+ * stammen er bilde-<de 8 foerste tegnene i jobId>, som i downloadFileName.
+ */
+export function privacyHistoryFileName(jobId: string, mimeType: string): string {
+  const short = jobId.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
+  return privacyFileName(short ? `bilde-${short}` : null, mimeType);
+}
+
+/** Som downloadMarkedImage, men mot privacy-download og med PNG-navnet. */
+export async function downloadPrivacyImage(opts: {
+  jobId: string;
+  /** Henter svaret med token (fetchPrivacyDownload i api.ts). */
+  fetchFile: () => Promise<Response>;
+  save?: (blob: Blob, fileName: string) => void;
+}): Promise<DownloadResult> {
+  const { jobId, fetchFile, save = saveBlob } = opts;
+  let res: Response;
+  try {
+    res = await fetchFile();
+  } catch {
+    // Nettverksfeil eller manglende token.
+    return { kind: "error", key: "review.downloadFailed" };
+  }
+  if (res.status !== 200) {
+    return { kind: "error", key: downloadErrorKey(res.status, await readJson(res)) };
+  }
+  let fileName: string;
+  try {
+    const blob = await res.blob();
+    fileName = privacyHistoryFileName(jobId, blob.type);
+    save(blob, fileName);
+  } catch {
+    return { kind: "error", key: "review.downloadFailed" };
+  }
+  return { kind: "ok", fileName };
 }
 
 /** Lagrer bloben som fil i nettleseren via en midlertidig <a download>. */

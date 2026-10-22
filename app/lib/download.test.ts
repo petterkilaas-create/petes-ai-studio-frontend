@@ -5,11 +5,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   canDownload,
+  canDownloadPrivacy,
   downloadErrorKey,
   downloadFileName,
   downloadMarkedImage,
+  downloadPrivacyImage,
   privacyDownload,
   privacyFileName,
+  privacyHistoryFileName,
   saveBlob,
 } from "./download.ts";
 
@@ -174,4 +177,88 @@ test("personvern: objekt-URL-en frigjoeres etter nedlastingen", (t) => {
   } finally {
     g.document = before;
   }
+});
+
+// --- Personvern i Historikk og paa /start: «Last ned» paa kortet (dag 51) ---
+
+const PRIVACY = { service: "privacy_blur", status: "succeeded", isOwner: true, mediaDeletedAt: null } as const;
+
+test("personvern-kortet: knappen bare for egen privacy_blur som er ferdig", () => {
+  assert.equal(canDownloadPrivacy(PRIVACY), true);
+  assert.equal(canDownloadPrivacy({ ...PRIVACY, mediaDeletedAt: undefined }), true);
+  // Kveldsbilde og andre tjenester, ogsaa ferdige: ingen knapp.
+  for (const service of ["scene_transform", "magic_cleanup", "virtual_staging", ""]) {
+    assert.equal(canDownloadPrivacy({ ...PRIVACY, service }), false, service);
+  }
+  for (const status of ["queued", "running", "awaiting_approval", "needs_review", "failed", "rejected", "unknown"] as const) {
+    assert.equal(canDownloadPrivacy({ ...PRIVACY, status }), false, status);
+  }
+  // Admin med «Alle brukere» ser andres jobb: ingen knapp (valg B1 A).
+  assert.equal(canDownloadPrivacy({ ...PRIVACY, isOwner: false }), false);
+  // TG-NEW-117: bildene er slettet.
+  assert.equal(canDownloadPrivacy({ ...PRIVACY, mediaDeletedAt: "2026-10-01T00:00:00Z" }), false);
+});
+
+test("personvern-kortet: filnavnet er bilde-<8 tegn>-personvern.png, ogsaa uten blob-type", () => {
+  assert.equal(privacyHistoryFileName(JOB, "image/png"), "bilde-250dccaf-personvern.png");
+  assert.equal(privacyHistoryFileName(JOB, ""), "bilde-250dccaf-personvern.png");
+  assert.equal(privacyHistoryFileName("ABC/../def-12345", "image/png"), "bilde-abcdef12-personvern.png");
+  assert.equal(privacyHistoryFileName("", "image/png"), "bilde-personvern.png");
+});
+
+test("personvern-kortet: 200 lagrer bloben uendret med PNG-navnet", async () => {
+  const saved: { blob: Blob; name: string }[] = [];
+  const body = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const result = await downloadPrivacyImage({
+    jobId: JOB,
+    fetchFile: async () => new Response(body, { status: 200, headers: { "Content-Type": "image/png" } }),
+    save: (blob, name) => saved.push({ blob, name }),
+  });
+  assert.deepEqual(result, { kind: "ok", fileName: "bilde-250dccaf-personvern.png" });
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].name, "bilde-250dccaf-personvern.png");
+  assert.deepEqual(new Uint8Array(await saved[0].blob.arrayBuffer()), body);
+});
+
+test("personvern-kortet: 200 uten Content-Type gir fortsatt .png", async () => {
+  const names: string[] = [];
+  const result = await downloadPrivacyImage({
+    jobId: JOB,
+    fetchFile: async () => new Response(new Blob([new Uint8Array([1, 2, 3])]), { status: 200 }),
+    save: (_blob, name) => names.push(name),
+  });
+  assert.deepEqual(result, { kind: "ok", fileName: "bilde-250dccaf-personvern.png" });
+  assert.deepEqual(names, ["bilde-250dccaf-personvern.png"]);
+});
+
+test("personvern-kortet: feilkodene gir riktig melding og ingen fil", async () => {
+  const cases: [number, unknown, string][] = [
+    [410, { detail: { code: "media_deleted" } }, "review.downloadDeleted"],
+    [409, { detail: { code: "action_not_allowed" } }, "review.downloadNotAllowed"],
+    [409, { detail: { code: "result_missing" } }, "review.downloadBroken"],
+    [409, { detail: { code: "result_mismatch" } }, "review.downloadBroken"],
+    [409, { detail: { code: "not_succeeded" } }, "review.downloadFailed"],
+    [404, { detail: "job not found" }, "review.downloadFailed"],
+    [503, { detail: "storage not available" }, "review.downloadFailed"],
+    [502, "<html>Bad gateway</html>", "review.downloadFailed"],
+  ];
+  for (const [status, body, key] of cases) {
+    const result = await downloadPrivacyImage({
+      jobId: JOB,
+      fetchFile: async () => json(status, body),
+      save: () => assert.fail("skal ikke lagre"),
+    });
+    assert.deepEqual(result, { kind: "error", key }, `${status} ${JSON.stringify(body)}`);
+  }
+});
+
+test("personvern-kortet: nettverksfeil gir downloadFailed", async () => {
+  const result = await downloadPrivacyImage({
+    jobId: JOB,
+    fetchFile: async () => {
+      throw new TypeError("Failed to fetch");
+    },
+    save: () => assert.fail("skal ikke lagre"),
+  });
+  assert.deepEqual(result, { kind: "error", key: "review.downloadFailed" });
 });
