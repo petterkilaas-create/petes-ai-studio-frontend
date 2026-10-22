@@ -5,7 +5,7 @@ import type { ProcessStatus } from "../hooks/processStatus";
  * Digital styling (S2-f og S3-f, KONTRAKT_BESTILLING): én bestilling er
  * ett bilde, ett romvalg og 1–8 stiler megleren velger, og koster én
  * kvote-enhet (Petter 21.10). Kortet staar bak `ENABLED.digital_styling`
- * (av til S4). Rene funksjoner, saa reglene kan testes med node --test; bare
+ * (paa fra S4, Dag 51). Rene funksjoner, saa reglene kan testes med node --test; bare
  * type-importer (api.ts kaster ved import naar NEXT_PUBLIC_API_BASE mangler).
  *
  * Feltet heter etter moebleringen, ikke rommet (`furnish_as`, S1-auditen

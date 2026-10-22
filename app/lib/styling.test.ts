@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withoutComments } from "./testing/jsxText.ts";
 
-// S2-f: bestilling av Digital styling bak ENABLED.digital_styling (av til S4).
+// S2-f: bestilling av Digital styling bak ENABLED.digital_styling (paa fra S4).
 // Kontrakt: ~/dev/_handoff/KONTRAKT_BESTILLING.md. api.ts kaster ved import
 // uten NEXT_PUBLIC_API_BASE; fetch byttes ut, ingen nettverkskall.
 process.env.NEXT_PUBLIC_API_BASE = "http://api.test";
@@ -97,17 +97,17 @@ const choice = (furnishAs: (typeof FURNISH_AS_CHOICES)[number], styles: readonly
 
 // --- Flagget og kortet ----------------------------------------------------------
 
-test("S2-f: ENABLED.digital_styling er false, og kortet kan ikke bestilles paa start eller Tjenester", () => {
-  assert.equal(ENABLED.digital_styling, false);
-  assert.equal(isServiceEnabled("digital_styling"), false);
+test("S4: ENABLED.digital_styling er true, og kortet kan bestilles paa start og Tjenester", () => {
+  assert.equal(ENABLED.digital_styling, true);
+  assert.equal(isServiceEnabled("digital_styling"), true);
   // Start (snarveiene) og Tjenester bruker orderableTools/expressCategories.
-  assert.ok(!orderableTools().some((t) => t.id === "digital_styling"));
-  assert.ok(!expressCategories().some((c) => c.id === "furnishing"));
-  assert.equal(toolFromParam("digital_styling"), null);
-  // Paa Tjenester er kortet «Kommer», som foer (dag 45): synlig, ikke valgbart.
+  assert.ok(orderableTools().some((t) => t.id === "digital_styling"));
+  assert.ok(expressCategories().some((c) => c.id === "furnishing"));
+  assert.deepEqual(toolFromParam("digital_styling"), { categoryId: "furnishing", toolId: "digital_styling" });
+  // Paa Tjenester er kortet valgbart, ikke lenger «Kommer».
   const card = visibleCategories().flatMap((c) => c.items).find((t) => t.id === "digital_styling");
   assert.ok(card);
-  assert.equal(card.orderable, false);
+  assert.equal(card.orderable, true);
   assert.equal(card.service, "scene_transform");
   assert.equal(card.kind, "styling");
 });

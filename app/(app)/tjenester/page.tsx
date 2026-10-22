@@ -87,7 +87,7 @@ function ExpressContent() {
   // Kvoten for gratisbilder (TG-NEW-149): fra GET /v1/quota, oppdatert fra bestillingen.
   const quota = useQuota();
   const job = useProcessJob({ onQuota: quota.apply });
-  // Digital styling: én bestilling med tre stiler (bak ENABLED.digital_styling).
+  // Digital styling: én bestilling med 1–8 av de åtte stilene (ENABLED.digital_styling, S4).
   const order = useOrderJobs({ onQuota: quota.apply });
   const refreshQuota = quota.refresh;
 
@@ -170,7 +170,7 @@ function ExpressContent() {
   const handleRun = () => {
     if (!selectedTool || !preview.file || isProcessing) return;
     if (selectedTool.kind === "styling") {
-      // Egen bestilling (POST /v1/orders/styling): alle tre stilene, ett trekk.
+      // Egen bestilling (POST /v1/orders/styling): de valgte stilene, ett trekk.
       const params = stylingParams(styling);
       if (params !== null) void order.run(preview.file, params);
       return;

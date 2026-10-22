@@ -25,8 +25,8 @@ export const ENABLED = {
   express_v2: false,
   privacy_blur: true,
   skumring: true,
-  /** Digital styling (S2-f): bestillingen er klar, men av til S4 slaar den paa. */
-  digital_styling: false,
+  /** Digital styling (S2-f, S3-f): aapnet i S4 (Dag 51), sammen med backend. */
+  digital_styling: true,
 } as const;
 
 /** Ukjent id gir av: en ny tjeneste maa legges inn over foer den vises. */
@@ -92,7 +92,7 @@ export function navLinks(): NavLink[] {
 
 // "simple"  = service alene (ingen params, backend-defaults gjelder).
 // "scene"   = scene_transform med preset_id + scene-type-gate (TG-NEW-58).
-// "styling" = Digital styling: egen bestilling med tre stiler (S2-f, POST /v1/orders/styling).
+// "styling" = Digital styling: egen bestilling med 1–8 stiler (S2-f, S3-f, POST /v1/orders/styling).
 export type ToolKind = "simple" | "scene" | "styling";
 
 export interface Tool {
@@ -189,7 +189,7 @@ const CATEGORIES: Category[] = [
     titleKey: "express.category.furnishing",
     items: [
       // Id-en er digital_styling, ikke virtual_stage (Petter 15.10): kortet
-      // styres ikke av ENABLED.virtual_stage og /staging. S2-f: tre stiler
+      // styres ikke av ENABLED.virtual_stage og /staging. S3-f: aatte stiler
       // under scene_transform, bestilt i ett kall (kind "styling", ingen presetId).
       {
         id: "digital_styling",
