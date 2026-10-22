@@ -341,7 +341,7 @@ test("TG-153: menyen viser bare ikonet under 640 px, og Start er ikke et hus", (
 // paa, vises som «Kommer» og kan ikke bestilles. ENABLED er uendret.
 // ---------------------------------------------------------------------------
 
-test("dag 45: visibleCategories gir alle kortene i rekkefoelge, fire «Kommer» og tre bestillbare", () => {
+test("dag 45 / S4: visibleCategories gir alle kortene i rekkefoelge, fire «Kommer» og fire bestillbare", () => {
   const cats = visibleCategories();
   assert.deepEqual(
     cats.map((c) => [c.id, c.items.map((t) => t.id)]),
@@ -354,29 +354,33 @@ test("dag 45: visibleCategories gir alle kortene i rekkefoelge, fire «Kommer» 
     ]
   );
   const tools = cats.flatMap((c) => c.items);
-  assert.deepEqual(tools.filter((t) => t.orderable).map((t) => t.id), ["skumring", "klart_vaer", "privacy_blur"]);
+  assert.deepEqual(
+    tools.filter((t) => t.orderable).map((t) => t.id),
+    ["skumring", "klart_vaer", "digital_styling", "privacy_blur"]
+  );
   assert.deepEqual(
     tools.filter((t) => !t.orderable).map((t) => t.id),
-    ["magic_cleanup", "digital_styling", "same_furniture_angles", "video", "copywriter"]
+    ["magic_cleanup", "same_furniture_angles", "video", "copywriter"]
   );
   // Ingen tom kategori, og orderable er det samme som ENABLED.
   for (const c of cats) assert.ok(c.items.length > 0, c.id);
   for (const t of tools) assert.equal(t.orderable, isServiceEnabled(t.id), t.id);
 });
 
-test("dag 45: det som kan bestilles og ?tjeneste= (Klart vaer aapnet i K3)", () => {
-  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "privacy_blur"]);
-  assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "privacy"]);
+test("dag 45 / S4: det som kan bestilles og ?tjeneste= (Klart vaer aapnet i K3, Digital styling i S4)", () => {
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "digital_styling", "privacy_blur"]);
+  assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "furnishing", "privacy"]);
   assert.deepEqual(toolFromParam("klart_vaer"), { categoryId: "timetraveler", toolId: "klart_vaer" });
-  for (const id of ["magic_cleanup", "digital_styling", "virtual_stage", "video", "copywriter"]) {
+  assert.deepEqual(toolFromParam("digital_styling"), { categoryId: "furnishing", toolId: "digital_styling" });
+  for (const id of ["magic_cleanup", "virtual_stage", "video", "copywriter"]) {
     assert.equal(toolFromParam(id), null, id);
   }
   // Video og Annonsetekst er ikke lagt inn i ENABLED, heller ikke som false.
   for (const id of ["video", "copywriter"]) {
     assert.ok(!Object.keys(ENABLED).includes(id), id);
   }
-  // Digital styling har egen noekkel fra S2-f, og den er av til S4.
-  assert.equal(ENABLED.digital_styling, false);
+  // Digital styling har egen noekkel fra S2-f, og den er paa fra S4.
+  assert.equal(ENABLED.digital_styling, true);
 });
 
 test("dag 45 / S2-f: digital styling-kortet er scene_transform, uavhengig av ENABLED.virtual_stage og /staging", () => {
@@ -386,7 +390,9 @@ test("dag 45 / S2-f: digital styling-kortet er scene_transform, uavhengig av ENA
   assert.equal(card.kind, "styling");
   assert.equal(card.presetId, undefined);
   assert.equal(card.titleKey, "service.virtual_stage");
-  assert.equal(card.orderable, false);
+  // S4: kortet kan bestilles, uavhengig av ENABLED.virtual_stage (som er av).
+  assert.equal(card.orderable, true);
+  assert.equal(ENABLED.virtual_stage, false);
   // Ingen kort bruker virtual_stage lenger.
   assert.ok(!visibleCategories().flatMap((c) => c.items).some((t) => t.service === "virtual_stage"));
 });
@@ -452,7 +458,7 @@ test("K3: magic_cleanup, virtual_stage og express_v2 er fortsatt av", () => {
   assert.equal(ENABLED.virtual_stage, false);
   assert.equal(ENABLED.express_v2, false);
   const ids = orderableTools().map((t) => t.id);
-  for (const id of ["magic_cleanup", "virtual_stage", "digital_styling"]) assert.ok(!ids.includes(id), id);
+  for (const id of ["magic_cleanup", "virtual_stage"]) assert.ok(!ids.includes(id), id);
 });
 
 test("K3: bestillingen paa Tjenester sender bare preset_id for et kort uten bildetypevelger", () => {
@@ -564,7 +570,7 @@ test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENA
       ["more", ["video", "copywriter"]],
     ]
   );
-  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "privacy_blur"]);
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "digital_styling", "privacy_blur"]);
   assert.deepEqual(ENABLED, {
     klart_vaer: true,
     magic_cleanup: false,
@@ -572,7 +578,7 @@ test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENA
     express_v2: false,
     privacy_blur: true,
     skumring: true,
-    digital_styling: false,
+    digital_styling: true,
   });
 });
 

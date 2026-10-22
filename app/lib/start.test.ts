@@ -104,8 +104,9 @@ test("TG-153 start: den automatiske hentingen gaar bare mens en jobb lages", () 
 // ---------------------------------------------------------------------------
 
 test("TG-153: snarveiene viser bare tjenester som kan bestilles i prod", () => {
-  // Speiler services/enabled.py i backend (TG-NEW-138): skumring, klart_vaer (K3) og privacy_blur.
-  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "privacy_blur"]);
+  // Speiler services/enabled.py i backend (TG-NEW-138): skumring, klart_vaer (K3), de aatte
+  // stilene i Digital styling (S4) og privacy_blur.
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "digital_styling", "privacy_blur"]);
   for (const tool of orderableTools()) assert.equal(ENABLED[tool.id as keyof typeof ENABLED], true, tool.id);
 });
 
@@ -116,7 +117,8 @@ test("TG-153: forhaandsvalget godtar bare tjenester som er slaatt paa", () => {
   assert.deepEqual(toolFromParam("skumring"), { categoryId: "timetraveler", toolId: "skumring" });
   assert.deepEqual(toolFromParam("privacy_blur"), { categoryId: "privacy", toolId: "privacy_blur" });
   assert.deepEqual(toolFromParam("klart_vaer"), { categoryId: "timetraveler", toolId: "klart_vaer" });
-  for (const hidden of ["magic_cleanup", "virtual_stage", "express_v2", "digital_styling", "video", "", "SKUMRING", "KLART_VAER"]) {
+  assert.deepEqual(toolFromParam("digital_styling"), { categoryId: "furnishing", toolId: "digital_styling" });
+  for (const hidden of ["magic_cleanup", "virtual_stage", "express_v2", "video", "", "SKUMRING", "KLART_VAER"]) {
     assert.equal(toolFromParam(hidden), null, hidden);
   }
   assert.equal(toolFromParam(null), null);
@@ -124,7 +126,7 @@ test("TG-153: forhaandsvalget godtar bare tjenester som er slaatt paa", () => {
 
 test("dag 38: /tjenester uten ?tjeneste= aapner Lys og himmel, uten tjeneste valgt", () => {
   // Standardkategorien er den foerste i lista; ?tjeneste= har forrang, som foer.
-  assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "privacy"]);
+  assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "furnishing", "privacy"]);
   const page = withoutComments(read("(app)/tjenester/page.tsx"));
   assert.match(page, /initial\?\.categoryId \?\? CATEGORIES\[0\]\?\.id \?\? ""/);
   assert.match(page, /useState<string \| null>\(initial\?\.toolId \?\? null\)/);
