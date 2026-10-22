@@ -12,7 +12,7 @@ import {
 import { useJobStatus, type UseJobStatusResult } from "../lib/useJobStatus";
 import { OrderKeys } from "../lib/orderKey";
 import type { QuotaEvent } from "../lib/quota";
-import { orderStatus, pollJobId, STYLING_ORDER_SERVICE } from "../lib/styling";
+import { orderPollDelayMs, orderStatus, pollJobId, STYLING_ORDER_SERVICE } from "../lib/styling";
 import { deriveProcessStatus, isProcessingStatus, type ProcessStatus } from "./processStatus";
 
 /** Ett kort per stil i bestillingen. */
@@ -55,9 +55,10 @@ export interface UseOrderJobsOptions {
  * POST /v1/orders/styling, og hver startet stil polles som i dag
  * (useJobStatus). `not_started` har ingen jobb og polles ikke.
  *
- * useProcessJob har én jobId; her er det hoeyst tre (MAX_ORDER_JOBS), og
- * reglene for hooks krever et fast antall kall. Derfor tre faste
- * useJobStatus-kall, der en tom plass faar null og ikke gjoer noe.
+ * useProcessJob har én jobId; her er det hoeyst aatte (MAX_ORDER_JOBS), og
+ * reglene for hooks krever et fast antall kall. Derfor aatte faste
+ * useJobStatus-kall, der en tom plass faar null og ikke gjoer noe. Med mange
+ * kort poller hvert kort saktere (orderPollDelayMs, S3-f).
  */
 export function useOrderJobs(options: UseOrderJobsOptions = {}): UseOrderJobsResult {
   const { getToken } = useAuth();
@@ -75,10 +76,16 @@ export function useOrderJobs(options: UseOrderJobsOptions = {}): UseOrderJobsRes
   // Et klikk nr. to mens kallet gaar, sendes ikke (knappen er av foerst etter neste render).
   const inFlightRef = useRef(false);
 
+  const pollOptions = { minDelayMs: orderPollDelayMs(jobs.length) };
   const polls: UseJobStatusResult[] = [
-    useJobStatus(pollJobId(jobs[0])),
-    useJobStatus(pollJobId(jobs[1])),
-    useJobStatus(pollJobId(jobs[2])),
+    useJobStatus(pollJobId(jobs[0]), pollOptions),
+    useJobStatus(pollJobId(jobs[1]), pollOptions),
+    useJobStatus(pollJobId(jobs[2]), pollOptions),
+    useJobStatus(pollJobId(jobs[3]), pollOptions),
+    useJobStatus(pollJobId(jobs[4]), pollOptions),
+    useJobStatus(pollJobId(jobs[5]), pollOptions),
+    useJobStatus(pollJobId(jobs[6]), pollOptions),
+    useJobStatus(pollJobId(jobs[7]), pollOptions),
   ];
 
   const run = useCallback(
