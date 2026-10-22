@@ -1,5 +1,7 @@
 import type { OrderJob, StylingOrderParams } from "./api";
 import type { ProcessStatus } from "../hooks/processStatus";
+import { t, type Locale } from "./i18n/index.ts";
+import { presetLabelKey } from "./presets.ts";
 
 /**
  * Digital styling (S2-f og S3-f, KONTRAKT_BESTILLING): én bestilling er
@@ -35,20 +37,41 @@ export function styleShort(style: StylingStyle): StylingShort {
   return style.slice("styling_".length) as StylingShort;
 }
 
+/** Er oppskriften Digital styling (`styling_…`, ogsaa de tre fra S2-f)? */
+export function isStylingPreset(presetId: string | null | undefined): boolean {
+  return presetId != null && presetId.startsWith("styling_");
+}
+
+/**
+ * Stilen som tekst paa godkjenningssiden (B2): «Dansk fargemoderne» for de
+ * aatte, kortetiketten for de tre fra S2-f («Digital styling – skandinavisk»),
+ * og null for en ukjent stil eller en oppskrift som ikke er styling.
+ */
+export function styleText(locale: Locale, presetId: string | null | undefined): string | null {
+  if (!isStylingPreset(presetId)) return null;
+  const style = STYLING_STYLES.find((s) => s === presetId);
+  if (style !== undefined) return t(locale, `styling.style.${styleShort(style)}`);
+  const key = presetLabelKey("scene_transform", presetId);
+  return key === null ? null : t(locale, key);
+}
+
 /** Hoeyst aatte stiler per bestilling (kontrakten), saa hooken har aatte faste poll-kall. */
 export const MAX_ORDER_JOBS = 8;
 
 /**
- * Romvalgene i velgeren ved lansering (Petter 15.27). Backend godtar ogsaa
- * `kids_room` og `home_office`, men de vises ikke.
+ * Romvalgene i velgeren, i samme rekkefoelge som `ST_ROOM` i backend. Sju
+ * ved lansering (Petter 15.27); barnerom og kontor kom med i B2 (Petter
+ * 22.10 kl. 17.48), etter sluttesten.
  */
 export const FURNISH_AS_CHOICES = [
   "living",
   "living_dining",
   "bedroom",
+  "kids_room",
   "kitchen_dining",
   "bathroom_decor",
   "hallway",
+  "home_office",
   "balcony_terrace",
 ] as const;
 export type FurnishAs = (typeof FURNISH_AS_CHOICES)[number];

@@ -1,6 +1,7 @@
 import type { ReviewRound, RoundChoices } from "./api";
 import { codeText, t, type Locale, type UiKey } from "./i18n/index.ts";
 import { variantOptions, type ImageVariant, type ReviewPreviews } from "./review.ts";
+import { isStylingPreset, styleText } from "./styling.ts";
 
 /**
  * Variantene i «Sammenlign originalen med» (D2a). Rene funksjoner, saa de
@@ -112,16 +113,33 @@ function choiceParts(locale: Locale, choices: RoundChoices): string[] {
 }
 
 /**
+ * Det som staar i parentes for admin: skumringsvalgene, eller stilen for
+ * Digital styling (B2), der skumringsvalgene ikke gir mening.
+ */
+function labelParts(locale: Locale, variant: CompareVariant, presetId: string | null | undefined): string[] {
+  if (isStylingPreset(presetId)) {
+    const style = styleText(locale, presetId);
+    return style === null ? [] : [style];
+  }
+  return variant.choices === null ? [] : choiceParts(locale, variant.choices);
+}
+
+/**
  * Etiketten, f.eks. «Runde 2 · nå (tidlig, lette skyer)» eller «Runde 1 ·
  * rått fra modellen». Nummeret er `round + 1` fra backend, aldri plassen i
  * lista (hull kan forekomme). Valgene i parentes bare med `choices`
- * (admin, TG-NEW-193); megleren ser «Runde 2 · nå».
+ * (admin, TG-NEW-193); megleren ser «Runde 2 · nå». For styling (`presetId`
+ * `styling_…`) staar stilen i parentes: «Runde 1 · nå (Dansk fargemoderne)».
  */
-export function variantLabel(locale: Locale, variant: CompareVariant, opts: { choices: boolean }): string {
+export function variantLabel(
+  locale: Locale,
+  variant: CompareVariant,
+  opts: { choices: boolean; presetId?: string | null }
+): string {
   if (variant.source.kind === "legacy") return t(locale, LEGACY_LABEL[variant.source.variant]);
   const base = t(locale, "compare.round", { n: (variant.round ?? 0) + 1 });
   if (variant.raw) return `${base} · ${t(locale, "compare.raw")}`;
   const head = variant.current ? `${base} · ${t(locale, "compare.now")}` : base;
-  const parts = !opts.choices || variant.choices === null ? [] : choiceParts(locale, variant.choices);
+  const parts = opts.choices ? labelParts(locale, variant, opts.presetId) : [];
   return parts.length > 0 ? `${head} (${parts.join(", ")})` : head;
 }

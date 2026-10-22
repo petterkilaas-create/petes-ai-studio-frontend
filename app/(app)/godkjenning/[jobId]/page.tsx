@@ -426,8 +426,8 @@ export default function GodkjenningPage({
               shown === null
                 ? ""
                 : stepShown !== null
-                  ? `${variantLabel(locale, shown, { choices: admin })} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
-                  : variantLabel(locale, shown, { choices: admin });
+                  ? `${variantLabel(locale, shown, { choices: admin, presetId: review.presetId })} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
+                  : variantLabel(locale, shown, { choices: admin, presetId: review.presetId });
             const correction = correctionControls(review);
             const canCorrect = correction.show && !limitReached && done === null;
             const isEditing = editing && canCorrect;
@@ -482,6 +482,7 @@ export default function GodkjenningPage({
                           selectedId={shown?.id ?? null}
                           onSelect={setVariantId}
                           choices={admin}
+                          presetId={review.presetId}
                           locale={locale}
                         />
                         <CompareViewer

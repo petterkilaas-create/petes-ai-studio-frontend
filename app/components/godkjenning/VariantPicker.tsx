@@ -15,6 +15,7 @@ export function VariantPicker({
   selectedId,
   onSelect,
   choices,
+  presetId,
   locale,
 }: {
   variants: CompareVariant[];
@@ -22,6 +23,8 @@ export function VariantPicker({
   onSelect: (id: string) => void;
   /** Valgene i etiketten (admin, TG-NEW-193). */
   choices: boolean;
+  /** Oppskriften: styling viser stilen i parentes i stedet for skumringsvalgene (B2). */
+  presetId: string | null;
   locale: Locale;
 }) {
   const headingId = useId();
@@ -40,7 +43,7 @@ export function VariantPicker({
             aria-pressed={selectedId === v.id}
             className={choiceClass(selectedId === v.id, "rounded-button text-left")}
           >
-            {variantLabel(locale, v, { choices })}
+            {variantLabel(locale, v, { choices, presetId })}
           </button>
         ))}
       </div>

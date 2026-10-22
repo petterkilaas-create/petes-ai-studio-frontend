@@ -88,11 +88,12 @@ test("TG193 #7: admin beholder dagens etikett med valgene", () => {
   assert.equal(variantLabel("nb", vs[1], { choices: true }), "Runde 1 (tidlig, uten himmel, peis tent, lys justert)");
 });
 
+// B2 (dag 51): oppskriften sendes med, saa styling viser stilen i parentes.
 test("TG193 #7: siden og variantvalget sender choices = admin", () => {
-  assert.equal(page.match(/variantLabel\(locale, shown, \{ choices: admin \}\)/g)?.length, 2);
+  assert.equal(page.match(/variantLabel\(locale, shown, \{ choices: admin, presetId: review\.presetId \}\)/g)?.length, 2);
   assert.doesNotMatch(page, /variantLabel\(locale, shown\)/);
-  assert.match(page, /<VariantPicker[\s\S]*?choices=\{admin\}[\s\S]*?\/>/);
-  assert.match(picker, /\{variantLabel\(locale, v, \{ choices \}\)\}/);
+  assert.match(page, /<VariantPicker[\s\S]*?choices=\{admin\}[\s\S]*?presetId=\{review\.presetId\}[\s\S]*?\/>/);
+  assert.match(picker, /\{variantLabel\(locale, v, \{ choices, presetId \}\)\}/);
 });
 
 // ---------------------------------------------------------------------------
