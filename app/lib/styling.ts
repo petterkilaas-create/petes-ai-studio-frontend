@@ -2,22 +2,41 @@ import type { OrderJob, StylingOrderParams } from "./api";
 import type { ProcessStatus } from "../hooks/processStatus";
 
 /**
- * Digital styling (S2-f, KONTRAKT_BESTILLING): én bestilling er ett bilde,
- * ett romvalg og alle tre stilene, og koster én kvote-enhet. Kortet staar
- * bak `ENABLED.digital_styling` (av til S4). Rene funksjoner, saa reglene
- * kan testes med node --test; bare type-importer (api.ts kaster ved import
- * naar NEXT_PUBLIC_API_BASE mangler).
+ * Digital styling (S2-f og S3-f, KONTRAKT_BESTILLING): én bestilling er
+ * ett bilde, ett romvalg og 1–8 stiler megleren velger, og koster én
+ * kvote-enhet (Petter 21.10). Kortet staar bak `ENABLED.digital_styling`
+ * (av til S4). Rene funksjoner, saa reglene kan testes med node --test; bare
+ * type-importer (api.ts kaster ved import naar NEXT_PUBLIC_API_BASE mangler).
  *
  * Feltet heter etter moebleringen, ikke rommet (`furnish_as`, S1-auditen
  * §2): etiketten er «Møbler som soverom», aldri «Soverom».
  */
 
-/** Stilene i den rekkefoelgen jobbene startes og kortene vises. */
-export const STYLING_STYLES = ["styling_skandinavisk", "styling_familie", "styling_moderne"] as const;
+/**
+ * De aatte stilene (S3-f) i den faste rekkefoelgen jobbene startes og kortene
+ * vises, samme som `ST_STYLE` i backend.
+ */
+export const STYLING_STYLES = [
+  "styling_moderne_nordisk",
+  "styling_varm_minimalisme",
+  "styling_japandi",
+  "styling_nordisk_klassisk",
+  "styling_dansk_farge",
+  "styling_by_vintage",
+  "styling_hytte_fjell",
+  "styling_nordisk_kyst",
+] as const;
 export type StylingStyle = (typeof STYLING_STYLES)[number];
+type ShortOf<T> = T extends `styling_${infer S}` ? S : never;
+/** Id-en uten `styling_`, brukt i ordlista (`styling.style.<kort>`). */
+export type StylingShort = ShortOf<StylingStyle>;
 
-/** Hoeyst tre stiler per bestilling (kontrakten), saa hooken har tre faste poll-kall. */
-export const MAX_ORDER_JOBS = 3;
+export function styleShort(style: StylingStyle): StylingShort {
+  return style.slice("styling_".length) as StylingShort;
+}
+
+/** Hoeyst aatte stiler per bestilling (kontrakten), saa hooken har aatte faste poll-kall. */
+export const MAX_ORDER_JOBS = 8;
 
 /**
  * Romvalgene i velgeren ved lansering (Petter 15.27). Backend godtar ogsaa
@@ -39,14 +58,35 @@ export interface StylingChoice {
   furnishAs: FurnishAs | null;
   /** «Rommet er tomt for løse møbler» (Petter 3A). */
   roomEmpty: boolean;
+  /** Stilene megleren har valgt. Ingen er forhaandsvalgt. */
+  styles: StylingStyle[];
 }
 
-export const EMPTY_STYLING: StylingChoice = { furnishAs: null, roomEmpty: false };
+export const EMPTY_STYLING: StylingChoice = { furnishAs: null, roomEmpty: false, styles: [] };
 
-/** `params_json` for bestillingen, eller null naar valget ikke er komplett (da er «Bestill» av). */
+/** Legger til stilen, eller tar den bort om den er valgt. */
+export function toggleStyle(styles: readonly StylingStyle[], id: StylingStyle): StylingStyle[] {
+  return styles.includes(id) ? styles.filter((s) => s !== id) : [...styles, id];
+}
+
+/**
+ * `params_json` for bestillingen, eller null naar valget ikke er komplett (da
+ * er «Bestill» av). Stilene sendes uten duplikater og i den faste
+ * rekkefoelgen, saa `Idempotency-Key` og duplikatsvaret blir stabile.
+ */
 export function stylingParams(choice: StylingChoice): StylingOrderParams | null {
   if (choice.furnishAs === null || !choice.roomEmpty) return null;
-  return { styles: [...STYLING_STYLES], furnish_as: choice.furnishAs, room_empty_confirmed: true };
+  const styles = STYLING_STYLES.filter((s) => choice.styles.includes(s));
+  if (styles.length === 0) return null;
+  return { styles, furnish_as: choice.furnishAs, room_empty_confirmed: true };
+}
+
+/**
+ * Minste ventetid mellom to poll per kort naar jobben venter (S3-auditen §2):
+ * 2 s × ⌈n/3⌉, minst 2 s. 1–3 stiler gir 2 s, 4–6 gir 4 s og 7–8 gir 6 s.
+ */
+export function orderPollDelayMs(jobCount: number): number {
+  return 2000 * Math.max(1, Math.ceil(jobCount / 3));
 }
 
 /** `service` i OrderKeys: bestillingen har ikke eget service-felt. */

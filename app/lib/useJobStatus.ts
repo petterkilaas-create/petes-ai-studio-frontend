@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { pollJob, type Rejection, type Review } from "./api";
 import { afterPoll, isTransientPollError, type JobStatus, type PollOutcome } from "./jobState";
@@ -30,8 +30,21 @@ export interface UseJobStatusResult {
   waking: boolean;
 }
 
-export function useJobStatus(jobId: string | null): UseJobStatusResult {
+export interface UseJobStatusOptions {
+  /**
+   * Minste ventetid naar jobben venter (202), f.eks. saktere polling for en
+   * bestilling med mange kort (S3-f). Backoff etter feil er uendret.
+   */
+  minDelayMs?: number;
+}
+
+export function useJobStatus(jobId: string | null, options: UseJobStatusOptions = {}): UseJobStatusResult {
   const { getToken } = useAuth();
+  // Leses gjennom en ref, saa en endring ikke starter pollingen paa nytt.
+  const minDelayMsRef = useRef(options.minDelayMs ?? 0);
+  useEffect(() => {
+    minDelayMsRef.current = options.minDelayMs ?? 0;
+  });
 
   const [status, setStatus] = useState<JobStatus>("idle");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -86,9 +99,10 @@ export function useJobStatus(jobId: string | null): UseJobStatusResult {
       // Rolig tekst bare ved kaldstart-feil, ikke ved 500 (TG-NEW-134).
       setWaking(step.kind === "wait" && isTransientPollError(outcome));
       if (step.kind === "wait") {
-        // pending (Retry-After) eller backoff etter en feil.
+        // pending (Retry-After) eller backoff etter en feil. Bare pending
+        // (et svar) faar minDelayMs.
         consecutiveErrors = step.consecutiveErrors;
-        schedule(step.delayMs);
+        schedule(outcome.ok ? Math.max(step.delayMs, minDelayMsRef.current) : step.delayMs);
         return;
       }
       if (step.kind === "gave_up") {

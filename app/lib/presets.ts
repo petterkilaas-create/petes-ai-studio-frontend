@@ -63,6 +63,55 @@ const SCENE_PRESETS: readonly ScenePreset[] = [
     workingKey: "media.working.styling",
     fileSlug: "styling-moderne",
   },
+  // De aatte stilene (S3-f). De tre over staar igjen for historikken.
+  {
+    ids: ["styling_moderne_nordisk"],
+    labelKey: "styling.preset.moderne_nordisk",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-moderne-nordisk",
+  },
+  {
+    ids: ["styling_varm_minimalisme"],
+    labelKey: "styling.preset.varm_minimalisme",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-varm-minimalisme",
+  },
+  {
+    ids: ["styling_japandi"],
+    labelKey: "styling.preset.japandi",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-japandi",
+  },
+  {
+    ids: ["styling_nordisk_klassisk"],
+    labelKey: "styling.preset.nordisk_klassisk",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-nordisk-klassisk",
+  },
+  {
+    ids: ["styling_dansk_farge"],
+    labelKey: "styling.preset.dansk_farge",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-dansk-farge",
+  },
+  {
+    ids: ["styling_by_vintage"],
+    labelKey: "styling.preset.by_vintage",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-by-vintage",
+  },
+  {
+    ids: ["styling_hytte_fjell"],
+    labelKey: "styling.preset.hytte_fjell",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-hytte-fjell",
+  },
+  {
+    ids: ["styling_nordisk_kyst"],
+    labelKey: "styling.preset.nordisk_kyst",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-nordisk-kyst",
+  },
 ];
 
 /** Reserven mens `preset_id` mangler (null): skumring. */
