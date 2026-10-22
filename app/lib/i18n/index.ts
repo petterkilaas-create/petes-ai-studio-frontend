@@ -216,7 +216,7 @@ const nbUi = {
   // Forsiden og Tjenester lover bare det som leveres (dag 33, L0b).
   // Navnet kommer fra brand.ts, aldri fra ordlista (D1, brief §13).
   "home.title": "Velkommen til {brand}",
-  "home.intro": "Redigering av boligfoto: kveldsbilde og blå himmel laget med AI, og skjuling av ansikter.",
+  "home.intro": "Redigering av boligfoto: kveldsbilde, blå himmel og digital styling laget med AI, og skjuling av ansikter.",
   // Startsiden (TG-NEW-153): det som venter, siste jobber og tjenestene. Ingen «oppdrag».
   "start.newOrder": "Ny bestilling",
   "start.waiting.title": "Venter på deg",
@@ -229,7 +229,7 @@ const nbUi = {
   "start.services.open": "Bruk tjenesten",
   "start.loading": "Henter jobbene …",
   "start.loadErrorTitle": "Kunne ikke hente jobbene",
-  "express.subtitle": "Kveldsbilde og blå himmel laget med AI, og skjuling av ansikter.",
+  "express.subtitle": "Kveldsbilde, blå himmel og digital styling laget med AI, og skjuling av ansikter.",
   // D1c: tekstene paa Tjenester (brief §7), uten metaforer og steg-nummer.
   // Noeklene heter fortsatt express.* (TG-NEW-153, valg B1).
   "express.title": "Tjenester",
@@ -565,9 +565,11 @@ const nb: Dictionary = {
       living: "Møbler som stue",
       living_dining: "Møbler som stue og spisestue",
       bedroom: "Møbler som soverom",
+      kids_room: "Møbler som barnerom",
       kitchen_dining: "Møbler som kjøkken og spisestue",
       bathroom_decor: "Møbler som bad",
       hallway: "Møbler som gang",
+      home_office: "Møbler som kontor",
       balcony_terrace: "Møbler som balkong eller terrasse",
     },
     // TG-NEW-185: grunnen (reason) når bestillingen gir 400 unsupported_image.
@@ -774,7 +776,7 @@ const en: Dictionary = {
     "unavailable.body": "This service is temporarily unavailable.",
     "unavailable.toServices": "Go to Services",
     "home.title": "Welcome to {brand}",
-    "home.intro": "Real estate photo editing: dusk image and blue sky made with AI, and blurring of faces.",
+    "home.intro": "Real estate photo editing: dusk image, blue sky and digital styling made with AI, and blurring of faces.",
     "start.newOrder": "New order",
     "start.waiting.title": "Waiting for you",
     "start.waiting.empty": "No images are waiting for you.",
@@ -786,7 +788,7 @@ const en: Dictionary = {
     "start.services.open": "Use this service",
     "start.loading": "Loading your jobs …",
     "start.loadErrorTitle": "Could not load your jobs",
-    "express.subtitle": "Dusk image and blue sky made with AI, and blurring of faces.",
+    "express.subtitle": "Dusk image, blue sky and digital styling made with AI, and blurring of faces.",
     "express.title": "Services",
     "express.chooseService": "Choose a service",
     "express.category.fixit": "Clean up",
@@ -1085,9 +1087,11 @@ const en: Dictionary = {
       living: "Furnish as living room",
       living_dining: "Furnish as living and dining room",
       bedroom: "Furnish as bedroom",
+      kids_room: "Furnish as children's room",
       kitchen_dining: "Furnish as kitchen and dining area",
       bathroom_decor: "Furnish as bathroom",
       hallway: "Furnish as hallway",
+      home_office: "Furnish as home office",
       balcony_terrace: "Furnish as balcony or terrace",
     },
     unsupportedImage: {

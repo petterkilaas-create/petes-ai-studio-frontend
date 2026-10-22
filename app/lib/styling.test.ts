@@ -168,18 +168,32 @@ test("S2-f: ingen tekst om styling nevner rommet i filnavnet eller lover samme m
 
 // --- Velgeren -------------------------------------------------------------------
 
-test("S2-f: velgeren viser sju valg og aldri kids_room eller home_office", () => {
+// B2 (Petter 22.10 kl. 17.48): barnerom og kontor er med, i rekkefoelgen til ST_ROOM i backend.
+test("B2: velgeren viser ni valg, med barnerom og kontor", () => {
   assert.deepEqual(
     [...FURNISH_AS_CHOICES],
-    ["living", "living_dining", "bedroom", "kitchen_dining", "bathroom_decor", "hallway", "balcony_terrace"]
+    [
+      "living",
+      "living_dining",
+      "bedroom",
+      "kids_room",
+      "kitchen_dining",
+      "bathroom_decor",
+      "hallway",
+      "home_office",
+      "balcony_terrace",
+    ]
   );
-  for (const hidden of ["kids_room", "home_office"]) {
-    assert.ok(!(FURNISH_AS_CHOICES as readonly string[]).includes(hidden), hidden);
-  }
   const picker = read("components/StylingChoicePicker.tsx");
   assert.match(picker, /FURNISH_AS_CHOICES\.map\(/);
   assert.match(picker, /codeText\(locale, "furnishAs", room\)/);
   assert.doesNotMatch(picker, /kids_room|home_office/);
+  assert.equal(codeText("nb", "furnishAs", "kids_room"), "Møbler som barnerom");
+  assert.equal(codeText("nb", "furnishAs", "home_office"), "Møbler som kontor");
+  assert.equal(codeText("en", "furnishAs", "kids_room"), "Furnish as children's room");
+  assert.equal(codeText("en", "furnishAs", "home_office"), "Furnish as home office");
+  assert.equal(stylingParams(choice("kids_room"))?.furnish_as, "kids_room");
+  assert.equal(stylingParams(choice("home_office"))?.furnish_as, "home_office");
 });
 
 test("S2-f: etiketten er «Møbler som …», aldri bare «Soverom», paa nb og en", () => {
@@ -515,4 +529,62 @@ test("S2-f: gjennomgangen har ingen paneler for styling, og «Ikke kontrollert»
   assert.equal(t("nb", "review.originalFirst"), "Bruk originalbildet som hovedbilde i annonsen, ikke det møblerte.");
   const disclosure = read("components/godkjenning/DisclosureBlock.tsx");
   assert.match(disclosure, /disclosure\?\.base === "furniture_added" &&/);
+});
+
+// ---------------------------------------------------------------------------
+// B2 (dag 51): stilen paa godkjenningssiden, og ingressen.
+// ---------------------------------------------------------------------------
+
+test("B2: isStylingPreset og styleText", () => {
+  const { isStylingPreset, styleText } = styling;
+  for (const id of [...STYLING_STYLES, "styling_skandinavisk", "styling_ukjent"]) assert.equal(isStylingPreset(id), true, id);
+  for (const id of ["skumring", "skumring_interior", "klart_vaer", null, undefined, ""]) {
+    assert.equal(isStylingPreset(id), false, String(id));
+    assert.equal(styleText("nb", id), null, String(id));
+  }
+  assert.equal(styleText("nb", "styling_dansk_farge"), "Dansk fargemoderne");
+  assert.equal(styleText("en", "styling_dansk_farge"), "Danish colour modern");
+  for (const id of STYLING_STYLES) {
+    assert.equal(styleText("nb", id), t("nb", `styling.style.${styleShort(id)}`), id);
+  }
+  assert.equal(styleText("nb", "styling_skandinavisk"), "Digital styling – skandinavisk");
+  assert.equal(styleText("nb", "styling_ukjent"), null);
+});
+
+test("B2: «Detaljer» viser stilen for styling og skumringsanalysen ellers", () => {
+  const details = read("components/godkjenning/DetailsPanel.tsx");
+  assert.match(details, /const styling = isStylingPreset\(review\.presetId\);/);
+  const start = details.indexOf("{styling ? (");
+  const split = details.indexOf(") : (", start);
+  assert.ok(start > 0 && split > start, "styling-grenen");
+  const stylingBranch = details.slice(start, split);
+  const rest = details.slice(split);
+  assert.match(stylingBranch, /t\(locale, "review\.style"\)/);
+  assert.match(stylingBranch, /styleText\(locale, review\.presetId\) \?\? review\.presetId/);
+  // Ingen skumringsanalyse for styling: bildetype, himmel, peis og lyskilder.
+  assert.doesNotMatch(stylingBranch, /imageType|skyVisibility|review\.sky|fireplace|LightList|review\.lights/);
+  for (const key of ["review.analysisTitle", "review.imageType", "review.sky", "review.fireplace", "review.lights", "<LightList"]) {
+    assert.ok(rest.includes(key), key);
+  }
+  // Grunner og merknader staar foer grenen, for alle oppskrifter.
+  assert.ok(details.indexOf('"reasonCode"') < start && details.indexOf('"flagCode"') < start);
+});
+
+test("B2: ingressen nevner digital styling, ordrett paa nb og en", () => {
+  assert.equal(
+    DICTIONARIES.nb.ui["express.subtitle"],
+    "Kveldsbilde, blå himmel og digital styling laget med AI, og skjuling av ansikter."
+  );
+  assert.equal(
+    DICTIONARIES.en.ui["express.subtitle"],
+    "Dusk image, blue sky and digital styling made with AI, and blurring of faces."
+  );
+  assert.equal(
+    DICTIONARIES.nb.ui["home.intro"],
+    "Redigering av boligfoto: kveldsbilde, blå himmel og digital styling laget med AI, og skjuling av ansikter."
+  );
+  assert.equal(
+    DICTIONARIES.en.ui["home.intro"],
+    "Real estate photo editing: dusk image, blue sky and digital styling made with AI, and blurring of faces."
+  );
 });

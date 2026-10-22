@@ -147,3 +147,51 @@ test("gamle jobber uten rounds bruker de merkede feltene som foer", () => {
   assert.deepEqual(admin.map((v) => v.id), ["legacy-lifted", "legacy-raw", "legacy-previous"]);
   assert.equal(variantLabel("en", admin[1], ADMIN), "Raw");
 });
+
+// ---------------------------------------------------------------------------
+// B2 (dag 51): Digital styling viser stilen i parentes, aldri skumringsvalgene.
+// ---------------------------------------------------------------------------
+
+/** En styling-runde faar skumringsvalgene fra backend (tidlig, uten himmel), slik live-sjekken av S4 viste. */
+const STYLING_CHOICES: RoundChoices = { ...CHOICES, skyApplied: false };
+
+function stylingVariants(isAdmin: boolean) {
+  return compareVariants(
+    images([round(0, { current: true, choices: STYLING_CHOICES, rawPreviewUrl: "raw0.jpg" })]),
+    { isAdmin }
+  );
+}
+
+test("B2: admin ser stilen i parentes for styling, ikke skumringsvalgene", () => {
+  const [now] = stylingVariants(true);
+  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_dansk_farge" }), "Runde 1 · nå (Dansk fargemoderne)");
+  assert.equal(variantLabel("en", now, { choices: true, presetId: "styling_dansk_farge" }), "Round 1 · now (Danish colour modern)");
+  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_japandi" }), "Runde 1 · nå (Japandi)");
+  // De tre fra S2-f: kortetiketten.
+  assert.equal(
+    variantLabel("nb", now, { choices: true, presetId: "styling_skandinavisk" }),
+    "Runde 1 · nå (Digital styling – skandinavisk)"
+  );
+  // Ukjent stil: ingen parentes, og aldri skumringsvalgene.
+  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_ukjent" }), "Runde 1 · nå");
+  for (const presetId of ["styling_dansk_farge", "styling_skandinavisk", "styling_ukjent"]) {
+    const label = variantLabel("nb", now, { choices: true, presetId });
+    assert.doesNotMatch(label, /tidlig|uten himmel|skyer|peis|lys justert/, presetId);
+  }
+});
+
+test("B2: megleren ser «Runde 1 · nå» for styling, og rått er uendret", () => {
+  const admin = stylingVariants(true);
+  const [now] = stylingVariants(false);
+  assert.equal(variantLabel("nb", now, { choices: false, presetId: "styling_dansk_farge" }), "Runde 1 · nå");
+  assert.equal(variantLabel("nb", admin[1], { choices: true, presetId: "styling_dansk_farge" }), "Runde 1 · rått fra modellen");
+});
+
+test("B2: skumring, Klart vaer og jobber uten oppskrift har skumringsvalgene som foer", () => {
+  const [now] = stylingVariants(true);
+  for (const presetId of ["skumring", "skumring_interior", "klart_vaer", null, undefined]) {
+    assert.equal(variantLabel("nb", now, { choices: true, presetId }), "Runde 1 · nå (tidlig, uten himmel)", String(presetId));
+  }
+  assert.equal(variantLabel("en", now, { choices: true, presetId: "skumring" }), "Round 1 · now (early, no sky)");
+  assert.equal(variantLabel("nb", now, { choices: false, presetId: "skumring" }), "Runde 1 · nå");
+});

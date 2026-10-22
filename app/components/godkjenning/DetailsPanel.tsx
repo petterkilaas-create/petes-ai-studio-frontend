@@ -4,6 +4,7 @@ import type { JobReviewDetail, ReviewLight, RunValue } from "../../lib/api";
 import { codeText, t, type Locale } from "../../lib/i18n";
 import { lightNames, type LightName } from "../../lib/lightsView";
 import { fireplaceAnswerKey } from "../../lib/review";
+import { isStylingPreset, styleText } from "../../lib/styling";
 import { cardClass } from "../ui/Card";
 import { FOCUS, LABEL } from "./classes";
 import { LightLabel } from "./LightLabel";
@@ -72,9 +73,12 @@ function LightList({
  * «Detaljer» (D2b, brief §3 punkt 6): analysen, med grunner, flagg,
  * uenighet mellom kjoeringene og de tre lyslistene. Siden viser panelet bare
  * naar showDetails(caps) er sann (i dag bare admin). Lukket som standard.
+ * For Digital styling (B2) vises stilen i stedet for skumringsanalysen
+ * (bildetype, himmel, peis og lyskilder); grunner og merknader som foer.
  */
 export function DetailsPanel({ review, locale }: { review: JobReviewDetail; locale: Locale }) {
   const nameOf = lightNames(review.lights);
+  const styling = isStylingPreset(review.presetId);
   return (
     <details className={CARD}>
       <summary className={`min-h-11 flex items-center cursor-pointer rounded-button text-sm font-medium text-ink ${FOCUS}`}>
@@ -102,46 +106,55 @@ export function DetailsPanel({ review, locale }: { review: JobReviewDetail; loca
           </div>
         )}
 
-        <div className="flex flex-col gap-4">
-          <p className={`${LABEL} mb-0`}>{t(locale, "review.analysisTitle")}</p>
-          <RunValueLine
-            label={t(locale, "review.imageType")}
-            value={review.imageType}
-            group="imageType"
-            locale={locale}
-          />
-          <RunValueLine
-            label={t(locale, "review.sky")}
-            value={review.skyVisibility}
-            group="skyVisibility"
-            locale={locale}
-          />
+        {styling ? (
           <div>
-            <p className="text-xs text-ink-2">{t(locale, "review.fireplace")}</p>
-            <p className="text-sm text-ink">
-              {review.fireplace.disagreement
-                ? t(locale, "review.fireplaceDisagreement")
-                : review.fireplace.present
-                  ? t(locale, "review.fireplacePresent")
-                  : t(locale, "review.fireplaceNone")}
-            </p>
-            {(review.fireplace.answer === "yes" || review.fireplace.answer === "no") && (
-              <p className="text-xs text-ink-2">
-                {t(locale, "review.fireplaceAnswered", {
-                  answer: t(locale, fireplaceAnswerKey(review.fireplace.answer)),
-                })}
-              </p>
-            )}
+            <p className="text-xs text-ink-2">{t(locale, "review.style")}</p>
+            <p className="text-sm text-ink">{styleText(locale, review.presetId) ?? review.presetId}</p>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-4">
+              <p className={`${LABEL} mb-0`}>{t(locale, "review.analysisTitle")}</p>
+              <RunValueLine
+                label={t(locale, "review.imageType")}
+                value={review.imageType}
+                group="imageType"
+                locale={locale}
+              />
+              <RunValueLine
+                label={t(locale, "review.sky")}
+                value={review.skyVisibility}
+                group="skyVisibility"
+                locale={locale}
+              />
+              <div>
+                <p className="text-xs text-ink-2">{t(locale, "review.fireplace")}</p>
+                <p className="text-sm text-ink">
+                  {review.fireplace.disagreement
+                    ? t(locale, "review.fireplaceDisagreement")
+                    : review.fireplace.present
+                      ? t(locale, "review.fireplacePresent")
+                      : t(locale, "review.fireplaceNone")}
+                </p>
+                {(review.fireplace.answer === "yes" || review.fireplace.answer === "no") && (
+                  <p className="text-xs text-ink-2">
+                    {t(locale, "review.fireplaceAnswered", {
+                      answer: t(locale, fireplaceAnswerKey(review.fireplace.answer)),
+                    })}
+                  </p>
+                )}
+              </div>
+            </div>
 
-        <div className="flex flex-col gap-4">
-          <p className={`${LABEL} mb-0`}>{t(locale, "review.lights")}</p>
-          {review.validRuns === 0 && <p className="text-xs text-amber-fg">{t(locale, "review.noValidRuns")}</p>}
-          <LightList title={t(locale, "review.lightsApproved")} lights={review.lights.approved} nameOf={nameOf} locale={locale} />
-          <LightList title={t(locale, "review.lightsUnstable")} lights={review.lights.unstable} nameOf={nameOf} locale={locale} />
-          <LightList title={t(locale, "review.lightsRejected")} lights={review.lights.rejected} nameOf={nameOf} locale={locale} />
-        </div>
+            <div className="flex flex-col gap-4">
+              <p className={`${LABEL} mb-0`}>{t(locale, "review.lights")}</p>
+              {review.validRuns === 0 && <p className="text-xs text-amber-fg">{t(locale, "review.noValidRuns")}</p>}
+              <LightList title={t(locale, "review.lightsApproved")} lights={review.lights.approved} nameOf={nameOf} locale={locale} />
+              <LightList title={t(locale, "review.lightsUnstable")} lights={review.lights.unstable} nameOf={nameOf} locale={locale} />
+              <LightList title={t(locale, "review.lightsRejected")} lights={review.lights.rejected} nameOf={nameOf} locale={locale} />
+            </div>
+          </>
+        )}
       </div>
     </details>
   );
