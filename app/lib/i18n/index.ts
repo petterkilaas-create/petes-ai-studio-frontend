@@ -99,7 +99,7 @@ const nbUi = {
   "action.noneAllowed": "Ingen handlinger er tilgjengelige for denne jobben.",
   "action.correct": "Korriger bildet",
   "action.makeNewImage": "Lag nytt bilde",
-  "action.checkAdded": "Sjekk at bildet ikke har fått nye vinduer, dører, lamper eller glass i dører. Sammenlign med originalen.",
+  "action.checkAdded": "Sjekk at ingen vinduer, dører, lamper eller glass i dører er lagt til eller fjernet. Sammenlign med originalen.",
   // TG-NEW-199 PR 4: kontrollen av tillegg (Petter 12.10, V1 A, V2 A, V3 A).
   "additions.warning": "Kontrollen fant mulige tillegg: {list}. Se markeringene i bildet.",
   "additions.note": "Kontrollen fant noe du bør se på: {list}.",
@@ -666,7 +666,7 @@ const en: Dictionary = {
     "action.noneAllowed": "No actions are available for this job.",
     "action.correct": "Correct image",
     "action.makeNewImage": "Create new image",
-    "action.checkAdded": "Check that the image has no new windows, doors, lamps or glass in doors. Compare with the original.",
+    "action.checkAdded": "Check that no windows, doors, lamps or glass in doors have been added or removed. Compare with the original.",
     "additions.warning": "The check found possible additions: {list}. See the markings in the image.",
     "additions.note": "The check found something you should look at: {list}.",
     "additions.unchecked": "Not checked automatically.",

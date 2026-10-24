@@ -20,8 +20,8 @@ const code = (rel: string) => read(rel).replace(/\/\*[\s\S]*?\*\//g, "").replace
 const card = code("components/godkjenning/DecisionCard.tsx");
 const page = code("(app)/godkjenning/[jobId]/page.tsx");
 
-const NB = "Sjekk at bildet ikke har fått nye vinduer, dører, lamper eller glass i dører. Sammenlign med originalen.";
-const EN = "Check that the image has no new windows, doors, lamps or glass in doors. Compare with the original.";
+const NB = "Sjekk at ingen vinduer, dører, lamper eller glass i dører er lagt til eller fjernet. Sammenlign med originalen.";
+const EN = "Check that no windows, doors, lamps or glass in doors have been added or removed. Compare with the original.";
 
 test("TG199: teksten paa norsk og engelsk", () => {
   assert.equal(t("nb", "action.checkAdded"), NB);
