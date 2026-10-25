@@ -1,7 +1,15 @@
 "use client";
 
 import { useId } from "react";
-import { FURNISH_AS_CHOICES, MAX_ORDER_JOBS, STYLING_STYLES, styleShort, toggleStyle, type StylingChoice } from "../lib/styling";
+import {
+  DECOR_LEVELS,
+  FURNISH_AS_CHOICES,
+  MAX_ORDER_JOBS,
+  STYLING_STYLES,
+  styleShort,
+  toggleStyle,
+  type StylingChoice,
+} from "../lib/styling";
 import { codeText, t, type Locale } from "../lib/i18n";
 
 const OPTION =
@@ -19,8 +27,9 @@ const STYLE_OPTION =
 
 /**
  * Valgene for Digital styling (S2-f), etter malen i DuskChoicePicker:
- * stilene (flervalg av aatte, hoeyst tre, S3-f og F1), romtypen («Møbler
- * som …», sju valg ved lansering) og bekreftelsen av at rommet er tomt (Petter 3A). Uten stil,
+ * stilene (flervalg av 14, hoeyst tre, S3-f, F1 og stilene v3), mengden pynt
+ * («Anbefalt for stilen» fra start, TG-NEW-257), romtypen («Møbler som …», sju
+ * valg ved lansering) og bekreftelsen av at rommet er tomt (Petter 3A). Uten stil,
  * romtype og kryss er «Bestill» av (stylingParams gir null). Ingen tekst
  * eller spoersmaal under romvalget (Cowork 21.10).
  *
@@ -40,6 +49,7 @@ export function StylingChoicePicker({
   locale: Locale;
 }) {
   const helpId = useId();
+  const decorHelpId = useId();
   const atLimit = value.styles.length >= MAX_ORDER_JOBS;
   return (
     <div className="border-t border-line pt-6 space-y-5">
@@ -73,6 +83,29 @@ export function StylingChoicePicker({
               </button>
             );
           })}
+        </div>
+      </div>
+      <div>
+        <p className="text-sm font-medium text-ink block mb-1">{t(locale, "styling.decor")}</p>
+        <p id={decorHelpId} className="text-sm text-ink-2 mb-3">{t(locale, "styling.decorHelp")}</p>
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-label={t(locale, "styling.decor")}
+          aria-describedby={decorHelpId}
+        >
+          {[null, ...DECOR_LEVELS].map((level) => (
+            <button
+              key={level ?? "default"}
+              type="button"
+              onClick={() => onChange({ ...value, decor: level })}
+              disabled={disabled}
+              aria-pressed={value.decor === level}
+              className={`${OPTION} ${value.decor === level ? ON : OFF}`}
+            >
+              {t(locale, `styling.decorLevel.${level ?? "default"}`)}
+            </button>
+          ))}
         </div>
       </div>
       <div>

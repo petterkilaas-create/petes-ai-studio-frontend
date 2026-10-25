@@ -189,8 +189,8 @@ const CATEGORIES: Category[] = [
     titleKey: "express.category.furnishing",
     items: [
       // Id-en er digital_styling, ikke virtual_stage (Petter 15.10): kortet
-      // styres ikke av ENABLED.virtual_stage og /staging. S3-f: aatte stiler
-      // under scene_transform, bestilt i ett kall (kind "styling", ingen presetId).
+      // styres ikke av ENABLED.virtual_stage og /staging. S3-f: stilene
+      // (14 fra stilene v3) under scene_transform, bestilt i ett kall (kind "styling", ingen presetId).
       {
         id: "digital_styling",
         service: "scene_transform",

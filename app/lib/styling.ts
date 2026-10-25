@@ -15,18 +15,25 @@ import { presetLabelKey } from "./presets.ts";
  */
 
 /**
- * De aatte stilene (S3-f) i den faste rekkefoelgen jobbene startes og kortene
- * vises, samme som `ST_STYLE` i backend.
+ * De 14 stilene (stilene v3, TG-NEW-257) i nr-rekkefoelgen 01–14 fra
+ * `stilnavn_v3.json`. Det er menyens rekkefoelge og rekkefoelgen jobbene
+ * sendes i. Backend krever ingen bestemt rekkefoelge.
  */
 export const STYLING_STYLES = [
   "styling_moderne_nordisk",
-  "styling_varm_minimalisme",
   "styling_japandi",
   "styling_nordisk_klassisk",
-  "styling_dansk_farge",
+  "styling_varm_minimalisme",
+  "styling_sekelskifte",
+  "styling_funkis",
   "styling_by_vintage",
-  "styling_hytte_fjell",
+  "styling_syttitall",
+  "styling_dansk_farge",
+  "styling_pastell",
   "styling_nordisk_kyst",
+  "styling_hytte_tradisjon",
+  "styling_hytte_fjell",
+  "styling_urban_industri",
 ] as const;
 export type StylingStyle = (typeof STYLING_STYLES)[number];
 type ShortOf<T> = T extends `styling_${infer S}` ? S : never;
@@ -43,8 +50,8 @@ export function isStylingPreset(presetId: string | null | undefined): boolean {
 }
 
 /**
- * Stilen som tekst paa godkjenningssiden (B2): «Dansk fargemoderne» for de
- * aatte, kortetiketten for de tre fra S2-f («Digital styling – skandinavisk»),
+ * Stilen som tekst paa godkjenningssiden (B2): «Fargerik eklektisk» for de
+ * 14, kortetiketten for de tre fra S2-f («Digital styling – skandinavisk»),
  * og null for en ukjent stil eller en oppskrift som ikke er styling.
  */
 export function styleText(locale: Locale, presetId: string | null | undefined): string | null {
@@ -79,6 +86,14 @@ export const FURNISH_AS_CHOICES = [
 ] as const;
 export type FurnishAs = (typeof FURNISH_AS_CHOICES)[number];
 
+/**
+ * Pyntnivaaene megleren kan velge (TG-NEW-257, Petter 12.43): Lite, Middels
+ * og Mye. «Anbefalt for stilen» er null og sendes ikke; da bruker backend
+ * stilens eget nivaa.
+ */
+export const DECOR_LEVELS = [1, 3, 5] as const;
+export type DecorLevel = (typeof DECOR_LEVELS)[number];
+
 export interface StylingChoice {
   /** null til megleren har valgt: ingen romtype er forhaandsvalgt. */
   furnishAs: FurnishAs | null;
@@ -86,9 +101,11 @@ export interface StylingChoice {
   roomEmpty: boolean;
   /** Stilene megleren har valgt. Ingen er forhaandsvalgt. */
   styles: StylingStyle[];
+  /** Mengde pynt; null er «Anbefalt for stilen», valgt fra start. */
+  decor: DecorLevel | null;
 }
 
-export const EMPTY_STYLING: StylingChoice = { furnishAs: null, roomEmpty: false, styles: [] };
+export const EMPTY_STYLING: StylingChoice = { furnishAs: null, roomEmpty: false, styles: [], decor: null };
 
 /**
  * Legger til stilen, eller tar den bort om den er valgt. Med MAX_ORDER_JOBS
@@ -104,12 +121,17 @@ export function toggleStyle(styles: readonly StylingStyle[], id: StylingStyle): 
  * er «Bestill» av). Stilene sendes uten duplikater og i den faste
  * rekkefoelgen, saa `Idempotency-Key` og duplikatsvaret blir stabile. Flere
  * enn MAX_ORDER_JOBS gir ogsaa null: ingenting sendes, og ingen stil kuttes.
+ * `decor_level` sendes bare for 1, 3 og 5; et annet nivaa gir null paa samme
+ * maate, saa valget aldri endres stille.
  */
 export function stylingParams(choice: StylingChoice): StylingOrderParams | null {
   if (choice.furnishAs === null || !choice.roomEmpty) return null;
   const styles = STYLING_STYLES.filter((s) => choice.styles.includes(s));
   if (styles.length === 0 || styles.length > MAX_ORDER_JOBS) return null;
-  return { styles, furnish_as: choice.furnishAs, room_empty_confirmed: true };
+  const params: StylingOrderParams = { styles, furnish_as: choice.furnishAs, room_empty_confirmed: true };
+  if (choice.decor === null) return params;
+  if (!DECOR_LEVELS.includes(choice.decor)) return null;
+  return { ...params, decor_level: choice.decor };
 }
 
 /**

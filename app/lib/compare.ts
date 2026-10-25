@@ -129,7 +129,7 @@ function labelParts(locale: Locale, variant: CompareVariant, presetId: string | 
  * rått fra modellen». Nummeret er `round + 1` fra backend, aldri plassen i
  * lista (hull kan forekomme). Valgene i parentes bare med `choices`
  * (admin, TG-NEW-193); megleren ser «Runde 2 · nå». For styling (`presetId`
- * `styling_…`) staar stilen i parentes: «Runde 1 · nå (Dansk fargemoderne)».
+ * `styling_…`) staar stilen i parentes: «Runde 1 · nå (Fargerik eklektisk)».
  */
 export function variantLabel(
   locale: Locale,

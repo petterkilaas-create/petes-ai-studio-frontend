@@ -1,9 +1,11 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withoutComments } from "./testing/jsxText.ts";
+import type { StylingStyle } from "./styling.ts";
 
 // S2-f: bestilling av Digital styling bak ENABLED.digital_styling (paa fra S4).
 // Kontrakt: ~/dev/_handoff/KONTRAKT_BESTILLING.md. api.ts kaster ved import
@@ -18,6 +20,7 @@ const { presetFileSlug, presetLabelKey, presetWorkingKey, shownPanels } = await 
 const { downloadFileName } = await import("./download.ts");
 const styling = await import("./styling.ts");
 const {
+  DECOR_LEVELS,
   EMPTY_STYLING,
   FURNISH_AS_CHOICES,
   MAX_ORDER_JOBS,
@@ -77,22 +80,50 @@ const ACCEPTED = {
   },
 };
 
-const EIGHT = [
-  "styling_moderne_nordisk",
-  "styling_varm_minimalisme",
-  "styling_japandi",
-  "styling_nordisk_klassisk",
-  "styling_dansk_farge",
-  "styling_by_vintage",
-  "styling_hytte_fjell",
-  "styling_nordisk_kyst",
-] as const;
+// Stilene v3 (TG-NEW-257): fasiten er en byte-lik kopi av stilnavn_v3.json
+// (Cowork 25.10). Tekstene i ordlista og menyen sammenlignes med den.
+const V3_SHA256 = "37451d82237dcd331b7e33e70c1418f000387568fcdd9cc73afbb88d4b7b6d07";
+const V3_BYTES = readFileSync(new URL("./testdata/stilnavn_v3.json", import.meta.url));
+interface V3Style {
+  nr: string;
+  id: string;
+  nb: string;
+  en: string;
+  desc_nb: string;
+  desc_en: string;
+  preset_nb: string;
+  preset_en: string;
+}
+interface V3Decor {
+  verdi: 1 | 3 | 5 | null;
+  nb: string;
+  en: string;
+}
+const V3 = JSON.parse(V3_BYTES.toString("utf8")) as {
+  pynt: { label_nb: string; label_en: string; help_nb: string; help_en: string; valg: V3Decor[] };
+  chip_nb: string;
+  chip_en: string;
+  stiler: V3Style[];
+};
+const ALL: readonly StylingStyle[] = STYLING_STYLES;
+/** Filnavnene til stilene fra S3-f, som de var foer stilene v3. */
+const OLD_SLUGS: Record<string, string> = {
+  styling_moderne_nordisk: "styling-moderne-nordisk",
+  styling_varm_minimalisme: "styling-varm-minimalisme",
+  styling_japandi: "styling-japandi",
+  styling_nordisk_klassisk: "styling-nordisk-klassisk",
+  styling_dansk_farge: "styling-dansk-farge",
+  styling_by_vintage: "styling-by-vintage",
+  styling_hytte_fjell: "styling-hytte-fjell",
+  styling_nordisk_kyst: "styling-nordisk-kyst",
+};
 
 /** Et komplett valg med de gitte stilene. */
-const choice = (furnishAs: (typeof FURNISH_AS_CHOICES)[number], styles: readonly (typeof EIGHT)[number][] = ["styling_japandi"]) => ({
+const choice = (furnishAs: (typeof FURNISH_AS_CHOICES)[number], styles: readonly StylingStyle[] = ["styling_japandi"]) => ({
   furnishAs,
   roomEmpty: true,
   styles: [...styles],
+  decor: null,
 });
 
 // --- Flagget og kortet ----------------------------------------------------------
@@ -114,14 +145,16 @@ test("S4: ENABLED.digital_styling er true, og kortet kan bestilles paa start og 
 
 // --- Presetene ------------------------------------------------------------------
 
-test("S3-f/F1: STYLING_STYLES er de aatte i fast rekkefoelge, og MAX_ORDER_JOBS er 3", () => {
-  assert.deepEqual([...STYLING_STYLES], [...EIGHT]);
+test("v3/F1: STYLING_STYLES er de 14 i nr-rekkefoelge fra stilnavn_v3.json, og MAX_ORDER_JOBS er 3", () => {
+  assert.equal(createHash("sha256").update(V3_BYTES).digest("hex"), V3_SHA256);
+  assert.deepEqual(V3.stiler.map((x) => x.nr), Array.from({ length: 14 }, (_, i) => String(i + 1).padStart(2, "0")));
+  assert.deepEqual([...STYLING_STYLES], V3.stiler.map((x) => x.id));
   // F1 (Petter 25.10): taket er tre, ikke lenger antall stiler.
   assert.equal(MAX_ORDER_JOBS, 3);
   assert.equal(styleShort("styling_by_vintage"), "by_vintage");
 });
 
-test("S3-f: de aatte stilene har kortetikett, ventetekst og et filnavn som bare nevner stilen", () => {
+test("S3-f/v3: alle stilene har kortetikett, ventetekst og et filnavn som bare nevner stilen", () => {
   for (const preset of STYLING_STYLES) {
     const short = styleShort(preset);
     const key = presetLabelKey("scene_transform", preset);
@@ -135,8 +168,8 @@ test("S3-f: de aatte stilene har kortetikett, ventetekst og et filnavn som bare 
   }
   assert.equal(presetFileSlug("styling_moderne_nordisk"), "styling-moderne-nordisk");
   assert.equal(presetFileSlug("styling_by_vintage"), "styling-by-vintage");
-  assert.equal(t("nb", "styling.preset.dansk_farge"), "Digital styling – Dansk fargemoderne");
-  assert.equal(t("en", "styling.preset.hytte_fjell"), "Virtual staging – Cabin and mountain");
+  assert.equal(t("nb", "styling.preset.dansk_farge"), "Digital styling – Fargerik eklektisk");
+  assert.equal(t("en", "styling.preset.hytte_fjell"), "Virtual staging – Modern cabin");
   // De tre gamle staar igjen for historikken.
   const old = { styling_skandinavisk: "skandinavisk", styling_familie: "familie", styling_moderne: "moderne" };
   for (const [preset, slug] of Object.entries(old)) {
@@ -212,14 +245,18 @@ test("S2-f: etiketten er «Møbler som …», aldri bare «Soverom», paa nb og 
 
 test("S2-f/S3-f: stilene staar over romvalget, og ingen tekst eller spoersmaal under romvalget, og soverom kan bestilles", () => {
   const picker = read("components/StylingChoicePicker.tsx");
-  // Stilgruppen (overskrift, hjelpelinje, etikett og kortbeskrivelse), saa
-  // romvalget og avkrysningen. Ingenting mellom romvalget og avkrysningen.
+  // Stilgruppen (overskrift, hjelpelinje, etikett og kortbeskrivelse), pyntgruppen
+  // (v3: overskrift og hjelpelinje; valgene, se v3-testene), saa romvalget og
+  // avkrysningen. Ingenting mellom romvalget og avkrysningen.
   assert.deepEqual(picker.match(/t\(locale, ["`][^"`]+["`]\)/g), [
     't(locale, "styling.styles")',
     't(locale, "styling.stylesHelp")',
     't(locale, "styling.styles")',
     "t(locale, `styling.style.${short}`)",
     "t(locale, `styling.styleDesc.${short}`)",
+    't(locale, "styling.decor")',
+    't(locale, "styling.decorHelp")',
+    't(locale, "styling.decor")',
     't(locale, "styling.furnishAs")',
     't(locale, "styling.furnishAs")',
     't(locale, "styling.roomEmpty")',
@@ -232,7 +269,7 @@ test("S2-f/S3-f: stilene staar over romvalget, og ingen tekst eller spoersmaal u
   assert.notEqual(stylingParams(choice("bedroom")), null);
 });
 
-test("S3-f: velgeren har aatte stilknapper med aria-pressed, og hver stil har etikett og kortbeskrivelse paa nb og en", () => {
+test("S3-f/v3: velgeren har 14 stilknapper med aria-pressed, og hver stil har etikett og kortbeskrivelse paa nb og en", () => {
   const picker = read("components/StylingChoicePicker.tsx");
   assert.match(picker, /STYLING_STYLES\.map\(/);
   assert.match(picker, /aria-pressed=\{on\}/);
@@ -262,9 +299,9 @@ test("S3-f: velgeren har aatte stilknapper med aria-pressed, og hver stil har et
     }
   }
   assert.equal(nb["styling.style.moderne_nordisk"], "Moderne nordisk");
-  assert.equal(nb["styling.styleDesc.nordisk_klassisk"], "Eldre bybolig: krem, støvet blått og mørkere tre.");
-  assert.equal(en["styling.style.by_vintage"], "Urban vintage");
-  assert.equal(en["styling.styleDesc.nordisk_kyst"], "Bright by the sea: linen white, sand and light blue.");
+  assert.equal(nb["styling.styleDesc.nordisk_klassisk"], "Tidløst og skreddersydd: krem, marmor og valnøtt.");
+  assert.equal(en["styling.style.by_vintage"], "Nordic mid-century");
+  assert.equal(en["styling.styleDesc.nordisk_kyst"], "Light and relaxed: white, sky blue and rattan.");
 });
 
 test("S3-f: toggleStyle legger til og tar bort, og stylingParams sorterer i fast rekkefoelge uten duplikater", () => {
@@ -277,10 +314,10 @@ test("S3-f: toggleStyle legger til og tar bort, og stylingParams sorterer i fast
     choice("living", ["styling_nordisk_kyst", "styling_japandi", "styling_moderne_nordisk", "styling_japandi"])
   );
   assert.deepEqual(params?.styles, ["styling_moderne_nordisk", "styling_japandi", "styling_nordisk_kyst"]);
-  // Tre, baklengs (F1: alle aatte gir null, se testen under).
+  // Tre, baklengs (F1: fire eller flere gir null, se testen under). Nr-rekkefoelgen (v3): 07, 11, 13.
   assert.deepEqual(
-    stylingParams(choice("living", ["styling_nordisk_kyst", "styling_hytte_fjell", "styling_by_vintage"]))?.styles,
-    ["styling_by_vintage", "styling_hytte_fjell", "styling_nordisk_kyst"]
+    stylingParams(choice("living", ["styling_hytte_fjell", "styling_nordisk_kyst", "styling_by_vintage"]))?.styles,
+    ["styling_by_vintage", "styling_nordisk_kyst", "styling_hytte_fjell"]
   );
   // Samme valg i ulik rekkefoelge gir samme noekkel.
   let n = 0;
@@ -296,7 +333,7 @@ test("S3-f: toggleStyle legger til og tar bort, og stylingParams sorterer i fast
 
 test("F1: en fjerde stil legges ikke til, og en valgt kan alltid tas bort", () => {
   const three = ["styling_japandi", "styling_by_vintage", "styling_nordisk_kyst"] as const;
-  for (const extra of EIGHT.filter((s) => !three.includes(s as (typeof three)[number]))) {
+  for (const extra of ALL.filter((s) => !three.includes(s as (typeof three)[number]))) {
     assert.deepEqual(toggleStyle(three, extra), [...three], extra);
   }
   // En ny liste, ikke den samme.
@@ -311,15 +348,15 @@ test("F1: en fjerde stil legges ikke til, og en valgt kan alltid tas bort", () =
     "styling_by_vintage",
     "styling_dansk_farge",
   ]);
-  // Klikk paa alle aatte etter hverandre gir de tre foerste.
-  const all = EIGHT.reduce<(typeof EIGHT)[number][]>((acc, s) => toggleStyle(acc, s), []);
-  assert.deepEqual(all, EIGHT.slice(0, 3));
+  // Klikk paa alle 14 etter hverandre gir de tre foerste.
+  const all = ALL.reduce<StylingStyle[]>((acc, s) => toggleStyle(acc, s), []);
+  assert.deepEqual(all, ALL.slice(0, 3));
 });
 
 test("F1: stylingParams sender aldri flere enn tre, og kutter ikke stille", () => {
-  for (let n = 1; n <= EIGHT.length; n++) {
-    const params = stylingParams(choice("living", EIGHT.slice(0, n)));
-    if (n <= MAX_ORDER_JOBS) assert.deepEqual(params?.styles, EIGHT.slice(0, n), String(n));
+  for (let n = 1; n <= ALL.length; n++) {
+    const params = stylingParams(choice("living", ALL.slice(0, n)));
+    if (n <= MAX_ORDER_JOBS) assert.deepEqual(params?.styles, ALL.slice(0, n), String(n));
     else assert.equal(params, null, String(n));
   }
   // Fire der to er like, er tre ulike og kan sendes.
@@ -357,7 +394,7 @@ test("S2-f/S3-f: «Bestill» er av uten kryss, uten romtype og uten stil", () =>
   assert.equal(t("en", "styling.roomEmpty"), "The room is empty of loose furniture");
   assert.equal(t("nb", "styling.order"), "Bestill");
   // Ingen stil er forhaandsvalgt.
-  assert.deepEqual(EMPTY_STYLING, { furnishAs: null, roomEmpty: false, styles: [] });
+  assert.deepEqual(EMPTY_STYLING, { furnishAs: null, roomEmpty: false, styles: [], decor: null });
   assert.equal(stylingParams({ ...choice("living"), roomEmpty: false }), null);
   assert.equal(stylingParams({ ...choice("living"), furnishAs: null }), null);
   assert.equal(stylingParams({ ...choice("living"), styles: [] }), null);
@@ -487,7 +524,7 @@ test("S3-f: et svar med aatte jobber der 5–8 er not_started, gir aatte kort, o
   const r = api.parseStylingOrder({
     order_id: "ord_8",
     duplicate: false,
-    jobs: EIGHT.map((preset_id, i) =>
+    jobs: ALL.slice(0, 8).map((preset_id, i) =>
       i < 4
         ? { preset_id, job_id: `j${i + 1}`, status: "queued", status_url: `/v1/jobs/j${i + 1}` }
         : { preset_id, job_id: null, status: "not_started", code: "capacity" }
@@ -495,7 +532,7 @@ test("S3-f: et svar med aatte jobber der 5–8 er not_started, gir aatte kort, o
     quota: { limited: true, used: 1, limit: 3, remaining: 2 },
   });
   assert.equal(r.jobs.length, 8);
-  assert.deepEqual(r.jobs.map((j) => j.presetId), [...EIGHT]);
+  assert.deepEqual(r.jobs.map((j) => j.presetId), ALL.slice(0, 8));
   assert.deepEqual(r.jobs.map(pollJobId), ["j1", "j2", "j3", "j4", null, null, null, null]);
   // Kortene: jobs.slice(0, polls.length) med aatte kall (testen over) beholder alle aatte.
   // F1: MAX_ORDER_JOBS er 3, men hooken har fortsatt aatte kall til B1 er live.
@@ -606,8 +643,8 @@ test("B2: isStylingPreset og styleText", () => {
     assert.equal(isStylingPreset(id), false, String(id));
     assert.equal(styleText("nb", id), null, String(id));
   }
-  assert.equal(styleText("nb", "styling_dansk_farge"), "Dansk fargemoderne");
-  assert.equal(styleText("en", "styling_dansk_farge"), "Danish colour modern");
+  assert.equal(styleText("nb", "styling_dansk_farge"), "Fargerik eklektisk");
+  assert.equal(styleText("en", "styling_dansk_farge"), "Colourful eclectic");
   for (const id of STYLING_STYLES) {
     assert.equal(styleText("nb", id), t("nb", `styling.style.${styleShort(id)}`), id);
   }
@@ -651,4 +688,137 @@ test("B2: ingressen nevner digital styling, ordrett paa nb og en", () => {
     DICTIONARIES.en.ui["home.intro"],
     "Real estate photo editing: dusk image, blue sky and digital styling made with AI, and blurring of faces."
   );
+});
+
+// ---------------------------------------------------------------------------
+// Stilene v3 (TG-NEW-257): 14 stiler, pyntvalget og «14 stiler» paa kortet.
+// Fasiten er kopien av stilnavn_v3.json (V3 oeverst i fila).
+// ---------------------------------------------------------------------------
+
+test("v3: navn, beskrivelse og preset-etikett for alle 14 er lik stilnavn_v3.json paa nb og en", () => {
+  assert.equal(V3.stiler.length, 14);
+  for (const x of V3.stiler) {
+    const style = x.id as StylingStyle;
+    const short = styleShort(style);
+    assert.equal(DICTIONARIES.nb.ui[`styling.style.${short}`], x.nb, x.id);
+    assert.equal(DICTIONARIES.en.ui[`styling.style.${short}`], x.en, x.id);
+    assert.equal(DICTIONARIES.nb.ui[`styling.styleDesc.${short}`], x.desc_nb, x.id);
+    assert.equal(DICTIONARIES.en.ui[`styling.styleDesc.${short}`], x.desc_en, x.id);
+    const key = presetLabelKey("scene_transform", x.id);
+    assert.equal(key, `styling.preset.${short}`, x.id);
+    assert.equal(DICTIONARIES.nb.ui[key!], x.preset_nb, x.id);
+    assert.equal(DICTIONARIES.en.ui[key!], x.preset_en, x.id);
+    // styleText gir det nye navnet, ogsaa for gamle jobber med samme id.
+    assert.equal(styling.styleText("nb", x.id), x.nb, x.id);
+    assert.equal(styling.styleText("en", x.id), x.en, x.id);
+  }
+});
+
+test("v3: de seks nye har fileSlug fra id-en, og de gamle har samme fileSlug som foer", () => {
+  const fresh = V3.stiler.map((x) => x.id).filter((id) => !(id in OLD_SLUGS));
+  assert.deepEqual(fresh, [
+    "styling_sekelskifte",
+    "styling_funkis",
+    "styling_syttitall",
+    "styling_pastell",
+    "styling_hytte_tradisjon",
+    "styling_urban_industri",
+  ]);
+  for (const id of fresh) {
+    const slug = `styling-${id.slice("styling_".length).replaceAll("_", "-")}`;
+    assert.equal(presetFileSlug(id), slug, id);
+    assert.equal(presetWorkingKey("scene_transform", id), "media.working.styling", id);
+  }
+  for (const [id, slug] of Object.entries(OLD_SLUGS)) {
+    assert.ok((STYLING_STYLES as readonly string[]).includes(id), id);
+    assert.equal(presetFileSlug(id), slug, id);
+  }
+});
+
+test("v3: kortet sier «14 stiler» og «14 styles»", () => {
+  assert.equal(t("nb", "express.card.digital_styling.chip2"), V3.chip_nb);
+  assert.equal(t("en", "express.card.digital_styling.chip2"), V3.chip_en);
+  assert.equal(V3.chip_nb, `${STYLING_STYLES.length} stiler`);
+  assert.equal(V3.chip_en, `${STYLING_STYLES.length} styles`);
+});
+
+test("v3: pyntvalget i ordlista er lik stilnavn_v3.json, og «Anbefalt» er valgt fra start", () => {
+  assert.deepEqual([...DECOR_LEVELS], [1, 3, 5]);
+  assert.deepEqual(V3.pynt.valg.map((v) => v.verdi), [null, ...DECOR_LEVELS]);
+  assert.equal(EMPTY_STYLING.decor, null);
+  for (const locale of ["nb", "en"] as const) {
+    const ui = DICTIONARIES[locale].ui;
+    assert.equal(ui["styling.decor"], V3.pynt[`label_${locale}`]);
+    assert.equal(ui["styling.decorHelp"], V3.pynt[`help_${locale}`]);
+    for (const v of V3.pynt.valg) {
+      assert.equal(ui[`styling.decorLevel.${v.verdi ?? "default"}`], v[locale], `${locale} ${v.verdi}`);
+    }
+  }
+});
+
+test("v3: velgeren har pyntgruppen rett etter stilene, med samme knapper som romvalget", () => {
+  const picker = read("components/StylingChoicePicker.tsx");
+  const styles = picker.indexOf("STYLING_STYLES.map(");
+  const decor = picker.indexOf("[null, ...DECOR_LEVELS].map(");
+  const rooms = picker.indexOf("FURNISH_AS_CHOICES.map(");
+  assert.ok(styles > 0 && styles < decor && decor < rooms);
+  const group = picker.slice(picker.lastIndexOf("<div", decor), rooms);
+  assert.match(group, /role="group"/);
+  assert.match(group, /aria-label=\{t\(locale, "styling\.decor"\)\}/);
+  assert.match(group, /aria-describedby=\{decorHelpId\}/);
+  assert.match(picker, /<p id=\{decorHelpId\}[^>]*>\{t\(locale, "styling\.decorHelp"\)\}<\/p>/);
+  assert.match(group, /onClick=\{\(\) => onChange\(\{ \.\.\.value, decor: level \}\)\}/);
+  assert.match(group, /disabled=\{disabled\}/);
+  assert.match(group, /aria-pressed=\{value\.decor === level\}/);
+  assert.match(group, /className=\{`\$\{OPTION\} \$\{value\.decor === level \? ON : OFF\}`\}/);
+  assert.match(group, /t\(locale, `styling\.decorLevel\.\$\{level \?\? "default"\}`\)/);
+  // Valget nullstilles med resten: bytte av tjeneste og «Start paa nytt».
+  const page = read("(app)/tjenester/page.tsx");
+  assert.equal(page.match(/setStyling\(EMPTY_STYLING\)/g)?.length, 2);
+});
+
+test("v3: stylingParams sender ikke decor_level for «Anbefalt», 1, 3 og 5 ellers, og aldri andre verdier", () => {
+  const base = choice("living", ["styling_japandi"]);
+  const none = stylingParams(base)!;
+  assert.ok(none);
+  assert.equal("decor_level" in none, false);
+  assert.deepEqual(none, { styles: ["styling_japandi"], furnish_as: "living", room_empty_confirmed: true });
+  for (const level of DECOR_LEVELS) {
+    assert.deepEqual(stylingParams({ ...base, decor: level }), {
+      styles: ["styling_japandi"],
+      furnish_as: "living",
+      room_empty_confirmed: true,
+      decor_level: level,
+    });
+  }
+  // En ugyldig verdi sendes aldri: «Bestill» er av, som ved flere enn tre stiler.
+  for (const bad of [0, 2, 4, 6, -1, 1.5, "3", undefined]) {
+    assert.equal(stylingParams({ ...base, decor: bad as unknown as 1 }), null, String(bad));
+  }
+  // Uten komplett valg hjelper ikke pyntvalget.
+  assert.equal(stylingParams({ ...base, roomEmpty: false, decor: 3 }), null);
+});
+
+test("v3: et annet pyntvalg gir ny noekkel, og «Anbefalt» gir samme params_json som foer", async () => {
+  let n = 0;
+  const keys = new OrderKeys(() => `key-${++n}`);
+  const file = image();
+  const base = choice("living", ["styling_japandi"]);
+  const order = (decor: 1 | 3 | 5 | null) => ({ file, service: STYLING_ORDER_SERVICE, params: stylingParams({ ...base, decor })! });
+  assert.equal(keys.keyFor(order(null)), "key-1");
+  assert.equal(keys.keyFor(order(null)), "key-1");
+  assert.equal(keys.keyFor(order(3)), "key-2");
+  assert.equal(keys.keyFor(order(5)), "key-3");
+  assert.equal(keys.keyFor(order(5)), "key-3");
+
+  const seen = scriptFetch([ACCEPTED, ACCEPTED]);
+  await api.submitStylingOrder({ image: file, params: stylingParams({ ...base, decor: 3 })!, getToken });
+  await api.submitStylingOrder({ image: file, params: stylingParams(base)!, getToken });
+  assert.deepEqual(JSON.parse(String(seen[0].form.get("params_json"))), {
+    styles: ["styling_japandi"],
+    furnish_as: "living",
+    room_empty_confirmed: true,
+    decor_level: 3,
+  });
+  assert.equal(String(seen[1].form.get("params_json")), '{"styles":["styling_japandi"],"furnish_as":"living","room_empty_confirmed":true}');
 });
