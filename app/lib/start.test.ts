@@ -124,11 +124,13 @@ test("TG-153: forhaandsvalget godtar bare tjenester som er slaatt paa", () => {
   assert.equal(toolFromParam(null), null);
 });
 
-test("dag 38: /tjenester uten ?tjeneste= aapner Lys og himmel, uten tjeneste valgt", () => {
-  // Standardkategorien er den foerste i lista; ?tjeneste= har forrang, som foer.
+test("dag 38 / D-1: /tjenester uten ?tjeneste= viser alle tjenestene, uten tjeneste valgt", () => {
+  // D-1 (dag 54, D1_SVAR punkt 4 A): ingen kategoribrikker lenger, saa siden
+  // har ingen startkategori. Alle bestillbare kort vises samtidig; ?tjeneste=
+  // velger kortet, som foer. Kategoriene i services.ts er uendret.
   assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "furnishing", "privacy"]);
   const page = withoutComments(read("(app)/tjenester/page.tsx"));
-  assert.match(page, /initial\?\.categoryId \?\? CATEGORIES\[0\]\?\.id \?\? ""/);
+  assert.doesNotMatch(page, /activeCategory|setActiveCategoryId|initial\?\.categoryId/);
   assert.match(page, /useState<string \| null>\(initial\?\.toolId \?\? null\)/);
   assert.equal(toolFromParam(null), null);
   assert.deepEqual(toolFromParam("privacy_blur"), { categoryId: "privacy", toolId: "privacy_blur" });

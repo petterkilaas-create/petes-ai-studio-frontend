@@ -375,11 +375,14 @@ function jsxOf(rel: string, fn: string): string {
 const EXPRESS_JSX: [string, string][] = [
   ["(app)/tjenester/page.tsx", "function ExpressContent"],
   ["components/DuskChoicePicker.tsx", "export function DuskChoicePicker"],
+  // D-1 (dag 54): de store tjenestekortene.
+  ["components/ServiceCard.tsx", "export function ServiceCard"],
 ];
 
 test("D1c: Tjenester og DuskChoicePicker har ingen synlig tekst skrevet rett inn", () => {
   for (const [rel, fn] of EXPRESS_JSX) {
-    assert.deepEqual(literalTexts(jsxOf(rel, fn)), [], rel);
+    // Tom alt="" er riktig for pyntebilder (ServiceCard), ikke synlig tekst, som i TG-158.
+    assert.deepEqual(literalTexts(jsxOf(rel, fn)).filter((x) => x !== ""), [], rel);
   }
 });
 

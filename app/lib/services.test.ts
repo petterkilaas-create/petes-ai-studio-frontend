@@ -423,10 +423,15 @@ test("dag 45: «Kommer»-kortet er ikke en knapp, og bare bestillbare kort kan v
   assert.doesNotMatch(page, /expressCategories/);
   // Valget slaas bare opp blant kortene som kan bestilles.
   assert.match(page, /\.find\(\(t\) => t\.orderable && t\.id === selectedToolId\)/);
-  // Grenen for «Kommer» kommer foer knappen og har ingen onClick eller knapp.
-  const start = page.indexOf("if (!tool.orderable) {");
+  // D-1 (dag 54, D1_SVAR punkt 4 A): «Kommer» er en egen seksjon nederst,
+  // uten kategorier, og de store kortene viser bare de bestillbare.
+  assert.match(page, /const ORDERABLE_TOOLS = ALL_TOOLS\.filter\(\(t\) => t\.orderable\);/);
+  assert.match(page, /const COMING_TOOLS = ALL_TOOLS\.filter\(\(t\) => !t\.orderable\);/);
+  assert.match(page, /\{ORDERABLE_TOOLS\.map\(\(tool\) => \(\s*<ServiceCard/);
+  // Seksjonen for «Kommer» har ingen onClick eller knapp.
+  const start = page.indexOf("{COMING_TOOLS.map((tool) => {");
   assert.ok(start > 0);
-  const branch = page.slice(start, page.indexOf("return (", page.indexOf("</div>\n              );", start)));
+  const branch = page.slice(start, page.indexOf("</section>", start));
   assert.match(branch, /role="group"/);
   assert.match(branch, /aria-disabled="true"/);
   assert.match(branch, /t\(locale, "express\.coming"\)/);
