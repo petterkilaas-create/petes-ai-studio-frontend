@@ -38,6 +38,10 @@
      ikke en merkefarge. Tekst paa den: paper. */
   --color-night: #101A2C;
 
+  /* Lysboksen paa godkjenningssiden (D-5b1): varm sort fra designet. Fast,
+     ikke en merkefarge. Tekst paa den: paper. */
+  --color-darkroom: #141312;
+
   --radius-card: 14px;
   --radius-button: 10px;
   --radius-pill: 9999px;

@@ -3,15 +3,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { t } from "./i18n/index.ts";
+import { DICTIONARIES } from "./i18n/index.ts";
 import { decisionControls } from "./review.ts";
 import type { DecisionAction } from "./api.ts";
 
 // TG-NEW-199 (Petter 11.10, valg A): godkjenningssiden minner megleren paa
-// aa sjekke at bildemodellen ikke har lagt til noe. Én linje over knappene,
-// bare naar «Godkjenn» vises, for begge stiler og begge roller. Linja staar
-// ogsaa etter PR 4, under advarselen eller merknaden fra kontrollen
-// (tg199pr4.test.ts), fordi kontrollen ikke ser alt.
+// aa sjekke at bildemodellen ikke har lagt til noe, bare naar «Godkjenn»
+// vises, for alle roller. D-5a (Petter 25.10): linja «action.checkAdded» er
+// erstattet av sjekklista per tjeneste (<ul>, tekstene i checklist.test.ts),
+// med de samme reglene: bare med «Godkjenn», foer knappene, ikke i
+// rettingen og bare i ordlista. Lista staar under advarselen eller
+// merknaden fra kontrollen (tg199pr4.test.ts), fordi kontrollen ikke ser alt.
 const APP = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(join(APP, rel), "utf8");
 /** Uten kommentarer, saa en kommentar ikke kan oppfylle eller bryte en sjekk. */
@@ -20,41 +22,51 @@ const code = (rel: string) => read(rel).replace(/\/\*[\s\S]*?\*\//g, "").replace
 const card = code("components/godkjenning/DecisionCard.tsx");
 const page = code("(app)/godkjenning/[jobId]/page.tsx");
 
-const NB = "Sjekk at ingen vinduer, dører, lamper eller glass i dører er lagt til eller fjernet. Sammenlign med originalen.";
-const EN = "Check that no windows, doors, lamps or glass in doors have been added or removed. Compare with the original.";
-
-test("TG199: teksten paa norsk og engelsk", () => {
-  assert.equal(t("nb", "action.checkAdded"), NB);
-  assert.equal(t("en", "action.checkAdded"), EN);
+test("TG199 og D-5a: «action.checkAdded» er borte fra ordlista og koden", () => {
+  assert.ok(!Object.hasOwn(DICTIONARIES.nb.ui, "action.checkAdded"));
+  assert.ok(!Object.hasOwn(DICTIONARIES.en.ui, "action.checkAdded"));
+  assert.doesNotMatch(card, /action\.checkAdded/);
+  assert.doesNotMatch(page, /action\.checkAdded/);
 });
 
-test("TG199: linja vises bare sammen med «Godkjenn» (controls.approve)", () => {
-  const uses = card.match(/"action\.checkAdded"/g) ?? [];
-  assert.equal(uses.length, 1, "linja står én gang i kortet");
-  // Linja står i blokka som bare vises med controls.approve, og blokka slutter etter linja.
+test("TG199 og D-5a: lista vises bare sammen med «Godkjenn» (controls.approve)", () => {
+  assert.equal(card.match(/<ul\b/g)?.length, 1, "lista står én gang i kortet");
+  assert.equal(card.match(/CHECKLISTS\[checklist\]/g)?.length, 1);
+  // Lista står i blokka som bare vises med controls.approve, og blokka slutter etter lista.
   const block = card.indexOf("{controls.approve && (\n            <div");
-  const line = card.indexOf('<p className="text-sm text-ink">{t(locale, "action.checkAdded")}</p>');
+  const list = card.indexOf("<ul ");
   const blockEnd = card.indexOf("</div>\n          )}", block);
-  assert.ok(block !== -1 && line > block && line < blockEnd, "linja er inne i controls.approve-blokka");
+  assert.ok(block !== -1 && list > block && list < blockEnd, "lista er inne i controls.approve-blokka");
+  // Uten liste (ukjent tjeneste) står bare krysset.
+  assert.match(card, /\{checklist !== null && \(\s*<div>\s*<p id=\{checklistId\}/);
+  // Tittelen over lista, og lista er merket med den.
+  assert.match(card, /\{t\(locale, "checklist\.title"\)\}\s*<\/p>\s*<ul aria-labelledby=\{checklistId\}/);
+  assert.match(card, /\{CHECKLISTS\[checklist\]\.map\(\(key\) => \(\s*<li key=\{key\}>\{t\(locale, key\)\}<\/li>\s*\)\)\}/);
   // Samme vern som knappen.
   assert.match(card, /\{controls\.approve && \(\s*<button\s+onClick=\{\(\) => onDecide\("approve"\)\}/);
 });
 
-test("TG199: linja står over knappene og ikke i rettingen", () => {
-  const line = card.indexOf('"action.checkAdded"');
+test("TG199 og D-5a: lista og krysset står over knappene og ikke i rettingen", () => {
+  const list = card.indexOf("<ul ");
+  const box = card.indexOf('type="checkbox"');
   const correctionBranch = card.indexOf("correction !== null ? (");
   const otherwise = card.indexOf(") : (", correctionBranch);
   const buttons = card.indexOf('<div className="flex flex-wrap gap-3">');
   const approveButton = card.indexOf('onDecide("approve")');
   assert.ok(correctionBranch !== -1 && otherwise > correctionBranch, "kortet har grenen for rettingen");
-  assert.ok(line > otherwise, "linja er i grenen uten retting");
-  assert.ok(line < buttons && line < approveButton, "linja står før knappene");
+  assert.ok(list > otherwise && box > otherwise, "lista og krysset er i grenen uten retting");
+  assert.ok(list < box, "krysset under lista");
+  assert.ok(box < buttons && box < approveButton, "lista og krysset står før knappene");
 });
 
-test("TG199: siden har ingen egen kopi av teksten", () => {
-  assert.doesNotMatch(page, /action\.checkAdded/);
-  for (const text of [NB, EN]) {
-    assert.ok(!page.includes(text) && !card.includes(text), "teksten bare i ordlista");
+test("TG199 og D-5a: siden og kortet har ingen egen kopi av tekstene", () => {
+  const texts = Object.entries(DICTIONARIES.nb.ui)
+    .concat(Object.entries(DICTIONARIES.en.ui))
+    .filter(([key]) => key.startsWith("checklist."))
+    .map(([, text]) => text);
+  assert.equal(texts.length, 30, "15 nøkler på nb og en");
+  for (const text of texts) {
+    assert.ok(!page.includes(text) && !card.includes(text), `bare i ordlista: ${text}`);
   }
 });
 

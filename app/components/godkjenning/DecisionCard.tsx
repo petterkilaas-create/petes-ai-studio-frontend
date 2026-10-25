@@ -1,8 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { REASON_MAX_LEN, type AdditionsCheck, type DecisionAction } from "../../lib/api";
 import { additionsSentences, additionsView, approveEnabled } from "../../lib/additions";
+import { CHECKLISTS, comparedKey, type ChecklistId } from "../../lib/checklist";
 import { codeText, t, type Locale } from "../../lib/i18n";
 import {
   reasonLength,
@@ -28,8 +29,14 @@ const BTN_DANGER = buttonClass("danger");
  * peisspoersmaalet for «Send videre» som foer.
  *
  * Kontrollen av tillegg (TG-NEW-199 PR 4): over sjekklista staar advarselen,
- * merknaden eller «Ikke kontrollert», og ved advarsel et kryss som maa
- * settes foer «Godkjenn». Alt bare naar «Godkjenn» vises, og ikke i rettingen.
+ * merknaden eller «Ikke kontrollert». Alt bare naar «Godkjenn» vises, og
+ * ikke i rettingen.
+ *
+ * Sjekklista og krysset (D-5a, Petter 25.10): én liste per tjeneste
+ * (`checklist`, null gir bare krysset), og ett kryss «Jeg har sammenlignet
+ * …» som maa settes foer «Godkjenn» for alle nivaaer. Ved advarsel gjelder
+ * krysset ogsaa de markerte stedene og setter `acknowledged`, som sendes
+ * som foer.
  */
 export function DecisionCard({
   reviewCode,
@@ -52,6 +59,9 @@ export function DecisionCard({
   onStartCorrection,
   correction,
   additions,
+  checklist,
+  compared,
+  onCompared,
   acknowledged,
   onAcknowledged,
   message,
@@ -82,7 +92,12 @@ export function DecisionCard({
   correction: ReactNode | null;
   /** Kontrollen av tillegg for gjeldende runde. */
   additions: AdditionsCheck;
-  /** Krysset «Jeg har sjekket de markerte stedene.» (bare ved advarsel). */
+  /** Sjekklista for tjenesten; null (ukjent oppskrift) gir bare krysset. */
+  checklist: ChecklistId | null;
+  /** Krysset «Jeg har sammenlignet bildet med originalen.» */
+  compared: boolean;
+  onCompared: (on: boolean) => void;
+  /** Ved advarsel: settes av samme kryss og sendes som `additions_acknowledged`. */
   acknowledged: boolean;
   onAcknowledged: (on: boolean) => void;
   message: string | null;
@@ -91,6 +106,7 @@ export function DecisionCard({
   const tooLong = reasonTooLong(reasonText);
   const view = additionsView(additions.level);
   const sentences = additionsSentences(locale, additions);
+  const checklistId = useId();
   return (
     <section className={`${CARD} flex flex-col gap-4`}>
       {roundFailed && (
@@ -110,7 +126,7 @@ export function DecisionCard({
             <FireplaceChoice answer={answer} onChange={onAnswer} disabled={locked} locale={locale} />
           )}
 
-          {/* TG-NEW-199: kontrollen, sjekklista og krysset. Bare naar «Godkjenn» vises. */}
+          {/* TG-NEW-199 og D-5a: kontrollen, sjekklista og krysset. Bare naar «Godkjenn» vises. */}
           {controls.approve && (
             <div className="flex flex-col gap-3">
               {view.notice === "warning" && (
@@ -129,19 +145,31 @@ export function DecisionCard({
                   {t(locale, "additions.unchecked")}
                 </p>
               )}
-              <p className="text-sm text-ink">{t(locale, "action.checkAdded")}</p>
-              {view.needsAck && (
-                <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-ink">
-                  <input
-                    type="checkbox"
-                    checked={acknowledged}
-                    disabled={locked}
-                    onChange={(e) => onAcknowledged(e.target.checked)}
-                    className={`w-5 h-5 mt-0.5 shrink-0 accent-primary ${FOCUS}`}
-                  />
-                  <span>{t(locale, "additions.ack")}</span>
-                </label>
+              {checklist !== null && (
+                <div>
+                  <p id={checklistId} className="text-sm font-medium text-ink">
+                    {t(locale, "checklist.title")}
+                  </p>
+                  <ul aria-labelledby={checklistId} className="mt-2 flex list-disc flex-col gap-1 pl-5 text-sm text-ink">
+                    {CHECKLISTS[checklist].map((key) => (
+                      <li key={key}>{t(locale, key)}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
+              <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={compared}
+                  disabled={locked}
+                  onChange={(e) => {
+                    onCompared(e.target.checked);
+                    if (view.needsAck) onAcknowledged(e.target.checked);
+                  }}
+                  className={`w-5 h-5 mt-0.5 shrink-0 accent-primary ${FOCUS}`}
+                />
+                <span>{t(locale, comparedKey(additions.level))}</span>
+              </label>
             </div>
           )}
 
@@ -153,7 +181,7 @@ export function DecisionCard({
               {controls.approve && (
                 <button
                   onClick={() => onDecide("approve")}
-                  disabled={locked || !approveEnabled(additions.level, acknowledged)}
+                  disabled={locked || !approveEnabled(additions.level, compared, acknowledged)}
                   aria-busy={approving}
                   className={BTN_PRIMARY}
                 >

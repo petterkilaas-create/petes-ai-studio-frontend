@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import { ChevronsLeftRight } from "lucide-react";
+import { ChevronsLeftRight, Eye, Maximize2 } from "lucide-react";
 import { t, type Locale } from "../../lib/i18n";
 import { SLIDER_START, sliderKey, valueFromPointer } from "../../lib/slider";
 import { choiceClass, FOCUS, LABEL } from "./classes";
@@ -24,6 +24,12 @@ import { choiceClass, FOCUS, LABEL } from "./classes";
  * «Vis mulige tillegg» (TG-NEW-199 PR 4) virker paa samme maate med
  * `additionsView` (resultatbildet med boksene fra kontrollen). De to
  * visningene utelukker hverandre.
+ *
+ * «Hold for original» (D-5a): mens knappen holdes inne (trykk og hold, eller
+ * mellomrom paa tastaturet), vises originalen i stedet for AI-bildet i
+ * slideren og i «Kun resultat». Slipp, og AI-bildet er tilbake; skillet
+ * staar der det sto. «Forstørr» aapner lysboksen (`onExpand`, siden har den).
+ * Begge krever begge bildene.
  */
 
 type Mode = "slider" | "side" | "result";
@@ -72,12 +78,15 @@ function Slider({
   aiUrl,
   resultAlt,
   onResultLoad,
+  full,
   locale,
 }: {
   originalUrl: string;
   aiUrl: string;
   resultAlt: string;
   onResultLoad?: () => void;
+  /** «Hold for original»: hele originalen, uten skillet. Verdien beholdes. */
+  full: boolean;
   locale: Locale;
 }) {
   const [value, setValue] = useState(SLIDER_START);
@@ -124,7 +133,7 @@ function Slider({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={aiUrl} alt={resultAlt} draggable={false} className="block w-full h-auto" onLoad={onResultLoad} />
       <span className={`${CHIP} right-3`}>{t(locale, "compare.ai")}</span>
-      <div className="absolute inset-0" style={{ clipPath: `inset(0 ${100 - value}% 0 0)` }}>
+      <div className="absolute inset-0" style={{ clipPath: `inset(0 ${full ? 0 : 100 - value}% 0 0)` }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={originalUrl}
@@ -134,13 +143,16 @@ function Slider({
         />
         <span className={`${CHIP} left-3`}>{t(locale, "review.original")}</span>
       </div>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-surface"
-        style={{ left: `${value}%` }}
-      />
+      {!full && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-surface"
+          style={{ left: `${value}%` }}
+        />
+      )}
       <div
         ref={handleRef}
+        hidden={full}
         role="slider"
         tabIndex={0}
         aria-label={t(locale, "compare.sliderLabel")}
@@ -158,6 +170,44 @@ function Slider({
   );
 }
 
+/**
+ * «Hold for original»: holdes inne med trykk (pekeren fanges, saa slipp
+ * utenfor knappen ogsaa teller) eller med mellomrom. Mister knappen fokus
+ * eller pekeren, slippes den.
+ */
+function HoldButton({ holding, onHold, locale }: { holding: boolean; onHold: (on: boolean) => void; locale: Locale }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={holding}
+      onPointerDown={(e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        onHold(true);
+      }}
+      onPointerUp={() => onHold(false)}
+      onPointerCancel={() => onHold(false)}
+      onLostPointerCapture={() => onHold(false)}
+      onKeyDown={(e) => {
+        if (e.key !== " ") return;
+        e.preventDefault();
+        if (!e.repeat) onHold(true);
+      }}
+      onKeyUp={(e) => {
+        if (e.key !== " ") return;
+        e.preventDefault();
+        onHold(false);
+      }}
+      onBlur={() => onHold(false)}
+      onContextMenu={(e) => e.preventDefault()}
+      className={choiceClass(holding, "rounded-pill inline-flex items-center gap-2 touch-none select-none [-webkit-touch-callout:none]")}
+    >
+      <Eye aria-hidden="true" className="h-4 w-4" />
+      {t(locale, "compare.hold")}
+    </button>
+  );
+}
+
 export function CompareViewer({
   originalUrl,
   result,
@@ -165,6 +215,7 @@ export function CompareViewer({
   onResultLoad,
   lightsView = null,
   additionsView = null,
+  onExpand,
   locale,
 }: {
   originalUrl: string | null;
@@ -178,10 +229,13 @@ export function CompareViewer({
   lightsView?: ReactNode;
   /** Resultatbildet med boksene fra kontrollen av tillegg (TG-NEW-199); null skjuler knappen. */
   additionsView?: ReactNode;
+  /** Aapner lysboksen (D-5b1); uten den vises ikke «Forstørr». */
+  onExpand?: () => void;
   locale: Locale;
 }) {
   const [mode, setMode] = useState<Mode>("slider");
   const [overlay, setOverlay] = useState<Overlay>(null);
+  const [holding, setHolding] = useState(false);
   const showLights = overlay === "lights" && lightsView !== null;
   const showAdditions = overlay === "additions" && additionsView !== null;
   const toggle = (o: Exclude<Overlay, null>) => setOverlay(overlay === o ? null : o);
@@ -227,6 +281,9 @@ export function CompareViewer({
   // Slideren trenger begge bildene; ellers vises de side ved side.
   const canSlide = originalUrl !== null && result.url !== null;
   const shown: Mode = mode === "slider" && !canSlide ? "side" : mode;
+  const plain = !showLights && !showAdditions;
+  const holdShown = canSlide && plain && shown !== "side";
+  const held = holding && holdShown;
 
   return (
     <div className="flex flex-col gap-4">
@@ -262,6 +319,7 @@ export function CompareViewer({
           aiUrl={result.url}
           resultAlt={resultAlt}
           onResultLoad={onResultLoad}
+          full={held}
           locale={locale}
         />
       )}
@@ -280,7 +338,32 @@ export function CompareViewer({
       )}
 
       {!showLights && !showAdditions && shown === "result" && (
-        <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} onLoad={onResultLoad} />
+        <div className="relative">
+          <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} onLoad={onResultLoad} />
+          {held && originalUrl !== null && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={originalUrl}
+                alt={t(locale, "compare.altOriginal")}
+                className="absolute inset-0 h-full w-full rounded-button border border-line object-cover"
+              />
+              <span className={`${CHIP} left-3`}>{t(locale, "review.original")}</span>
+            </>
+          )}
+        </div>
+      )}
+
+      {(holdShown || (canSlide && onExpand !== undefined)) && (
+        <div className="flex flex-wrap gap-2">
+          {holdShown && <HoldButton holding={held} onHold={setHolding} locale={locale} />}
+          {canSlide && onExpand !== undefined && (
+            <button type="button" onClick={onExpand} className={choiceClass(false, "rounded-pill inline-flex items-center gap-2")}>
+              <Maximize2 aria-hidden="true" className="h-4 w-4" />
+              {t(locale, "compare.expand")}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
