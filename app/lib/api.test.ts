@@ -892,3 +892,87 @@ test("G3: review_panels leses strengt: verdi, null, ukjent navn droppet, ikke-li
   assert.equal(panels({ dusk: true }), null);
   assert.equal(api.normalizeReview(REVIEW_BODY, "j1").reviewPanels, null);
 });
+
+// ---- D-5c: order og framing (TG-NEW-249, TG-NEW-260) ------------------------
+
+const ORDER = {
+  order_id: "ord_abc",
+  jobs: [
+    { job_id: "a", preset_id: "styling_moderne_nordisk", status: "succeeded", thumb_url: "https://x/a_thumb.jpg" },
+    { job_id: "b", preset_id: "styling_japandi", status: "awaiting_approval", thumb_url: null },
+  ],
+};
+
+test("D-5c: normalizeReview leser order, eldst foerst, med miniatyren eller null", () => {
+  const r = api.normalizeReview({ ...REVIEW_BODY, order: ORDER }, "b");
+  assert.deepEqual(r.order, {
+    orderId: "ord_abc",
+    jobs: [
+      { jobId: "a", presetId: "styling_moderne_nordisk", status: "succeeded", thumbUrl: "https://x/a_thumb.jpg" },
+      { jobId: "b", presetId: "styling_japandi", status: "awaiting_approval", thumbUrl: null },
+    ],
+  });
+});
+
+test("D-5c: uten order (eldre backend, enkeltjobb, lesefeil) er order null", () => {
+  assert.equal(api.normalizeReview(REVIEW_BODY, "j1").order, null);
+  for (const raw of [null, "ord", [], {}, { order_id: "ord_x" }, { jobs: [] }, { order_id: "", jobs: [] },
+    { order_id: 3, jobs: [] }, { order_id: "ord_x", jobs: "a" }]) {
+    assert.equal(api.toReviewOrder(raw), null, JSON.stringify(raw));
+  }
+});
+
+test("D-5c: rader uten job_id hoppes over, dubletter tas bare foerste gang, og ukjente felt blir null", () => {
+  const order = api.toReviewOrder({
+    order_id: "ord_x",
+    jobs: [
+      null,
+      "a",
+      { job_id: "" },
+      { preset_id: "styling_moderne_nordisk" },
+      { job_id: "a", preset_id: 3, status: 7, thumb_url: "" },
+      { job_id: "a", preset_id: "styling_japandi", status: "succeeded" },
+      { job_id: "b", result_url: "https://x/b.png" },
+    ],
+  });
+  assert.deepEqual(order, {
+    orderId: "ord_x",
+    jobs: [
+      { jobId: "a", presetId: null, status: "unknown", thumbUrl: null },
+      { jobId: "b", presetId: null, status: "unknown", thumbUrl: null },
+    ],
+  });
+  // Lekkasjen L2: bare den merkede miniatyren leses.
+  assert.doesNotMatch(JSON.stringify(order), /\.png/);
+});
+
+test("D-5c: framing er maalt bare med measured true og et endelig tall >= 0", () => {
+  const framing = (raw: unknown) => api.normalizeReview({ ...REVIEW_BODY, framing: raw }, "j1").framing;
+  assert.deepEqual(framing({ outside_pct: 8.3, measured: true }), { outsidePct: 8.3, measured: true });
+  assert.deepEqual(framing({ outside_pct: 0, measured: true }), { outsidePct: 0, measured: true });
+  const none = { outsidePct: null, measured: false };
+  assert.deepEqual(api.normalizeReview(REVIEW_BODY, "j1").framing, none);
+  for (const raw of [
+    null,
+    "8.3",
+    [],
+    { outside_pct: null, measured: false },
+    { outside_pct: 8.3, measured: false },
+    { outside_pct: 8.3 },
+    { outside_pct: null, measured: true },
+    { outside_pct: "8.3", measured: true },
+    { outside_pct: -1, measured: true },
+    { outside_pct: Number.NaN, measured: true },
+    { outside_pct: 8.3, measured: "true" },
+  ]) {
+    assert.deepEqual(api.toFraming(raw), none, JSON.stringify(raw));
+  }
+});
+
+test("D-5c: tomt eller oedelagt svar gir order null og framing umaalt", () => {
+  for (const raw of [null, {}, [], "x", { order: [], framing: [] }]) {
+    const r = api.normalizeReview(raw, "j1");
+    assert.equal(r.order, null);
+    assert.deepEqual(r.framing, { outsidePct: null, measured: false });
+  }
+});

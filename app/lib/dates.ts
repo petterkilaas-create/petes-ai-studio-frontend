@@ -1,7 +1,7 @@
 import type { Locale } from "./i18n/index.ts";
 
-/** Datoformatet per spraak i ordlista. */
-const DATE_LOCALES: Readonly<Record<Locale, string>> = { nb: "nb-NO", en: "en-GB" };
+/** Dato- og tallformatet per spraak i ordlista (tallene: orderTabs.ts, D-5c). */
+export const DATE_LOCALES: Readonly<Record<Locale, string>> = { nb: "nb-NO", en: "en-GB" };
 
 /**
  * Datoen paa jobbkortene og i banneret om slettede bilder (TG-NEW-117).

@@ -1085,6 +1085,73 @@ export interface JobReviewDetail {
    * G1c): da vises alle fem, som foer (presets.ts).
    */
   reviewPanels: ReviewPanel[] | null;
+  /**
+   * D-5c (TG-NEW-249): jobbene i bestillingen, eldst foerst, ogsaa denne.
+   * null for enkeltjobber, gamle jobber, ved lesefeil i backend og naar
+   * feltet mangler (eldre backend): da er siden som foer.
+   */
+  order: ReviewOrder | null;
+  /** D-5c (TG-NEW-260): rammen. Mangler feltet: ikke maalt. */
+  framing: ReviewFraming;
+}
+
+/** En jobb i bestillingen (D-5c). `thumbUrl` er den merkede miniatyren, eller null. */
+export interface ReviewOrderJob {
+  jobId: string;
+  presetId: string | null;
+  status: string;
+  thumbUrl: string | null;
+}
+
+export interface ReviewOrder {
+  orderId: string;
+  jobs: ReviewOrderJob[];
+}
+
+/**
+ * Andelen av KI-bildet som ligger utenfor originalfotoet, i prosent med én
+ * desimal (TG-NEW-260). `measured` er sann bare med et tall.
+ */
+export interface ReviewFraming {
+  outsidePct: number | null;
+  measured: boolean;
+}
+
+/**
+ * `order` (D-5c): strengt lest. Ikke et objekt, uten `order_id` eller uten
+ * en liste med jobber gir null. Rader uten `job_id` hoppes over, og en
+ * `job_id` som staar to ganger, tas bare med foerste gang. Rekkefoelgen
+ * fra backend beholdes (eldst foerst).
+ */
+export function toReviewOrder(raw: unknown): ReviewOrder | null {
+  if (!isRecord(raw)) return null;
+  const orderId = nonEmptyString(raw.order_id);
+  if (orderId === null || !Array.isArray(raw.jobs)) return null;
+  const seen = new Set<string>();
+  const jobs: ReviewOrderJob[] = [];
+  for (const j of records(raw.jobs)) {
+    const jobId = nonEmptyString(j.job_id);
+    if (jobId === null || seen.has(jobId)) continue;
+    seen.add(jobId);
+    jobs.push({
+      jobId,
+      presetId: nonEmptyString(j.preset_id),
+      status: stringOrNull(j.status) ?? "unknown",
+      // Lekkasjen L2: bare den merkede miniatyren.
+      thumbUrl: nonEmptyString(j.thumb_url),
+    });
+  }
+  return { orderId, jobs };
+}
+
+/** `framing` (D-5c): maalt bare med `measured: true` og et endelig tall >= 0. */
+export function toFraming(raw: unknown): ReviewFraming {
+  if (!isRecord(raw)) return { outsidePct: null, measured: false };
+  const pct = raw.outside_pct;
+  if (raw.measured !== true || typeof pct !== "number" || !Number.isFinite(pct) || pct < 0) {
+    return { outsidePct: null, measured: false };
+  }
+  return { outsidePct: pct, measured: true };
 }
 
 /** Panelene paa godkjenningssiden som en oppskrift kan bruke (G1c). */
@@ -1360,6 +1427,8 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     additionsCheck: toAdditionsCheck(r.additions_check),
     presetId: nonEmptyString(r.preset_id),
     reviewPanels: toReviewPanels(r.review_panels),
+    order: toReviewOrder(r.order),
+    framing: toFraming(r.framing),
   };
 }
 
