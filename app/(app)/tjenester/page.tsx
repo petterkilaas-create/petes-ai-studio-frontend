@@ -2,8 +2,11 @@
 
 import { Suspense, useEffect, useState, type ChangeEvent } from "react";
 import { useSearchParams } from "next/navigation";
-import { Check, LayoutGrid } from "lucide-react";
-import { CATEGORY_ICONS, TOOL_ICONS } from "@/app/components/toolIcons";
+import { LayoutGrid } from "lucide-react";
+import { TOOL_ICONS } from "@/app/components/toolIcons";
+import { ServiceCard } from "@/app/components/ServiceCard";
+import { SERVICE_CARD_TEXT, UPLOAD_CARD_ID, uploadScrollBehavior } from "@/app/lib/serviceCards";
+import { CARD_IMAGES } from "./cardImages";
 import { useImagePreview } from "@/app/hooks/useImagePreview";
 import { useProcessJob } from "@/app/hooks/useProcessJob";
 import { useQuota } from "@/app/hooks/useQuota";
@@ -32,26 +35,23 @@ import { orderErrorText, t } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import { SERVICE_PARAM, toolFromParam, visibleCategories } from "@/app/lib/services";
 import { Button } from "@/app/components/ui/Button";
-import { Card, cardClass } from "@/app/components/ui/Card";
+import { Card } from "@/app/components/ui/Card";
 import { Pill } from "@/app/components/ui/Pill";
 import { PageHeader } from "@/app/components/ui/PageHeader";
 
 // Tjenestevalget ligger i lib/services.ts. Alle kortene vises; de som ikke er
 // slaatt paa i ENABLED (TG-NEW-136), har orderable false og vises som
 // «Kommer» uten klikk (dag 45). Ikonene ligger i components/toolIcons.ts.
+// D-1 (dag 54): ingen kategorier lenger. De bestillbare kortene staar oeverst
+// som store kort, og «Kommer» i egen seksjon nederst (D1_SVAR punkt 4 A).
 const CATEGORIES = visibleCategories();
+const ALL_TOOLS = CATEGORIES.flatMap((c) => c.items);
+const ORDERABLE_TOOLS = ALL_TOOLS.filter((t) => t.orderable);
+const COMING_TOOLS = ALL_TOOLS.filter((t) => !t.orderable);
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
 const STEP_LABEL = "text-sm font-medium text-ink block mb-3";
-
-function chipClass(selected: boolean): string {
-  return `inline-flex min-h-11 items-center gap-2 px-4 rounded-pill text-sm border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS} ${
-    selected
-      ? "bg-primary border-primary text-on-primary font-medium"
-      : "bg-surface border-line-strong text-ink-2 hover:bg-surface-2 hover:text-ink"
-  }`;
-}
 
 type SceneType = "auto" | "exterior" | "interior";
 
@@ -69,10 +69,9 @@ function ExpressContent() {
   // /start). Bare tjenester som er slaatt paa; ellers ingen valg, som foer.
   const searchParams = useSearchParams();
   const [initial] = useState(() => toolFromParam(searchParams.get(SERVICE_PARAM)));
-  const [activeCategoryId, setActiveCategoryId] = useState<string>(
-    initial?.categoryId ?? CATEGORIES[0]?.id ?? ""
-  );
   const [selectedToolId, setSelectedToolId] = useState<string | null>(initial?.toolId ?? null);
+  // Oekes naar megleren velger et kort: da rulles opplastingskortet inn (D1_SVAR punkt 5).
+  const [scrollRequest, setScrollRequest] = useState(0);
 
   // Scene-type-gate-kontroller (kun for scene_transform-kort).
   const [sceneType, setSceneType] = useState<SceneType>("auto");
@@ -91,8 +90,6 @@ function ExpressContent() {
   const order = useOrderJobs({ onQuota: quota.apply });
   const refreshQuota = quota.refresh;
 
-  const activeCategory =
-    CATEGORIES.find((c) => c.id === activeCategoryId) ?? CATEGORIES[0];
   // Bare et kort som kan bestilles, kan vaere valgt (dag 45).
   const selectedTool =
     CATEGORIES.flatMap((c) => c.items).find((t) => t.orderable && t.id === selectedToolId) ??
@@ -137,9 +134,20 @@ function ExpressContent() {
     if (orderAllFailed) refreshQuota();
   }, [orderAllFailed, refreshQuota]);
 
+  // Opplastingskortet finnes foerst etter at kortet er valgt, saa rullingen
+  // skjer her og ikke i selectTool. Ikke ved ?tjeneste= (scrollRequest 0).
+  useEffect(() => {
+    if (scrollRequest === 0) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    document
+      .getElementById(UPLOAD_CARD_ID)
+      ?.scrollIntoView({ block: "start", behavior: uploadScrollBehavior(reducedMotion) });
+  }, [scrollRequest]);
+
   const selectTool = (toolId: string) => {
     if (isProcessing) return;
     setSelectedToolId(toolId);
+    setScrollRequest((n) => n + 1);
     // Nullstill scene-kontroller og resultat ved bytte av verktoy.
     setSceneType("auto");
     setForceSceneType(false);
@@ -229,96 +237,30 @@ function ExpressContent() {
         }
       />
 
-      {/* --- VELG TJENESTE --- */}
+      {/* --- VELG TJENESTE: de store kortene (D-1), uten kategorier --- */}
       <section className="space-y-4">
         <h2 className="text-sm font-medium text-ink">{t(locale, "express.chooseService")}</h2>
 
-        <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map((cat) => {
-            const Icon = CATEGORY_ICONS[cat.id];
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setActiveCategoryId(cat.id)}
-                disabled={isProcessing}
-                aria-pressed={activeCategoryId === cat.id}
-                className={chipClass(activeCategoryId === cat.id)}
-              >
-                {Icon && <Icon aria-hidden className="size-4" strokeWidth={1.75} />}
-                {t(locale, cat.titleKey)}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {activeCategory.items.map((tool) => {
-            const selected = tool.id === selectedToolId;
-            const Icon = TOOL_ICONS[tool.id];
-            if (!tool.orderable) {
-              // «Kommer» (dag 45): ingen knapp og ingen onClick, ikke i
-              // tab-rekkefoelgen. Ingen opacity, saa teksten holder kontrasten.
-              return (
-                <div
-                  key={tool.id}
-                  role="group"
-                  aria-disabled="true"
-                  aria-labelledby={`coming-${tool.id}`}
-                  className="rounded-card border border-dashed border-line-strong bg-paper p-6 text-left flex flex-col h-full"
-                >
-                  <div className="mb-4 flex items-start justify-between gap-3">
-                    {Icon && (
-                      <span aria-hidden className="flex size-11 items-center justify-center rounded-button bg-surface-2 text-ink-2">
-                        <Icon className="size-5" strokeWidth={1.75} />
-                      </span>
-                    )}
-                    <span className="ml-auto">
-                      <Pill tone="neutral">{t(locale, "express.coming")}</Pill>
-                    </span>
-                  </div>
-                  <h3 id={`coming-${tool.id}`} className="text-[15px] font-medium text-ink-2 mb-1">
-                    {t(locale, tool.titleKey)}
-                  </h3>
-                  <p className="text-ink-2 text-[13px] leading-relaxed flex-1">{t(locale, tool.descKey)}</p>
-                </div>
-              );
-            }
-            return (
-              <button
-                key={tool.id}
-                type="button"
-                onClick={() => selectTool(tool.id)}
-                disabled={isProcessing}
-                aria-pressed={selected}
-                className={cardClass(
-                  "md",
-                  `text-left flex flex-col h-full transition-colors disabled:cursor-not-allowed ${FOCUS} ${
-                    selected ? "border-ink ring-1 ring-ink" : "hover:border-line-strong"
-                  }`
-                )}
-              >
-                {Icon && (
-                  <span aria-hidden className="mb-4 flex size-11 items-center justify-center rounded-button bg-surface-2 text-ink">
-                    <Icon className="size-5" strokeWidth={1.75} />
-                  </span>
-                )}
-                <h3 className="text-[15px] font-medium text-ink mb-1">{t(locale, tool.titleKey)}</h3>
-                <p className="text-ink-2 text-[13px] leading-relaxed flex-1">{t(locale, tool.descKey)}</p>
-                {selected && (
-                  <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink">
-                    <Check aria-hidden className="size-4" /> {t(locale, "express.selected")}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+          {ORDERABLE_TOOLS.map((tool) => (
+            <ServiceCard
+              key={tool.id}
+              tool={tool}
+              text={SERVICE_CARD_TEXT[tool.id]}
+              images={CARD_IMAGES[tool.id]}
+              selected={tool.id === selectedToolId}
+              disabled={isProcessing}
+              onSelect={() => selectTool(tool.id)}
+              locale={locale}
+            />
+          ))}
         </div>
       </section>
 
       {/* --- OPPLASTING + KJOERING (naar en tjeneste er valgt) --- */}
       {selectedTool && (
-        <Card padding="lg" className="space-y-6">
+        // scroll-mt: under den faste topplinja (h-16) naar kortet rulles inn.
+        <Card id={UPLOAD_CARD_ID} padding="lg" className="scroll-mt-24 space-y-6">
           <div className="flex items-center gap-4">
             {SelectedIcon && (
               <span aria-hidden className="flex size-11 items-center justify-center rounded-button bg-surface-2 text-ink">
@@ -541,6 +483,46 @@ function ExpressContent() {
               </div>
             )}
           </Card>
+        </section>
+      )}
+
+      {/* --- KOMMER (dag 45): kortene som ikke kan bestilles, uten kategorier (D-1) --- */}
+      {COMING_TOOLS.length > 0 && (
+        <section aria-labelledby="kommer-tittel" className="space-y-4">
+          <h2 id="kommer-tittel" className="text-sm font-medium text-ink">
+            {t(locale, "express.comingTitle")}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {COMING_TOOLS.map((tool) => {
+              const Icon = TOOL_ICONS[tool.id];
+              // Ingen knapp og ingen onClick, ikke i tab-rekkefoelgen. Ingen
+              // opacity, saa teksten holder kontrasten.
+              return (
+                <div
+                  key={tool.id}
+                  role="group"
+                  aria-disabled="true"
+                  aria-labelledby={`coming-${tool.id}`}
+                  className="rounded-card border border-dashed border-line-strong bg-paper p-6 text-left flex flex-col h-full"
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    {Icon && (
+                      <span aria-hidden className="flex size-11 items-center justify-center rounded-button bg-surface-2 text-ink-2">
+                        <Icon className="size-5" strokeWidth={1.75} />
+                      </span>
+                    )}
+                    <span className="ml-auto">
+                      <Pill tone="neutral">{t(locale, "express.coming")}</Pill>
+                    </span>
+                  </div>
+                  <h3 id={`coming-${tool.id}`} className="text-[15px] font-medium text-ink-2 mb-1">
+                    {t(locale, tool.titleKey)}
+                  </h3>
+                  <p className="text-ink-2 text-[13px] leading-relaxed flex-1">{t(locale, tool.descKey)}</p>
+                </div>
+              );
+            })}
+          </div>
         </section>
       )}
     </main>
