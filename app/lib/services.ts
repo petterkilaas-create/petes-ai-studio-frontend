@@ -92,7 +92,7 @@ export function navLinks(): NavLink[] {
 
 // "simple"  = service alene (ingen params, backend-defaults gjelder).
 // "scene"   = scene_transform med preset_id + scene-type-gate (TG-NEW-58).
-// "styling" = Digital styling: egen bestilling med 1–8 stiler (S2-f, S3-f, POST /v1/orders/styling).
+// "styling" = Digital styling: egen bestilling med 1–3 stiler (S2-f, S3-f, POST /v1/orders/styling).
 export type ToolKind = "simple" | "scene" | "styling";
 
 export interface Tool {

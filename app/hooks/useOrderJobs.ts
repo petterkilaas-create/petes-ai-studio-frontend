@@ -55,10 +55,11 @@ export interface UseOrderJobsOptions {
  * POST /v1/orders/styling, og hver startet stil polles som i dag
  * (useJobStatus). `not_started` har ingen jobb og polles ikke.
  *
- * useProcessJob har én jobId; her er det hoeyst aatte (MAX_ORDER_JOBS), og
- * reglene for hooks krever et fast antall kall. Derfor aatte faste
- * useJobStatus-kall, der en tom plass faar null og ikke gjoer noe. Med mange
- * kort poller hvert kort saktere (orderPollDelayMs, S3-f).
+ * useProcessJob har én jobId; her er det hoeyst tre (MAX_ORDER_JOBS, F1),
+ * men backend godtar aatte til B1 er live, og reglene for hooks krever et
+ * fast antall kall. Derfor aatte faste useJobStatus-kall, der en tom plass
+ * faar null og ikke gjoer noe. Med mange kort poller hvert kort saktere
+ * (orderPollDelayMs, S3-f).
  */
 export function useOrderJobs(options: UseOrderJobsOptions = {}): UseOrderJobsResult {
   const { getToken } = useAuth();

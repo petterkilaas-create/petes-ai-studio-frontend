@@ -1,6 +1,7 @@
 "use client";
 
-import { FURNISH_AS_CHOICES, STYLING_STYLES, styleShort, toggleStyle, type StylingChoice } from "../lib/styling";
+import { useId } from "react";
+import { FURNISH_AS_CHOICES, MAX_ORDER_JOBS, STYLING_STYLES, styleShort, toggleStyle, type StylingChoice } from "../lib/styling";
 import { codeText, t, type Locale } from "../lib/i18n";
 
 const OPTION =
@@ -8,6 +9,8 @@ const OPTION =
 // Valgt = primary, saa valget ikke bare vises med farge (aria-pressed i tillegg).
 const ON = "bg-primary border-primary text-on-primary font-medium";
 const OFF = "bg-surface border-line-strong text-ink-2 hover:bg-surface-2 hover:text-ink";
+// Stil som ikke kan velges fordi tre er valgt (F1): som disabled, uten hover.
+const LOCKED = "bg-surface border-line-strong text-ink-2 opacity-50 cursor-not-allowed";
 const LABEL = "text-sm font-medium text-ink block mb-3";
 // Stilknappene: samme farger og fokusring som romvalget, men rektangulaere
 // med kortbeskrivelsen under etiketten.
@@ -16,10 +19,14 @@ const STYLE_OPTION =
 
 /**
  * Valgene for Digital styling (S2-f), etter malen i DuskChoicePicker:
- * stilene (flervalg av aatte, S3-f), romtypen («Møbler som …», sju valg ved
- * lansering) og bekreftelsen av at rommet er tomt (Petter 3A). Uten stil,
+ * stilene (flervalg av aatte, hoeyst tre, S3-f og F1), romtypen («Møbler
+ * som …», sju valg ved lansering) og bekreftelsen av at rommet er tomt (Petter 3A). Uten stil,
  * romtype og kryss er «Bestill» av (stylingParams gir null). Ingen tekst
  * eller spoersmaal under romvalget (Cowork 21.10).
+ *
+ * Med tre valgt er resten aria-disabled (F1): de blir i Tab-rekkefoelgen og
+ * leses som utilgjengelige, og gruppen peker paa hjelpelinja («opptil tre»).
+ * En valgt stil kan alltid velges bort.
  */
 export function StylingChoicePicker({
   value,
@@ -32,23 +39,34 @@ export function StylingChoicePicker({
   disabled: boolean;
   locale: Locale;
 }) {
+  const helpId = useId();
+  const atLimit = value.styles.length >= MAX_ORDER_JOBS;
   return (
     <div className="border-t border-line pt-6 space-y-5">
       <div>
         <p className="text-sm font-medium text-ink block mb-1">{t(locale, "styling.styles")}</p>
-        <p className="text-sm text-ink-2 mb-3">{t(locale, "styling.stylesHelp")}</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2" role="group" aria-label={t(locale, "styling.styles")}>
+        <p id={helpId} className="text-sm text-ink-2 mb-3">{t(locale, "styling.stylesHelp")}</p>
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 gap-2"
+          role="group"
+          aria-label={t(locale, "styling.styles")}
+          aria-describedby={helpId}
+        >
           {STYLING_STYLES.map((style) => {
             const short = styleShort(style);
             const on = value.styles.includes(style);
+            const locked = atLimit && !on;
             return (
               <button
                 key={style}
                 type="button"
-                onClick={() => onChange({ ...value, styles: toggleStyle(value.styles, style) })}
+                onClick={() => {
+                  if (!locked) onChange({ ...value, styles: toggleStyle(value.styles, style) });
+                }}
                 disabled={disabled}
                 aria-pressed={on}
-                className={`${STYLE_OPTION} ${on ? ON : OFF}`}
+                aria-disabled={locked || undefined}
+                className={`${STYLE_OPTION} ${on ? ON : locked ? LOCKED : OFF}`}
               >
                 <span className="block">{t(locale, `styling.style.${short}`)}</span>
                 <span className="block text-xs font-normal opacity-80">{t(locale, `styling.styleDesc.${short}`)}</span>
