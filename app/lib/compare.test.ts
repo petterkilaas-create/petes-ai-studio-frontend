@@ -164,8 +164,8 @@ function stylingVariants(isAdmin: boolean) {
 
 test("B2: admin ser stilen i parentes for styling, ikke skumringsvalgene", () => {
   const [now] = stylingVariants(true);
-  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_dansk_farge" }), "Runde 1 · nå (Dansk fargemoderne)");
-  assert.equal(variantLabel("en", now, { choices: true, presetId: "styling_dansk_farge" }), "Round 1 · now (Danish colour modern)");
+  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_dansk_farge" }), "Runde 1 · nå (Fargerik eklektisk)");
+  assert.equal(variantLabel("en", now, { choices: true, presetId: "styling_dansk_farge" }), "Round 1 · now (Colourful eclectic)");
   assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_japandi" }), "Runde 1 · nå (Japandi)");
   // De tre fra S2-f: kortetiketten.
   assert.equal(

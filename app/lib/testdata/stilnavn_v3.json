@@ -1,0 +1,177 @@
+{
+  "versjon": "stilnavn_v3",
+  "kilde": "Cowork-Claude 25.10.2026. Norske navn fra stilpakker_v3.json (Petter: alle 14). Engelske navn og beskrivelser er Coworks forslag.",
+  "rekkefolge": "Menyen viser stilene i nr-rekkefølge 01-14.",
+  "pynt": {
+    "label_nb": "Mengde pynt",
+    "label_en": "Amount of decor",
+    "help_nb": "Anbefalt gir hver stil den mengden som passer den.",
+    "help_en": "Recommended gives each style the amount that suits it.",
+    "valg": [
+      {
+        "verdi": null,
+        "nb": "Anbefalt for stilen",
+        "en": "Recommended for the style"
+      },
+      {
+        "verdi": 1,
+        "nb": "Lite",
+        "en": "Light"
+      },
+      {
+        "verdi": 3,
+        "nb": "Middels",
+        "en": "Medium"
+      },
+      {
+        "verdi": 5,
+        "nb": "Mye",
+        "en": "Full"
+      }
+    ]
+  },
+  "chip_nb": "14 stiler",
+  "chip_en": "14 styles",
+  "stiler": [
+    {
+      "nr": "01",
+      "id": "styling_moderne_nordisk",
+      "nb": "Moderne nordisk",
+      "en": "Modern Nordic",
+      "desc_nb": "Lyst og rolig: eik, varmhvitt og dempet blått.",
+      "desc_en": "Light and calm: oak, warm white and muted blue.",
+      "preset_nb": "Digital styling – Moderne nordisk",
+      "preset_en": "Virtual staging – Modern Nordic"
+    },
+    {
+      "nr": "02",
+      "id": "styling_japandi",
+      "nb": "Japandi",
+      "en": "Japandi",
+      "desc_nb": "Lavt og stille: rispapirhvitt, leire og sotet eik.",
+      "desc_en": "Low and quiet: rice-paper white, clay and black-stained oak.",
+      "preset_nb": "Digital styling – Japandi",
+      "preset_en": "Virtual staging – Japandi"
+    },
+    {
+      "nr": "03",
+      "id": "styling_nordisk_klassisk",
+      "nb": "Klassisk eleganse",
+      "en": "Classic elegance",
+      "desc_nb": "Tidløst og skreddersydd: krem, marmor og valnøtt.",
+      "desc_en": "Timeless and tailored: cream, marble and walnut.",
+      "preset_nb": "Digital styling – Klassisk eleganse",
+      "preset_en": "Virtual staging – Classic elegance"
+    },
+    {
+      "nr": "04",
+      "id": "styling_varm_minimalisme",
+      "nb": "Stille luksus",
+      "en": "Quiet luxury",
+      "desc_nb": "Dypt og mykt: travertin, taupe og sjokoladebrunt.",
+      "desc_en": "Deep and soft: travertine, taupe and chocolate brown.",
+      "preset_nb": "Digital styling – Stille luksus",
+      "preset_en": "Virtual staging – Quiet luxury"
+    },
+    {
+      "nr": "05",
+      "id": "styling_sekelskifte",
+      "nb": "Sekelskifte",
+      "en": "Turn of the century",
+      "desc_nb": "Rikt og mettet: dypgrønt, fløyel og mahogni.",
+      "desc_en": "Rich and saturated: deep green, velvet and mahogany.",
+      "preset_nb": "Digital styling – Sekelskifte",
+      "preset_en": "Virtual staging – Turn of the century"
+    },
+    {
+      "nr": "06",
+      "id": "styling_funkis",
+      "nb": "Funkis",
+      "en": "Functionalism",
+      "desc_nb": "Stramt og lyst: krittvitt, stålrør og opalglass.",
+      "desc_en": "Strict and light: chalk white, tubular steel and opal glass.",
+      "preset_nb": "Digital styling – Funkis",
+      "preset_en": "Virtual staging – Functionalism"
+    },
+    {
+      "nr": "07",
+      "id": "styling_by_vintage",
+      "nb": "Nordisk 50–60-tall",
+      "en": "Nordic mid-century",
+      "desc_nb": "Slankt og lyst: teak, skoggrønt og messing.",
+      "desc_en": "Slim and light: teak, forest green and brass.",
+      "preset_nb": "Digital styling – Nordisk 50–60-tall",
+      "preset_en": "Virtual staging – Nordic mid-century"
+    },
+    {
+      "nr": "08",
+      "id": "styling_syttitall",
+      "nb": "70-talls retro",
+      "en": "70s retro",
+      "desc_nb": "Lavt og rundt: brent oransje, sennep og kord.",
+      "desc_en": "Low and rounded: burnt orange, mustard and corduroy.",
+      "preset_nb": "Digital styling – 70-talls retro",
+      "preset_en": "Virtual staging – 70s retro"
+    },
+    {
+      "nr": "09",
+      "id": "styling_dansk_farge",
+      "nb": "Fargerik eklektisk",
+      "en": "Colourful eclectic",
+      "desc_nb": "Personlig og samlet: plomme, dypblått og kelim.",
+      "desc_en": "Personal and collected: plum, deep blue and kilim.",
+      "preset_nb": "Digital styling – Fargerik eklektisk",
+      "preset_en": "Virtual staging – Colourful eclectic"
+    },
+    {
+      "nr": "10",
+      "id": "styling_pastell",
+      "nb": "Dansk pastell",
+      "en": "Danish pastel",
+      "desc_nb": "Mykt og lekent: babyrosa, lyseblått og smørgult.",
+      "desc_en": "Soft and playful: baby pink, light blue and butter yellow.",
+      "preset_nb": "Digital styling – Dansk pastell",
+      "preset_en": "Virtual staging – Danish pastel"
+    },
+    {
+      "nr": "11",
+      "id": "styling_nordisk_kyst",
+      "nb": "Kyst og sommerhus",
+      "en": "Coast and summer house",
+      "desc_nb": "Lyst og avslappet: hvitt, himmelblått og rotting.",
+      "desc_en": "Light and relaxed: white, sky blue and rattan.",
+      "preset_nb": "Digital styling – Kyst og sommerhus",
+      "preset_en": "Virtual staging – Coast and summer house"
+    },
+    {
+      "nr": "12",
+      "id": "styling_hytte_tradisjon",
+      "nb": "Tradisjonell hytte",
+      "en": "Traditional cabin",
+      "desc_nb": "Lunt og tradisjonelt: tjærebrunt, rørosrødt og furu.",
+      "desc_en": "Cosy and traditional: tar brown, Røros red and pine.",
+      "preset_nb": "Digital styling – Tradisjonell hytte",
+      "preset_en": "Virtual staging – Traditional cabin"
+    },
+    {
+      "nr": "13",
+      "id": "styling_hytte_fjell",
+      "nb": "Moderne hytte",
+      "en": "Modern cabin",
+      "desc_nb": "Stort og rolig: røykgrått, mørk eik og ull.",
+      "desc_en": "Large and calm: smoke grey, dark oak and wool.",
+      "preset_nb": "Digital styling – Moderne hytte",
+      "preset_en": "Virtual staging – Modern cabin"
+    },
+    {
+      "nr": "14",
+      "id": "styling_urban_industri",
+      "nb": "Urban industri",
+      "en": "Urban industrial",
+      "desc_nb": "Røft, men varmt: betong, svart stål og konjakk.",
+      "desc_en": "Rough but warm: concrete, black steel and cognac.",
+      "preset_nb": "Digital styling – Urban industri",
+      "preset_en": "Virtual staging – Urban industrial"
+    }
+  ]
+}

@@ -158,7 +158,7 @@ export const home = {
         id: "virtual_stage",
         studio: "Bildestudio",
         title: "Digital styling",
-        text: "Tomme rom møbleres digitalt i en av tre stiler: skandinavisk, familie eller moderne. Vegger, vinduer og dører beholdes, og du godkjenner hvert bilde.",
+        text: "Tomme rom møbleres digitalt i en av fjorten stiler, fra moderne nordisk til tradisjonell hytte. Vegger, vinduer og dører beholdes, og du godkjenner hvert bilde.",
         status: "soon",
         media: {
           kind: "split",

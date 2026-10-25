@@ -411,6 +411,11 @@ export interface StylingOrderParams {
   furnish_as: string;
   /** Megleren bekrefter at rommet er tomt (Petter 3A). Alltid bokstavelig true. */
   room_empty_confirmed: true;
+  /**
+   * Mengde pynt (TG-NEW-257): bare 1, 3 eller 5. Mangler feltet, bruker
+   * backend stilens eget nivaa («Anbefalt for stilen»).
+   */
+  decor_level?: 1 | 3 | 5;
 }
 
 /**

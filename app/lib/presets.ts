@@ -63,7 +63,8 @@ const SCENE_PRESETS: readonly ScenePreset[] = [
     workingKey: "media.working.styling",
     fileSlug: "styling-moderne",
   },
-  // De aatte stilene (S3-f). De tre over staar igjen for historikken.
+  // Stilene fra S3-f, med navn fra stilene v3. De tre over staar igjen for
+  // historikken.
   {
     ids: ["styling_moderne_nordisk"],
     labelKey: "styling.preset.moderne_nordisk",
@@ -111,6 +112,44 @@ const SCENE_PRESETS: readonly ScenePreset[] = [
     labelKey: "styling.preset.nordisk_kyst",
     workingKey: "media.working.styling",
     fileSlug: "styling-nordisk-kyst",
+  },
+  // Stilene v3 (TG-NEW-257): de seks nye. fileSlug kommer fra id-en; stilene
+  // over beholder sin, ogsaa der navnet er endret.
+  {
+    ids: ["styling_sekelskifte"],
+    labelKey: "styling.preset.sekelskifte",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-sekelskifte",
+  },
+  {
+    ids: ["styling_funkis"],
+    labelKey: "styling.preset.funkis",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-funkis",
+  },
+  {
+    ids: ["styling_syttitall"],
+    labelKey: "styling.preset.syttitall",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-syttitall",
+  },
+  {
+    ids: ["styling_pastell"],
+    labelKey: "styling.preset.pastell",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-pastell",
+  },
+  {
+    ids: ["styling_hytte_tradisjon"],
+    labelKey: "styling.preset.hytte_tradisjon",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-hytte-tradisjon",
+  },
+  {
+    ids: ["styling_urban_industri"],
+    labelKey: "styling.preset.urban_industri",
+    workingKey: "media.working.styling",
+    fileSlug: "styling-urban-industri",
   },
 ];
 
