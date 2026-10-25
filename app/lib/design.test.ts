@@ -44,6 +44,8 @@ const TOKENS_8: Record<string, string> = {
   "red-fg": "#8A1F17",
   // MS3b (Petter 02.10): kveldsblaatt fra utkastet, fast og ikke en merkefarge.
   night: "#101A2C",
+  // D-5b1 (Petter 25.10): lysboksen, varm sort fra designet, fast og ikke en merkefarge.
+  darkroom: "#141312",
 };
 
 test("globals.css: alle tokenene i §8 finnes i @theme med riktig verdi", () => {
@@ -985,7 +987,7 @@ test("TG147: Godkjenn-knappen viser «Godkjenner …» og er laast mens kallet p
   const card = withoutComments(read("components/godkjenning/DecisionCard.tsx"));
   assert.match(
     card,
-    /onClick=\{\(\) => onDecide\("approve"\)\}\s*disabled=\{locked \|\| !approveEnabled\(additions\.level, acknowledged\)\}\s*aria-busy=\{approving\}[\s\S]*?\{approving \? t\(locale, "action\.approving"\) : t\(locale, "action\.approve"\)\}/
+    /onClick=\{\(\) => onDecide\("approve"\)\}\s*disabled=\{locked \|\| !approveEnabled\(additions\.level, compared, acknowledged\)\}\s*aria-busy=\{approving\}[\s\S]*?\{approving \? t\(locale, "action\.approving"\) : t\(locale, "action\.approve"\)\}/
   );
 });
 

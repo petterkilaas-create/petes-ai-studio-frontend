@@ -46,6 +46,7 @@ import { compareVariants, selectedVariant, variantLabel } from "@/app/lib/compar
 import { canShowMarkers } from "@/app/lib/lightsView";
 import { panelShown } from "@/app/lib/presets";
 import { canShowAdditions } from "@/app/lib/additions";
+import { checklistFor } from "@/app/lib/checklist";
 import {
   blockedResult,
   brightnessResultUrl,
@@ -63,6 +64,7 @@ import { CompareViewer } from "@/app/components/godkjenning/CompareViewer";
 import { LightMarkers } from "@/app/components/godkjenning/LightMarkers";
 import { AdditionMarkers } from "@/app/components/godkjenning/AdditionMarkers";
 import { VariantPicker } from "@/app/components/godkjenning/VariantPicker";
+import { Lightbox } from "@/app/components/godkjenning/Lightbox";
 import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
 import { CorrectionPanel } from "@/app/components/godkjenning/CorrectionPanel";
 import { MoodPanel } from "@/app/components/godkjenning/MoodPanel";
@@ -101,9 +103,18 @@ import { FOCUS } from "@/app/components/godkjenning/classes";
  * rundeetiketten, usikre lys (rettingen og markoerene), peisen og «ikke
  * brukt» om himmelen. Admin (adminView) ser alt som foer.
  *
- * Kontrollen av tillegg (TG-NEW-199 PR 4): ved `warning` maa krysset settes
- * foer «Godkjenn», og det sendes med som `additions_acknowledged`. Krysset
- * nullstilles ved hver ny henting (ny runde, eller 409 uten kryss).
+ * Kontrollen av tillegg (TG-NEW-199 PR 4): ved `warning` sendes krysset med
+ * som `additions_acknowledged`.
+ *
+ * Sjekklista og krysset (D-5a, Petter 25.10): én liste per tjeneste
+ * (checklistFor) og ett kryss «Jeg har sammenlignet …» som maa settes foer
+ * «Godkjenn» for alle nivaaer; ved advarsel setter det ogsaa
+ * `acknowledged`. Ingenting nytt sendes til backend. Krysset gjelder per
+ * jobb og nullstilles ved hver ny henting (ny runde, 409, avgjoerelse).
+ *
+ * Bredere visning og lysboks (D-5a): siden er ca. 1360 px (menyen er felles
+ * og staar paa 1152 px, Petter 25.10, AVVIK 2 b), saa bildet blir ca. 870 px. «Forstørr» aapner lysboksen med samme bilde,
+ * trinn og runder.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -145,8 +156,11 @@ export default function GodkjenningPage({
   const [correctAnswer, setCorrectAnswer] = useState<FireplaceAnswer>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
-  // «Jeg har sjekket de markerte stedene.» (TG-NEW-199). Gjelder bare runden siden viser.
+  // «Jeg har sammenlignet bildet med originalen.» (D-5a). Ved advarsel setter
+  // samme kryss ogsaa acknowledged (TG-NEW-199). Gjelder bare runden siden viser.
+  const [compared, setCompared] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
   // Synkront vern mot dobbeltklikk; busy-state rekker ikke aa oppdatere
   // mellom to raske klikk. Backend har ogsaa eget vern.
   const inFlight = useRef(false);
@@ -175,7 +189,9 @@ export default function GodkjenningPage({
     setVariantId(null);
     setChosenStep(null);
     setResultLoaded(false);
+    setCompared(false);
     setAcknowledged(false);
+    setLightbox(false);
   }, [jobId, getToken]);
 
   useEffect(() => {
@@ -355,7 +371,7 @@ export default function GodkjenningPage({
 
   return (
     <div className="flex flex-col">
-      <main className="max-w-6xl mx-auto w-full p-4 sm:p-8 flex-1 flex flex-col gap-6">
+      <main className="max-w-[1360px] mx-auto w-full p-4 sm:p-8 flex-1 flex flex-col gap-6">
         <div>
           <Link
             href="/history"
@@ -469,9 +485,9 @@ export default function GodkjenningPage({
                   </p>
                 )}
 
-                {/* Stort bilde til venstre, handlinger og stemning ved siden av. Paa mobil under hverandre. */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                  <section className={`${CARD} lg:col-span-2 flex flex-col gap-6 min-w-0`}>
+                {/* Stort bilde til venstre, handlinger og stemning i en kolonne paa 22rem ved siden av. Paa mobil under hverandre. */}
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
+                  <section className={`${CARD} flex flex-col gap-6 min-w-0`}>
                     {deleted ? (
                       // Ingen varianter, modusknapper eller lysstyrke: én boks (Petter 05.10, A1).
                       <PreviewPlaceholder reason="deleted" />
@@ -511,6 +527,7 @@ export default function GodkjenningPage({
                               />
                             ) : null
                           }
+                          onExpand={() => setLightbox(true)}
                           locale={locale}
                         />
                         {brightness.kind === "control" && step !== null && (
@@ -525,6 +542,28 @@ export default function GodkjenningPage({
                           />
                         )}
                         {brightness.kind === "approved" && <BrightnessApproved step={brightness.step} locale={locale} />}
+                        {lightbox && review.images.originalUrl !== null && (
+                          <Lightbox
+                            originalUrl={review.images.originalUrl}
+                            aiUrl={shownUrl}
+                            aiAlt={t(locale, "compare.altResult", { label: shownLabel })}
+                            placeholder={<PreviewPlaceholder />}
+                            rounds={
+                              variants.length > 1 ? (
+                                <VariantPicker
+                                  variants={variants}
+                                  selectedId={shown?.id ?? null}
+                                  onSelect={setVariantId}
+                                  choices={admin}
+                                  presetId={review.presetId}
+                                  locale={locale}
+                                />
+                              ) : null
+                            }
+                            onClose={() => setLightbox(false)}
+                            locale={locale}
+                          />
+                        )}
                       </>
                     )}
                   </section>
@@ -600,6 +639,9 @@ export default function GodkjenningPage({
                           ) : null
                         }
                         additions={review.additionsCheck}
+                        checklist={checklistFor(review.presetId)}
+                        compared={compared}
+                        onCompared={setCompared}
                         acknowledged={acknowledged}
                         onAcknowledged={setAcknowledged}
                         message={messageText}

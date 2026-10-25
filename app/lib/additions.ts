@@ -35,9 +35,14 @@ export function additionsView(level: AdditionsLevel): AdditionsView {
   }
 }
 
-/** «Godkjenn» kan trykkes: krysset er satt, eller nivaaet krever det ikke. */
-export function approveEnabled(level: AdditionsLevel, acknowledged: boolean): boolean {
-  return level !== "warning" || acknowledged;
+/**
+ * «Godkjenn» kan trykkes (D-5a, Petter 25.10, §3 b): krysset «Jeg har
+ * sammenlignet …» er satt, for alle nivaaer. Ved advarsel setter det samme
+ * krysset ogsaa `acknowledged` (sendes som `additions_acknowledged`), og
+ * det kreves fortsatt.
+ */
+export function approveEnabled(level: AdditionsLevel, compared: boolean, acknowledged: boolean): boolean {
+  return compared && (!additionsView(level).needsAck || acknowledged);
 }
 
 /** Noekkel for en type: kjent kode, ellers felles «annen endring». */

@@ -108,12 +108,18 @@ test("TG199 PR4: nivået styrer linja, krysset og «Vis mulige tillegg»", () =>
   assert.deepEqual(additionsView("danger" as AdditionsLevel), additionsView("unchecked"));
 });
 
-test("TG199 PR4: «Godkjenn» er av ved advarsel til krysset er satt", () => {
-  assert.equal(approveEnabled("warning", false), false);
-  assert.equal(approveEnabled("warning", true), true);
-  for (const level of ["note", "none", "unchecked"] as AdditionsLevel[]) {
-    assert.equal(approveEnabled(level, false), true, level);
-    assert.equal(approveEnabled(level, true), true, level);
+// D-5a (Petter 25.10, §3 b): ett kryss for alle nivaaer. Ved advarsel
+// setter krysset ogsaa acknowledged, og det kreves fortsatt.
+test("TG199 PR4 og D-5a: «Godkjenn» er av til krysset er satt, for alle nivåer", () => {
+  assert.equal(approveEnabled("warning", false, false), false);
+  assert.equal(approveEnabled("warning", true, false), false, "advarsel uten acknowledged");
+  assert.equal(approveEnabled("warning", false, true), false);
+  assert.equal(approveEnabled("warning", true, true), true);
+  for (const level of ["note", "none", "unchecked", "danger" as AdditionsLevel] as AdditionsLevel[]) {
+    assert.equal(approveEnabled(level, false, false), false, level);
+    assert.equal(approveEnabled(level, false, true), false, level);
+    assert.equal(approveEnabled(level, true, false), true, level);
+    assert.equal(approveEnabled(level, true, true), true, level);
   }
 });
 
@@ -197,8 +203,9 @@ test("TG199 PR4: setningene ved advarsel og merknad (V2 A)", () => {
 test("TG199 PR4: tekstene på norsk og engelsk", () => {
   assert.equal(t("nb", "additions.unchecked"), "Ikke kontrollert automatisk.");
   assert.equal(t("en", "additions.unchecked"), "Not checked automatically.");
-  assert.equal(t("nb", "additions.ack"), "Jeg har sjekket de markerte stedene.");
-  assert.equal(t("en", "additions.ack"), "I have checked the marked places.");
+  // D-5a: «additions.ack» er erstattet av krysset «checklist.comparedWarning» (checklist.test.ts).
+  assert.ok(!Object.hasOwn(DICTIONARIES.nb.ui, "additions.ack"));
+  assert.ok(!Object.hasOwn(DICTIONARIES.en.ui, "additions.ack"));
   assert.equal(t("nb", "additions.show"), "Vis mulige tillegg");
   assert.equal(t("en", "additions.show"), "Show possible additions");
   assert.equal(
@@ -316,27 +323,29 @@ test("TG199 PR4: i kortet står linja, sjekklista og krysset over knappene, bare
   const warning = at('view.notice === "warning"');
   const note = at('view.notice === "note"');
   const unchecked = at('view.notice === "unchecked"');
-  const checklist = at('"action.checkAdded"');
-  const ack = at("view.needsAck && (");
+  const checklist = at("CHECKLISTS[checklist]");
+  const ack = at("checked={compared}");
   assert.ok(otherwise !== -1 && block > otherwise, "blokka er i grenen uten retting");
   for (const [name, i] of Object.entries({ warning, note, unchecked, checklist, ack })) {
     assert.ok(i > block && i < blockEnd, `${name} er i controls.approve-blokka`);
   }
   assert.ok(blockEnd < buttons, "blokka står før knappene");
-  // Sjekklista under advarselen og merknaden, krysset under sjekklista.
+  // Sjekklista under advarselen og merknaden, krysset under sjekklista (D-5a: ett kryss).
   assert.ok(warning < checklist && note < checklist && unchecked < checklist && checklist < ack);
-  assert.equal(card.match(/"additions\.ack"/g)?.length, 1);
+  assert.equal(card.match(/type="checkbox"/g)?.length, 1);
+  assert.doesNotMatch(card, /"additions\.ack"/);
 });
 
-test("TG199 PR4: krysset er en ekte checkbox med label, og advarselen kunngjøres", () => {
+test("TG199 PR4 og D-5a: krysset er en ekte checkbox med label, og advarselen kunngjøres", () => {
+  // D-5a: ett kryss. Ved advarsel setter det ogsaa acknowledged.
   assert.match(
     card,
-    /<label className="[^"]*min-h-11[^"]*">\s*<input\s+type="checkbox"\s+checked=\{acknowledged\}\s+disabled=\{locked\}\s+onChange=\{\(e\) => onAcknowledged\(e\.target\.checked\)\}[\s\S]*?\/>\s*<span>\{t\(locale, "additions\.ack"\)\}<\/span>\s*<\/label>/
+    /<label className="[^"]*min-h-11[^"]*">\s*<input\s+type="checkbox"\s+checked=\{compared\}\s+disabled=\{locked\}\s+onChange=\{\(e\) => \{\s*onCompared\(e\.target\.checked\);\s*if \(view\.needsAck\) onAcknowledged\(e\.target\.checked\);\s*\}\}[\s\S]*?\/>\s*<span>\{t\(locale, comparedKey\(additions\.level\)\)\}<\/span>\s*<\/label>/
   );
   assert.match(card, /view\.notice === "warning" && \(\s*<div className="[^"]*text-red-fg bg-red-bg[^"]*" role="alert">/);
   assert.match(card, /view\.notice === "note" && \(\s*<p className="[^"]*text-amber-fg bg-amber-bg[^"]*" role="status">/);
   assert.match(card, /view\.notice === "unchecked" && \(\s*<p className="text-sm text-ink-2" role="status">/);
-  assert.match(card, /disabled=\{locked \|\| !approveEnabled\(additions\.level, acknowledged\)\}/);
+  assert.match(card, /disabled=\{locked \|\| !approveEnabled\(additions\.level, compared, acknowledged\)\}/);
 });
 
 test("TG199 PR4: boksene på gjeldende rundes forhåndsvisning, plasseringen bare for admin", () => {
