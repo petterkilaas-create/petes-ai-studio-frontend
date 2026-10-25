@@ -114,10 +114,10 @@ test("S4: ENABLED.digital_styling er true, og kortet kan bestilles paa start og 
 
 // --- Presetene ------------------------------------------------------------------
 
-test("S3-f: STYLING_STYLES er de aatte i fast rekkefoelge, og MAX_ORDER_JOBS er 8", () => {
+test("S3-f/F1: STYLING_STYLES er de aatte i fast rekkefoelge, og MAX_ORDER_JOBS er 3", () => {
   assert.deepEqual([...STYLING_STYLES], [...EIGHT]);
-  assert.equal(MAX_ORDER_JOBS, STYLING_STYLES.length);
-  assert.equal(MAX_ORDER_JOBS, 8);
+  // F1 (Petter 25.10): taket er tre, ikke lenger antall stiler.
+  assert.equal(MAX_ORDER_JOBS, 3);
   assert.equal(styleShort("styling_by_vintage"), "by_vintage");
 });
 
@@ -239,15 +239,21 @@ test("S3-f: velgeren har aatte stilknapper med aria-pressed, og hver stil har et
   assert.match(picker, /onChange\(\{ \.\.\.value, styles: toggleStyle\(value\.styles, style\) \}\)/);
   assert.match(picker, /grid grid-cols-1 md:grid-cols-2/);
   assert.match(picker, /const STYLE_OPTION =\s*"min-h-11 [^"]*text-left[^"]*focus-visible:ring-2 focus-visible:ring-accent/);
-  assert.match(picker, /\$\{STYLE_OPTION\} \$\{on \? ON : OFF\}/);
+  assert.match(picker, /\$\{STYLE_OPTION\} \$\{on \? ON : locked \? LOCKED : OFF\}/);
   // Stilgruppen staar foer romvalget.
   assert.ok(picker.indexOf("STYLING_STYLES.map(") < picker.indexOf("FURNISH_AS_CHOICES.map("));
   const nb = DICTIONARIES.nb.ui;
   const en = DICTIONARIES.en.ui;
   assert.equal(nb["styling.styles"], "Velg én eller flere stiler");
-  assert.equal(nb["styling.stylesHelp"], "Du får ett bilde per stil. Bestillingen teller som ett gratisbilde.");
+  assert.equal(
+    nb["styling.stylesHelp"],
+    "Du kan velge opptil tre stiler per bilde. Du får ett bilde per stil. Bestillingen teller som ett gratisbilde."
+  );
   assert.equal(en["styling.styles"], "Choose one or more styles");
-  assert.equal(en["styling.stylesHelp"], "You get one image per style. The order counts as one free image.");
+  assert.equal(
+    en["styling.stylesHelp"],
+    "You can choose up to three styles per photo. You get one image per style. The order counts as one free image."
+  );
   for (const style of STYLING_STYLES) {
     const short = styleShort(style);
     for (const ui of [nb, en]) {
@@ -271,8 +277,11 @@ test("S3-f: toggleStyle legger til og tar bort, og stylingParams sorterer i fast
     choice("living", ["styling_nordisk_kyst", "styling_japandi", "styling_moderne_nordisk", "styling_japandi"])
   );
   assert.deepEqual(params?.styles, ["styling_moderne_nordisk", "styling_japandi", "styling_nordisk_kyst"]);
-  // Alle aatte, baklengs.
-  assert.deepEqual(stylingParams(choice("living", [...EIGHT].reverse()))?.styles, [...EIGHT]);
+  // Tre, baklengs (F1: alle aatte gir null, se testen under).
+  assert.deepEqual(
+    stylingParams(choice("living", ["styling_nordisk_kyst", "styling_hytte_fjell", "styling_by_vintage"]))?.styles,
+    ["styling_by_vintage", "styling_hytte_fjell", "styling_nordisk_kyst"]
+  );
   // Samme valg i ulik rekkefoelge gir samme noekkel.
   let n = 0;
   const keys = new OrderKeys(() => `key-${++n}`);
@@ -283,6 +292,56 @@ test("S3-f: toggleStyle legger til og tar bort, og stylingParams sorterer i fast
     keys.keyFor({ file, service: STYLING_ORDER_SERVICE, params: a }),
     keys.keyFor({ file, service: STYLING_ORDER_SERVICE, params: b })
   );
+});
+
+test("F1: en fjerde stil legges ikke til, og en valgt kan alltid tas bort", () => {
+  const three = ["styling_japandi", "styling_by_vintage", "styling_nordisk_kyst"] as const;
+  for (const extra of EIGHT.filter((s) => !three.includes(s as (typeof three)[number]))) {
+    assert.deepEqual(toggleStyle(three, extra), [...three], extra);
+  }
+  // En ny liste, ikke den samme.
+  assert.notEqual(toggleStyle(three, "styling_japandi"), three);
+  assert.notEqual(toggleStyle(three, "styling_dansk_farge"), three);
+  for (const s of three) {
+    assert.deepEqual(toggleStyle(three, s), three.filter((x) => x !== s), s);
+  }
+  // Med to valgt kan den tredje legges til.
+  assert.deepEqual(toggleStyle(["styling_japandi", "styling_by_vintage"], "styling_dansk_farge"), [
+    "styling_japandi",
+    "styling_by_vintage",
+    "styling_dansk_farge",
+  ]);
+  // Klikk paa alle aatte etter hverandre gir de tre foerste.
+  const all = EIGHT.reduce<(typeof EIGHT)[number][]>((acc, s) => toggleStyle(acc, s), []);
+  assert.deepEqual(all, EIGHT.slice(0, 3));
+});
+
+test("F1: stylingParams sender aldri flere enn tre, og kutter ikke stille", () => {
+  for (let n = 1; n <= EIGHT.length; n++) {
+    const params = stylingParams(choice("living", EIGHT.slice(0, n)));
+    if (n <= MAX_ORDER_JOBS) assert.deepEqual(params?.styles, EIGHT.slice(0, n), String(n));
+    else assert.equal(params, null, String(n));
+  }
+  // Fire der to er like, er tre ulike og kan sendes.
+  assert.deepEqual(
+    stylingParams(choice("living", ["styling_japandi", "styling_dansk_farge", "styling_japandi", "styling_hytte_fjell"]))
+      ?.styles,
+    ["styling_japandi", "styling_dansk_farge", "styling_hytte_fjell"]
+  );
+});
+
+test("F1: velgeren laaser resten med aria-disabled naar tre er valgt, og gruppen peker paa hjelpelinja", () => {
+  const picker = read("components/StylingChoicePicker.tsx");
+  assert.match(picker, /const atLimit = value\.styles\.length >= MAX_ORDER_JOBS;/);
+  assert.match(picker, /const locked = atLimit && !on;/);
+  assert.match(picker, /if \(!locked\) onChange\(\{ \.\.\.value, styles: toggleStyle\(value\.styles, style\) \}\);/);
+  assert.match(picker, /aria-disabled=\{locked \|\| undefined\}/);
+  // Fortsatt native disabled bare mens bestillingen gaar.
+  assert.match(picker, /disabled=\{disabled\}\s*aria-pressed=\{on\}/);
+  assert.match(picker, /const LOCKED = "[^"]*opacity-50[^"]*cursor-not-allowed[^"]*";/);
+  assert.doesNotMatch(picker.match(/const LOCKED = "[^"]*"/)![0], /hover:/);
+  assert.match(picker, /<p id=\{helpId\} [^>]*>\{t\(locale, "styling\.stylesHelp"\)\}<\/p>/);
+  assert.match(picker, /role="group"\s*aria-label=\{t\(locale, "styling\.styles"\)\}\s*aria-describedby=\{helpId\}/);
 });
 
 test("S3-f: orderPollDelayMs er 2 s × ⌈n/3⌉, minst 2 s", () => {
@@ -439,7 +498,8 @@ test("S3-f: et svar med aatte jobber der 5–8 er not_started, gir aatte kort, o
   assert.deepEqual(r.jobs.map((j) => j.presetId), [...EIGHT]);
   assert.deepEqual(r.jobs.map(pollJobId), ["j1", "j2", "j3", "j4", null, null, null, null]);
   // Kortene: jobs.slice(0, polls.length) med aatte kall (testen over) beholder alle aatte.
-  assert.equal(r.jobs.slice(0, MAX_ORDER_JOBS).length, 8);
+  // F1: MAX_ORDER_JOBS er 3, men hooken har fortsatt aatte kall til B1 er live.
+  assert.equal(r.jobs.slice(0, 8).length, 8);
   // Kortene vises i to kolonner fra md og fire fra lg.
   const cards = read("components/StylingOrderCards.tsx");
   assert.match(cards, /grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6/);
@@ -495,7 +555,11 @@ test("S2-f: feilkodene har egen tekst paa begge spraak", () => {
   assert.equal(orderErrorText("en", "room_empty_not_confirmed", null), "Please confirm that the room is empty.");
   assert.equal(
     orderErrorText("nb", "invalid_order", null),
-    "Bestillingen er ikke gyldig. Velg rom og minst én stil."
+    "Bestillingen er ikke gyldig. Velg rom og én til tre stiler."
+  );
+  assert.equal(
+    orderErrorText("en", "invalid_order", null),
+    "The order is not valid. Choose a room and one to three styles."
   );
 });
 

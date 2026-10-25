@@ -86,7 +86,7 @@ function ExpressContent() {
   // Kvoten for gratisbilder (TG-NEW-149): fra GET /v1/quota, oppdatert fra bestillingen.
   const quota = useQuota();
   const job = useProcessJob({ onQuota: quota.apply });
-  // Digital styling: én bestilling med 1–8 av de åtte stilene (ENABLED.digital_styling, S4).
+  // Digital styling: én bestilling med 1–3 av de åtte stilene (ENABLED.digital_styling, S4).
   const order = useOrderJobs({ onQuota: quota.apply });
   const refreshQuota = quota.refresh;
 

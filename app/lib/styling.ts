@@ -5,7 +5,7 @@ import { presetLabelKey } from "./presets.ts";
 
 /**
  * Digital styling (S2-f og S3-f, KONTRAKT_BESTILLING): én bestilling er
- * ett bilde, ett romvalg og 1–8 stiler megleren velger, og koster én
+ * ett bilde, ett romvalg og 1–3 stiler megleren velger (F1, Petter 25.10), og koster én
  * kvote-enhet (Petter 21.10). Kortet staar bak `ENABLED.digital_styling`
  * (paa fra S4, Dag 51). Rene funksjoner, saa reglene kan testes med node --test; bare
  * type-importer (api.ts kaster ved import naar NEXT_PUBLIC_API_BASE mangler).
@@ -55,8 +55,11 @@ export function styleText(locale: Locale, presetId: string | null | undefined): 
   return key === null ? null : t(locale, key);
 }
 
-/** Hoeyst aatte stiler per bestilling (kontrakten), saa hooken har aatte faste poll-kall. */
-export const MAX_ORDER_JOBS = 8;
+/**
+ * Hoeyst tre stiler per bestilling (F1, Petter 25.10). Backend godtar aatte
+ * til B1 er live; hooken har fortsatt aatte faste poll-kall.
+ */
+export const MAX_ORDER_JOBS = 3;
 
 /**
  * Romvalgene i velgeren, i samme rekkefoelge som `ST_ROOM` i backend. Sju
@@ -87,20 +90,25 @@ export interface StylingChoice {
 
 export const EMPTY_STYLING: StylingChoice = { furnishAs: null, roomEmpty: false, styles: [] };
 
-/** Legger til stilen, eller tar den bort om den er valgt. */
+/**
+ * Legger til stilen, eller tar den bort om den er valgt. Med MAX_ORDER_JOBS
+ * valgt legges ingen ny til; en valgt kan alltid tas bort.
+ */
 export function toggleStyle(styles: readonly StylingStyle[], id: StylingStyle): StylingStyle[] {
-  return styles.includes(id) ? styles.filter((s) => s !== id) : [...styles, id];
+  if (styles.includes(id)) return styles.filter((s) => s !== id);
+  return styles.length >= MAX_ORDER_JOBS ? [...styles] : [...styles, id];
 }
 
 /**
  * `params_json` for bestillingen, eller null naar valget ikke er komplett (da
  * er «Bestill» av). Stilene sendes uten duplikater og i den faste
- * rekkefoelgen, saa `Idempotency-Key` og duplikatsvaret blir stabile.
+ * rekkefoelgen, saa `Idempotency-Key` og duplikatsvaret blir stabile. Flere
+ * enn MAX_ORDER_JOBS gir ogsaa null: ingenting sendes, og ingen stil kuttes.
  */
 export function stylingParams(choice: StylingChoice): StylingOrderParams | null {
   if (choice.furnishAs === null || !choice.roomEmpty) return null;
   const styles = STYLING_STYLES.filter((s) => choice.styles.includes(s));
-  if (styles.length === 0) return null;
+  if (styles.length === 0 || styles.length > MAX_ORDER_JOBS) return null;
   return { styles, furnish_as: choice.furnishAs, room_empty_confirmed: true };
 }
 
