@@ -395,7 +395,8 @@ const nbUi = {
   "styling.toggleStyle": "Velg stilen {style}",
   "styling.openMoodboard": "Åpne moodboard",
   "styling.openMoodboardFor": "Åpne moodboard for {style}",
-  // Linja under romflisene, ordrett fra designet (Styling.dc.html, «1 · Rommet»).
+  // Linja under romflisene, ordrett fra designet (Styling.dc.html, «1 · Rommet»),
+  // unntatt gangen (Petter, AVVIK 1: gangen får aldri speil, og knagger er faste ting).
   "styling.roomSub.living": "Sofa, bord og lys",
   "styling.roomSub.living_dining": "Sofa og spisebord",
   "styling.roomSub.bedroom": "Seng og nattbord",
