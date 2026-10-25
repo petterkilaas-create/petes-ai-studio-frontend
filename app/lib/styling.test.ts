@@ -243,24 +243,32 @@ test("S2-f: etiketten er «Møbler som …», aldri bare «Soverom», paa nb og 
   for (const text of Object.values(DICTIONARIES.nb.codes.furnishAs)) assert.notEqual(text, "Soverom");
 });
 
-test("S2-f/S3-f: stilene staar over romvalget, og ingen tekst eller spoersmaal under romvalget, og soverom kan bestilles", () => {
+// D-3 kompakt (Petter 15.53): rommet foerst, saa stilene, saa pynten.
+test("S2-f/S3-f/D-3: rommet staar foerst med krysset i samme rad, saa stilene og pynten, og soverom kan bestilles", () => {
   const picker = read("components/StylingChoicePicker.tsx");
-  // Stilgruppen (overskrift, hjelpelinje, etikett og kortbeskrivelse), pyntgruppen
-  // (v3: overskrift og hjelpelinje; valgene, se v3-testene), saa romvalget og
-  // avkrysningen. Ingenting mellom romvalget og avkrysningen.
+  // 1 · romvalget og krysset, med linja under flisene; 2 · stilene (overskrift,
+  // hjelpelinje, etikett og navnet paa stilen i fokus og i dialogen; kortene og
+  // panelet har egne filer); 3 · pyntgruppen (valgene, se v3-testene).
+  // (nameOf staar oeverst i komponenten; pyntvalgene har " i noekkelen og telles ikke her.)
   assert.deepEqual(picker.match(/t\(locale, ["`][^"`]+["`]\)/g), [
+    "t(locale, `styling.style.${styleShort(style)}`)",
+    't(locale, "styling.furnishAs")',
+    't(locale, "styling.roomEmpty")',
+    't(locale, "styling.furnishAs")',
+    "t(locale, `styling.roomSub.${room}`)",
     't(locale, "styling.styles")',
     't(locale, "styling.stylesHelp")',
     't(locale, "styling.styles")',
-    "t(locale, `styling.style.${short}`)",
-    "t(locale, `styling.styleDesc.${short}`)",
     't(locale, "styling.decor")',
     't(locale, "styling.decorHelp")',
     't(locale, "styling.decor")',
-    't(locale, "styling.furnishAs")',
-    't(locale, "styling.furnishAs")',
-    't(locale, "styling.roomEmpty")',
   ]);
+  const rooms = picker.indexOf("FURNISH_AS_CHOICES.map(");
+  const styles = picker.indexOf("<StyleCards");
+  const decor = picker.indexOf("[null, ...DECOR_LEVELS].map(");
+  assert.ok(rooms > 0 && rooms < styles && styles < decor);
+  // Krysset staar i raden over romflisene, foer stilene.
+  assert.ok(picker.indexOf('t(locale, "styling.roomEmpty")') < rooms);
   assert.doesNotMatch(picker, /aria-live|bedroomHint/);
   for (const locale of ["nb", "en"] as const) {
     assert.ok(!Object.keys(DICTIONARIES[locale].ui).some((k) => /bedroomHint/.test(k)), locale);
@@ -269,16 +277,20 @@ test("S2-f/S3-f: stilene staar over romvalget, og ingen tekst eller spoersmaal u
   assert.notEqual(stylingParams(choice("bedroom")), null);
 });
 
-test("S3-f/v3: velgeren har 14 stilknapper med aria-pressed, og hver stil har etikett og kortbeskrivelse paa nb og en", () => {
+// D-3: stilknappene er kort (StyleCards) med to knapper hver, og fokuspanelet
+// har sin egen knapp. Valget skjer fortsatt i velgeren, med toggleStyle.
+test("S3-f/v3/D-3: velgeren har 14 stilkort med aria-pressed, og hver stil har etikett og kortbeskrivelse paa nb og en", () => {
   const picker = read("components/StylingChoicePicker.tsx");
-  assert.match(picker, /STYLING_STYLES\.map\(/);
-  assert.match(picker, /aria-pressed=\{on\}/);
+  const cards = read("components/styling/StyleCards.tsx");
+  const panel = read("components/styling/StyleFocusPanel.tsx");
+  assert.match(cards, /STYLING_STYLES\.map\(\(style\) => \{/);
+  assert.match(cards, /onClick=\{\(\) => onToggle\(style\)\}\s*disabled=\{disabled\}\s*aria-pressed=\{on\}/);
+  assert.match(cards, /onClick=\{\(\) => onFocus\(style\)\}/);
+  assert.match(panel, /onClick=\{onToggle\}\s*disabled=\{disabled\}\s*aria-pressed=\{on\}/);
   assert.match(picker, /onChange\(\{ \.\.\.value, styles: toggleStyle\(value\.styles, style\) \}\)/);
-  assert.match(picker, /grid grid-cols-1 md:grid-cols-2/);
-  assert.match(picker, /const STYLE_OPTION =\s*"min-h-11 [^"]*text-left[^"]*focus-visible:ring-2 focus-visible:ring-accent/);
-  assert.match(picker, /\$\{STYLE_OPTION\} \$\{on \? ON : locked \? LOCKED : OFF\}/);
-  // Stilgruppen staar foer romvalget.
-  assert.ok(picker.indexOf("STYLING_STYLES.map(") < picker.indexOf("FURNISH_AS_CHOICES.map("));
+  assert.match(picker, /onToggle=\{\(\) => toggle\(focus\)\}/);
+  assert.match(picker, /onToggle=\{toggle\}/);
+  assert.match(picker, /onFocus=\{setFocus\}/);
   const nb = DICTIONARIES.nb.ui;
   const en = DICTIONARIES.en.ui;
   assert.equal(nb["styling.styles"], "Velg én eller flere stiler");
@@ -367,16 +379,27 @@ test("F1: stylingParams sender aldri flere enn tre, og kutter ikke stille", () =
   );
 });
 
-test("F1: velgeren laaser resten med aria-disabled naar tre er valgt, og gruppen peker paa hjelpelinja", () => {
+test("F1/D-3: velgeren laaser resten med aria-disabled naar tre er valgt, og gruppen peker paa hjelpelinja", () => {
   const picker = read("components/StylingChoicePicker.tsx");
+  const cards = read("components/styling/StyleCards.tsx");
+  const panel = read("components/styling/StyleFocusPanel.tsx");
+  const classes = read("components/styling/classes.ts");
   assert.match(picker, /const atLimit = value\.styles\.length >= MAX_ORDER_JOBS;/);
   assert.match(picker, /const locked = atLimit && !on;/);
   assert.match(picker, /if \(!locked\) onChange\(\{ \.\.\.value, styles: toggleStyle\(value\.styles, style\) \}\);/);
-  assert.match(picker, /aria-disabled=\{locked \|\| undefined\}/);
-  // Fortsatt native disabled bare mens bestillingen gaar.
-  assert.match(picker, /disabled=\{disabled\}\s*aria-pressed=\{on\}/);
-  assert.match(picker, /const LOCKED = "[^"]*opacity-50[^"]*cursor-not-allowed[^"]*";/);
-  assert.doesNotMatch(picker.match(/const LOCKED = "[^"]*"/)![0], /hover:/);
+  assert.match(picker, /locked=\{atLimit && !focusOn\}/);
+  assert.match(cards, /const locked = atLimit && !on;/);
+  for (const src of [cards, panel]) {
+    assert.match(src, /aria-disabled=\{locked \|\| undefined\}/);
+    // Fortsatt native disabled bare mens bestillingen gaar.
+    assert.match(src, /disabled=\{disabled\}\s*aria-pressed=\{on\}/);
+  }
+  // De andre dempes, og haken har ingen hover naar den er laast.
+  assert.match(cards, /\$\{locked \? "opacity-60" : ""\}/);
+  assert.match(cards, /: locked\s*\? "border-line-strong bg-surface"\s*: "border-line-strong bg-surface group-hover:border-ink"/);
+  assert.match(panel, /: locked\s*\? LOCKED/);
+  assert.match(classes, /export const LOCKED = "[^"]*opacity-50[^"]*cursor-not-allowed[^"]*";/);
+  assert.doesNotMatch(classes.match(/export const LOCKED = "[^"]*"/)![0], /hover:/);
   assert.match(picker, /<p id=\{helpId\} [^>]*>\{t\(locale, "styling\.stylesHelp"\)\}<\/p>/);
   assert.match(picker, /role="group"\s*aria-label=\{t\(locale, "styling\.styles"\)\}\s*aria-describedby=\{helpId\}/);
 });
@@ -756,13 +779,13 @@ test("v3: pyntvalget i ordlista er lik stilnavn_v3.json, og «Anbefalt» er valg
   }
 });
 
-test("v3: velgeren har pyntgruppen rett etter stilene, med samme knapper som romvalget", () => {
+test("v3/D-3: pyntgruppen staar sist, med samme knapper som foer og prikk-ikoner", () => {
   const picker = read("components/StylingChoicePicker.tsx");
-  const styles = picker.indexOf("STYLING_STYLES.map(");
+  const styles = picker.indexOf("<StyleFocusPanel");
   const decor = picker.indexOf("[null, ...DECOR_LEVELS].map(");
   const rooms = picker.indexOf("FURNISH_AS_CHOICES.map(");
-  assert.ok(styles > 0 && styles < decor && decor < rooms);
-  const group = picker.slice(picker.lastIndexOf("<div", decor), rooms);
+  assert.ok(rooms > 0 && rooms < styles && styles < decor);
+  const group = picker.slice(picker.lastIndexOf("<div", decor));
   assert.match(group, /role="group"/);
   assert.match(group, /aria-label=\{t\(locale, "styling\.decor"\)\}/);
   assert.match(group, /aria-describedby=\{decorHelpId\}/);
@@ -770,8 +793,13 @@ test("v3: velgeren har pyntgruppen rett etter stilene, med samme knapper som rom
   assert.match(group, /onClick=\{\(\) => onChange\(\{ \.\.\.value, decor: level \}\)\}/);
   assert.match(group, /disabled=\{disabled\}/);
   assert.match(group, /aria-pressed=\{value\.decor === level\}/);
-  assert.match(group, /className=\{`\$\{OPTION\} \$\{value\.decor === level \? ON : OFF\}`\}/);
+  assert.match(group, /className=\{`\$\{OPTION\} \$\{value\.decor === level \? ON : OFF\} inline-flex items-center gap-2`\}/);
   assert.match(group, /t\(locale, `styling\.decorLevel\.\$\{level \?\? "default"\}`\)/);
+  // ●○○ Lite, ●●○ Middels, ●●● Mye; «Anbefalt for stilen» uten prikker. Prikkene er pynt (aria-hidden).
+  assert.match(picker, /const DECOR_DOTS: Record<DecorLevel, number> = \{ 1: 1, 3: 2, 5: 3 \};/);
+  assert.match(group, /\{level !== null && <DecorDots filled=\{DECOR_DOTS\[level\]\} of=\{3\} \/>\}/);
+  const dots = read("components/styling/DecorDots.tsx");
+  assert.match(dots, /label === undefined \? \{ "aria-hidden": true \}/);
   // Valget nullstilles med resten: bytte av tjeneste og «Start paa nytt».
   const page = read("(app)/tjenester/page.tsx");
   assert.equal(page.match(/setStyling\(EMPTY_STYLING\)/g)?.length, 2);

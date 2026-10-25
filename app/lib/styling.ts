@@ -1,6 +1,6 @@
 import type { OrderJob, StylingOrderParams } from "./api";
 import type { ProcessStatus } from "../hooks/processStatus";
-import { t, type Locale } from "./i18n/index.ts";
+import { codeText, t, type Locale } from "./i18n/index.ts";
 import { presetLabelKey } from "./presets.ts";
 
 /**
@@ -132,6 +132,32 @@ export function stylingParams(choice: StylingChoice): StylingOrderParams | null 
   if (choice.decor === null) return params;
   if (!DECOR_LEVELS.includes(choice.decor)) return null;
   return { ...params, decor_level: choice.decor };
+}
+
+/**
+ * Teksten i den faste bestillingslinja (D-3 kompakt): for eksempel «2 stiler
+ * · Middels pynt · Møbler som stue og spisestue». `short` er uten rommet (én
+ * linje paa mobil). `missing` er det foerste som mangler for at «Bestill»
+ * skal virke, i samme rekkefoelge som velgeren (rom, stil, kryss), eller null
+ * naar valget er komplett. Samme regler som stylingParams.
+ */
+export function stylingSummary(
+  locale: Locale,
+  choice: StylingChoice
+): { text: string; short: string; missing: string | null } {
+  const n = choice.styles.length;
+  const styles = t(locale, n === 0 ? "styling.summary.styles.0" : n === 1 ? "styling.summary.styles.1" : "styling.summary.styles.n", { n });
+  const decor = t(locale, `styling.summary.decor.${choice.decor ?? "default"}`);
+  const room = choice.furnishAs === null ? t(locale, "styling.summary.noRoom") : codeText(locale, "furnishAs", choice.furnishAs);
+  const missing =
+    choice.furnishAs === null
+      ? t(locale, "styling.summary.missingRoom")
+      : n === 0
+        ? t(locale, "styling.summary.missingStyle")
+        : !choice.roomEmpty
+          ? t(locale, "styling.summary.missingEmpty")
+          : null;
+  return { text: [styles, decor, room].join(" · "), short: `${styles} · ${decor}`, missing };
 }
 
 /**

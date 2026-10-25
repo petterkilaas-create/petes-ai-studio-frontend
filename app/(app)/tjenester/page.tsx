@@ -7,6 +7,7 @@ import { TOOL_ICONS } from "@/app/components/toolIcons";
 import { ServiceCard } from "@/app/components/ServiceCard";
 import { SERVICE_CARD_TEXT, UPLOAD_CARD_ID, uploadScrollBehavior } from "@/app/lib/serviceCards";
 import { CARD_IMAGES } from "./cardImages";
+import { STYLE_IMAGES } from "./styleImages";
 import { useImagePreview } from "@/app/hooks/useImagePreview";
 import { useProcessJob } from "@/app/hooks/useProcessJob";
 import { useQuota } from "@/app/hooks/useQuota";
@@ -29,7 +30,8 @@ import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "@/app/li
 import { useOrderJobs } from "@/app/hooks/useOrderJobs";
 import { StylingChoicePicker } from "@/app/components/StylingChoicePicker";
 import { StylingOrderCards } from "@/app/components/StylingOrderCards";
-import { EMPTY_STYLING, stylingParams, type StylingChoice } from "@/app/lib/styling";
+import { StylingOrderBar } from "@/app/components/styling/StylingOrderBar";
+import { EMPTY_STYLING, stylingParams, stylingSummary, type StylingChoice } from "@/app/lib/styling";
 import { privacyDownload, saveBlob } from "@/app/lib/download";
 import { orderErrorText, t } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
@@ -350,18 +352,28 @@ function ExpressContent() {
               value={styling}
               onChange={setStyling}
               disabled={isProcessing}
+              images={STYLE_IMAGES}
               locale={locale}
             />
           )}
 
           <QuotaNotice view={quotaShown} locale={locale} />
 
+          {/* Digital styling: «Bestill» i den faste linja (D-3 kompakt); «Start på nytt» står under. */}
+          {isStyling && (
+            <StylingOrderBar {...stylingSummary(locale, styling)}>
+              <Button onClick={handleRun} disabled={runDisabled}>
+                {t(locale, isProcessing ? "styling.ordering" : "styling.order")}
+              </Button>
+            </StylingOrderBar>
+          )}
+
           <div className="flex flex-wrap gap-3">
-            <Button onClick={handleRun} disabled={runDisabled}>
-              {isStyling
-                ? t(locale, isProcessing ? "styling.ordering" : "styling.order")
-                : t(locale, isProcessing ? "express.running" : "express.run")}
-            </Button>
+            {!isStyling && (
+              <Button onClick={handleRun} disabled={runDisabled}>
+                {t(locale, isProcessing ? "express.running" : "express.run")}
+              </Button>
+            )}
             <Button variant="secondary" onClick={handleReset} disabled={isProcessing}>
               {t(locale, "express.reset")}
             </Button>

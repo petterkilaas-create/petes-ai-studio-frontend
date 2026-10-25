@@ -136,3 +136,24 @@ test("D-5a: de nye ordene finnes på nb og en", () => {
   assert.equal(DICTIONARIES.nb.ui["compare.hold"], "Hold for original");
   assert.match(DICTIONARIES.nb.ui["lightbox.keys"], /Piltaster flytter skillet · \+ og − zoomer · 0 tilbakestiller · Esc lukker/);
 });
+
+// D-3 (live-sjekken av D-5a, Petter 25.10, valg L1): hintet kan ikke markeres ved
+// dobbeltklikk eller dobbelttrykk. Paa berøringsskjerm (pointer: coarse) staar
+// fingerhintet, ellers tastaturhintet; teksten er som foer.
+test("D-3: lysboks-hintet har select-none, og berøringsskjerm får fingerhintet i stedet for tastaturhintet", () => {
+  const keys = lightbox.match(/<p className="([^"]*)">\{t\(locale, "lightbox\.keys"\)\}<\/p>/);
+  const touch = lightbox.match(/<p className="([^"]*)">\{t\(locale, "lightbox\.touch"\)\}<\/p>/);
+  assert.ok(keys && touch);
+  for (const cls of [keys[1], touch[1]]) {
+    assert.match(cls, /\bselect-none\b/);
+    assert.match(cls, /^hidden /);
+  }
+  assert.match(keys[1], /\bpointer-fine:block\b/);
+  assert.doesNotMatch(keys[1], /pointer-coarse/);
+  assert.match(touch[1], /\bpointer-coarse:block\b/);
+  assert.doesNotMatch(touch[1], /pointer-fine/);
+  assert.equal(
+    DICTIONARIES.nb.ui["lightbox.touch"],
+    "Dra i skillet · to fingre zoomer og flytter · dobbelttrykk tilbakestiller"
+  );
+});

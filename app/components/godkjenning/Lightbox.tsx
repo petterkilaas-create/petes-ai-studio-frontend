@@ -390,8 +390,8 @@ export function Lightbox({
               <RotateCcw aria-hidden="true" className="h-5 w-5" />
             </button>
           </div>
-          <p className="hidden text-sm text-paper pointer-fine:block">{t(locale, "lightbox.keys")}</p>
-          <p className="hidden text-sm text-paper pointer-coarse:block">{t(locale, "lightbox.touch")}</p>
+          <p className="hidden select-none text-sm text-paper pointer-fine:block">{t(locale, "lightbox.keys")}</p>
+          <p className="hidden select-none text-sm text-paper pointer-coarse:block">{t(locale, "lightbox.touch")}</p>
           <button
             type="button"
             onClick={close}
