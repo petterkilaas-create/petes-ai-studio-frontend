@@ -385,9 +385,16 @@ test("D-3: romflisene har ikonet fra designet, «Møbler som …» og linja, og 
   for (const [, room, , sub, flag] of defs) {
     const svg = stylingHtml.match(new RegExp(`<sc-if value="\\{\\{item\\.${flag}\\}\\}"[^>]*>(<svg\\b[\\s\\S]*?<\\/svg>)<\\/sc-if>`))![1];
     assert.deepEqual(ROOM_ICONS[room as FurnishAs], parseSvg(svg), room);
-    // Linja under er ordrett fra designet paa norsk.
-    assert.equal(t("nb", `styling.roomSub.${room as FurnishAs}`), sub, room);
+    // Linja under er ordrett fra designet paa norsk, unntatt gangen (Petter,
+    // AVVIK 1: gangen faar aldri speil, og knagger er faste ting).
+    const nb = room === "hallway" ? "Benk, konsoll og teppe" : sub;
+    assert.equal(t("nb", `styling.roomSub.${room as FurnishAs}`), nb, room);
     assert.ok(t("en", `styling.roomSub.${room as FurnishAs}`).length > 0, room);
+  }
+  assert.equal(t("en", "styling.roomSub.hallway"), "Bench, console and rug");
+  for (const room of FURNISH_AS_CHOICES) {
+    assert.doesNotMatch(t("nb", `styling.roomSub.${room}`), /speil|knagg/i, room);
+    assert.doesNotMatch(t("en", `styling.roomSub.${room}`), /mirror|hook/i, room);
   }
   // Etiketten er fortsatt «Møbler som …», og verdien som sendes er rom-id-en.
   for (const room of FURNISH_AS_CHOICES) {

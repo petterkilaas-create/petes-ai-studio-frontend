@@ -402,7 +402,7 @@ const nbUi = {
   "styling.roomSub.kids_room": "Barneseng og lek",
   "styling.roomSub.kitchen_dining": "Spisebord og pynt",
   "styling.roomSub.bathroom_decor": "Håndklær og pynt",
-  "styling.roomSub.hallway": "Benk, speil og knagger",
+  "styling.roomSub.hallway": "Benk, konsoll og teppe",
   "styling.roomSub.home_office": "Skrivebord og stol",
   "styling.roomSub.balcony_terrace": "Utemøbler",
   // Den faste bestillingslinja (D-3 kompakt): sammendraget, og hva som mangler.
@@ -1058,7 +1058,7 @@ const en: Dictionary = {
     "styling.roomSub.kids_room": "Child's bed and play",
     "styling.roomSub.kitchen_dining": "Dining table and decor",
     "styling.roomSub.bathroom_decor": "Towels and decor",
-    "styling.roomSub.hallway": "Bench, mirror and hooks",
+    "styling.roomSub.hallway": "Bench, console and rug",
     "styling.roomSub.home_office": "Desk and chair",
     "styling.roomSub.balcony_terrace": "Outdoor furniture",
     "styling.summary.styles.0": "No style chosen",
