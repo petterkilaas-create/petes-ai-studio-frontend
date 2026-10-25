@@ -15,7 +15,10 @@ export function literalTexts(jsx: string): string[] {
     .map((m) => m[1].trim())
     // Kode etter en selvlukkende tag (f.eks. `/>) : x === "y" ? (`) er ikke tekst.
     .filter((text) => /\p{L}/u.test(text) && !/^[)}:?&|]|===/.test(text));
-  const attrs = [...jsx.matchAll(/\b(?:alt|title|placeholder|aria-label)="([^"]*)"/g)].map((m) => m[1]);
+  // Tom alt (pynt, f.eks. miniatyren paa en fane med navnet ved siden av, D-5c) er ikke tekst.
+  const attrs = [...jsx.matchAll(/\b(?:alt|title|placeholder|aria-label)="([^"]*)"/g)]
+    .map((m) => m[1])
+    .filter((text) => text !== "");
   // Strenger i uttrykk som ser ut som tekst (stor forbokstav), f.eks. {busy ? "Running..." : "Run"}.
   // Klasser, statuser og noekler i ordlista starter med liten bokstav.
   const strings = [...jsx.matchAll(/"(\p{Lu}[^"]*)"/gu)].map((m) => m[1]);

@@ -47,6 +47,7 @@ import { canShowMarkers } from "@/app/lib/lightsView";
 import { panelShown } from "@/app/lib/presets";
 import { canShowAdditions } from "@/app/lib/additions";
 import { checklistFor } from "@/app/lib/checklist";
+import { framingWarning, orderTabs } from "@/app/lib/orderTabs";
 import {
   blockedResult,
   brightnessResultUrl,
@@ -66,6 +67,7 @@ import { AdditionMarkers } from "@/app/components/godkjenning/AdditionMarkers";
 import { VariantPicker } from "@/app/components/godkjenning/VariantPicker";
 import { Lightbox } from "@/app/components/godkjenning/Lightbox";
 import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
+import { OrderTabs } from "@/app/components/godkjenning/OrderTabs";
 import { CorrectionPanel } from "@/app/components/godkjenning/CorrectionPanel";
 import { MoodPanel } from "@/app/components/godkjenning/MoodPanel";
 import { DetailsPanel } from "@/app/components/godkjenning/DetailsPanel";
@@ -115,6 +117,11 @@ import { FOCUS } from "@/app/components/godkjenning/classes";
  * Bredere visning og lysboks (D-5a): siden er ca. 1360 px (menyen er felles
  * og staar paa 1152 px, Petter 25.10, AVVIK 2 b), saa bildet blir ca. 870 px. «Forstørr» aapner lysboksen med samme bilde,
  * trinn og runder.
+ *
+ * Fanene per bestilling (D-5c, TG-NEW-249): med minst to jobber i `order`
+ * staar en rad med én fane per stil over bildet. Fanene er lenker, saa siden
+ * monteres paa nytt ved bytte. Rammevarselet (TG-NEW-260) staar i kortet
+ * over sjekklista naar `framing` er maalt og over grensen (orderTabs.ts).
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -461,6 +468,7 @@ export default function GodkjenningPage({
 
             const readOnly = isReadOnlyOther(review);
             const deleted = mediaDeleted(review);
+            const tabs = orderTabs(review.order, jobId, locale);
 
             return (
               <>
@@ -484,6 +492,8 @@ export default function GodkjenningPage({
                     {t(locale, "review.mediaDeleted", { date: formatDate(review.mediaDeletedAt ?? null, locale) })}
                   </p>
                 )}
+
+                {tabs !== null && <OrderTabs tabs={tabs} locale={locale} />}
 
                 {/* Stort bilde til venstre, handlinger og stemning i en kolonne paa 22rem ved siden av. Paa mobil under hverandre. */}
                 <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
@@ -644,6 +654,7 @@ export default function GodkjenningPage({
                         onCompared={setCompared}
                         acknowledged={acknowledged}
                         onAcknowledged={setAcknowledged}
+                        framingPct={framingWarning(review.framing)}
                         message={messageText}
                         locale={locale}
                       />

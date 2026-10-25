@@ -99,6 +99,10 @@ const nbUi = {
   "action.noneAllowed": "Ingen handlinger er tilgjengelige for denne jobben.",
   "action.correct": "Korriger bildet",
   "action.makeNewImage": "Lag nytt bilde",
+  // D-5c (Petter 25.10): fanene per bestilling og rammevarselet (TG-NEW-249, TG-NEW-260).
+  "review.orderTabs.label": "Stilene i bestillingen",
+  "review.framing.warning":
+    "Bildet kan vise mer av rommet enn originalen: ca. {pct} % av bildet ligger utenfor originalfotoet. Sammenlign utsnittet før du godkjenner.",
   // D-5a (Petter 25.10): sjekklista per tjeneste og krysset foer «Godkjenn». Generert fra sjekklister_v1.json.
   "checklist.title": "Sjekk mot originalen:",
   "checklist.compared": "Jeg har sammenlignet bildet med originalen.",
@@ -778,6 +782,9 @@ const en: Dictionary = {
     "action.noneAllowed": "No actions are available for this job.",
     "action.correct": "Correct image",
     "action.makeNewImage": "Create new image",
+    "review.orderTabs.label": "Styles in this order",
+    "review.framing.warning":
+      "The image may show more of the room than the original: about {pct}% of the image lies outside the original photo. Compare the framing before you approve.",
     "checklist.title": "Check against the original:",
     "checklist.compared": "I have compared the image with the original.",
     "checklist.comparedWarning": "I have compared the image with the original and checked the marked places.",

@@ -4,6 +4,7 @@ import { useId, type ReactNode } from "react";
 import { REASON_MAX_LEN, type AdditionsCheck, type DecisionAction } from "../../lib/api";
 import { additionsSentences, additionsView, approveEnabled } from "../../lib/additions";
 import { CHECKLISTS, comparedKey, type ChecklistId } from "../../lib/checklist";
+import { framingText } from "../../lib/orderTabs";
 import { codeText, t, type Locale } from "../../lib/i18n";
 import {
   reasonLength,
@@ -37,6 +38,10 @@ const BTN_DANGER = buttonClass("danger");
  * …» som maa settes foer «Godkjenn» for alle nivaaer. Ved advarsel gjelder
  * krysset ogsaa de markerte stedene og setter `acknowledged`, som sendes
  * som foer.
+ *
+ * Rammevarselet (D-5c, TG-NEW-260): over sjekklista, i samme stil som
+ * merknaden fra kontrollen (gult, Petter 25.10, AVVIK 2), naar bildet kan
+ * vise mer av rommet enn originalen. Det endrer ikke krysset eller «Godkjenn».
  */
 export function DecisionCard({
   reviewCode,
@@ -64,6 +69,7 @@ export function DecisionCard({
   onCompared,
   acknowledged,
   onAcknowledged,
+  framingPct,
   message,
   locale,
 }: {
@@ -100,6 +106,8 @@ export function DecisionCard({
   /** Ved advarsel: settes av samme kryss og sendes som `additions_acknowledged`. */
   acknowledged: boolean;
   onAcknowledged: (on: boolean) => void;
+  /** Prosenten utenfor originalfotoet naar den er over grensen (framingWarning), ellers null. */
+  framingPct: number | null;
   message: string | null;
   locale: Locale;
 }) {
@@ -126,7 +134,7 @@ export function DecisionCard({
             <FireplaceChoice answer={answer} onChange={onAnswer} disabled={locked} locale={locale} />
           )}
 
-          {/* TG-NEW-199 og D-5a: kontrollen, sjekklista og krysset. Bare naar «Godkjenn» vises. */}
+          {/* TG-NEW-199, D-5a og D-5c: kontrollen, rammen, sjekklista og krysset. Bare naar «Godkjenn» vises. */}
           {controls.approve && (
             <div className="flex flex-col gap-3">
               {view.notice === "warning" && (
@@ -143,6 +151,11 @@ export function DecisionCard({
               {view.notice === "unchecked" && (
                 <p className="text-sm text-ink-2" role="status">
                   {t(locale, "additions.unchecked")}
+                </p>
+              )}
+              {framingPct !== null && (
+                <p className="text-sm text-amber-fg bg-amber-bg rounded-button p-3 break-words" role="status">
+                  {framingText(locale, framingPct)}
                 </p>
               )}
               {checklist !== null && (
