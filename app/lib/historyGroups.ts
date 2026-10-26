@@ -1,6 +1,11 @@
 import type { JobSummary } from "./api";
-import { formatDay } from "./dates.ts";
-import { t, type Locale } from "./i18n/index.ts";
+import { formatDate } from "./dates.ts";
+import { t, type Locale, type Message, type UiKey } from "./i18n/index.ts";
+import { cardNote, type MediaView } from "./jobMedia.ts";
+import { jobMessage } from "./jobMessage.ts";
+import { ownerBadge, rejectedLabelKey } from "./roles.ts";
+import { canOpenReview, isRejectedByReviewer } from "./statusVariants.ts";
+import { MAX_ORDER_JOBS, styleText } from "./styling.ts";
 
 /**
  * Historikken per bestilling (TG-NEW-262). Rene funksjoner, saa reglene kan
@@ -47,14 +52,99 @@ export function groupHistory(jobs: readonly JobSummary[]): HistoryEntry[] {
   return entries;
 }
 
+/*
+ * Kortet for en bestilling (OrderCard, dag 55): ett kort i rutenettet med
+ * stilene side om side i bildet, én linje per stil og én knapp. Jobbene er
+ * i stilrekkefoelgen (eldst foerst), som fra groupHistory.
+ */
+
 /**
- * Overskriften paa en bestilling: «Digital styling · 3 stiler · 26. okt.
- * 2026». Datoen er fra den eldste jobben; antallet er jobbene som er lastet.
+ * Tittelen: «Digital styling · 3 stiler». Antallet er jobbene som er lastet.
  * Rommet staar ikke med: jobblista sender det ikke (AVVIK 1, valg A).
  */
-export function orderHeading(locale: Locale, jobs: readonly JobSummary[]): string {
+export function orderTitle(locale: Locale, jobs: readonly JobSummary[]): string {
   const n = jobs.length;
   const styles = t(locale, n === 1 ? "styling.summary.styles.1" : "styling.summary.styles.n", { n });
-  const day = formatDay(jobs[0]?.createdAt ?? null, locale);
-  return [t(locale, "service.virtual_stage"), styles, day].join(" · ");
+  return [t(locale, "service.virtual_stage"), styles].join(" · ");
+}
+
+/** Dato og klokkeslett fra den eldste jobben (formatDate, som JobCard). */
+export function orderDate(locale: Locale, jobs: readonly JobSummary[]): string {
+  return formatDate(jobs[0]?.createdAt ?? null, locale);
+}
+
+/**
+ * Knappen: jobben som venter (den foerste i stilrekkefoelgen), ellers den
+ * foerste jobben. Teksten som paa JobCard (openLinkKey): «Åpne godkjenning»
+ * naar en venter, ellers «Åpne». Godkjenningssiden viser fanene for hele
+ * bestillingen. null bare uten jobber.
+ */
+export function orderOpen(jobs: readonly JobSummary[]): { jobId: string; labelKey: UiKey } | null {
+  const waiting = jobs.find((j) => canOpenReview(j.status));
+  const target = waiting ?? jobs[0];
+  if (target === undefined) return null;
+  return { jobId: target.jobId, labelKey: waiting !== undefined ? "history.openReview" : "history.open" };
+}
+
+/** En linje per stil: navnet, merket som paa JobCard og teksten under. */
+export interface OrderLine {
+  /** Stilnavnet alene («Funkis»); en ukjent stil heter «Digital styling». */
+  label: string;
+  job: JobSummary;
+  /** «Avvist av deg» eller «Avvist av eieren» i stedet for statusen (som JobCard). */
+  rejectedKey: UiKey | null;
+  /** Begrunnelsen naar megleren har avvist (som JobCard). */
+  reason: string | null;
+  /** Den korte meldingen (jobMessage), aldri raa `error`; null naar jobben er avvist av megleren. */
+  message: Message | null;
+}
+
+export function orderLines(locale: Locale, jobs: readonly JobSummary[]): OrderLine[] {
+  return jobs.map((job) => {
+    const rejected = isRejectedByReviewer(job);
+    return {
+      label: styleText(locale, job.presetId) ?? t(locale, "service.virtual_stage"),
+      job,
+      rejectedKey: rejected ? rejectedLabelKey(job) : null,
+      reason: rejected && job.reason ? job.reason : null,
+      message: rejected ? null : jobMessage(job.status, job.code),
+    };
+  });
+}
+
+/** «Ikke din» med eier én gang per kort (scope=all), eller null. */
+export function orderOwner(jobs: readonly JobSummary[]): { ownerShort: string | null } | null {
+  for (const job of jobs) {
+    const other = ownerBadge(job);
+    if (other !== null) return other;
+  }
+  return null;
+}
+
+/**
+ * Merknaden om slettede bilder (cardNote) én gang per kort, naar den gjelder
+ * minst én av jobbene. `thumbs` staar i samme rekkefoelge som `jobs`.
+ */
+export function orderNote(jobs: readonly JobSummary[], thumbs: readonly (string | null)[]): UiKey | null {
+  for (const [i, job] of jobs.entries()) {
+    const note = cardNote(job, thumbs[i] ?? null);
+    if (note !== null) return note;
+  }
+  return null;
+}
+
+/** Rutene i bildet: hoeyst MAX_ORDER_JOBS, i stilrekkefoelgen. */
+export function orderTiles<T>(items: readonly T[]): T[] {
+  return items.slice(0, MAX_ORDER_JOBS);
+}
+
+/**
+ * En rute i bildet: samme visning som paa JobCard (mediaView), men uten
+ * tekst over bildet. Statusen staar i linja for stilen. Et slettet bilde
+ * blir plassholderen.
+ */
+export function tileView(view: MediaView): MediaView {
+  if (view.kind === "result") return view;
+  if (view.kind === "original") return { ...view, overlay: null };
+  return { kind: "placeholder", overlay: null };
 }

@@ -1,4 +1,5 @@
 import type { JobSummary } from "./api";
+import { groupHistory, type HistoryEntry } from "./historyGroups.ts";
 import { isWorking } from "./jobMedia.ts";
 
 /**
@@ -69,4 +70,34 @@ export function startView(jobs: StartJobs): StartView {
 /** Den automatiske hentingen (som i Historikk) gaar bare mens en jobb lages. */
 export function anyWorking(jobs: StartJobs): boolean {
   return jobs.kind === "loaded" && [...jobs.waiting, ...jobs.recent].some((j) => isWorking(j.status));
+}
+
+/** Nyeste foerst, som lista fra backend (created_at, saa job_id). Uten dato sist. */
+function newestFirst(a: JobSummary, b: JobSummary): number {
+  if (a.createdAt !== b.createdAt) {
+    if (a.createdAt === null) return 1;
+    if (b.createdAt === null) return -1;
+    return a.createdAt < b.createdAt ? 1 : -1;
+  }
+  return a.jobId < b.jobId ? 1 : a.jobId > b.jobId ? -1 : 0;
+}
+
+/**
+ * Kortene paa /start (dag 55, TG-NEW-262): en bestilling er ett kort, som i
+ * Historikken (groupHistory). Jobbene er de samme som i startView; bare
+ * kortene endres. En bestilling med en jobb som venter, staar samlet under
+ * «Venter paa deg»: de andre jobbene i bestillingen som vises under «Siste
+ * jobber», flyttes inn i kortet, saa bestillingen ikke deles mellom delene.
+ */
+export function startEntries(
+  waiting: readonly JobSummary[],
+  recent: readonly JobSummary[]
+): { waiting: HistoryEntry[]; recent: HistoryEntry[] } {
+  const orders = new Set(waiting.flatMap((j) => (j.orderId === null ? [] : [j.orderId])));
+  const inWaiting = (j: JobSummary) => j.orderId !== null && orders.has(j.orderId);
+  const pulled = recent.filter(inWaiting);
+  return {
+    waiting: groupHistory([...waiting, ...pulled].sort(newestFirst)),
+    recent: groupHistory(recent.filter((j) => !inWaiting(j))),
+  };
 }

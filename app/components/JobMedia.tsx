@@ -28,11 +28,12 @@ export function JobMedia({
   /** Alt-tekst for resultatbildet. */
   resultAlt: string;
   locale: Locale;
-  aspect?: "wide" | "square";
+  /** "fill": fyller ruta den staar i (stilene paa OrderCard). */
+  aspect?: "wide" | "square" | "fill";
   /** Ekstra klasser paa boksen (ramme og hjoerner). */
   frame?: string;
 }) {
-  const box = `relative w-full overflow-hidden bg-surface-2 ${aspect === "square" ? "aspect-square" : "aspect-[3/2]"}${
+  const box = `relative w-full overflow-hidden bg-surface-2 ${aspect === "fill" ? "h-full" : aspect === "square" ? "aspect-square" : "aspect-[3/2]"}${
     frame ? ` ${frame}` : ""
   }`;
 
