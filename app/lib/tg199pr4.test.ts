@@ -181,11 +181,11 @@ test("TG199 PR4: lista uten dubletter, med antall, i rekkefølgen fra backend", 
 test("TG199 PR4: setningene ved advarsel og merknad (V2 A)", () => {
   const both = { level: "warning" as const, items: [item("warning", "new_window"), item("note", "changed_lamp")] };
   assert.deepEqual(additionsSentences("nb", both), {
-    warning: "Kontrollen fant mulige tillegg: nytt vindu. Se markeringene i bildet.",
+    warning: "Kontrollen fant mulige endringer: nytt vindu. Se markeringene i bildet.",
     note: "Kontrollen fant noe du bør se på: endret lampe.",
   });
   assert.deepEqual(additionsSentences("en", { level: "warning", items: [item("warning", "new_window")] }), {
-    warning: "The check found possible additions: new window. See the markings in the image.",
+    warning: "The check found possible changes: new window. See the markings in the image.",
     note: null,
   });
   assert.deepEqual(additionsSentences("nb", { level: "note", items: [item("note", "light_through_opening")] }), {
@@ -193,7 +193,7 @@ test("TG199 PR4: setningene ved advarsel og merknad (V2 A)", () => {
     note: "Kontrollen fant noe du bør se på: lys gjennom åpning.",
   });
   // Nivå uten poster: setningen blir aldri tom.
-  assert.equal(additionsSentences("nb", { level: "warning", items: [] }).warning, "Kontrollen fant mulige tillegg: annen endring. Se markeringene i bildet.");
+  assert.equal(additionsSentences("nb", { level: "warning", items: [] }).warning, "Kontrollen fant mulige endringer: annen endring. Se markeringene i bildet.");
   assert.equal(additionsSentences("nb", { level: "note", items: [] }).note, "Kontrollen fant noe du bør se på: annen endring.");
   for (const level of ["none", "unchecked"] as const) {
     assert.deepEqual(additionsSentences("nb", { level, items: both.items }), { warning: null, note: null });
@@ -206,8 +206,8 @@ test("TG199 PR4: tekstene på norsk og engelsk", () => {
   // D-5a: «additions.ack» er erstattet av krysset «checklist.comparedWarning» (checklist.test.ts).
   assert.ok(!Object.hasOwn(DICTIONARIES.nb.ui, "additions.ack"));
   assert.ok(!Object.hasOwn(DICTIONARIES.en.ui, "additions.ack"));
-  assert.equal(t("nb", "additions.show"), "Vis mulige tillegg");
-  assert.equal(t("en", "additions.show"), "Show possible additions");
+  assert.equal(t("nb", "additions.show"), "Vis mulige endringer");
+  assert.equal(t("en", "additions.show"), "Show possible changes");
   assert.equal(
     DICTIONARIES.nb.codes.decisionError.additions_not_acknowledged,
     "Kryss av for at du har sjekket de markerte stedene, og godkjenn på nytt."
@@ -376,7 +376,7 @@ test("TG199 PR4: krysset nullstilles ved ny henting og sendes med godkjenningen"
   assert.match(page, /additions=\{review\.additionsCheck\}/);
   // Ingen tekst skrevet rett inn.
   for (const src of [page, card, markersSrc, viewer]) {
-    for (const text of ["Ikke kontrollert", "Vis mulige tillegg", "Jeg har sjekket", "Kontrollen fant"]) {
+    for (const text of ["Ikke kontrollert", "Vis mulige endringer", "Jeg har sjekket", "Kontrollen fant"]) {
       assert.ok(!src.includes(text), text);
     }
   }

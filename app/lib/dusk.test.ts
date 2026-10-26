@@ -2,48 +2,31 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   changeSky,
-  changeTime,
   DEFAULT_DUSK,
-  DUSK_SKY_BY_TIME,
-  DUSK_TIMES,
+  DUSK_CARDS,
+  DUSK_STYLES,
   duskFacts,
   duskParams,
-  isValidPair,
+  isValidChoice,
   type DuskChoice,
   type ReviewDusk,
 } from "./dusk.ts";
 import { codeText, DICTIONARIES, t } from "./i18n/index.ts";
 
-test("lovlige himmelvalg per tidspunkt, i riktig rekkefoelge", () => {
-  assert.deepEqual(DUSK_SKY_BY_TIME.early, ["clear", "light_clouds", "pink_clouds"]);
-  assert.deepEqual(DUSK_SKY_BY_TIME.late, ["dark", "starry"]);
-  assert.deepEqual(DUSK_TIMES, ["early", "late"]);
-  assert.deepEqual(DEFAULT_DUSK, { time: "early", sky: "clear", style: "nordic_blue_hour_v1" });
-});
+// Stilkortene (Dag 55) erstattet tidspunkt-knappene: tiden foelger kortet.
+// Kontrakten per kort testes i stilkort.test.ts.
 
-test("bytte av tidspunkt nullstiller himmelen til standarden", () => {
-  const pink: DuskChoice = { time: "early", sky: "pink_clouds", style: "nordic_blue_hour_v1" };
-  assert.deepEqual(changeTime(pink, "late"), { time: "late", sky: "dark", style: "nordic_blue_hour_v1" });
-  const starry: DuskChoice = { time: "late", sky: "starry", style: "nordic_blue_hour_v1" };
-  assert.deepEqual(changeTime(starry, "early"), { time: "early", sky: "clear", style: "nordic_blue_hour_v1" });
-  // Samme tidspunkt beholder himmelen.
-  assert.deepEqual(changeTime(pink, "early"), pink);
-});
-
-test("et ugyldig par kan ikke velges eller bygges", () => {
-  assert.equal(isValidPair("late", "pink_clouds"), false);
-  assert.equal(isValidPair("early", "starry"), false);
-  assert.equal(isValidPair("early", "aurora"), false);
-  assert.equal(isValidPair("__proto__", "clear"), false);
-  const late: DuskChoice = { time: "late", sky: "dark", style: "nordic_blue_hour_v1" };
+test("et ugyldig valg kan ikke velges eller bygges", () => {
+  assert.equal(isValidChoice("late_evening_v1", "pink_clouds"), false);
+  assert.equal(isValidChoice("nordic_blue_hour_v2", "dark"), false);
+  assert.equal(isValidChoice("nordic_blue_hour_v2", "starry"), false);
+  assert.equal(isValidChoice("nordic_blue_hour_v2", "aurora"), false);
+  assert.equal(isValidChoice("__proto__", "clear"), false);
+  const late: DuskChoice = { style: "late_evening_v1", sky: "dark" };
   assert.deepEqual(changeSky(late, "pink_clouds"), late);
-  assert.deepEqual(changeSky(late, "starry"), { time: "late", sky: "starry", style: "nordic_blue_hour_v1" });
-  assert.throws(() =>
-    duskParams("scene_transform", "skumring", { time: "late", sky: "pink_clouds" } as DuskChoice)
-  );
-  assert.throws(() =>
-    duskParams("scene_transform", "skumring", { time: "early", sky: "dark" } as DuskChoice)
-  );
+  assert.throws(() => duskParams("scene_transform", "skumring", { style: "late_evening_v1", sky: "pink_clouds" } as DuskChoice));
+  assert.throws(() => duskParams("scene_transform", "skumring", { style: "nordic_blue_hour_v2", sky: "dark" } as DuskChoice));
+  assert.throws(() => duskParams("scene_transform", "skumring", { style: "nordic_blue_hour_v1", sky: "clear" } as unknown as DuskChoice));
 });
 
 // TG-NEW-189: dusk_style sendes alltid for skumring, ogsaa standardstilen.
@@ -51,18 +34,14 @@ test("params_json: skumring har alltid alle tre feltene", () => {
   for (const preset of ["skumring", "skumring_interior"]) {
     assert.deepEqual(duskParams("scene_transform", preset, DEFAULT_DUSK), {
       dusk_time: "early",
-      dusk_sky: "clear",
-      dusk_style: "nordic_blue_hour_v1",
+      dusk_sky: "light_clouds",
+      dusk_style: "nordic_blue_hour_v2",
     });
-    assert.deepEqual(
-      duskParams("scene_transform", preset, { time: "late", sky: "starry", style: "nordic_blue_hour_v1" }),
-      { dusk_time: "late", dusk_sky: "starry", dusk_style: "nordic_blue_hour_v1" }
-    );
   }
 });
 
 test("params_json: andre tjenester og presets faar ingen av feltene", () => {
-  const late: DuskChoice = { time: "late", sky: "starry", style: "warm_dusk_v2" };
+  const late: DuskChoice = { style: "late_evening_v1", sky: "dark" };
   for (const [service, preset] of [
     ["scene_transform", "klart_vaer"],
     ["scene_transform", undefined],
@@ -93,18 +72,22 @@ test("faktaboksen: uten dusk vises ingenting, ukjent kode gir generisk tekst", (
   );
 });
 
-test("alle tidspunkt og himmelvalg har tekst paa nb og en", () => {
+test("alle tidspunkt og himmelvalg paa kortene har tekst paa nb og en", () => {
   for (const locale of ["nb", "en"] as const) {
     const { codes, generic } = DICTIONARIES[locale];
-    for (const time of DUSK_TIMES) {
+    for (const style of DUSK_STYLES) {
+      const { time, skies } = DUSK_CARDS[style];
       assert.ok(Object.hasOwn(codes.duskTime, time), `${locale}/${time}`);
       assert.notEqual(codeText(locale, "duskTime", time), generic.duskTime);
-      for (const sky of DUSK_SKY_BY_TIME[time]) {
+      for (const sky of skies) {
         assert.ok(Object.hasOwn(codes.duskSky, sky), `${locale}/${sky}`);
       }
     }
   }
   assert.equal(codeText("nb", "duskTime", "late"), "Sen kveld");
+  // Gamle jobber kan ha stjernehimmel.
   assert.equal(codeText("nb", "duskSky", "starry"), "Stjernehimmel");
+  assert.equal(codeText("nb", "duskSky", "clear"), "Klar himmel");
+  assert.equal(codeText("en", "duskSky", "clear"), "Clear sky");
   assert.equal(codeText("en", "duskSky", "pink_clouds"), "Pink clouds");
 });

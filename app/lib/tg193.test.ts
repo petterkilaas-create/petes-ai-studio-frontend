@@ -205,24 +205,24 @@ test("TG193 #21: «Usikker» i rettingen bare for admin; bryterne og kandidat-fl
 // #26-29 «Stemning og lys»: én kort linje for megler, uten «ikke brukt» og peis.
 // ---------------------------------------------------------------------------
 
-test("TG193 #26-28: megleren faar valgene som koder, uten himmel naar den ikke ble brukt", () => {
-  assert.deepEqual(duskLine({ time: "early", sky: "clear", skyApplied: true }), { time: "early", sky: "clear" });
-  assert.deepEqual(duskLine({ time: "early", sky: "clear", skyApplied: null }), { time: "early", sky: "clear" });
-  assert.deepEqual(duskLine({ time: "late", sky: "starry", skyApplied: false }), { time: "late", sky: null });
-  assert.deepEqual(duskLine({ time: null, sky: "dark", skyApplied: true }), { time: null, sky: "dark" });
-  assert.equal(duskLine({ time: null, sky: "dark", skyApplied: false }), null);
-  assert.equal(duskLine(null), null);
+test("TG193 #26-28: megleren faar stilen og himmelen som koder, uten himmel naar den ikke ble brukt", () => {
+  // Stilkortene (Dag 55): stilen i stedet for tidspunktet; himmelen bare for Blå time.
+  const blue = { requested: "nordic_blue_hour_v2", applied: "nordic_blue_hour_v2" };
+  assert.deepEqual(duskLine({ time: "early", sky: "light_clouds", skyApplied: true }, blue), { style: "nordic_blue_hour_v2", sky: "light_clouds" });
+  assert.deepEqual(duskLine({ time: "early", sky: "light_clouds", skyApplied: null }, blue), { style: "nordic_blue_hour_v2", sky: "light_clouds" });
+  assert.deepEqual(duskLine({ time: "early", sky: "light_clouds", skyApplied: false }, blue), { style: "nordic_blue_hour_v2", sky: null });
+  assert.equal(duskLine(null, blue), null);
+  assert.equal(duskLine({ time: "early", sky: "clear", skyApplied: true }, null), null);
 });
-
 test("TG193 #26-29: MoodPanel viser linja for megler og dagens visning og peisen bare for admin", () => {
   assert.match(page, /<MoodPanel review=\{review\} admin=\{admin\} locale=\{locale\} \/>/);
   assert.match(mood, /const facts = admin \? duskFacts\(review\.dusk\) : null;/);
-  assert.match(mood, /const line = admin \? null : duskLine\(review\.dusk\);/);
+  assert.match(mood, /const line = admin \? null : duskLine\(review\.dusk, review\.style\);/);
   assert.match(mood, /admin && \(review\.fireplace\.answer === "yes" \|\| review\.fireplace\.answer === "no"\)/);
   // «ikke brukt» og peisen leses bare i admin-grenene (facts og fire).
   const lineBlock = mood.slice(mood.indexOf("{line !== null && ("), mood.indexOf("{fire !== null && ("));
   assert.ok(lineBlock.length > 0);
-  assert.match(lineBlock, /codeText\(locale, "duskTime", line\.time\)/);
+  assert.match(lineBlock, /codeText\(locale, "duskStyle", line\.style\)/);
   assert.match(lineBlock, /codeText\(locale, "duskSky", line\.sky\)/);
   assert.match(lineBlock, /\.join\(" · "\)/);
   assert.doesNotMatch(lineBlock, /duskSkyNotApplied|fireplace/);

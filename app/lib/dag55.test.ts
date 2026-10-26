@@ -12,7 +12,7 @@ import type { FurnishAs, StylingChoice } from "./styling.ts";
 process.env.NEXT_PUBLIC_API_BASE = "http://api.test";
 const api = await import("./api.ts");
 const { OrderKeys } = await import("./orderKey.ts");
-const { DICTIONARIES, t } = await import("./i18n/index.ts");
+const { codeText, DICTIONARIES, t } = await import("./i18n/index.ts");
 const {
   EMPTY_STYLING,
   FURNISH_AS_CHOICES,
@@ -258,13 +258,12 @@ test("Dag 55: ønsket logges aldri (ingen console og ingen analyse i filene som 
 });
 
 // --- Stjernehimmel --------------------------------------------------------------
+// Stjernehimmelen og teksten om den ble fjernet med stilkortene (Dag 55,
+// TG-NEW-259); merknaden ved Lys sommerkveld testes i stilkort.test.ts.
 
-test("Dag 55 (S4): teksten ved Stjernehimmel, bare når den er valgt, i aria-live", () => {
-  assert.equal(t("nb", "dusk.starryNote"), "Ikke for bilder fra mai–juli.");
-  assert.equal(t("en", "dusk.starryNote"), "Not for photos taken May–July.");
-  const picker = read("components/DuskChoicePicker.tsx");
-  assert.match(picker, /const starry = value\.sky === "starry";/);
-  assert.match(picker, /<p aria-live="polite"[^>]*>\s*\{starry \? t\(locale, "dusk\.starryNote"\) : ""\}\s*<\/p>/);
-  // Ingen sperre: himmelknappene er som foer.
-  assert.match(picker, /onClick=\{\(\) => onChange\(changeSky\(value, sky\)\)\}\s*disabled=\{disabled\}/);
+test("Dag 55 (S4): stjernehimmelen kan ikke velges lenger, men vises for gamle jobber", () => {
+  assert.equal(Object.hasOwn(DICTIONARIES.nb.ui, "dusk.starryNote"), false);
+  assert.equal(Object.hasOwn(DICTIONARIES.en.ui, "dusk.starryNote"), false);
+  assert.doesNotMatch(read("components/DuskChoicePicker.tsx"), /starry/);
+  assert.equal(codeText("nb", "duskSky", "starry"), "Stjernehimmel");
 });

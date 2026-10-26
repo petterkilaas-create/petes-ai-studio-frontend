@@ -6,7 +6,7 @@ import { boardText, type MoodboardStyle } from "../../lib/moodboards";
 import { DEFAULT_BRAND } from "../../lib/brand";
 import { t, type Locale } from "../../lib/i18n";
 import { DecorDots } from "./DecorDots";
-import { FOCUS, LOCKED } from "./classes";
+import { FOCUS, LOCKED, TAG } from "./classes";
 
 /**
  * Utstillingsvinduet for stilen i fokus (D-3 kompakt, ca. 420 px paa PC):
@@ -19,9 +19,6 @@ import { FOCUS, LOCKED } from "./classes";
  * Eksempelbildet er en plassholder (stilproben i referansestua 13861317).
  * Innholdet i moodboardet er bare paa norsk.
  */
-
-/** AI-lappen paa bildet, som paa tjenestekortene (ServiceCard). */
-const TAG = "pointer-events-none absolute top-3 left-3 rounded-pill bg-ink/80 px-3 py-1.5 text-[13px] font-medium text-surface";
 
 const SIZES = "(min-width: 1024px) 490px, 100vw";
 

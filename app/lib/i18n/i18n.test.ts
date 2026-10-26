@@ -147,7 +147,7 @@ test("merketeksten: nb og en har noeklene og alle kodene fra kontrakten", () => 
     const dict = DICTIONARIES[locale];
     for (const key of keys) assert.ok(dict.ui[key].trim().length > 0, `${locale} ${key}`);
     assert.deepEqual(Object.keys(dict.codes.disclosureBase), ["evening_from_day", "sky_replaced", "furniture_added"]);
-    assert.deepEqual(Object.keys(dict.codes.disclosureTime).sort(), ["early", "late"]);
+    assert.deepEqual(Object.keys(dict.codes.disclosureTime).sort(), ["early", "late", "summer_night"]);
     assert.deepEqual(Object.keys(dict.codes.disclosureEdited), edited);
   }
   assert.equal(t("nb", "review.disclosureHelp"), "Lim den inn i annonsen sammen med bildet.");

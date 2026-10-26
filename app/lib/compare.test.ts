@@ -86,8 +86,8 @@ test("etikettene lages fra choices, paa nb og en", () => {
     compareVariants(images([round(0, { current: true, choices: { ...CHOICES, ...choices } })]), {
       isAdmin: false,
     })[0];
-  assert.equal(variantLabel("nb", r({ sky: "clear" }), ADMIN), "Runde 1 · nå (tidlig, klar blå time)");
-  assert.equal(variantLabel("en", r({ sky: "clear" }), ADMIN), "Round 1 · now (early, clear blue hour)");
+  assert.equal(variantLabel("nb", r({ sky: "clear" }), ADMIN), "Runde 1 · nå (tidlig, klar himmel)");
+  assert.equal(variantLabel("en", r({ sky: "clear" }), ADMIN), "Round 1 · now (early, clear sky)");
   assert.equal(variantLabel("nb", r({ time: "late", sky: "starry" }), ADMIN), "Runde 1 · nå (sen, stjernehimmel)");
   assert.equal(variantLabel("nb", r({ skyApplied: false }), ADMIN), "Runde 1 · nå (tidlig, uten himmel)");
   assert.equal(variantLabel("en", r({ skyApplied: false }), ADMIN), "Round 1 · now (early, no sky)");
