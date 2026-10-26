@@ -91,6 +91,7 @@ test("G3: automatisk henting bytter kortet naar oppskriften kommer", () => {
     isOwner: true,
     ownerShort: null,
     presetId,
+    orderId: null,
   });
   const prev = [row(null)];
   assert.equal(mergeRefresh(prev, [row(null)], 20)[0], prev[0]);

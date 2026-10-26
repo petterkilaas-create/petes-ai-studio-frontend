@@ -2,6 +2,7 @@ import type { ReviewFraming, ReviewOrder } from "./api";
 import { DATE_LOCALES } from "./dates.ts";
 import { t, type Locale, type UiKey } from "./i18n/index.ts";
 import { styleText } from "./styling.ts";
+import { isRejectedByReviewer } from "./statusVariants.ts";
 
 /**
  * Fanene per bestilling og rammevarselet paa godkjenningssiden (D-5c,
@@ -28,12 +29,13 @@ export function reviewHref(jobId: string): string {
 }
 
 /**
- * Statusen paa fanen, bare ut fra `status` (Petter 25.10, AVVIK 1 A):
- * `order.jobs` har ingen `code`, saa en jobb megleren har avvist (`failed`),
- * staar som «Feilet» til backend sender koden (TG-NEW-262). `rejected` er
- * avslaget fra port 0. Ukjent status gir «Ukjent status».
+ * Statusen paa fanen ut fra `status` og `code` (TG-NEW-262): en jobb megleren
+ * har avvist (`failed` med `rejected_by_reviewer`, isRejectedByReviewer som i
+ * Historikken) staar som «Avvist». `failed` uten koden er fortsatt «Feilet».
+ * `rejected` er avslaget fra port 0. Ukjent status gir «Ukjent status».
  */
-export function orderStatusKey(status: string): UiKey {
+export function orderStatusKey(status: string, code: string | null = null): UiKey {
+  if (isRejectedByReviewer({ status, code })) return "status.rejected";
   switch (status) {
     case "queued":
     case "running":
@@ -63,7 +65,7 @@ export function orderTabs(order: ReviewOrder | null, jobId: string, locale: Loca
     jobId: job.jobId,
     href: reviewHref(job.jobId),
     label: styleText(locale, job.presetId) ?? t(locale, "service.virtual_stage"),
-    statusKey: orderStatusKey(job.status),
+    statusKey: orderStatusKey(job.status, job.code),
     thumbUrl: job.thumbUrl,
     current: job.jobId === jobId,
   }));

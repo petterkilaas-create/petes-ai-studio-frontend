@@ -32,6 +32,7 @@ const job = (jobId: string, extra: Partial<ReviewOrderJob> = {}): ReviewOrderJob
   presetId: "styling_moderne_nordisk",
   status: "awaiting_approval",
   thumbUrl: null,
+  code: null,
   ...extra,
 });
 const order = (...jobs: ReviewOrderJob[]): ReviewOrder => ({ orderId: "ord_x", jobs });
@@ -93,7 +94,7 @@ test("D-5c: lenken koder job-id-en, og en ukjent stil heter «Digital styling»"
   assert.equal(orderTabs(order(job("a", { presetId: "styling_japandi" }), job("b")), "a", "en")?.[0].label, "Japandi");
 });
 
-test("D-5c: statusen paa fanen kommer bare fra status (AVVIK 1 A)", () => {
+test("D-5c og TG-NEW-262: statusen paa fanen kommer fra status, og «Avvist» fra koden", () => {
   const cases: [string, string, string][] = [
     ["queued", "Lages", "In progress"],
     ["running", "Lages", "In progress"],
@@ -101,7 +102,7 @@ test("D-5c: statusen paa fanen kommer bare fra status (AVVIK 1 A)", () => {
     ["needs_review", "Til godkjenning", "Awaiting approval"],
     ["succeeded", "Godkjent", "Approved"],
     ["rejected", "Avvist", "Rejected"],
-    // Avvist av megleren er `failed` i backend; uten `code` staar den som «Feilet» (TG-NEW-262).
+    // `failed` uten koden er fortsatt «Feilet» (TG-NEW-262).
     ["failed", "Feilet", "Failed"],
     ["cancelled", "Ukjent status", "Unknown status"],
     ["unknown", "Ukjent status", "Unknown status"],
@@ -110,6 +111,27 @@ test("D-5c: statusen paa fanen kommer bare fra status (AVVIK 1 A)", () => {
     assert.equal(t("nb", orderStatusKey(status)), nb, status);
     assert.equal(t("en", orderStatusKey(status)), en, status);
   }
+  // Avvist av megleren: `failed` med rejected_by_reviewer (isRejectedByReviewer, som Historikken).
+  assert.equal(t("nb", orderStatusKey("failed", "rejected_by_reviewer")), "Avvist");
+  assert.equal(t("en", orderStatusKey("failed", "rejected_by_reviewer")), "Rejected");
+  // Andre koder, og koden uten `failed`, endrer ingenting.
+  assert.equal(t("nb", orderStatusKey("failed", "provider_error")), "Feilet");
+  assert.equal(t("nb", orderStatusKey("failed", null)), "Feilet");
+  assert.equal(t("nb", orderStatusKey("succeeded", "rejected_by_reviewer")), "Godkjent");
+});
+
+test("TG-NEW-262: fanen til en avvist jobb viser «Avvist»", () => {
+  const order: ReviewOrder = {
+    orderId: "ord_r",
+    jobs: [
+      job("a", { status: "failed", code: "rejected_by_reviewer" }),
+      job("b", { status: "failed" }),
+      job("c"),
+    ],
+  };
+  const tabs = orderTabs(order, "c", "nb");
+  assert.deepEqual(tabs?.map((tab) => t("nb", tab.statusKey)), ["Avvist", "Feilet", "Til godkjenning"]);
+  assert.deepEqual(orderTabs(order, "c", "en")?.map((tab) => t("en", tab.statusKey)), ["Rejected", "Failed", "Awaiting approval"]);
 });
 
 test("D-5c: rammevarselet bare naar det er maalt og over grensen", () => {

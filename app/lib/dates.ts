@@ -19,3 +19,14 @@ export function formatDate(iso: string | null, locale: Locale): string {
     minute: "2-digit",
   });
 }
+
+/**
+ * Bare datoen, uten klokkeslett («26. okt. 2026»): overskriften paa en
+ * bestilling i Historikken (TG-NEW-262). Som formatDate ellers.
+ */
+export function formatDay(iso: string | null, locale: Locale): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(DATE_LOCALES[locale], { day: "numeric", month: "short", year: "numeric" });
+}

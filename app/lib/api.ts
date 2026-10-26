@@ -416,6 +416,12 @@ export interface StylingOrderParams {
    * backend stilens eget nivaa («Anbefalt for stilen»).
    */
   decor_level?: 1 | 3 | 5;
+  /**
+   * Meglerens oensker (TG-NEW-250): hoeyst 300 tegn (kodepunkter), bare for
+   * `living` og `living_dining`, og bare naar teksten ikke er tom. Ellers
+   * utelates noekkelen. Logges aldri.
+   */
+  wishes?: string;
 }
 
 /**
@@ -631,6 +637,8 @@ interface JobSummaryWire {
   thumb_deleted_at?: unknown;
   /** G1b: oppskriften (f.eks. "skumring"), eller null mens jobben kjoerer. */
   preset_id?: unknown;
+  /** TG-NEW-262: bestillingen jobben hoerer til, eller null (enkeltjobber og gamle jobber). */
+  order_id?: unknown;
 }
 
 /**
@@ -724,6 +732,12 @@ export interface JobSummary {
    * bruker da reserven (presets.ts).
    */
   presetId: string | null;
+  /**
+   * TG-NEW-262: bestillingen jobben hoerer til (Historikken grupperer paa
+   * den, historyGroups.ts). null for enkeltjobber, gamle jobber og naar
+   * feltet mangler (eldre backend).
+   */
+  orderId: string | null;
 }
 
 /** Statusene i filteret «Venter paa meg» (GET /v1/jobs?status=, 2d-1a). */
@@ -822,6 +836,7 @@ export async function listJobs(opts: {
     mediaDeletedAt: nonEmptyString(row.media_deleted_at),
     thumbDeletedAt: nonEmptyString(row.thumb_deleted_at),
     presetId: nonEmptyString(row.preset_id),
+    orderId: nonEmptyString(row.order_id),
   }));
 }
 
@@ -1101,6 +1116,8 @@ export interface ReviewOrderJob {
   presetId: string | null;
   status: string;
   thumbUrl: string | null;
+  /** TG-NEW-262: koden som i jobblista (f.eks. rejected_by_reviewer), ellers null. Mangler feltet: null. */
+  code: string | null;
 }
 
 export interface ReviewOrder {
@@ -1139,6 +1156,7 @@ export function toReviewOrder(raw: unknown): ReviewOrder | null {
       status: stringOrNull(j.status) ?? "unknown",
       // Lekkasjen L2: bare den merkede miniatyren.
       thumbUrl: nonEmptyString(j.thumb_url),
+      code: nonEmptyString(j.code),
     });
   }
   return { orderId, jobs };

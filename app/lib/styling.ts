@@ -103,9 +103,73 @@ export interface StylingChoice {
   styles: StylingStyle[];
   /** Mengde pynt; null er «Anbefalt for stilen», valgt fra start. */
   decor: DecorLevel | null;
+  /**
+   * Meglerens oensker (TG-NEW-250), tom fra start. Sendes bare for stuene
+   * (WISH_ROOMS); i et annet rom kan teksten staa, men den foelger ikke med.
+   */
+  wishes: string;
 }
 
-export const EMPTY_STYLING: StylingChoice = { furnishAs: null, roomEmpty: false, styles: [], decor: null };
+export const EMPTY_STYLING: StylingChoice = { furnishAs: null, roomEmpty: false, styles: [], decor: null, wishes: "" };
+
+/**
+ * Rommene der oenskefeltet vises og `wishes` sendes (Petter 24.10 og 26.10):
+ * planleggeren kjoerer bare for stuene. Backend gir 400 for andre rom.
+ */
+export const WISH_ROOMS = ["living", "living_dining"] as const satisfies readonly FurnishAs[];
+
+/** Hoeyst 300 tegn, talt i kodepunkter som i backend. */
+export const WISHES_MAX = 300;
+
+export function isWishRoom(room: FurnishAs | null): boolean {
+  return room !== null && (WISH_ROOMS as readonly FurnishAs[]).includes(room);
+}
+
+/** Antall tegn i kodepunkter (`Array.from`), som backend teller: en emoji er ett tegn. */
+export function wishesLength(text: string): number {
+  return Array.from(text).length;
+}
+
+/** Teksten klemt til WISHES_MAX kodepunkter (feltet, som paa lerretet). */
+export function clampWishes(text: string): string {
+  return wishesLength(text) <= WISHES_MAX ? text : Array.from(text).slice(0, WISHES_MAX).join("");
+}
+
+/**
+ * Forslagene aa trykke paa (testet i oenskeproben, Dag 54). `text` er det som
+ * legges i feltet og sendes, alltid paa norsk (tekst til planleggeren);
+ * knappen viser `styling.wish.<id>` paa brukerens spraak.
+ */
+export const WISH_SUGGESTIONS = {
+  sofa_window: "Sofaen mot vinduet",
+  round_table: "Rundt spisebord",
+  long_table: "Langbord til åtte personer",
+  table_window: "Spisebordet ved vinduet",
+  no_armchair: "Ingen lenestol",
+  door_free: "Hold området ved døra fritt",
+} as const;
+export type WishSuggestion = keyof typeof WISH_SUGGESTIONS;
+
+const SUGGESTIONS_BY_ROOM: Readonly<Record<(typeof WISH_ROOMS)[number], readonly WishSuggestion[]>> = {
+  living: ["sofa_window", "no_armchair", "door_free"],
+  living_dining: ["sofa_window", "round_table", "long_table", "table_window", "no_armchair", "door_free"],
+};
+
+/** Forslagene for rommet, i fast rekkefoelge; ingen for andre rom. */
+export function wishSuggestions(room: FurnishAs | null): readonly WishSuggestion[] {
+  return room === "living" || room === "living_dining" ? SUGGESTIONS_BY_ROOM[room] : [];
+}
+
+/**
+ * Teksten med forslaget lagt til, med «. » mellom (bare mellomrom naar teksten
+ * alt slutter med punktum), eller null naar det ikke er plass innenfor WISHES_MAX.
+ */
+export function addSuggestion(text: string, id: WishSuggestion): string | null {
+  const suggestion = WISH_SUGGESTIONS[id];
+  const base = text.trimEnd();
+  const next = base === "" ? suggestion : `${base}${base.endsWith(".") ? " " : ". "}${suggestion}`;
+  return wishesLength(next) <= WISHES_MAX ? next : null;
+}
 
 /**
  * Legger til stilen, eller tar den bort om den er valgt. Med MAX_ORDER_JOBS
@@ -122,16 +186,26 @@ export function toggleStyle(styles: readonly StylingStyle[], id: StylingStyle): 
  * rekkefoelgen, saa `Idempotency-Key` og duplikatsvaret blir stabile. Flere
  * enn MAX_ORDER_JOBS gir ogsaa null: ingenting sendes, og ingen stil kuttes.
  * `decor_level` sendes bare for 1, 3 og 5; et annet nivaa gir null paa samme
- * maate, saa valget aldri endres stille.
+ * maate, saa valget aldri endres stille. `wishes` (trimmet) sendes bare for
+ * stuene og bare naar det ikke er tomt; over WISHES_MAX gir null. Oensket er
+ * med i params, saa `Idempotency-Key` skiller bestillinger med ulike oensker.
  */
 export function stylingParams(choice: StylingChoice): StylingOrderParams | null {
   if (choice.furnishAs === null || !choice.roomEmpty) return null;
   const styles = STYLING_STYLES.filter((s) => choice.styles.includes(s));
   if (styles.length === 0 || styles.length > MAX_ORDER_JOBS) return null;
-  const params: StylingOrderParams = { styles, furnish_as: choice.furnishAs, room_empty_confirmed: true };
-  if (choice.decor === null) return params;
-  if (!DECOR_LEVELS.includes(choice.decor)) return null;
-  return { ...params, decor_level: choice.decor };
+  let params: StylingOrderParams = { styles, furnish_as: choice.furnishAs, room_empty_confirmed: true };
+  if (choice.decor !== null) {
+    if (!DECOR_LEVELS.includes(choice.decor)) return null;
+    params = { ...params, decor_level: choice.decor };
+  }
+  // Oensket sist, og bare for stuene og naar det ikke er tomt (TG-NEW-250).
+  // Uten oenske er params byte-like med foer, og noekkelen utelates helt.
+  if (!isWishRoom(choice.furnishAs)) return params;
+  const wishes = choice.wishes.trim();
+  if (wishes === "") return params;
+  if (wishesLength(wishes) > WISHES_MAX) return null;
+  return { ...params, wishes };
 }
 
 /**

@@ -38,6 +38,7 @@ function job(id: string, status: JobSummaryStatus = "succeeded"): JobSummary {
     isOwner: true,
     ownerShort: null,
     presetId: null,
+    orderId: null,
   };
 }
 const many = (prefix: string, n: number, status?: JobSummaryStatus) =>
