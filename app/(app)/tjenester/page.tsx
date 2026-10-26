@@ -7,6 +7,7 @@ import { TOOL_ICONS } from "@/app/components/toolIcons";
 import { ServiceCard } from "@/app/components/ServiceCard";
 import { SERVICE_CARD_TEXT, UPLOAD_CARD_ID, uploadScrollBehavior } from "@/app/lib/serviceCards";
 import { CARD_IMAGES } from "./cardImages";
+import { DUSK_IMAGES } from "./duskImages";
 import { STYLE_IMAGES } from "./styleImages";
 import { useImagePreview } from "@/app/hooks/useImagePreview";
 import { useProcessJob } from "@/app/hooks/useProcessJob";
@@ -343,6 +344,7 @@ function ExpressContent() {
               value={dusk}
               onChange={setDusk}
               disabled={isProcessing}
+              images={DUSK_IMAGES}
               locale={locale}
             />
           )}

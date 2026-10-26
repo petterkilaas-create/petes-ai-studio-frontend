@@ -403,6 +403,19 @@ test("D1c: de gamle ordene fra Express finnes ikke i synlig tekst", () => {
   }
 });
 
+// Stilkortene (Dag 55): navnene i kodegruppene vises ogsaa, og skrives «Varm skumring», aldri «Skumring …».
+test("Stilkort: stilnavn, tidspunkt og himmel har ikke ordet «Skumring» med stor S", () => {
+  for (const locale of ["nb", "en"] as const) {
+    const { codes } = DICTIONARIES[locale];
+    for (const group of ["duskStyle", "duskTime", "duskSky", "roundTime", "roundSky"] as const) {
+      for (const [code, text] of Object.entries(codes[group])) {
+        assert.doesNotMatch(text, OLD_EXPRESS_WORDS, `${locale} ${group}.${code}`);
+      }
+    }
+  }
+  assert.doesNotMatch(withoutComments(read("(app)/tjenester/duskImages.ts")), OLD_EXPRESS_WORDS);
+});
+
 test("D1c: services.ts har bare noekler til ordlista, ingen tekst eller emoji", () => {
   const code = withoutComments(read("lib/services.ts"));
   assert.doesNotMatch(code, /^\s*(title|desc|icon):/m);

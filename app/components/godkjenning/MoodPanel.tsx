@@ -19,14 +19,16 @@ const CARD = cardClass("md");
  * plassering fra analysen (fritekst, D2c); den ligger i «Detaljer». Himmelen vises
  * ikke som valg naar den ikke ble brukt (sky_applied false).
  *
- * Megleren (`admin` false, TG-NEW-193) ser valgene i én kort linje
- * («Tidlig skumring · Klar blå time»), uten «ikke brukt» om himmelen og uten
- * peisen. Admin ser alt som foer.
+ * Megleren (`admin` false, TG-NEW-193) ser valget i én kort linje: stilen,
+ * og himmelen for Blå time («Blå time · Lette skyer», «Lys sommerkveld»;
+ * stilkortene, Dag 55), uten «ikke brukt» om himmelen og uten peisen. Admin
+ * ser alt som foer.
  *
- * Stil v2 (TG-NEW-189): begge roller faar en linje naar jobben ba om varm
- * skumring, men runden ble laget med standardstilen. Admin ser ogsaa stilen
- * som ble brukt, med den bestilte naar den er en annen. Ingen av delene
- * vises foer runden har en prompt (`applied` null, f.eks. needs_review).
+ * Stil v2 (TG-NEW-189) og stilkortene: begge roller faar en linje naar
+ * runden ble laget med en annen stil enn den bestilte («Varm skumring passet
+ * ikke dette bildet, så Blå time ble brukt»). Admin ser ogsaa stilen som ble
+ * brukt, med den bestilte naar den er en annen. Ingen av delene vises foer
+ * runden har en prompt (`applied` null, f.eks. needs_review).
  *
  * Panelene per oppskrift (G3): delene oppskriften ikke bruker (peis, dusk,
  * stil, lys) er borte, og uten noen av dem rendres ikke panelet. Uten
@@ -46,9 +48,9 @@ export function MoodPanel({
   const review = moodReview(full);
   if (review === null) return null;
   const facts = admin ? duskFacts(review.dusk) : null;
-  const line = admin ? null : duskLine(review.dusk);
+  const line = admin ? null : duskLine(review.dusk, review.style);
   const style = admin ? styleFacts(review.style) : null;
-  const fellBack = styleFellBack(review.style);
+  const fellBack = styleFellBack(review.style, review.dusk?.time ?? null);
   const lit = litLights(review.lights);
   const nameOf = lightNames(review.lights);
   const fire =
@@ -70,7 +72,14 @@ export function MoodPanel({
   return (
     <section className={`${CARD} flex flex-col gap-4`}>
       <p className={`${LABEL} mb-0`}>{t(locale, "review.moodTitle")}</p>
-      {fellBack && <p className="text-sm text-ink">{t(locale, "review.styleFellBack")}</p>}
+      {fellBack !== null && (
+        <p className="text-sm text-ink">
+          {t(locale, "review.styleFellBack", {
+            requested: codeText(locale, "duskStyle", fellBack.requested),
+            applied: codeText(locale, "duskStyle", fellBack.applied),
+          })}
+        </p>
+      )}
       {facts !== null && (
         <div className="flex flex-col gap-2">
           <div>
@@ -93,7 +102,7 @@ export function MoodPanel({
       {line !== null && (
         <p className="text-sm text-ink">
           {[
-            line.time === null ? null : codeText(locale, "duskTime", line.time),
+            codeText(locale, "duskStyle", line.style),
             line.sky === null ? null : codeText(locale, "duskSky", line.sky),
           ]
             .filter((s): s is string => s !== null)

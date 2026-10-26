@@ -7,63 +7,79 @@
  * koder; tekstene ligger i ordlista (kodegruppene duskTime og duskSky).
  * Valgene kan ikke endres i «Rett» eller ved «Send videre» (kommer i 2f-c).
  *
- * Stil v2 (TG-NEW-189): stilen (`dusk_style`) er en del av valget. Varm
- * skumring brukes bare paa utebilder med synlig himmel og minst én lampe;
- * ellers lager backend bildet med standardstilen og tid og himmel.
- * `warm_dusk` er himmelen backend viser for en v2-runde, aldri et valg
- * megleren kan sende, saa den ligger bare i ordlista, ikke i DuskSky.
+ * Stil v2 (TG-NEW-189): stilen (`dusk_style`) er en del av valget.
+ * Stilkortene (Dag 55, TG-NEW-259): megleren velger ett av fire kort, og
+ * tidspunktet foelger kortet. `warm_dusk` og `summer_night` er koder backend
+ * viser i godkjenningen for runder uten himmelvalg, aldri valg megleren kan
+ * sende, saa de ligger bare i ordlista. Det samme gjelder `starry` og de gamle
+ * stilene (`nordic_blue_hour_v1`, `warm_dusk_v2`) fra eldre jobber.
  */
 
 export type DuskTime = "early" | "late";
-export type DuskSky = "clear" | "light_clouds" | "pink_clouds" | "dark" | "starry";
-export type DuskStyle = "nordic_blue_hour_v1" | "warm_dusk_v2";
+export type DuskSky = "clear" | "light_clouds" | "pink_clouds" | "dark";
+export type DuskStyle = "nordic_blue_hour_v2" | "warm_dusk_v3" | "late_evening_v1" | "summer_night_v1";
 
 export interface DuskChoice {
-  time: DuskTime;
-  sky: DuskSky;
   style: DuskStyle;
+  sky: DuskSky;
 }
 
-export const DUSK_TIMES: readonly DuskTime[] = ["early", "late"];
+/** Ett stilkort: tidspunktet backend krever, og de lovlige himlene (den foerste er standarden). */
+export interface DuskCard {
+  time: DuskTime;
+  skies: readonly DuskSky[];
+}
 
-/** Stilene i den rekkefoelgen knappene vises. Den foerste er standarden. */
-export const DUSK_STYLES: readonly DuskStyle[] = ["nordic_blue_hour_v1", "warm_dusk_v2"];
-export const STYLE_V1: DuskStyle = "nordic_blue_hour_v1";
-export const STYLE_V2: DuskStyle = "warm_dusk_v2";
-
-/** Lovlige himmelvalg per tidspunkt. Det foerste er standarden. */
-export const DUSK_SKY_BY_TIME: Readonly<Record<DuskTime, readonly DuskSky[]>> = {
-  early: ["clear", "light_clouds", "pink_clouds"],
-  late: ["dark", "starry"],
+/**
+ * Stilkortene (Dag 55, TG-NEW-259), i den rekkefoelgen de vises. Kontrakten er
+ * `dusk_styles.STYLES` i backend: tid og himmel sendes som foer, og backend
+ * svarer 400 paa et par som ikke passer stilen. Bare Blå time har himmelvalg;
+ * de andre sender standarden. Vinterkveld er ikke med (ingen bilder ennaa).
+ */
+export const DUSK_CARDS: Readonly<Record<DuskStyle, DuskCard>> = {
+  nordic_blue_hour_v2: { time: "early", skies: ["light_clouds", "clear", "pink_clouds"] },
+  warm_dusk_v3: { time: "early", skies: ["light_clouds"] },
+  late_evening_v1: { time: "late", skies: ["dark"] },
+  summer_night_v1: { time: "early", skies: ["light_clouds"] },
 };
 
-export const DEFAULT_DUSK: DuskChoice = { time: "early", sky: "clear", style: STYLE_V1 };
+/** Stilene i den rekkefoelgen kortene vises. Den foerste er standarden. */
+export const DUSK_STYLES: readonly DuskStyle[] = ["nordic_blue_hour_v2", "warm_dusk_v3", "late_evening_v1", "summer_night_v1"];
+export const STYLE_BLUE: DuskStyle = "nordic_blue_hour_v2";
+export const STYLE_SUMMER: DuskStyle = "summer_night_v1";
+
+/** Koder fra jobber foer stilkortene. De kan ikke bestilles, bare vises. */
+export const STYLE_V1 = "nordic_blue_hour_v1";
+export const STYLE_V2 = "warm_dusk_v2";
+
+export const DEFAULT_DUSK: DuskChoice = { style: STYLE_BLUE, sky: "light_clouds" };
 
 /** Presetene der skumringsvalgene gjelder (nivaa 2). */
 const DUSK_PRESETS: ReadonlySet<string> = new Set(["skumring", "skumring_interior"]);
 
-export function defaultSky(time: DuskTime): DuskSky {
-  return DUSK_SKY_BY_TIME[time][0];
+export function isDuskStyle(style: string): style is DuskStyle {
+  return Object.hasOwn(DUSK_CARDS, style);
 }
 
-export function isValidPair(time: string, sky: string): boolean {
-  return Object.hasOwn(DUSK_SKY_BY_TIME, time) &&
-    (DUSK_SKY_BY_TIME[time as DuskTime] as readonly string[]).includes(sky);
+export function isValidChoice(style: string, sky: string): boolean {
+  return isDuskStyle(style) && (DUSK_CARDS[style].skies as readonly string[]).includes(sky);
 }
 
-/** Nytt tidspunkt setter himmelen til standarden for tidspunktet. Stilen staar. */
-export function changeTime(choice: DuskChoice, time: DuskTime): DuskChoice {
-  return time === choice.time ? choice : { ...choice, time, sky: defaultSky(time) };
+/** Himmelknappene under kortene: bare for stiler med mer enn én himmel (Blå time). */
+export function skyChoices(style: DuskStyle): readonly DuskSky[] {
+  const { skies } = DUSK_CARDS[style];
+  return skies.length > 1 ? skies : [];
 }
 
-/** Ny stil: tid og himmel staar (de brukes hvis varm skumring ikke passer). */
+/** Nytt kort setter himmelen til standarden for stilen. Samme kort beholder himmelen. */
 export function changeStyle(choice: DuskChoice, style: DuskStyle): DuskChoice {
-  return DUSK_STYLES.includes(style) ? { ...choice, style } : choice;
+  if (!isDuskStyle(style) || style === choice.style) return choice;
+  return { style, sky: DUSK_CARDS[style].skies[0] };
 }
 
-/** Et himmelvalg som ikke passer tidspunktet, ignoreres. */
+/** Et himmelvalg som ikke passer stilen, ignoreres. */
 export function changeSky(choice: DuskChoice, sky: DuskSky): DuskChoice {
-  return isValidPair(choice.time, sky) ? { ...choice, sky } : choice;
+  return isValidChoice(choice.style, sky) ? { ...choice, sky } : choice;
 }
 
 export function isDuskOrder(service: string, presetId: string | undefined): boolean {
@@ -72,7 +88,8 @@ export function isDuskOrder(service: string, presetId: string | undefined): bool
 
 /**
  * Feltene til params_json. For skumring alltid alle tre, ogsaa uendret
- * standard; for alt annet ingen. Et ugyldig par eller en ukjent stil kaster
+ * standard; for alt annet ingen. Tiden kommer fra kortet. En ukjent stil
+ * eller en himmel stilen ikke har, kaster
  * (feil i frontend, skjemaet skal aldri kunne lage det).
  */
 export function duskParams(
@@ -81,13 +98,13 @@ export function duskParams(
   choice: DuskChoice
 ): { dusk_time: DuskTime; dusk_sky: DuskSky; dusk_style: DuskStyle } | Record<string, never> {
   if (!isDuskOrder(service, presetId)) return {};
-  if (!isValidPair(choice.time, choice.sky)) {
-    throw new Error(`ugyldig skumringsvalg: ${choice.time}/${choice.sky}`);
-  }
-  if (!DUSK_STYLES.includes(choice.style)) {
+  if (!isDuskStyle(choice.style)) {
     throw new Error(`ugyldig skumringsstil: ${choice.style}`);
   }
-  return { dusk_time: choice.time, dusk_sky: choice.sky, dusk_style: choice.style };
+  if (!isValidChoice(choice.style, choice.sky)) {
+    throw new Error(`ugyldig himmel for ${choice.style}: ${choice.sky}`);
+  }
+  return { dusk_time: DUSK_CARDS[choice.style].time, dusk_sky: choice.sky, dusk_style: choice.style };
 }
 
 /**
@@ -115,22 +132,33 @@ export function duskFacts(dusk: ReviewDusk | null): DuskFacts | null {
   };
 }
 
-/** Himmelen backend viser for en runde laget med varm skumring (DUSK_BY_STYLE). */
-export const WARM_DUSK_SKY = "warm_dusk";
+/**
+ * Stilen slik megleren ser den: en gammel jobb med v1 og sen tid er Sen kveld
+ * (foer stilkortene var Sen kveld v1 + `late`, og Sen kveld faller fortsatt
+ * tilbake dit). Andre koder staar som de er.
+ */
+export function displayStyle(code: string, time: string | null): string {
+  return code === STYLE_V1 && time === "late" ? "late_evening_v1" : code;
+}
+
+/** Stilene der himmelen er et valg, og derfor staar i meglerlinja. */
+const BLUE_HOUR: ReadonlySet<string> = new Set([STYLE_V1, STYLE_BLUE]);
 
 /**
- * Den korte linja for megleren (TG-NEW-193): bare valgene, som koder, f.eks.
- * «Tidlig skumring · Klar blå time». Himmelen utelates naar den ikke ble brukt
- * (sky_applied false), og et felt som mangler, utelates. null: ingen linje.
- * En runde med varm skumring viser bare himmelen («Varm skumring»), ikke
- * «Tidlig skumring · Varm skumring» (TG-NEW-189).
+ * Den korte linja for megleren (TG-NEW-193, stilkortene Dag 55): stilen, og
+ * himmelen for Blå time, som koder, f.eks. «Blå time · Lette skyer» eller
+ * «Lys sommerkveld». Stilen er den runden ble laget med, ellers den bestilte.
+ * Himmelen utelates naar den ikke ble brukt (sky_applied false). null: ingen
+ * linje (dusk- eller stil-panelet er skjult; de vises sammen for skumring).
  */
-export function duskLine(dusk: ReviewDusk | null): { time: string | null; sky: string | null } | null {
-  if (dusk === null) return null;
-  const sky = dusk.skyApplied === false ? null : dusk.sky;
-  if (sky === WARM_DUSK_SKY) return { time: null, sky };
-  if (dusk.time === null && sky === null) return null;
-  return { time: dusk.time, sky };
+export function duskLine(
+  dusk: ReviewDusk | null,
+  style: ReviewStyle | null
+): { style: string; sky: string | null } | null {
+  if (dusk === null || style === null) return null;
+  const name = displayStyle(style.applied ?? style.requested, dusk.time);
+  const sky = BLUE_HOUR.has(name) && dusk.skyApplied !== false ? dusk.sky : null;
+  return { style: name, sky };
 }
 
 /**
@@ -142,9 +170,21 @@ export interface ReviewStyle {
   applied: string | null;
 }
 
-/** Jobben ba om varm skumring, men runden ble laget med standardstilen. */
-export function styleFellBack(style: ReviewStyle | null): boolean {
-  return style !== null && style.requested === STYLE_V2 && style.applied === STYLE_V1;
+/**
+ * Stilen runden ble laget med, er en annen enn den bestilte (fallback, f.eks.
+ * Varm skumring uten himmel). Sammenlignes etter displayStyle, ikke paa
+ * kodene: Sen kveld som faller tilbake til v1 + `late`, er fortsatt Sen kveld
+ * for megleren (Cowork 26.10, valg A). Admin ser kodene i Stil-raden.
+ * null: ingen linje.
+ */
+export function styleFellBack(
+  style: ReviewStyle | null,
+  time: string | null
+): { requested: string; applied: string } | null {
+  if (style === null || style.applied === null) return null;
+  const requested = displayStyle(style.requested, time);
+  const applied = displayStyle(style.applied, time);
+  return requested === applied ? null : { requested, applied };
 }
 
 /**
