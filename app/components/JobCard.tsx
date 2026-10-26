@@ -44,7 +44,8 @@ function serviceLabel(locale: Locale, service: string, presetId: string | null):
 }
 
 // Status-pill: frikoblet fra StatusBadge (som tar en annen status-union).
-function StatusPill({
+// Ogsaa linjene paa OrderCard.
+export function StatusPill({
   status,
   service,
   rejectedKey = null,

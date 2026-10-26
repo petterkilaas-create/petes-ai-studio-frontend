@@ -16,6 +16,7 @@ import {
   anyWorking,
   HISTORY_PATH,
   RECENT_FETCH,
+  startEntries,
   startView,
   WAITING_FETCH,
   WAITING_HISTORY_HREF,
@@ -23,6 +24,8 @@ import {
 } from "@/app/lib/start";
 import { DEFAULT_BRAND } from "@/app/lib/brand";
 import { JobCard } from "@/app/components/JobCard";
+import { OrderCard } from "@/app/components/OrderCard";
+import type { HistoryEntry } from "@/app/lib/historyGroups";
 import { QuotaNotice } from "@/app/components/QuotaNotice";
 import { TOOL_ICONS } from "@/app/components/toolIcons";
 import { Button, ButtonLink } from "@/app/components/ui/Button";
@@ -119,6 +122,8 @@ export default function Home() {
   useAutoRefresh(anyWorking(jobs), silentRefresh, refreshEpoch);
 
   const view = startView(jobs);
+  // TG-NEW-262: en bestilling er ett kort, som i Historikken.
+  const entries = view.kind === "active" ? startEntries(view.waiting, view.recent) : null;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-8 md:px-8 md:py-12">
@@ -154,7 +159,7 @@ export default function Home() {
         </Card>
       )}
 
-      {view.kind === "active" && (
+      {view.kind === "active" && entries !== null && (
         <>
           <section className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -166,18 +171,14 @@ export default function Home() {
                 </Link>
               )}
             </div>
-            {view.waiting.length === 0 ? (
+            {entries.waiting.length === 0 ? (
               <p className="text-sm text-ink-2">{t(locale, "start.waiting.empty")}</p>
             ) : (
-              <div className={`${JOB_GRID} lg:grid-cols-4`}>
-                {view.waiting.map((job) => (
-                  <JobCard key={job.jobId} job={job} thumb={thumbSrc(job)} />
-                ))}
-              </div>
+              <div className={`${JOB_GRID} lg:grid-cols-4`}>{entries.waiting.map(entryCard)}</div>
             )}
           </section>
 
-          {view.recent.length > 0 && (
+          {entries.recent.length > 0 && (
             <section className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className={SECTION_TITLE}>{t(locale, "start.recent.title")}</h2>
@@ -186,11 +187,7 @@ export default function Home() {
                   <ArrowRight aria-hidden className="size-4" />
                 </Link>
               </div>
-              <div className={`${JOB_GRID} lg:grid-cols-3`}>
-                {view.recent.map((job) => (
-                  <JobCard key={job.jobId} job={job} thumb={thumbSrc(job)} />
-                ))}
-              </div>
+              <div className={`${JOB_GRID} lg:grid-cols-3`}>{entries.recent.map(entryCard)}</div>
             </section>
           )}
         </>
@@ -198,6 +195,15 @@ export default function Home() {
 
       {view.kind !== "new" && <ServiceShortcuts locale={locale} />}
     </main>
+  );
+}
+
+/** Kortet for en oppfoering: JobCard for en jobb, OrderCard for en bestilling. */
+function entryCard(entry: HistoryEntry) {
+  return entry.kind === "job" ? (
+    <JobCard key={entry.job.jobId} job={entry.job} thumb={thumbSrc(entry.job)} />
+  ) : (
+    <OrderCard key={`order-${entry.orderId}`} jobs={entry.jobs} thumbs={entry.jobs.map((job) => thumbSrc(job))} />
   );
 }
 

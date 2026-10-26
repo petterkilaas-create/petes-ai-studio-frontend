@@ -1028,7 +1028,9 @@ test("ventebilde: symbolet snurrer bare med CSS og staar stille ved redusert bev
 test("ventebilde: Historikk viser JobMedia fra thumbSrc og henter selv bare mens jobber er i arbeid", () => {
   const page = withoutComments(read("(app)/history/page.tsx"));
   // TG-NEW-153: kortet er components/JobCard.tsx; siden gir det thumbSrc(job).
-  assert.match(page, /<JobCard key=\{job\.jobId\} job=\{job\} thumb=\{thumbSrc\(job\)\} \/>/);
+  assert.match(page, /<JobCard key=\{entry\.job\.jobId\} job=\{entry\.job\} thumb=\{thumbSrc\(entry\.job\)\} \/>/);
+  // Dag 55: en bestilling er OrderCard; siden gir thumbSrc(job) for hver stil.
+  assert.match(page, /thumbs=\{entry\.jobs\.map\(\(job\) => thumbSrc\(job\)\)\}/);
   const card = withoutComments(read("components/JobCard.tsx"));
   assert.match(card, /<JobMedia\s*view=\{mediaView\(job, thumb\)\}/);
   assert.doesNotMatch(card, /thumbSrc|\.thumbUrl|\.originalThumbUrl/, "kortet velger ikke bildet selv");

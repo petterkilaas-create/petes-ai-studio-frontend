@@ -13,8 +13,9 @@ import {
 } from "@/app/lib/api";
 import { thumbSrc } from "@/app/lib/statusVariants";
 import { JobCard } from "@/app/components/JobCard";
+import { OrderCard } from "@/app/components/OrderCard";
 import { isWorking, mergeRefresh } from "@/app/lib/jobMedia";
-import { groupHistory, orderHeading } from "@/app/lib/historyGroups";
+import { groupHistory } from "@/app/lib/historyGroups";
 import type { RefreshResult } from "@/app/lib/autoRefresh";
 import { useAutoRefresh } from "@/app/hooks/useAutoRefresh";
 import { Button, ButtonLink } from "@/app/components/ui/Button";
@@ -268,20 +269,13 @@ function HistoryContent() {
         </Card>
       ) : (
         <>
-          {/* TG-NEW-262: jobbene i en bestilling samlet (groupHistory), over alt som er lastet. */}
+          {/* TG-NEW-262: en bestilling er ett kort (groupHistory), over alt som er lastet. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
             {groupHistory(jobs).map((entry) =>
               entry.kind === "job" ? (
                 <JobCard key={entry.job.jobId} job={entry.job} thumb={thumbSrc(entry.job)} />
               ) : (
-                <section key={`order-${entry.orderId}`} className="col-span-full">
-                  <h2 className="mb-3 text-sm font-medium text-ink">{orderHeading(locale, entry.jobs)}</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {entry.jobs.map((job) => (
-                      <JobCard key={job.jobId} job={job} thumb={thumbSrc(job)} />
-                    ))}
-                  </div>
-                </section>
+                <OrderCard key={`order-${entry.orderId}`} jobs={entry.jobs} thumbs={entry.jobs.map((job) => thumbSrc(job))} />
               )
             )}
           </div>

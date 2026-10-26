@@ -175,7 +175,9 @@ test("TG-153: /start bruker bare kallene som finnes, egne jobber, og nye forsoek
 
 test("TG-153: /start viser det merkede bildet, og tjenestene kommer fra orderableTools", () => {
   const page = withoutComments(read("(app)/start/page.tsx"));
-  assert.equal((page.match(/<JobCard key=\{job\.jobId\} job=\{job\} thumb=\{thumbSrc\(job\)\} \/>/g) ?? []).length, 2);
+  // Dag 55: begge delene bruker entryCard (JobCard eller OrderCard), med thumbSrc fra siden.
+  assert.equal((page.match(/\.map\(entryCard\)/g) ?? []).length, 2);
+  assert.match(page, /<JobCard key=\{entry\.job\.jobId\} job=\{entry\.job\} thumb=\{thumbSrc\(entry\.job\)\} \/>/);
   assert.match(page, /orderableTools\(\)\.map/);
   assert.match(page, /href=\{serviceHref\(tool\.id\)\}/);
   assert.match(page, /<ButtonLink href=\{SERVICES_PATH\}>/);
