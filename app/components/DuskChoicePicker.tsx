@@ -47,6 +47,7 @@ export function DuskChoicePicker({
   locale: Locale;
 }) {
   const warm = value.style === STYLE_V2;
+  const starry = value.sky === "starry";
   return (
     <div className="border-t border-line pt-6 space-y-5">
       <p className={LABEL}>{t(locale, "dusk.title")}</p>
@@ -106,6 +107,10 @@ export function DuskChoicePicker({
           ))}
         </div>
         <p className="text-[13px] text-ink-2 mt-2">{t(locale, "dusk.hint")}</p>
+        {/* Stjernehimmel (S4): bare en tekst, ingen sperre. Alltid i treet, som linja over. */}
+        <p aria-live="polite" className={`text-[13px] text-ink${starry ? " mt-2" : ""}`}>
+          {starry ? t(locale, "dusk.starryNote") : ""}
+        </p>
       </div>
     </div>
   );

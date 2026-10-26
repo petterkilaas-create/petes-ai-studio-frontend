@@ -50,6 +50,7 @@ function job(overrides: Partial<JobSummary> = {}): JobSummary {
     isOwner: true,
     ownerShort: null,
     presetId: null,
+    orderId: null,
     ...overrides,
   };
 }

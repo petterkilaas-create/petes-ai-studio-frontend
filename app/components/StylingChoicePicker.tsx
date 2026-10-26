@@ -3,12 +3,18 @@
 import { useId, useRef, useState } from "react";
 import type { StaticImageData } from "next/image";
 import {
+  addSuggestion,
+  clampWishes,
   DECOR_LEVELS,
   FURNISH_AS_CHOICES,
+  isWishRoom,
   MAX_ORDER_JOBS,
   STYLING_STYLES,
   styleShort,
   toggleStyle,
+  wishesLength,
+  wishSuggestions,
+  WISHES_MAX,
   type DecorLevel,
   type StylingChoice,
   type StylingStyle,
@@ -45,6 +51,9 @@ const DECOR_DOTS: Record<DecorLevel, number> = { 1: 1, 3: 2, 5: 3 };
  * utstillingsvinduet for stilen i fokus, og 3 · mengden pynt («Anbefalt for
  * stilen» fra start, TG-NEW-257). Uten stil, romtype og kryss er «Bestill»
  * av (stylingParams gir null); den faste bestillingslinja staar paa siden.
+ * 4 · ønskene (TG-NEW-250) vises bare for stuene (isWishRoom); for andre rom
+ * staar én linje. Feltet klemmes til 300 kodepunkter, og et forslag er av
+ * naar det ikke er plass. Ønsket logges aldri.
  *
  * Fokus og valg er to ting: et trykk paa et kort viser stilen i panelet,
  * haken eller knappen i panelet velger den (og viser den). Fra start vises
@@ -73,6 +82,9 @@ export function StylingChoicePicker({
 }) {
   const helpId = useId();
   const decorHelpId = useId();
+  const wishesId = useId();
+  const wishesHelpId = useId();
+  const wishesCountId = useId();
   const [focus, setFocus] = useState<StylingStyle>(value.styles[0] ?? STYLING_STYLES[0]);
   const [sheet, setSheet] = useState<StylingStyle | null>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -92,6 +104,7 @@ export function StylingChoicePicker({
     opener.current?.focus();
   };
   const focusOn = value.styles.includes(focus);
+  const wishRoom = isWishRoom(value.furnishAs);
   const nameOf = (style: StylingStyle) => t(locale, `styling.style.${styleShort(style)}`);
   return (
     <div className="border-t border-line pt-6 space-y-5">
@@ -203,6 +216,59 @@ export function StylingChoicePicker({
             </button>
           ))}
         </div>
+      </div>
+
+      <div>
+        <div className="mb-2.5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          {wishRoom ? (
+            <label htmlFor={wishesId} className={LABEL}>
+              <span className="text-ink-2">4 · </span>
+              {t(locale, "styling.wishes")}
+            </label>
+          ) : (
+            <p className={LABEL}>
+              <span className="text-ink-2">4 · </span>
+              {t(locale, "styling.wishes")}
+            </p>
+          )}
+          {!wishRoom && <p className="text-sm text-ink-2">{t(locale, "styling.wishesOnlyLiving")}</p>}
+        </div>
+        {wishRoom && (
+          <div className="space-y-2.5">
+            <p id={wishesHelpId} className="text-sm text-ink-2">{t(locale, "styling.wishesHelp")}</p>
+            <div className="flex flex-wrap gap-2" role="group" aria-label={t(locale, "styling.wishesSuggestions")}>
+              {wishSuggestions(value.furnishAs).map((id) => {
+                const next = addSuggestion(value.wishes, id);
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => {
+                      if (next !== null) onChange({ ...value, wishes: next });
+                    }}
+                    disabled={disabled || next === null}
+                    className={`${OPTION} ${OFF}`}
+                  >
+                    {t(locale, `styling.wish.${id}`)}
+                  </button>
+                );
+              })}
+            </div>
+            {/* scroll-mb: feltet havner ikke bak den faste bestillingslinja naar det faar fokus. */}
+            <textarea
+              id={wishesId}
+              rows={3}
+              value={value.wishes}
+              onChange={(e) => onChange({ ...value, wishes: clampWishes(e.target.value) })}
+              disabled={disabled}
+              aria-describedby={`${wishesHelpId} ${wishesCountId}`}
+              className="block w-full scroll-mb-28 rounded-button border border-line-strong bg-surface px-3 py-2 text-sm text-ink disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            />
+            <p id={wishesCountId} className="text-right text-xs text-ink-2 tabular-nums">
+              {t(locale, "styling.wishesCount", { n: Math.min(wishesLength(value.wishes), WISHES_MAX) })}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

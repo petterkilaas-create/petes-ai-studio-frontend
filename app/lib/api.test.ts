@@ -307,6 +307,19 @@ test("listJobs sender statusfilteret og leser code/reason", async () => {
   );
 });
 
+test("TG-NEW-262: listJobs leser order_id; mangler, tom eller ikke tekst gir null", async () => {
+  const row = { service: "scene_transform", created_at: null, error: null, status: "succeeded" };
+  mockFetch(200, [
+    { ...row, job_id: "a", order_id: "ord_1" },
+    { ...row, job_id: "b", order_id: null },
+    { ...row, job_id: "c" },
+    { ...row, job_id: "d", order_id: "" },
+    { ...row, job_id: "e", order_id: 5 },
+  ]);
+  const rows = await api.listJobs({ getToken });
+  assert.deepEqual(rows.map((r) => r.orderId), ["ord_1", null, null, null, null]);
+});
+
 test("listJobs uten filter sender ikke status", async () => {
   const calls = captureFetch(200, []);
   await api.listJobs({ getToken });
@@ -908,10 +921,24 @@ test("D-5c: normalizeReview leser order, eldst foerst, med miniatyren eller null
   assert.deepEqual(r.order, {
     orderId: "ord_abc",
     jobs: [
-      { jobId: "a", presetId: "styling_moderne_nordisk", status: "succeeded", thumbUrl: "https://x/a_thumb.jpg" },
-      { jobId: "b", presetId: "styling_japandi", status: "awaiting_approval", thumbUrl: null },
+      { jobId: "a", presetId: "styling_moderne_nordisk", status: "succeeded", thumbUrl: "https://x/a_thumb.jpg", code: null },
+      { jobId: "b", presetId: "styling_japandi", status: "awaiting_approval", thumbUrl: null, code: null },
     ],
   });
+});
+
+test("TG-NEW-262: code leses per jobb i order.jobs; mangler eller er tom gir null", () => {
+  const order = api.toReviewOrder({
+    order_id: "ord_r",
+    jobs: [
+      { job_id: "a", status: "failed", code: "rejected_by_reviewer" },
+      { job_id: "b", status: "failed", code: null },
+      { job_id: "c", status: "failed", code: "" },
+      { job_id: "d", status: "awaiting_approval" },
+      { job_id: "e", status: "failed", code: 7 },
+    ],
+  });
+  assert.deepEqual(order?.jobs.map((j) => j.code), ["rejected_by_reviewer", null, null, null, null]);
 });
 
 test("D-5c: uten order (eldre backend, enkeltjobb, lesefeil) er order null", () => {
@@ -938,8 +965,8 @@ test("D-5c: rader uten job_id hoppes over, dubletter tas bare foerste gang, og u
   assert.deepEqual(order, {
     orderId: "ord_x",
     jobs: [
-      { jobId: "a", presetId: null, status: "unknown", thumbUrl: null },
-      { jobId: "b", presetId: null, status: "unknown", thumbUrl: null },
+      { jobId: "a", presetId: null, status: "unknown", thumbUrl: null, code: null },
+      { jobId: "b", presetId: null, status: "unknown", thumbUrl: null, code: null },
     ],
   });
   // Lekkasjen L2: bare den merkede miniatyren leses.

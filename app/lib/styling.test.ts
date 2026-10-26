@@ -124,6 +124,7 @@ const choice = (furnishAs: (typeof FURNISH_AS_CHOICES)[number], styles: readonly
   roomEmpty: true,
   styles: [...styles],
   decor: null,
+  wishes: "",
 });
 
 // --- Flagget og kortet ----------------------------------------------------------
@@ -248,8 +249,11 @@ test("S2-f/S3-f/D-3: rommet staar foerst med krysset i samme rad, saa stilene og
   const picker = read("components/StylingChoicePicker.tsx");
   // 1 · romvalget og krysset, med linja under flisene; 2 · stilene (overskrift,
   // hjelpelinje, etikett og navnet paa stilen i fokus og i dialogen; kortene og
-  // panelet har egne filer); 3 · pyntgruppen (valgene, se v3-testene).
-  // (nameOf staar oeverst i komponenten; pyntvalgene har " i noekkelen og telles ikke her.)
+  // panelet har egne filer); 3 · pyntgruppen (valgene, se v3-testene); 4 ·
+  // ønskene (overskriften som etikett eller tekst, linja for andre rom,
+  // hjelpeteksten, forslagsgruppen og forslagene, TG-NEW-250; se dag55.test.ts).
+  // (nameOf staar oeverst i komponenten; pyntvalgene har " i noekkelen og telles ikke her,
+  // heller ikke telleren, som har {n}.)
   assert.deepEqual(picker.match(/t\(locale, ["`][^"`]+["`]\)/g), [
     "t(locale, `styling.style.${styleShort(style)}`)",
     't(locale, "styling.furnishAs")',
@@ -262,6 +266,12 @@ test("S2-f/S3-f/D-3: rommet staar foerst med krysset i samme rad, saa stilene og
     't(locale, "styling.decor")',
     't(locale, "styling.decorHelp")',
     't(locale, "styling.decor")',
+    't(locale, "styling.wishes")',
+    't(locale, "styling.wishes")',
+    't(locale, "styling.wishesOnlyLiving")',
+    't(locale, "styling.wishesHelp")',
+    't(locale, "styling.wishesSuggestions")',
+    "t(locale, `styling.wish.${id}`)",
   ]);
   const rooms = picker.indexOf("FURNISH_AS_CHOICES.map(");
   const styles = picker.indexOf("<StyleCards");
@@ -417,7 +427,7 @@ test("S2-f/S3-f: «Bestill» er av uten kryss, uten romtype og uten stil", () =>
   assert.equal(t("en", "styling.roomEmpty"), "The room is empty of loose furniture");
   assert.equal(t("nb", "styling.order"), "Bestill");
   // Ingen stil er forhaandsvalgt.
-  assert.deepEqual(EMPTY_STYLING, { furnishAs: null, roomEmpty: false, styles: [], decor: null });
+  assert.deepEqual(EMPTY_STYLING, { furnishAs: null, roomEmpty: false, styles: [], decor: null, wishes: "" });
   assert.equal(stylingParams({ ...choice("living"), roomEmpty: false }), null);
   assert.equal(stylingParams({ ...choice("living"), furnishAs: null }), null);
   assert.equal(stylingParams({ ...choice("living"), styles: [] }), null);

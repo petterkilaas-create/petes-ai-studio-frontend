@@ -400,14 +400,14 @@ test("D-3: romflisene har ikonet fra designet, «Møbler som …» og linja, og 
   for (const room of FURNISH_AS_CHOICES) {
     assert.match(codeText("nb", "furnishAs", room), /^Møbler som /);
     assert.equal(
-      stylingParams({ furnishAs: room, roomEmpty: true, styles: ["styling_japandi"], decor: null })?.furnish_as,
+      stylingParams({ furnishAs: room, roomEmpty: true, styles: ["styling_japandi"], decor: null, wishes: "" })?.furnish_as,
       room
     );
   }
 });
 
 test("D-3: bestillingslinja viser riktig sammendrag, hva som mangler, og «Bestill» er av uten komplett valg", () => {
-  const full = { furnishAs: "living_dining" as const, roomEmpty: true, styles: ["styling_japandi", "styling_funkis"] as StylingStyle[], decor: 3 as const };
+  const full = { furnishAs: "living_dining" as const, roomEmpty: true, styles: ["styling_japandi", "styling_funkis"] as StylingStyle[], decor: 3 as const, wishes: "" };
   assert.deepEqual(stylingSummary("nb", full), {
     text: "2 stiler · Middels pynt · Møbler som stue og spisestue",
     short: "2 stiler · Middels pynt",
@@ -416,7 +416,7 @@ test("D-3: bestillingslinja viser riktig sammendrag, hva som mangler, og «Besti
   assert.equal(stylingSummary("nb", { ...full, styles: ["styling_japandi"], decor: null }).text, "1 stil · Anbefalt pynt · Møbler som stue og spisestue");
   assert.equal(stylingSummary("en", full).text, "2 styles · Medium decor · Furnish as living and dining room");
   // Det som mangler, i velgerens rekkefoelge: rom, stil, kryss. Samme regler som stylingParams.
-  const none = { furnishAs: null, roomEmpty: false, styles: [] as StylingStyle[], decor: null };
+  const none = { furnishAs: null, roomEmpty: false, styles: [] as StylingStyle[], decor: null, wishes: "" };
   assert.equal(stylingSummary("nb", none).text, "Ingen stil valgt · Anbefalt pynt · Rom ikke valgt");
   assert.equal(stylingSummary("nb", none).missing, "Velg hva rommet skal møbleres som.");
   assert.equal(stylingSummary("nb", { ...full, styles: [] }).missing, "Velg minst én stil.");

@@ -7,13 +7,13 @@ import { isStylingPreset } from "./styling.ts";
 /**
  * Sjekklista og krysset foer «Godkjenn» (D-5a, Petter 25.10, AVVIK 2 a og
  * §3 b). Én liste per tjeneste; tekstene staar i ordlista og er generert fra
- * sjekklister_v1.json (kopi i testdata/). Rene funksjoner, saa de kan testes
- * med node --test.
+ * sjekklister_v2.json (kopi i testdata/; v2 la til peisen i kveldsbilde, Dag 55).
+ * Rene funksjoner, saa de kan testes med node --test.
  */
 
 export type ChecklistId = "styling" | "kveldsbilde" | "blaa_himmel";
 
-/** Punktene i hver liste, i rekkefoelgen fra sjekklister_v1.json. */
+/** Punktene i hver liste, i rekkefoelgen fra sjekklister_v2.json. */
 export const CHECKLISTS: Readonly<Record<ChecklistId, readonly UiKey[]>> = {
   styling: [
     "checklist.styling.1",
@@ -27,6 +27,7 @@ export const CHECKLISTS: Readonly<Record<ChecklistId, readonly UiKey[]>> = {
     "checklist.kveldsbilde.2",
     "checklist.kveldsbilde.3",
     "checklist.kveldsbilde.4",
+    "checklist.kveldsbilde.5",
   ],
   blaa_himmel: ["checklist.blaa_himmel.1", "checklist.blaa_himmel.2", "checklist.blaa_himmel.3"],
 };
