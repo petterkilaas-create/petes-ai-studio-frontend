@@ -1,4 +1,4 @@
-import type { ReviewRound, RoundChoices } from "./api";
+import type { DecisionAction, ReviewRound, RoundChoices } from "./api";
 import { codeText, t, type Locale, type UiKey } from "./i18n/index.ts";
 import { resultImageUrl, variantOptions, type ImageVariant, type ReviewPreviews } from "./review.ts";
 import { isStylingPreset, styleText } from "./styling.ts";
@@ -172,23 +172,24 @@ function variantUrl(images: ReviewPreviews, v: CompareVariant): string | null {
 }
 
 /**
- * Stripa: originalen foerst, saa versjonene eldst foerst, og de raa (admin)
- * til slutt, ogsaa eldst foerst. `variants` er de siden viser
- * (compareVariants og visibleVariants); stripa endrer ikke hvilke.
+ * Stripa: originalen foerst, saa versjonene eldst foerst. `variants` er de
+ * siden viser (compareVariants og visibleVariants). De raa (admin) staar
+ * ikke i stripa (FE-3); de vises med bryteren under bildet (rawCounterpart).
  */
 export function versionStrip(images: StripImages, variants: CompareVariant[]): StripEntry[] {
-  const sorted = [...variants].sort(
-    (a, b) => Number(a.raw) - Number(b.raw) || variantOrder(a) - variantOrder(b)
-  );
+  const sorted = variants.filter((v) => !v.raw).sort((a, b) => variantOrder(a) - variantOrder(b));
   return [
     { id: ORIGINAL_ID, kind: "original", url: images.originalUrl },
     ...sorted.map((variant): StripEntry => ({ id: variant.id, kind: "variant", variant, url: variantUrl(images, variant) })),
   ];
 }
 
-/** Stripa vises bare med minst to versjoner, som velgeren foer. */
-export function stripShown(strip: StripEntry[]): boolean {
-  return strip.filter((e) => e.kind === "variant").length > 1;
+/**
+ * Stripa vises med minst to versjoner, som velgeren foer, og alltid mens en
+ * ny versjon lages (plassholderen «Lages …», FE-3).
+ */
+export function stripShown(strip: StripEntry[], making: number | null = null): boolean {
+  return making !== null || strip.filter((e) => e.kind === "variant").length > 1;
 }
 
 /** Versjonen som vises foerst og som «Godkjenn» gjelder: gjeldende, ellers den nyeste. Aldri originalen. */
@@ -220,4 +221,46 @@ export function stripLabel(
   opts: { choices: boolean; presetId?: string | null }
 ): string {
   return entry.kind === "original" ? t(locale, "review.original") : variantLabel(locale, entry.variant, opts);
+}
+
+// ---------------------------------------------------------------------------
+// FE-3 (Dag 57): synlig venting og raabildet ut av stripa. Ingen nye kall.
+// ---------------------------------------------------------------------------
+
+/**
+ * Et nytt bilde lages: fra klikket paa «Lag nytt bilde» eller «Lag bildet»
+ * (`pending` er "correct" eller "continue" mens kallet gaar) til jobben er
+ * ferdig (`polling`, etter 202 eller naar siden aapnes mens jobben kjoerer).
+ * Backend svarer 202 bare paa continue og correct. Feiler kallet, er begge
+ * av, og laget forsvinner.
+ */
+export function makingImage(polling: boolean, pending: DecisionAction | null): boolean {
+  return polling || pending === "correct" || pending === "continue";
+}
+
+/**
+ * Nummeret paa versjonen som lages: én mer enn den nyeste («Versjon n» er
+ * runde n − 1). Ingen versjoner ennaa: 1. Gamle jobber uten runder: én mer
+ * enn antallet.
+ */
+export function nextVersion(variants: CompareVariant[]): number {
+  const lifted = variants.filter((v) => !v.raw);
+  if (lifted.length === 0) return 1;
+  if (lifted.every((v) => v.round !== null)) return Math.max(...lifted.map((v) => v.round ?? 0)) + 2;
+  return lifted.length + 1;
+}
+
+/**
+ * Det raa bildet fra modellen for versjonen som er valgt i stripa (bare
+ * admin har raa varianter). Originalen og versjoner uten raatt bilde: null,
+ * og bryteren vises ikke.
+ */
+export function rawCounterpart(variants: CompareVariant[], entry: StripEntry | null): CompareVariant | null {
+  if (entry === null || entry.kind !== "variant" || entry.variant.raw) return null;
+  const v = entry.variant;
+  if (v.source.kind === "legacy") {
+    if (v.source.variant !== "lifted") return null;
+    return variants.find((r) => r.raw && r.source.kind === "legacy") ?? null;
+  }
+  return variants.find((r) => r.raw && r.source.kind === "round" && r.round === v.round) ?? null;
 }

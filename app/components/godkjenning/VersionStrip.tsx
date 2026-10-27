@@ -11,6 +11,9 @@ import { FOCUS, LABEL } from "./classes";
  * · nå»). Erstatter VariantPicker paa siden og i lysboksen. Skjult naar det
  * bare finnes én versjon. Bare visning: valget sendes aldri til backend.
  *
+ * Mens en ny versjon lages (`making`, FE-3), staar en plassholder merket
+ * «Lages …» sist. Den er ikke en knapp, og stripa vises da alltid.
+ *
  * Miniatyren er forhaandsvisningen skalert ned med CSS (lastes lat); mangler
  * lenken, vises en tom flate, aldri en annen lenke. Etiketten er teksten
  * skjermlesere leser, saa bildet har tom alt.
@@ -21,6 +24,7 @@ export function VersionStrip({
   onSelect,
   choices,
   presetId,
+  making = null,
   locale,
 }: {
   strip: StripEntry[];
@@ -30,10 +34,12 @@ export function VersionStrip({
   choices: boolean;
   /** Oppskriften: styling viser stilen i parentes i stedet for skumringsvalgene (B2). */
   presetId: string | null;
+  /** Nummeret paa versjonen som lages (nextVersion), eller null. */
+  making?: number | null;
   locale: Locale;
 }) {
   const headingId = useId();
-  if (!stripShown(strip)) return null;
+  if (!stripShown(strip, making)) return null;
   return (
     <div>
       <p id={headingId} className={`${LABEL} mb-2`}>
@@ -69,6 +75,17 @@ export function VersionStrip({
             </button>
           );
         })}
+        {making !== null && (
+          <span
+            className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-button border border-dashed border-line-strong bg-surface py-1 pl-1 pr-3 text-[13px] text-ink-2"
+          >
+            <span
+              aria-hidden="true"
+              className="h-9 w-[54px] shrink-0 rounded-[5px] bg-surface-2 animate-pulse motion-reduce:animate-none"
+            />
+            <span className="min-w-0 break-words">{t(locale, "compare.makingShort")}</span>
+          </span>
+        )}
       </div>
     </div>
   );

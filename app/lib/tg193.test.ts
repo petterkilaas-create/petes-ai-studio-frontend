@@ -91,7 +91,9 @@ test("TG193 #7: admin beholder dagens etikett med valgene", () => {
 // B2 (dag 51): oppskriften sendes med, saa styling viser stilen i parentes.
 test("TG193 #7: siden og variantvalget sender choices = admin", () => {
   // FE-c (Dag 57): etiketten via stripLabel, og stripa paa siden og i lysboksen.
-  assert.equal(page.match(/stripLabel\(locale, entry, \{ choices: admin, presetId: review\.presetId \}\)/g)?.length, 2);
+  // FE-3: råbildet (bryteren) har variantLabel med de samme valgene.
+  assert.equal(page.match(/stripLabel\(locale, entry, \{ choices: admin, presetId: review\.presetId \}\)/g)?.length, 1);
+  assert.equal(page.match(/variantLabel\(locale, raw, \{ choices: admin, presetId: review\.presetId \}\)/g)?.length, 1);
   assert.doesNotMatch(page, /(variantLabel|stripLabel)\(locale, (shown|entry)\)/);
   assert.equal(page.match(/<VersionStrip[\s\S]*?choices=\{admin\}[\s\S]*?presetId=\{review\.presetId\}[\s\S]*?\/>/g)?.length, 2);
   assert.match(picker, /\{stripLabel\(locale, entry, \{ choices, presetId \}\)\}/);

@@ -170,9 +170,10 @@ test("FE-c: etikettene «Original», «Versjon 1», «Versjon 2 · nå» (nummer
   assert.doesNotMatch(JSON.stringify(labels("nb")), /Runde/);
 });
 
-test("FE-c: rå varianter (admin) til slutt, eldst foerst; megleren ser dem ikke", () => {
+test("FE-c og FE-3: rå varianter står ikke i stripa, heller ikke for admin", () => {
   const imgs = images([round(1, { current: true }), round(0)]);
-  assert.deepEqual(stripOf(imgs, true).map((e) => e.id), [ORIGINAL_ID, "r0", "r1", "r0-raw", "r1-raw"]);
+  // FE-3 (Dag 57): råbildet er en bryter under bildet, ikke en egen versjon.
+  assert.deepEqual(stripOf(imgs, true).map((e) => e.id), [ORIGINAL_ID, "r0", "r1"]);
   assert.deepEqual(stripOf(imgs, false).map((e) => e.id), [ORIGINAL_ID, "r0", "r1"]);
 });
 
@@ -219,9 +220,9 @@ test("FE-c: «Godkjenn» er laast for originalen og eldre versjoner, aapen for d
   assert.equal(approveLocked(s, selectedEntry(s, "r1")), true);
   assert.equal(approveLocked(s, selectedEntry(s, "r0")), true);
   assert.equal(approveLocked(s, selectedEntry(s, ORIGINAL_ID)), true);
-  // Rått fra modellen (admin) er ikke det som godkjennes.
+  // Rått fra modellen (admin) er ikke i stripa; en gammel id gir den nyeste (FE-3, låsen ligger i siden).
   const admin = stripOf(THREE, true);
-  assert.equal(approveLocked(admin, selectedEntry(admin, "r3-raw")), true);
+  assert.equal(selectedEntry(admin, "r3-raw")?.id, "r3");
   // Uten versjoner er det ingenting aa laase.
   const none = stripOf(images([]));
   assert.equal(approveLocked(none, selectedEntry(none, null)), false);
@@ -233,7 +234,7 @@ test("FE-c: laasen i kortet: knappen er laast og teksten vises, krysset og advar
   assert.match(card, /\{controls\.approve && approveLock && \(\s*<p className="text-sm text-ink-2" role="status">\s*\{t\(locale, "compare\.approveLatest"\)\}/);
   // Krysset laases ikke av versjonen.
   assert.match(card, /checked=\{compared\}\s+disabled=\{locked\}/);
-  assert.match(page, /const approveLock = approveLocked\(strip, entry\);/);
+  assert.match(page, /const approveLock = approveLocked\(strip, entry\) \|\| rawOn;/);
   assert.match(page, /approveLock=\{approveLock\}/);
   assert.equal(t("nb", "compare.approveLatest"), "Gå til den nyeste versjonen for å godkjenne.");
   assert.equal(t("en", "compare.approveLatest"), "Go to the latest version to approve.");
@@ -243,7 +244,7 @@ test("FE-c: stripa paa siden og i lysboksen; «Original» viser bare originalen;
   assert.equal(page.match(/<VersionStrip\b/g)?.length, 2);
   assert.doesNotMatch(page, /<VariantPicker\b/);
   assert.match(page, /const strip = versionStrip\(review\.images, variants\);/);
-  assert.match(page, /const shown = entry\?\.kind === "variant" \? entry\.variant : null;/);
+  assert.match(page, /const shown = rawOn \? raw : entry\?\.kind === "variant" \? entry\.variant : null;/);
   // Siden: uten valgt variant vises bare originalen (CompareViewer med result null).
   assert.match(page, /result=\{shown === null \? null : \{ url: shownUrl, label: shownLabel \}\}/);
   assert.match(page, /originalOnly=\{originalShown\}/);
@@ -252,7 +253,7 @@ test("FE-c: stripa paa siden og i lysboksen; «Original» viser bare originalen;
   assert.match(viewer, /<HoldButton holding=\{held\} onHold=\{setHolding\} locale=\{locale\} \/>/);
   // Komponenten: knapper med aria-pressed, miniatyr uten alt (etiketten er teksten).
   assert.match(strip, /aria-pressed=\{selected\}/);
-  assert.match(strip, /if \(!stripShown\(strip\)\) return null;/);
+  assert.match(strip, /if \(!stripShown\(strip, making\)\) return null;/);
   assert.match(strip, /alt=""/);
   assert.equal(DICTIONARIES.nb.ui["compare.versions"], "Versjoner");
   assert.equal(DICTIONARIES.en.ui["compare.versions"], "Versions");

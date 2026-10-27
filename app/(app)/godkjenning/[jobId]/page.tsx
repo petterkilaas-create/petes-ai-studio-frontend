@@ -48,7 +48,18 @@ import {
 import { runDecision } from "@/app/lib/decide";
 import { canDownload } from "@/app/lib/download";
 import { formatDate } from "@/app/lib/dates";
-import { approveLocked, compareVariants, selectedEntry, stripLabel, stripShown, versionStrip } from "@/app/lib/compare";
+import {
+  approveLocked,
+  compareVariants,
+  makingImage,
+  nextVersion,
+  rawCounterpart,
+  selectedEntry,
+  stripLabel,
+  stripShown,
+  variantLabel,
+  versionStrip,
+} from "@/app/lib/compare";
 import { canShowMarkers } from "@/app/lib/lightsView";
 import { panelShown } from "@/app/lib/presets";
 import { canShowAdditions } from "@/app/lib/additions";
@@ -72,6 +83,7 @@ import { CompareViewer } from "@/app/components/godkjenning/CompareViewer";
 import { LightMarkers } from "@/app/components/godkjenning/LightMarkers";
 import { AdditionMarkers } from "@/app/components/godkjenning/AdditionMarkers";
 import { VersionStrip } from "@/app/components/godkjenning/VersionStrip";
+import { MakingOverlay } from "@/app/components/godkjenning/MakingOverlay";
 import { Lightbox } from "@/app/components/godkjenning/Lightbox";
 import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
 import { OrderTabs } from "@/app/components/godkjenning/OrderTabs";
@@ -82,7 +94,7 @@ import { DetailsPanel } from "@/app/components/godkjenning/DetailsPanel";
 import { DisclosureBlock } from "@/app/components/godkjenning/DisclosureBlock";
 import { DownloadButton } from "@/app/components/godkjenning/DownloadButton";
 import { BrightnessApproved, BrightnessControl } from "@/app/components/godkjenning/BrightnessControl";
-import { FOCUS } from "@/app/components/godkjenning/classes";
+import { choiceClass, FOCUS } from "@/app/components/godkjenning/classes";
 
 /**
  * Godkjenningssiden (2d-1): megleren avgjoer egne jobber i «Til kontroll»
@@ -160,6 +172,8 @@ export default function GodkjenningPage({
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
   // Valgt versjon i stripa («original» eller en variant); null gir gjeldende runde.
   const [variantId, setVariantId] = useState<string | null>(null);
+  // FE-3: bryteren «Vis rått svar fra modellen (bare admin)» under bildet.
+  const [rawShown, setRawShown] = useState(false);
   // Admin (view_all fra /me) ser rått. Feil eller manglende svar: ikke admin.
   const [caps, setCaps] = useState<Capabilities>(NO_CAPABILITIES);
   const [answer, setAnswer] = useState<FireplaceAnswer>(null);
@@ -212,6 +226,7 @@ export default function GodkjenningPage({
     // Etter en ny runde eller avgjoerelse vises gjeldende runde igjen,
     // og lysstyrken starter paa default_step (Petter 02.10, valg 4).
     setVariantId(null);
+    setRawShown(false);
     setChosenStep(null);
     setResultLoaded(false);
     setCompared(false);
@@ -357,10 +372,15 @@ export default function GodkjenningPage({
       refetch: fetchReview,
       onStart: () => {
         setBusy(true);
+        // FE-3: laget «Lager versjon n …» vises fra klikket (makingImage).
+        setPending("correct");
         setMessage(null);
       },
       onError: () => setMessage({ key: "decision.error" }),
-      onSettled: () => setBusy(false),
+      onSettled: () => {
+        setBusy(false);
+        setPending(null);
+      },
       handle: (out) => {
         const result = correctionResult(out);
         switch (result.kind) {
@@ -466,8 +486,14 @@ export default function GodkjenningPage({
             const strip = versionStrip(review.images, variants);
             const entry = selectedEntry(strip, variantId);
             const originalShown = entry?.kind === "original";
-            const shown = entry?.kind === "variant" ? entry.variant : null;
-            const approveLock = approveLocked(strip, entry);
+            // FE-3: råbildet står ikke i stripa; bryteren viser det for valgt versjon (bare admin).
+            const raw = rawCounterpart(variants, entry);
+            const rawOn = rawShown && raw !== null;
+            const shown = rawOn ? raw : entry?.kind === "variant" ? entry.variant : null;
+            // «Godkjenn» er låst når råbildet vises, som før (backend godkjenner gjeldende versjon).
+            const approveLock = approveLocked(strip, entry) || rawOn;
+            // FE-3: fra klikket på «Lag nytt bilde» eller «Lag bildet» til nytt resultat eller feil.
+            const making = makingImage(polling, pending) ? nextVersion(variants) : null;
             const brightness = brightnessView(review, shown);
             const step = brightness.kind === "control" ? selectedStep(brightness, chosenStep) : null;
             // Gjeldende runde med slideren: trinnets lenke fra backend, aldri et CSS-filter.
@@ -483,12 +509,16 @@ export default function GodkjenningPage({
                   ? resultImageUrl(review.images, shown.source.variant)
                   : shown.source.url;
             const shownUrl = stepShown !== null ? brightnessResultUrl(review.brightness, stepShown) : roundUrl;
-            const shownLabel =
+            const entryLabel =
               entry === null
                 ? ""
-                : stepShown !== null
-                  ? `${stripLabel(locale, entry, { choices: admin, presetId: review.presetId })} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
+                : rawOn
+                  ? variantLabel(locale, raw, { choices: admin, presetId: review.presetId })
                   : stripLabel(locale, entry, { choices: admin, presetId: review.presetId });
+            const shownLabel =
+              stepShown !== null
+                ? `${entryLabel} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
+                : entryLabel;
             const correction = correctionControls(review);
             const canCorrect = correction.show && !limitReached && done === null;
             const isEditing = editing && canCorrect;
@@ -548,37 +578,56 @@ export default function GodkjenningPage({
                           onSelect={setVariantId}
                           choices={admin}
                           presetId={review.presetId}
+                          making={making}
                           locale={locale}
                         />
-                        <CompareViewer
-                          originalUrl={review.images.originalUrl}
-                          result={shown === null ? null : { url: shownUrl, label: shownLabel }}
-                          placeholder={<PreviewPlaceholder />}
-                          onResultLoad={() => setResultLoaded(true)}
-                          lightsView={
-                            canShowMarkers(review, { litOnly: !admin }) && review.images.originalUrl !== null ? (
-                              <LightMarkers
-                                url={review.images.originalUrl}
-                                lights={review.lights}
-                                inputOrientation={review.inputOrientation}
-                                litOnly={!admin}
-                                locale={locale}
-                              />
-                            ) : null
-                          }
-                          additionsView={
-                            canShowAdditions(review) && review.images.previewUrl !== null ? (
-                              <AdditionMarkers
-                                url={review.images.previewUrl}
-                                items={review.additionsCheck.items}
-                                admin={admin}
-                                locale={locale}
-                              />
-                            ) : null
-                          }
-                          onExpand={() => setLightbox(true)}
-                          locale={locale}
-                        />
+                        {/* FE-3: laget dekker visningen mens en ny versjon lages; den er inert så lenge. */}
+                        <div className="relative">
+                          <div inert={making !== null}>
+                            <CompareViewer
+                              originalUrl={review.images.originalUrl}
+                              result={shown === null ? null : { url: shownUrl, label: shownLabel }}
+                              placeholder={<PreviewPlaceholder />}
+                              onResultLoad={() => setResultLoaded(true)}
+                              lightsView={
+                                canShowMarkers(review, { litOnly: !admin }) && review.images.originalUrl !== null ? (
+                                  <LightMarkers
+                                    url={review.images.originalUrl}
+                                    lights={review.lights}
+                                    inputOrientation={review.inputOrientation}
+                                    litOnly={!admin}
+                                    locale={locale}
+                                  />
+                                ) : null
+                              }
+                              additionsView={
+                                canShowAdditions(review) && review.images.previewUrl !== null ? (
+                                  <AdditionMarkers
+                                    url={review.images.previewUrl}
+                                    items={review.additionsCheck.items}
+                                    admin={admin}
+                                    locale={locale}
+                                  />
+                                ) : null
+                              }
+                              onExpand={() => setLightbox(true)}
+                              locale={locale}
+                            />
+                          </div>
+                          {making !== null && <MakingOverlay version={making} locale={locale} />}
+                        </div>
+                        {raw !== null && (
+                          <div>
+                            <button
+                              type="button"
+                              onClick={() => setRawShown(!rawOn)}
+                              aria-pressed={rawOn}
+                              className={choiceClass(rawOn, "rounded-pill")}
+                            >
+                              {t(locale, "compare.showRaw")}
+                            </button>
+                          </div>
+                        )}
                         {brightness.kind === "control" && step !== null && (
                           <BrightnessControl
                             view={brightness}
@@ -602,13 +651,14 @@ export default function GodkjenningPage({
                             }
                             placeholder={<PreviewPlaceholder />}
                             rounds={
-                              stripShown(strip) ? (
+                              stripShown(strip, making) ? (
                                 <VersionStrip
                                   strip={strip}
                                   selectedId={entry?.id ?? null}
                                   onSelect={setVariantId}
                                   choices={admin}
                                   presetId={review.presetId}
+                                  making={making}
                                   locale={locale}
                                 />
                               ) : null
