@@ -19,6 +19,7 @@ import { Pill } from "./ui/Pill";
 import { messageText, t, type Locale, type UiKey } from "../lib/i18n";
 import { jobMessage } from "../lib/jobMessage";
 import { failedLines } from "../lib/notCreated";
+import { wishesSummaryText } from "../lib/wishes";
 import { useLocale } from "../lib/i18n/useLocale";
 import { ownerBadge, rejectedLabelKey } from "../lib/roles";
 
@@ -81,6 +82,8 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
   // P3b: grunnene naar vi ikke laget bildet, og gratisbildet bare ved "returned".
   const lines = failedLines(job);
   const reason = rejectedByYou && job.reason ? job.reason : null;
+  // TG-NEW-263: bare tallene fra lista, aldri tekst fra ønsket.
+  const wishes = wishesSummaryText(job.wishesSummary);
   const note = cardNote(job, thumb);
 
   return (
@@ -107,6 +110,7 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
         <span className="text-ink-2 text-[13px]">
           {formatDate(job.createdAt, locale)}
         </span>
+        {wishes !== null && <span className="text-ink-2 text-[13px]">{t(locale, wishes.key, wishes.vars)}</span>}
         {note !== null && (
           // TG-NEW-117: miniatyren finnes, men bildene i full stoerrelse er slettet.
           <span className="text-ink-2 text-[13px]">{t(locale, note)}</span>

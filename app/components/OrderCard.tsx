@@ -93,6 +93,9 @@ export function OrderCard({ jobs, thumbs }: { jobs: JobSummary[]; thumbs: (strin
               {line.message !== null && (
                 <p className="text-[13px] text-ink-2 leading-relaxed">{messageText(locale, line.message)}</p>
               )}
+              {line.wishes !== null && (
+                <p className="text-[13px] text-ink-2 leading-relaxed">{t(locale, line.wishes.key, line.wishes.vars)}</p>
+              )}
               {line.lines.map((key) => (
                 <p key={key} className="text-[13px] text-ink-2 leading-relaxed">
                   {t(locale, key)}
