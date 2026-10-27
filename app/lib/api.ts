@@ -35,7 +35,16 @@ export interface ProcessParams {
   dusk_time?: DuskTime;
   dusk_sky?: DuskSky;
   dusk_style?: DuskStyle;
+  /** «Hvor er bildet tatt?» (TG-NEW-268): bare naar megleren har valgt, og bare lovlige valg. */
+  image_type_hint?: ImageTypeHint;
 }
+
+/** Meglerens valg ved bestilling (TG-NEW-268, backend #257). Tomt: analysen avgjoer. */
+export const IMAGE_TYPE_HINTS = ["interior", "exterior", "aerial"] as const;
+export type ImageTypeHint = (typeof IMAGE_TYPE_HINTS)[number];
+
+/** Koden for et valg tjenesten ikke godtar (400 ved bestilling); `hint` legges i `detail.reason`. */
+export const IMAGE_TYPE_HINT_NOT_SUPPORTED = "image_type_hint_not_supported";
 
 /**
  * Strukturert gate-avslag fra scene-type-gaten (TG-NEW-58).
@@ -426,7 +435,9 @@ export async function submitJob(opts: {
   if (code !== null) {
     const outer = isRecord(body) ? body : {};
     const inner = isRecord(outer.detail) ? outer.detail : {};
-    throw new SubmitError(res.status, code, { used: inner.used, limit: inner.limit, reason: inner.reason });
+    // TG-NEW-268: valget tjenesten ikke godtar, staar i `hint`; teksten velges etter det (orderErrorText).
+    const reason = code === IMAGE_TYPE_HINT_NOT_SUPPORTED ? inner.hint : inner.reason;
+    throw new SubmitError(res.status, code, { used: inner.used, limit: inner.limit, reason });
   }
 
   if (res.status === 400) {
@@ -1074,6 +1085,18 @@ export interface RunValue {
 }
 
 /**
+ * `image_type` i review-svaret (TG-NEW-268): `value` er typen bildet ble
+ * laget med. `source` og `hint` kommer bare naar jobben ble bestilt med
+ * IMAGE_TYPE_CHOICE paa; mangler `source`, er den "analysis".
+ */
+export interface ImageTypeView extends RunValue {
+  /** normalizeReview setter alltid feltet; mangler det (testdata), gjelder "analysis". */
+  source?: "broker" | "analysis";
+  /** Meglerens valg, bare kjente verdier; ellers null (eller mangler). */
+  hint?: ImageTypeHint | null;
+}
+
+/**
  * Det megleren trenger for aa avgjoere en jobb (GET /v1/jobs/{id}/review).
  * Bare koder og data; tekstene kommer fra ordlista (app/lib/i18n).
  */
@@ -1111,7 +1134,7 @@ export interface JobReviewDetail {
   allowedActions: DecisionAction[];
   validRuns: number;
   fireplace: { present: boolean; disagreement: boolean; answer: string | null };
-  imageType: RunValue;
+  imageType: ImageTypeView;
   skyVisibility: RunValue;
   /** Skumringsvalgene (2f-a); null naar backend ikke sender feltet. */
   dusk: ReviewDusk | null;
@@ -1547,6 +1570,15 @@ function toRunValue(raw: unknown): RunValue {
   return { value: stringOrNull(r.value), runValues: stringList(r.run_values) };
 }
 
+/** `image_type` med `source` og `hint` strengt lest (TG-NEW-268). */
+export function toImageType(raw: unknown): ImageTypeView {
+  const r = isRecord(raw) ? raw : {};
+  const hint = typeof r.hint === "string" && (IMAGE_TYPE_HINTS as readonly string[]).includes(r.hint)
+    ? (r.hint as ImageTypeHint)
+    : null;
+  return { ...toRunValue(raw), source: r.source === "broker" ? "broker" : "analysis", hint };
+}
+
 /**
  * Normaliserer review-svaret. Manglende eller feil felt gir tomme verdier,
  * aldri krasj; ukjente koder beholdes og oversettes med generisk tekst.
@@ -1577,7 +1609,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
       disagreement: fireplace.disagreement === true,
       answer: stringOrNull(fireplace.answer),
     },
-    imageType: toRunValue(r.image_type),
+    imageType: toImageType(r.image_type),
     skyVisibility: toRunValue(r.sky_visibility),
     dusk: toDusk(r.dusk),
     style: toStyle(r.style),

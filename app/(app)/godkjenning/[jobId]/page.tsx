@@ -17,18 +17,20 @@ import { useJobStatus } from "@/app/lib/useJobStatus";
 import { codeText, t, type CodeGroup, type UiKey } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import {
-  analysisNotes,
   buildDecision,
   decisionControls,
   isFireplaceStop,
   isStopped,
   mediaDeleted,
   outcome,
+  noteText,
   resultImageUrl,
+  reviewNotes,
   shouldPoll,
   stopReasons,
   type FireplaceAnswer,
 } from "@/app/lib/review";
+import { imageTypeLine } from "@/app/lib/imageType";
 import { adminView, isReadOnlyOther, showDetails } from "@/app/lib/roles";
 import {
   buildCorrection,
@@ -439,6 +441,8 @@ export default function GodkjenningPage({
             const review = load.review;
             const controls = decisionControls(review, answer);
             const done = outcome(review);
+            // TG-NEW-268: «Bildetype: … (valgt ved bestilling)», bare naar megleren valgte typen.
+            const typeLine = imageTypeLine(review);
             // P3b: grunnene naar vi ikke laget bildet, og gratisbildet ved "returned".
             // Rett etter «Ja, avbryt» staar bekreftelsen i stedet (den har gratisbildet med).
             const doneLines =
@@ -612,6 +616,7 @@ export default function GodkjenningPage({
                             {t(locale, key)}
                           </p>
                         ))}
+                        {typeLine !== null && <p className="text-sm text-ink mt-2">{noteText(locale, typeLine)}</p>}
                         {canDownload(review) && <DownloadButton jobId={review.jobId} presetId={review.presetId} locale={locale} />}
                         {review.status === "succeeded" && (
                           <DisclosureBlock disclosure={review.disclosure} locale={locale} />
@@ -633,7 +638,8 @@ export default function GodkjenningPage({
                             ? { reasons: stopReasons(review), fireplace: isFireplaceStop(review) }
                             : null
                         }
-                        notes={analysisNotes(review)}
+                        notes={reviewNotes(review)}
+                        imageTypeLine={typeLine}
                         controls={controls}
                         canCorrect={canCorrect}
                         roundFailed={correction.roundFailed}

@@ -29,6 +29,8 @@ import { NotCreatedPanel } from "@/app/components/NotCreatedPanel";
 import { pollFailedLines } from "@/app/lib/notCreated";
 import { OpenReviewLink } from "@/app/components/OpenReviewLink";
 import { DuskChoicePicker } from "@/app/components/DuskChoicePicker";
+import { ImageTypeChoice } from "@/app/components/ImageTypeChoice";
+import { imageTypeChoices, imageTypeParams, type ImageTypeChoice as ImageTypeValue } from "@/app/lib/imageType";
 import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "@/app/lib/dusk";
 import { useOrderJobs } from "@/app/hooks/useOrderJobs";
 import { StylingChoicePicker } from "@/app/components/StylingChoicePicker";
@@ -85,6 +87,8 @@ function ExpressContent() {
   const [dusk, setDusk] = useState<DuskChoice>(DEFAULT_DUSK);
   // Digital styling (S2-f): romtypen og bekreftelsen av tomt rom.
   const [styling, setStyling] = useState<StylingChoice>(EMPTY_STYLING);
+  // «Hvor er bildet tatt?» (TG-NEW-268): gjelder bildet, saa det nullstilles ved nytt bilde og ny tjeneste.
+  const [imageType, setImageType] = useState<ImageTypeValue>("auto");
 
   const locale = useLocale();
   const preview = useImagePreview();
@@ -109,6 +113,8 @@ function ExpressContent() {
     selectedTool?.kind === "scene" && selectedTool.sceneGate !== false;
   const showDuskControls =
     selectedTool !== null && isDuskOrder(selectedTool.service, selectedTool.presetId);
+  // Bare tjenester med lovlige valg (imageTypeHints i services.ts): Kveldsbilde og Blå himmel.
+  const imageTypeOptions = imageTypeChoices(selectedTool);
   const quotaShown = countsAgainstQuota(selectedTool?.service)
     ? quotaView(quota.quota)
     : ({ kind: "hidden" } as const);
@@ -164,6 +170,7 @@ function ExpressContent() {
     setForceSceneType(false);
     setDusk(DEFAULT_DUSK);
     setStyling(EMPTY_STYLING);
+    setImageType("auto");
     job.reset();
     order.reset();
   };
@@ -177,6 +184,8 @@ function ExpressContent() {
     // Bekreftelsen av tomt rom gjelder bildet: et nytt bilde maa bekreftes paa nytt.
     order.reset();
     setStyling((s) => ({ ...s, roomEmpty: false }));
+    // Hvor bildet er tatt, gjelder ogsaa bildet (TG-NEW-268).
+    setImageType("auto");
   };
 
   const handleSceneTypeChange = (value: SceneType) => {
@@ -206,6 +215,8 @@ function ExpressContent() {
           : {}),
         // Skumring: alltid tid, himmel og stil; andre kort: ingen (2f-b, TG-NEW-189).
         ...duskParams(selectedTool.service, selectedTool.presetId, dusk),
+        // TG-NEW-268: bare naar megleren har valgt, og bare et lovlig valg.
+        ...imageTypeParams(selectedTool, imageType),
       });
     } else {
       // Simple tjenester: service alene, backend-defaults (som i prod).
@@ -221,6 +232,7 @@ function ExpressContent() {
     setForceSceneType(false);
     setDusk(DEFAULT_DUSK);
     setStyling(EMPTY_STYLING);
+    setImageType("auto");
   };
 
   const handleForceExterior = () => {
@@ -357,6 +369,17 @@ function ExpressContent() {
               onChange={setDusk}
               disabled={isProcessing}
               images={DUSK_IMAGES}
+              locale={locale}
+            />
+          )}
+
+          {/* TG-NEW-268: etter stilene og himmelen i Kveldsbilde, rett etter bildet i Blå himmel. */}
+          {imageTypeOptions.length > 0 && (
+            <ImageTypeChoice
+              choices={imageTypeOptions}
+              value={imageType}
+              onChange={setImageType}
+              disabled={isProcessing}
               locale={locale}
             />
           )}

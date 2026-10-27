@@ -1,6 +1,8 @@
 import type { AdditionsLevel, BrightnessStep, DecisionAction, DecisionRequest, JobReviewDetail } from "./api";
 import type { UiKey } from "./i18n";
+import { t, type Locale } from "./i18n/index.ts";
 import { checklistFor } from "./checklist.ts";
+import { brokerDiffersNote } from "./imageType.ts";
 import { panelShown } from "./presets.ts";
 
 /**
@@ -234,9 +236,30 @@ export const NOTE_ORDER = [
   "analysis_text_unreadable",
   "analysis_screenshot_overlay",
   "image_type_disagreement",
+  // TG-NEW-268: med meglerens bildetype. Uenigheten har egne ord (brokerDiffersNote).
+  "image_type_broker_differs",
+  "image_type_untested",
   "fireplace_disagreement",
   "analysis_other",
 ] as const;
+
+/**
+ * En merknad: noekkelen, og ev. ord som settes inn ({hint}, {analysis} …).
+ * Hvert ord er en liste med noekler, satt sammen med «eller» (noteText).
+ */
+export interface Note {
+  key: UiKey;
+  words?: Readonly<Record<string, readonly UiKey[]>>;
+}
+
+/** Teksten for en merknad paa brukerens spraak. */
+export function noteText(locale: Locale, note: Note): string {
+  if (note.words === undefined) return t(locale, note.key);
+  const or = ` ${t(locale, "imageTypeWord.or")} `;
+  const vars: Record<string, string> = {};
+  for (const [name, keys] of Object.entries(note.words)) vars[name] = keys.map((k) => t(locale, k)).join(or);
+  return t(locale, note.key, vars);
+}
 
 type Service = "kveldsbilde" | "klart_vaer" | "styling" | null;
 
@@ -364,10 +387,32 @@ export function analysisNotes(review: Pick<JobReviewDetail, "flagCodes" | "prese
       case "image_type_disagreement":
         add(service === "styling" ? "note.image_type_disagreement.styling" : "note.analysis_other");
         break;
+      case "image_type_broker_differs":
+        // Med ord fra review-svaret: reviewNotes.
+        break;
+      case "image_type_untested":
+        // Bare Blaa himmel + Drone valgt av megleren gir den som merknad (backend #257).
+        add(service === "klart_vaer" ? "note.image_type_untested.klart_vaer" : "note.analysis_other");
+        break;
       default:
         add(`note.${code}`);
     }
   }
   if (unknown) add("note.unknown");
   return keys;
+}
+
+/**
+ * Alle merknadene i boksen over sjekklista: uenigheten om bildetypen med ord
+ * foerst (TG-NEW-268, brokerDiffersNote), saa merknadene fra analysisNotes.
+ * Den generelle merknaden staar hoeyst én gang.
+ */
+export function reviewNotes(review: Pick<JobReviewDetail, "flagCodes" | "presetId" | "imageType">): Note[] {
+  const notes: Note[] = [];
+  const first = brokerDiffersNote(review);
+  if (first !== null) notes.push(first);
+  for (const key of analysisNotes(review)) {
+    if (!notes.some((n) => n.key === key && n.words === undefined)) notes.push({ key });
+  }
+  return notes;
 }

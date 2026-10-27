@@ -336,8 +336,9 @@ test("P3a: siden gir stoppboksen og merknadene til alle roller; «Detaljer» er 
     page,
     /stop=\{\s*isStopped\(review\)\s*\? \{ reasons: stopReasons\(review\), fireplace: isFireplaceStop\(review\) \}\s*: null\s*\}/
   );
-  assert.match(page, /notes=\{analysisNotes\(review\)\}/);
-  assert.doesNotMatch(page, /(stop|notes)=\{[^}]*admin/);
+  // TG-NEW-268: reviewNotes = merknaden om bildetypen med ord, saa analysisNotes.
+  assert.match(page, /notes=\{reviewNotes\(review\)\}/);
+  assert.doesNotMatch(page, /(stop|notes|imageTypeLine)=\{[^}]*admin/);
   assert.match(page, /\{showDetails\(caps\) && <DetailsPanel /);
 });
 

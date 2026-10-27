@@ -39,6 +39,7 @@ export type CodeGroup =
   | "disclosureEdited"
   | "orderError"
   | "unsupportedImage"
+  | "imageTypeHintNotSupported"
   | "furnishAs"
   | "orderNotStarted";
 
@@ -166,6 +167,28 @@ const nbUi = {
   "note.analysis_screenshot_overlay":
     "Bildet ser ut som et skjermbilde med en meny- eller adresselinje øverst. Sjekk om linjen er med i bildet.",
   "note.unknown": "Analysen hadde en merknad til bildet. Sammenlign bildet nøye med originalen.",
+  // Bildetype ved bestilling (TG-NEW-268): {hint} er valget, {analysis} hva kjøringene så, {made} typen bildet er laget som.
+  "note.image_type_broker_differs":
+    "Du valgte {hint}, men analysen mente at bildet er tatt {analysis}. Bildet er laget som {made}. Sjekk at det ser riktig ut.",
+  "note.image_type_broker_differs.other":
+    "Du valgte {hint}, men analysen kjente ikke igjen hvor bildet er tatt. Bildet er laget som {made}. Sjekk at det ser riktig ut.",
+  "note.image_type_untested.klart_vaer": "Blå himmel er ikke testet på dronebilder ennå. Sjekk bildet nøye før du godkjenner.",
+  "imageTypeWord.interior": "innendørs",
+  "imageTypeWord.exterior": "utendørs",
+  "imageTypeWord.ground": "fra bakken",
+  "imageTypeWord.balcony": "på en balkong eller terrasse",
+  "imageTypeWord.aerial": "fra en drone",
+  "imageTypeWord.or": "eller",
+  "imageTypeMade.interior": "et innebilde",
+  "imageTypeMade.exterior": "et utebilde",
+  "imageTypeMade.aerial": "et dronebilde",
+  "review.imageTypeChosen": "Bildetype: {type} (valgt ved bestilling)",
+  "imageTypeChoice.title": "Hvor er bildet tatt?",
+  "imageTypeChoice.help": "Vet du det, blir resultatet sikrere. Ellers avgjør analysen.",
+  "imageTypeChoice.auto": "La analysen avgjøre",
+  "imageTypeChoice.interior": "Innendørs",
+  "imageTypeChoice.exterior": "Utendørs",
+  "imageTypeChoice.aerial": "Drone",
   "action.fireplaceQuestion": "Skal peisen være tent?",
   "action.fireplaceLit": "Tent",
   "action.fireplaceNotLit": "Ikke tent",
@@ -860,6 +883,11 @@ const nb: Dictionary = {
       unreadable: "Bildet kunne ikke leses. Det kan være skadet. Prøv en annen kopi av bildet.",
       format: "Dette bildeformatet kan ikke brukes. Lagre bildet som JPEG eller PNG og velg det på nytt.",
     },
+    // TG-NEW-268: valget (hint) tjenesten ikke godtar, 400 image_type_hint_not_supported. Bare en sikring.
+    imageTypeHintNotSupported: {
+      aerial: "Kveldsbilde kan ikke lages fra dronebilder ennå.",
+      interior: "Blå himmel bytter himmelen på bilder tatt utendørs.",
+    },
   },
   generic: {
     reviewCode: "Vi trenger et svar fra deg før vi lager bildet.",
@@ -884,6 +912,7 @@ const nb: Dictionary = {
     disclosureEdited: "Merketeksten kunne ikke lages.",
     orderError: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
     unsupportedImage: "Bildet kan ikke brukes. Lagre det som JPEG eller PNG og velg det på nytt.",
+    imageTypeHintNotSupported: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
     furnishAs: "Ukjent romtype",
     orderNotStarted: "Denne stilen ble ikke laget. Bestillingen teller som én.",
   },
@@ -1012,6 +1041,27 @@ const en: Dictionary = {
     "note.analysis_screenshot_overlay":
       "The image looks like a screenshot with a menu or address bar at the top. Check whether the bar is part of the image.",
     "note.unknown": "The analysis had a note about the image. Compare the image carefully with the original.",
+    "note.image_type_broker_differs":
+      "You chose {hint}, but the analysis thought the photo was taken {analysis}. The image was made as {made}. Check that it looks right.",
+    "note.image_type_broker_differs.other":
+      "You chose {hint}, but the analysis did not recognise where the photo was taken. The image was made as {made}. Check that it looks right.",
+    "note.image_type_untested.klart_vaer": "Blue sky has not been tested on drone photos yet. Check the image carefully before you approve.",
+    "imageTypeWord.interior": "indoors",
+    "imageTypeWord.exterior": "outdoors",
+    "imageTypeWord.ground": "from the ground",
+    "imageTypeWord.balcony": "on a balcony or terrace",
+    "imageTypeWord.aerial": "from a drone",
+    "imageTypeWord.or": "or",
+    "imageTypeMade.interior": "an indoor photo",
+    "imageTypeMade.exterior": "an outdoor photo",
+    "imageTypeMade.aerial": "a drone photo",
+    "review.imageTypeChosen": "Photo type: {type} (chosen when ordering)",
+    "imageTypeChoice.title": "Where was the photo taken?",
+    "imageTypeChoice.help": "If you know, the result will be more reliable. Otherwise the analysis decides.",
+    "imageTypeChoice.auto": "Let the analysis decide",
+    "imageTypeChoice.interior": "Indoors",
+    "imageTypeChoice.exterior": "Outdoors",
+    "imageTypeChoice.aerial": "Drone",
     "action.fireplaceQuestion": "Should the fireplace be lit?",
     "action.fireplaceLit": "Lit",
     "action.fireplaceNotLit": "Not lit",
@@ -1640,6 +1690,10 @@ const en: Dictionary = {
       unreadable: "The image could not be read. It may be damaged. Try another copy of the image.",
       format: "This image format cannot be used. Save the image as JPEG or PNG and choose it again.",
     },
+    imageTypeHintNotSupported: {
+      aerial: "Dusk image cannot be made from drone photos yet.",
+      interior: "Blue sky replaces the sky in photos taken outdoors.",
+    },
   },
   generic: {
     reviewCode: "We need an answer from you before we create the image.",
@@ -1664,6 +1718,7 @@ const en: Dictionary = {
     disclosureEdited: "The disclosure text could not be created.",
     orderError: "The image could not be processed. Please try again, or contact us.",
     unsupportedImage: "The image cannot be used. Save it as JPEG or PNG and choose it again.",
+    imageTypeHintNotSupported: "The image could not be processed. Please try again, or contact us.",
     furnishAs: "Unknown room type",
     orderNotStarted: "This style was not made. The order counts as one.",
   },
@@ -1719,6 +1774,8 @@ export function codeText(locale: Locale, group: CodeGroup, code: unknown): strin
  */
 export function orderErrorText(locale: Locale, code: unknown, reason: unknown): string {
   if (code === "unsupported_image") return codeText(locale, "unsupportedImage", reason);
+  // TG-NEW-268: teksten etter valget (hint, lagt i reason av submitJob); ukjent gir den generelle.
+  if (code === "image_type_hint_not_supported") return codeText(locale, "imageTypeHintNotSupported", reason);
   return codeText(locale, "orderError", code);
 }
 
