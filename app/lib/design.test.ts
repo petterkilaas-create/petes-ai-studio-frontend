@@ -601,17 +601,14 @@ test("D2b: «Detaljer» vises bare naar showDetails(caps) er sann", () => {
 /** Ord og koder fra analysen som bare hoerer hjemme i «Detaljer». */
 const ANALYSIS = /review\.lightsUnstable|review\.lightsRejected|review\.lightsApproved|"lightReason"|"reasonCode"|"flagCode"|review\.runValues|review\.analysisTitle|review\.analysisLocation|review\.noValidRuns|(?<![.\w])reason(?=[\s/>])/;
 
-// TG-NEW-219 (Petter 19.10): megleren ser grunnen for de tre kodene i MEGLER_REASON_CODES, via meglerReason.
-const TG219_REASON = '{reason !== null && <p className="text-sm text-ink">{codeText(locale, "reasonCode", reason)}</p>}';
+// Porten (Dag 56, P3a): megleren ser grunnene og merknadene som egne tekster
+// (stop.* og note.* i ordlista, via stopReasons og analysisNotes), aldri
+// kodene fra analysen. Derfor ingen unntak her lenger (TG-NEW-219-linja er borte).
 
 test("D2b: analysen staar bare i DetailsPanel (megleren ser den ikke)", () => {
   const files = ["(app)/godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("DetailsPanel.tsx") && !f.endsWith("LightLabel.tsx"))];
   for (const f of files) {
-    let src = withoutComments(read(f));
-    if (f.endsWith("DecisionCard.tsx")) {
-      assert.equal(src.split(TG219_REASON).length, 2, "TG-NEW-219-linja en gang i DecisionCard");
-      src = src.replace(TG219_REASON, "");
-    }
+    const src = withoutComments(read(f));
     assert.doesNotMatch(src, ANALYSIS, f);
   }
   const details = read("components/godkjenning/DetailsPanel.tsx");
@@ -643,7 +640,8 @@ test("D2b: handlingene i ett kort, i rekkefoelgen Godkjenn · Korriger bildet ·
   const card = withoutComments(read("components/godkjenning/DecisionCard.tsx"));
   const approve = card.indexOf('t(locale, "action.approve")');
   const correct = card.indexOf('t(locale, "action.correct")');
-  const reject = card.indexOf('t(locale, "action.reject")');
+  // Porten (P3a): i et stopp heter Avvis «Avbryt» (stop === null ? "action.reject" : "action.stopReject").
+  const reject = card.indexOf('"action.reject"');
   assert.ok(approve > 0 && approve < correct && correct < reject, "rekkefoelgen");
   assert.match(card, /onClick=\{onStartCorrection\} disabled=\{locked\} className=\{BTN_SECONDARY\}/);
   assert.match(card, /onClick=\{\(\) => onRejectOpen\(true\)\} disabled=\{locked\} className=\{BTN_DANGER\}/);

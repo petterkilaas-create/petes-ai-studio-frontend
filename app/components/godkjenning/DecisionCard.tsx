@@ -5,7 +5,7 @@ import { REASON_MAX_LEN, type AdditionsCheck, type DecisionAction } from "../../
 import { additionsSentences, additionsView, approveEnabled } from "../../lib/additions";
 import { CHECKLISTS, comparedKey, type ChecklistId } from "../../lib/checklist";
 import { framingText } from "../../lib/orderTabs";
-import { codeText, t, type Locale } from "../../lib/i18n";
+import { t, type Locale, type UiKey } from "../../lib/i18n";
 import {
   reasonLength,
   reasonTooLong,
@@ -42,10 +42,17 @@ const BTN_DANGER = buttonClass("danger");
  * Rammevarselet (D-5c, TG-NEW-260): over sjekklista, i samme stil som
  * merknaden fra kontrollen (gult, Petter 25.10, AVVIK 2), naar bildet kan
  * vise mer av rommet enn originalen. Det endrer ikke krysset eller «Godkjenn».
+ *
+ * Porten (Dag 56, P3a), for alle roller: stoppboksen (`stop`, needs_review)
+ * har overskriften og én linje per grunn. Knappene heter da «Lag likevel»
+ * (peisen: «Lag bildet») og «Avbryt», og «Avbryt» spoer «Bildet blir ikke
+ * laget.» med «Ja, avbryt» / «Tilbake», uten begrunnelse (Cowork 27.10, 2A).
+ * Merknadene fra analysen (`notes`) staar over sjekklista i samme stil som
+ * merknaden fra kontrollen. Etter at bildet er laget, er knappene som foer.
  */
 export function DecisionCard({
-  reviewCode,
-  reason,
+  stop,
+  notes,
   controls,
   canCorrect,
   roundFailed,
@@ -73,10 +80,10 @@ export function DecisionCard({
   message,
   locale,
 }: {
-  /** Hvorfor jobben venter (gate_review, fireplace_answer_missing), som kode. */
-  reviewCode: string | null;
-  /** TG-NEW-219: grunnen megleren ser, som kode. */
-  reason: string | null;
+  /** Stoppboksen (needs_review): grunnene (stopReasons) og om det er peisstoppet. null: ikke stoppet. */
+  stop: { reasons: UiKey[]; fireplace: boolean } | null;
+  /** Merknadene fra analysen (analysisNotes); tom: ingen boks. */
+  notes: UiKey[];
   controls: DecisionControls;
   canCorrect: boolean;
   roundFailed: boolean;
@@ -127,8 +134,16 @@ export function DecisionCard({
         correction
       ) : (
         <>
-          {reviewCode !== null && <p className="text-sm text-ink">{codeText(locale, "reviewCode", reviewCode)}</p>}
-          {reason !== null && <p className="text-sm text-ink">{codeText(locale, "reasonCode", reason)}</p>}
+          {stop !== null && (
+            <div className="flex flex-col gap-2 break-words">
+              <p className="text-ink font-bold">{t(locale, "stop.title")}</p>
+              {stop.reasons.map((key) => (
+                <p key={key} className="text-sm text-ink">
+                  {t(locale, key)}
+                </p>
+              ))}
+            </div>
+          )}
 
           {controls.fireplaceQuestion && (
             <FireplaceChoice answer={answer} onChange={onAnswer} disabled={locked} locale={locale} />
@@ -157,6 +172,13 @@ export function DecisionCard({
                 <p className="text-sm text-amber-fg bg-amber-bg rounded-button p-3 break-words" role="status">
                   {framingText(locale, framingPct)}
                 </p>
+              )}
+              {notes.length > 0 && (
+                <div className="flex flex-col gap-2 text-sm text-amber-fg bg-amber-bg rounded-button p-3 break-words" role="status">
+                  {notes.map((key) => (
+                    <p key={key}>{t(locale, key)}</p>
+                  ))}
+                </div>
               )}
               {checklist !== null && (
                 <div>
@@ -207,7 +229,7 @@ export function DecisionCard({
                   disabled={locked || !controls.continueEnabled}
                   className={BTN_PRIMARY}
                 >
-                  {t(locale, "action.continue")}
+                  {t(locale, stop === null ? "action.continue" : stop.fireplace ? "action.makeImage" : "action.continueAnyway")}
                 </button>
               )}
               {canCorrect && (
@@ -217,7 +239,7 @@ export function DecisionCard({
               )}
               {controls.reject && !rejectOpen && (
                 <button onClick={() => onRejectOpen(true)} disabled={locked} className={BTN_DANGER}>
-                  {t(locale, "action.reject")}
+                  {t(locale, stop === null ? "action.reject" : "action.stopReject")}
                 </button>
               )}
             </div>
@@ -225,7 +247,22 @@ export function DecisionCard({
 
           {controls.continue && <p className="text-xs text-ink-2">{t(locale, "action.newImage")}</p>}
 
-          {controls.reject && rejectOpen && (
+          {/* I stoppet: kort bekreftelse uten begrunnelse (backend godtar reject uten reason). */}
+          {controls.reject && rejectOpen && stop !== null && (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-ink">{t(locale, "stop.confirm")}</p>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={() => onDecide("reject")} disabled={locked} className={BTN_DANGER}>
+                  {t(locale, "action.confirmStop")}
+                </button>
+                <button onClick={() => onRejectOpen(false)} disabled={locked} className={BTN_SECONDARY}>
+                  {t(locale, "action.back")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {controls.reject && rejectOpen && stop === null && (
             <div className="flex flex-col gap-2">
               <textarea
                 value={reasonText}

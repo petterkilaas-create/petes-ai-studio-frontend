@@ -1,5 +1,6 @@
 import type { AdditionsLevel, BrightnessStep, DecisionAction, DecisionRequest, JobReviewDetail } from "./api";
 import type { UiKey } from "./i18n";
+import { checklistFor } from "./checklist.ts";
 import { panelShown } from "./presets.ts";
 
 /**
@@ -198,16 +199,172 @@ export function outcome(
   }
 }
 
-/** TG-NEW-219: grunnene megleren ser ved stopp i port 1, i denne rekkefølgen. */
-export const MEGLER_REASON_CODES = ["image_type_not_supported", "sky_missing", "sky_through_windows_only"] as const;
+// ---- Porten for megleren (Dag 56, P3a) -----------------------------------------
+// Petter 27.10: megleren skal se hva som er funnet og hvilket valg hen har.
+// Tekstene staar i ordlista (stop.* og note.*); de korte kodene i
+// reasonCode/flagCode er bare for admin i «Detaljer». Ukjente koder gir en
+// noeytral tekst, aldri en tom boks. Ingen tekst lover gratisbildet tilbake
+// (det kommer med kvote-PR-en, P2).
+
+/** Rekkefoelgen grunnene vises i. Koder utenfor lista er ukjente. */
+export const STOP_REASON_ORDER = [
+  "screenshot_overlay",
+  "image_type_not_supported",
+  "sky_missing",
+  "sky_through_windows_only",
+  "furnish_as_mismatch",
+  "image_type_untested",
+  "image_type_disagreement",
+  "valid_runs_insufficient",
+  "analysis_uncertain",
+  "fireplace_disagreement",
+  "fireplace_present",
+] as const;
+
+/** Rekkefoelgen merknadene vises i. Koder utenfor lista er ukjente. */
+export const NOTE_ORDER = [
+  "analysis_light_unconfirmed",
+  "single_run",
+  "analysis_sky_unclear",
+  "sky_visibility_disagreement",
+  "analysis_overexposed",
+  "analysis_text_unreadable",
+  "analysis_screenshot_overlay",
+  "image_type_disagreement",
+  "fireplace_disagreement",
+  "analysis_other",
+] as const;
+
+type Service = "kveldsbilde" | "klart_vaer" | "styling" | null;
+
+/** Tjenesten jobben hoerer til, med samme skille som sjekklista (checklistFor). */
+function serviceOf(presetId: string | null): Service {
+  switch (checklistFor(presetId)) {
+    case "kveldsbilde":
+      return "kveldsbilde";
+    case "blaa_himmel":
+      return "klart_vaer";
+    case "styling":
+      return "styling";
+    default:
+      return null;
+  }
+}
+
+function has<T extends string>(list: readonly T[], code: string): code is T {
+  return (list as readonly string[]).includes(code);
+}
+
+/** Bare egne koder i fast rekkefoelge, uten duplikater; `unknown` til slutt naar noe er ukjent. */
+function ordered<T extends string>(codes: readonly string[], order: readonly T[]): { known: T[]; unknown: boolean } {
+  return {
+    known: order.filter((code) => codes.includes(code)),
+    unknown: codes.some((code) => !has(order, code)),
+  };
+}
+
+type StopReview = Pick<JobReviewDetail, "status" | "code" | "reasonCodes" | "allowedActions" | "presetId" | "imageType">;
+
+/** Er jobben stoppet foer bildet ble laget (needs_review)? */
+export function isStopped(review: Pick<JobReviewDetail, "status">): boolean {
+  return review.status === "needs_review";
+}
+
+/** Peisstoppet: fortsett-knappen heter «Lag bildet», ikke «Lag likevel». */
+export function isFireplaceStop(review: Pick<JobReviewDetail, "status" | "code">): boolean {
+  return isStopped(review) && review.code === "fireplace_answer_missing";
+}
+
+function stopReasonKey(code: (typeof STOP_REASON_ORDER)[number], review: StopReview): UiKey | null {
+  switch (code) {
+    case "screenshot_overlay":
+      return "stop.reason.screenshot_overlay";
+    case "image_type_not_supported":
+      return "stop.reason.image_type_not_supported";
+    case "sky_missing":
+      return "stop.reason.sky_missing";
+    case "sky_through_windows_only":
+      return "stop.reason.sky_through_windows_only";
+    case "furnish_as_mismatch": {
+      // Romtypen sendes ikke (AVVIK 1); retningen foelger av bildetypen.
+      const type = review.imageType.value;
+      if (type === "interior") return "stop.reason.furnish_as_mismatch.inside";
+      if (type === "balcony_terrace" || type === "exterior_facade") return "stop.reason.furnish_as_mismatch.outside";
+      return "stop.reason.furnish_as_mismatch";
+    }
+    case "image_type_untested":
+      switch (serviceOf(review.presetId)) {
+        case "kveldsbilde":
+          return "stop.reason.image_type_untested.kveldsbilde";
+        case "klart_vaer":
+          return "stop.reason.image_type_untested.klart_vaer";
+        case "styling":
+          return "stop.reason.image_type_untested.styling";
+        default:
+          return null;
+      }
+    case "image_type_disagreement":
+      return "stop.reason.image_type_disagreement";
+    case "valid_runs_insufficient":
+      return review.allowedActions.includes("continue")
+        ? "stop.reason.valid_runs_insufficient.one"
+        : "stop.reason.valid_runs_insufficient.none";
+    case "analysis_uncertain":
+      return "stop.reason.analysis_uncertain";
+    case "fireplace_disagreement":
+    case "fireplace_present":
+      return "stop.reason.fireplace";
+  }
+}
 
 /**
- * Grunnen megleren ser over knappene (TG-NEW-219, Petter 19.10): den foerste
- * koden fra MEGLER_REASON_CODES som finnes i `reasonCodes`, bare ved stopp i
- * port 1 (needs_review + gate_review). Ellers null. Andre grunner er bare
- * for admin (DetailsPanel). `includes` paa lista, ikke `in` paa et objekt.
+ * Grunnene i stoppboksen (needs_review), for alle roller: én tekst per
+ * kode i STOP_REASON_ORDER, uten duplikater. Ukjent kode, ukjent tjeneste
+ * eller ingen koder gir `stop.reason.unknown`. Ikke stoppet: tom liste.
  */
-export function meglerReason(review: Pick<JobReviewDetail, "status" | "code" | "reasonCodes">): string | null {
-  if (review.status !== "needs_review" || review.code !== "gate_review") return null;
-  return MEGLER_REASON_CODES.find((code) => review.reasonCodes.includes(code)) ?? null;
+export function stopReasons(review: StopReview): UiKey[] {
+  if (!isStopped(review)) return [];
+  const { known, unknown } = ordered(review.reasonCodes, STOP_REASON_ORDER);
+  const keys: UiKey[] = [];
+  let neutral = unknown || known.length === 0;
+  for (const code of known) {
+    const key = stopReasonKey(code, review);
+    if (key === null) neutral = true;
+    else if (!keys.includes(key)) keys.push(key);
+  }
+  if (neutral) keys.push("stop.reason.unknown");
+  return keys;
+}
+
+/**
+ * Merknadene fra analysen (flag_codes) over sjekklista, for alle roller.
+ * Lampene og «Korriger bildet» finnes bare i Kveldsbilde: lampeteksten
+ * vises ikke for andre tjenester, og `single_run` faar da den generelle
+ * teksten. Uenig bildetype er en merknad bare i styling. Ukjent kode:
+ * `note.unknown`. Ingen koder: tom liste (ingen boks).
+ */
+export function analysisNotes(review: Pick<JobReviewDetail, "flagCodes" | "presetId">): UiKey[] {
+  const service = serviceOf(review.presetId);
+  const { known, unknown } = ordered(review.flagCodes, NOTE_ORDER);
+  const keys: UiKey[] = [];
+  const add = (key: UiKey | null) => {
+    if (key !== null && !keys.includes(key)) keys.push(key);
+  };
+  for (const code of known) {
+    switch (code) {
+      case "analysis_light_unconfirmed":
+        add(service === "kveldsbilde" ? "note.analysis_light_unconfirmed" : null);
+        break;
+      case "single_run":
+        add(service === "kveldsbilde" ? "note.single_run.kveldsbilde" : "note.analysis_other");
+        break;
+      case "image_type_disagreement":
+        add(service === "styling" ? "note.image_type_disagreement.styling" : "note.analysis_other");
+        break;
+      default:
+        add(`note.${code}`);
+    }
+  }
+  if (unknown) add("note.unknown");
+  return keys;
 }

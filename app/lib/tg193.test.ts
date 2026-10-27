@@ -179,15 +179,17 @@ test("TG193 #9: siden gir litOnly = !admin; forklaringen og «uten plassering» 
 });
 
 // ---------------------------------------------------------------------------
-// #13 Grunnen til at jobben venter: bare admin.
+// #13 Grunnen til at jobben venter: snudd i porten (Dag 56, P3a), nå for alle roller.
 // ---------------------------------------------------------------------------
 
-test("TG193 #13: grunnen (review.code) sendes bare til handlingskortet for admin", () => {
-  assert.match(page, /reviewCode=\{admin \? review\.code : null\}/);
-  assert.doesNotMatch(page, /reviewCode=\{review\.code\}/);
-  // Kortet viser ingenting naar koden er null.
+test("TG193 #13 (snudd i P3a): stoppboksen vises for alle roller, ikke bak admin", () => {
+  assert.doesNotMatch(page, /reviewCode=/);
+  assert.match(page, /stop=\{\s*isStopped\(review\)/);
+  assert.doesNotMatch(page, /stop=\{[^}]*admin/);
+  // Kortet viser ingenting naar `stop` er null.
   const card = code("components/godkjenning/DecisionCard.tsx");
-  assert.match(card, /\{reviewCode !== null && <p className="text-sm text-ink">\{codeText\(locale, "reviewCode", reviewCode\)\}<\/p>\}/);
+  assert.match(card, /\{stop !== null && \(/);
+  assert.doesNotMatch(card, /"reviewCode"/);
 });
 
 // ---------------------------------------------------------------------------

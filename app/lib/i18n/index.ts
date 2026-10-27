@@ -89,6 +89,60 @@ const nbUi = {
   "action.confirmReject": "Bekreft avvisning",
   "action.working": "Sender …",
   "action.newImage": "Dette lager et nytt bilde.",
+  // Porten (Dag 56, P3a): stoppboksen og merknadene fra analysen, for alle roller.
+  // Ingen tekst lover gratisbildet tilbake (kommer med kvote-PR-en, P2).
+  "action.continueAnyway": "Lag likevel",
+  "action.makeImage": "Lag bildet",
+  "action.stopReject": "Avbryt",
+  "action.confirmStop": "Ja, avbryt",
+  "action.back": "Tilbake",
+  "stop.title": "Vi trenger et svar fra deg før vi lager bildet.",
+  "stop.confirm": "Bildet blir ikke laget.",
+  "stop.reason.screenshot_overlay":
+    "Bildet ser ut som et skjermbilde med en meny- eller adresselinje øverst, og linjen blir med i bildet. Last opp originalfotoet, eller lag bildet likevel.",
+  "stop.reason.analysis_uncertain":
+    "Analysen var usikker på noe i bildet. Du kan lage bildet likevel og sjekke resultatet nøye.",
+  "stop.reason.valid_runs_insufficient.one":
+    "Bare én av to analyser av bildet ga svar. Du kan lage bildet likevel og sjekke resultatet nøye.",
+  "stop.reason.valid_runs_insufficient.none": "Analysen av bildet feilet. Avbryt og prøv igjen.",
+  "stop.reason.image_type_disagreement":
+    "Analysene var uenige om hva slags bilde dette er. Lager du bildet likevel, bruker vi den første analysen, så sjekk resultatet nøye.",
+  "stop.reason.image_type_untested.klart_vaer":
+    "Blå himmel er ikke testet på denne typen bilde ennå, så resultatet kan bli dårligere. Vil du prøve likevel?",
+  "stop.reason.image_type_untested.kveldsbilde":
+    "Kveldsbilde er ikke laget for denne typen bilde ennå, for eksempel dronebilder.",
+  "stop.reason.image_type_untested.styling":
+    "Digital styling er ikke laget for denne typen bilde ennå, for eksempel dronebilder.",
+  "stop.reason.image_type_not_supported": "Blå himmel kan ikke brukes på bilder tatt innendørs.",
+  "stop.reason.sky_missing": "Bildet har ingen himmel som kan byttes.",
+  "stop.reason.sky_through_windows_only": "Himmelen synes bare gjennom vinduer.",
+  // Romtypen sendes ikke fra backend; retningen foelger av bildetypen (Cowork 27.10).
+  "stop.reason.furnish_as_mismatch.inside":
+    "Bildet ser ut som et rom inne, men du valgte balkong eller terrasse. Avbryt og bestill på nytt med riktig romtype.",
+  "stop.reason.furnish_as_mismatch.outside":
+    "Bildet ser ut som et uterom, men du valgte et rom inne. Avbryt og bestill på nytt med riktig romtype.",
+  "stop.reason.furnish_as_mismatch": "Bildet passer ikke romtypen du valgte. Avbryt og bestill på nytt med riktig romtype.",
+  "stop.reason.fireplace": "Vi er usikre på om bildet har en peis. Velg om den skal være tent.",
+  "stop.reason.unknown": "Vi stoppet bildet før det ble laget.",
+  "note.analysis_light_unconfirmed":
+    "Analysen fant noe som kan være en lampe, men var ikke sikker, så den er ikke tent. Er det en lampe, kan du tenne den i «Korriger bildet».",
+  "note.analysis_sky_unclear":
+    "Analysen var usikker på hvor mye himmel som synes. Sjekk at himmelen ser naturlig ut mot originalen.",
+  "note.analysis_overexposed":
+    "Deler av originalen er svært lyse, så detaljer kan mangle der. Sjekk de lyse områdene mot originalen.",
+  "note.analysis_text_unreadable":
+    "Analysen kunne ikke lese all tekst i bildet, som skilt eller husnummer. Sjekk at teksten er lik originalen.",
+  "note.analysis_other": "Analysen var usikker på noe i bildet. Sammenlign bildet nøye med originalen.",
+  "note.single_run.kveldsbilde":
+    "Bare én av to analyser ga svar, så ingen lamper er tent. Du kan tenne dem i «Korriger bildet».",
+  "note.image_type_disagreement.styling":
+    "Analysen var usikker på bildetypen, så vi brukte rommet du valgte. Sjekk at møblene passer rommet.",
+  "note.sky_visibility_disagreement":
+    "Analysene var uenige om hvor mye himmel som synes, så vi regnet med minst himmel. Sjekk at himmelen ser naturlig ut mot originalen.",
+  "note.fireplace_disagreement": "Analysene var uenige om bildet har en peis. Sjekk peisen mot originalen.",
+  "note.analysis_screenshot_overlay":
+    "Bildet ser ut som et skjermbilde med en meny- eller adresselinje øverst. Sjekk om linjen er med i bildet.",
+  "note.unknown": "Analysen hadde en merknad til bildet. Sammenlign bildet nøye med originalen.",
   "action.fireplaceQuestion": "Skal peisen være tent?",
   "action.fireplaceLit": "Tent",
   "action.fireplaceNotLit": "Ikke tent",
@@ -522,9 +576,9 @@ const nb: Dictionary = {
   ui: nbUi,
   codes: {
     reviewCode: {
-      gate_review: "Bildet må sjekkes før vi lager det.",
+      gate_review: "Vi trenger et svar fra deg før vi lager bildet.",
       fireplace_answer_missing: "Venter på svar om peisen.",
-      needs_review: "Bildet må sjekkes før vi lager det.",
+      needs_review: "Vi trenger et svar fra deg før vi lager bildet.",
     },
     reasonCode: {
       valid_runs_insufficient: "Analysen ga ufullstendig svar.",
@@ -750,7 +804,7 @@ const nb: Dictionary = {
     },
   },
   generic: {
-    reviewCode: "Bildet må sjekkes.",
+    reviewCode: "Vi trenger et svar fra deg før vi lager bildet.",
     reasonCode: "Annen grunn.",
     flagCode: "Annen merknad.",
     lightType: "Lyskilde",
@@ -825,6 +879,59 @@ const en: Dictionary = {
     "action.confirmReject": "Confirm rejection",
     "action.working": "Sending …",
     "action.newImage": "This creates a new image.",
+    "action.continueAnyway": "Create anyway",
+    "action.makeImage": "Create the image",
+    "action.stopReject": "Cancel",
+    "action.confirmStop": "Yes, cancel",
+    "action.back": "Back",
+    "stop.title": "We need an answer from you before we create the image.",
+    "stop.confirm": "The image will not be created.",
+    "stop.reason.screenshot_overlay":
+      "The image looks like a screenshot with a menu or address bar at the top, and the bar will be part of the image. Upload the original photo, or create the image anyway.",
+    "stop.reason.analysis_uncertain":
+      "The analysis was uncertain about something in the image. You can create the image anyway and check the result carefully.",
+    "stop.reason.valid_runs_insufficient.one":
+      "Only one of two analyses of the image gave an answer. You can create the image anyway and check the result carefully.",
+    "stop.reason.valid_runs_insufficient.none": "The analysis of the image failed. Cancel and try again.",
+    "stop.reason.image_type_disagreement":
+      "The analyses disagreed on what kind of image this is. If you create the image anyway, we use the first analysis, so check the result carefully.",
+    "stop.reason.image_type_untested.klart_vaer":
+      "Blue sky has not been tested on this type of image yet, so the result may be worse. Do you want to try anyway?",
+    "stop.reason.image_type_untested.kveldsbilde":
+      "Dusk image is not made for this type of image yet, for example drone photos.",
+    "stop.reason.image_type_untested.styling":
+      "Digital styling is not made for this type of image yet, for example drone photos.",
+    "stop.reason.image_type_not_supported": "Blue sky can't be used on indoor photos.",
+    "stop.reason.sky_missing": "The image has no sky to replace.",
+    "stop.reason.sky_through_windows_only": "The sky is only visible through windows.",
+    "stop.reason.furnish_as_mismatch.inside":
+      "The image looks like an indoor room, but you chose balcony or terrace. Cancel and order again with the right room type.",
+    "stop.reason.furnish_as_mismatch.outside":
+      "The image looks like an outdoor space, but you chose an indoor room. Cancel and order again with the right room type.",
+    "stop.reason.furnish_as_mismatch":
+      "The image does not match the room type you chose. Cancel and order again with the right room type.",
+    "stop.reason.fireplace": "We are not sure whether the image has a fireplace. Choose whether it should be lit.",
+    "stop.reason.unknown": "We stopped the image before it was created.",
+    "note.analysis_light_unconfirmed":
+      "The analysis found something that may be a lamp, but was not sure, so it is not lit. If it is a lamp, you can light it in “Correct image”.",
+    "note.analysis_sky_unclear":
+      "The analysis was uncertain about how much sky is visible. Check that the sky looks natural compared with the original.",
+    "note.analysis_overexposed":
+      "Parts of the original are very bright, so details may be missing there. Check the bright areas against the original.",
+    "note.analysis_text_unreadable":
+      "The analysis could not read all text in the image, such as signs or house numbers. Check that the text matches the original.",
+    "note.analysis_other": "The analysis was uncertain about something in the image. Compare the image carefully with the original.",
+    "note.single_run.kveldsbilde":
+      "Only one of two analyses gave an answer, so no lamps are lit. You can light them in “Correct image”.",
+    "note.image_type_disagreement.styling":
+      "The analysis was uncertain about the image type, so we used the room you chose. Check that the furniture suits the room.",
+    "note.sky_visibility_disagreement":
+      "The analyses disagreed on how much sky is visible, so we assumed the least sky. Check that the sky looks natural compared with the original.",
+    "note.fireplace_disagreement":
+      "The analyses disagreed on whether the image has a fireplace. Check the fireplace against the original.",
+    "note.analysis_screenshot_overlay":
+      "The image looks like a screenshot with a menu or address bar at the top. Check whether the bar is part of the image.",
+    "note.unknown": "The analysis had a note about the image. Compare the image carefully with the original.",
     "action.fireplaceQuestion": "Should the fireplace be lit?",
     "action.fireplaceLit": "Lit",
     "action.fireplaceNotLit": "Not lit",
@@ -1212,9 +1319,9 @@ const en: Dictionary = {
   },
   codes: {
     reviewCode: {
-      gate_review: "The image needs a check before we create it.",
+      gate_review: "We need an answer from you before we create the image.",
       fireplace_answer_missing: "Waiting for an answer about the fireplace.",
-      needs_review: "The image needs a check before we create it.",
+      needs_review: "We need an answer from you before we create the image.",
     },
     reasonCode: {
       valid_runs_insufficient: "The analysis gave an incomplete answer.",
@@ -1423,7 +1530,7 @@ const en: Dictionary = {
     },
   },
   generic: {
-    reviewCode: "The image needs a check.",
+    reviewCode: "We need an answer from you before we create the image.",
     reasonCode: "Other reason.",
     flagCode: "Other note.",
     lightType: "Light source",
