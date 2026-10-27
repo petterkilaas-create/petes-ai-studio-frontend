@@ -444,7 +444,8 @@ test("getReview 200 normaliserer svaret og ignorerer ukjente handlinger", async 
     key: null, id: "L3", run: 2, type: "candle", location: "vindu", box: null, reasonCode: "not_confirmed",
     editable: false, state: null,
   });
-  assert.deepEqual(r.review.correction, { roundsLeft: 0, lastRoundFailed: false });
+  // Dag 57 (TG-NEW-145): uten feltene er valgene tomme.
+  assert.deepEqual(r.review.correction, { roundsLeft: 0, lastRoundFailed: false, choicesAccepted: [], currentChoices: null });
   assert.equal(r.review.images.previous, null);
   assert.equal(r.review.lights.approved[0].reasonCode, null);
   assert.deepEqual(r.review.imageType.runValues, ["interior", "exterior_facade"]);
@@ -595,7 +596,7 @@ test("normalizeReview leser Rett-feltene (2d-2a)", () => {
   assert.equal(r.lights.approved[1].state, null, "ukjent state");
   assert.equal(r.lights.unstable[0].run, 2);
   assert.equal(r.lights.unstable[0].editable, false);
-  assert.deepEqual(r.correction, { roundsLeft: 0, lastRoundFailed: true });
+  assert.deepEqual(r.correction, { roundsLeft: 0, lastRoundFailed: true, choicesAccepted: [], currentChoices: null });
   assert.deepEqual(r.images.previous, { round: 0, previewUrl: null });
   // Negativt eller oedelagt rundetall blir 0.
   assert.equal(api.normalizeReview({ correction: { rounds_left: -1 } }, "j1").correction.roundsLeft, 0);
@@ -802,6 +803,9 @@ test("normalizeReview: images.rounds (D2a, KONTRAKT_RUNDER)", () => {
         skyApplied: false,
         fireplaceFire: null,
         lightsChanged: false,
+        // Dag 57 (TG-NEW-145): uten feltene er rundens stil og pyntnivaa null.
+        style: null,
+        decorLevel: null,
       },
     },
     { round: 0, current: false, previewUrl: null, rawPreviewUrl: null, choices: null },

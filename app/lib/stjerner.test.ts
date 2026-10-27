@@ -95,7 +95,7 @@ test("Stjerner: merknaden «Ikke for bilder fra mai–juli.», nb og en", () => 
 
 test("Stjerner: merknaden staar i samme aria-live-boks som sommernotatet, bare ved Sen kveld med stjerner", () => {
   const picker = code("components/DuskChoicePicker.tsx");
-  assert.match(picker, /const stars = value\.style === STYLE_LATE && value\.sky === "starry";/);
+  assert.match(picker, /const stars = value\?\.style === STYLE_LATE && value\.sky === "starry";/);
   assert.match(
     picker,
     /const note = summer \? t\(locale, "dusk\.summerNote"\) : stars \? t\(locale, "dusk\.starryNote"\) : "";/

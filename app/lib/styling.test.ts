@@ -294,7 +294,9 @@ test("S3-f/v3/D-3: velgeren har 14 stilkort med aria-pressed, og hver stil har e
   const picker = read("components/StylingChoicePicker.tsx");
   const cards = read("components/styling/StyleCards.tsx");
   const panel = read("components/styling/StyleFocusPanel.tsx");
-  assert.match(cards, /STYLING_STYLES\.map\(\(style\) => \{/);
+  // Dag 57 (TG-NEW-145): `shown` er alle 14 som standard; «Rett» viser et utvalg.
+  assert.match(cards, /shown = STYLING_STYLES,/);
+  assert.match(cards, /shown\.map\(\(style\) => \{/);
   assert.match(cards, /onClick=\{\(\) => onToggle\(style\)\}\s*disabled=\{disabled\}\s*aria-pressed=\{on\}/);
   assert.match(cards, /onClick=\{\(\) => onFocus\(style\)\}/);
   assert.match(panel, /onClick=\{onToggle\}\s*disabled=\{disabled\}\s*aria-pressed=\{on\}/);

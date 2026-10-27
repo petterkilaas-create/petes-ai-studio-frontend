@@ -29,6 +29,8 @@ const CARD_OFF = "border-line hover:bg-surface-2";
 
 // To kort per rad paa mobil, fire fra md (siden er hoeyst max-w-6xl).
 const SIZES = "(min-width: 768px) 270px, 50vw";
+// Kompakt (i «Rett», kolonnen paa 22rem): alltid to kort per rad.
+const SIZES_COMPACT = "(min-width: 1024px) 170px, 50vw";
 
 /**
  * Stilkortene for Kveldsbilde (Dag 55, TG-NEW-259): fire kort med
@@ -43,31 +45,38 @@ const SIZES = "(min-width: 768px) 270px, 50vw";
  *
  * Bildene kommer som prop fra siden (duskImages.ts), fordi node --test ikke
  * kan laste .jpg.
+ *
+ * «Endre valg» (TG-NEW-145): i «Rett» er `compact` paa (to kort per rad og
+ * ingen skillelinje), og `value` kan vaere null naar bildet ble laget med en
+ * gammel stil som ikke er et kort. Da er ingen kort valgt, og ingen himmel
+ * vises foer et kort er valgt.
  */
 export function DuskChoicePicker({
   value,
   onChange,
   disabled,
   images,
+  compact = false,
   locale,
 }: {
-  value: DuskChoice;
+  value: DuskChoice | null;
   onChange: (value: DuskChoice) => void;
   disabled: boolean;
   images: Record<DuskStyle, StaticImageData>;
+  compact?: boolean;
   locale: Locale;
 }) {
-  const summer = value.style === STYLE_SUMMER;
-  const stars = value.style === STYLE_LATE && value.sky === "starry";
+  const summer = value?.style === STYLE_SUMMER;
+  const stars = value?.style === STYLE_LATE && value.sky === "starry";
   const note = summer ? t(locale, "dusk.summerNote") : stars ? t(locale, "dusk.starryNote") : "";
-  const skies = skyChoices(value.style);
+  const skies = value === null ? [] : skyChoices(value.style);
   return (
-    <div className="border-t border-line pt-6 space-y-4">
+    <div className={compact ? "space-y-4" : "border-t border-line pt-6 space-y-4"}>
       <p className={LABEL}>{t(locale, "dusk.title")}</p>
-      <ul className="grid grid-cols-2 gap-2 md:grid-cols-4" aria-label={t(locale, "dusk.style")}>
+      <ul className={`grid grid-cols-2 gap-2${compact ? "" : " md:grid-cols-4"}`} aria-label={t(locale, "dusk.style")}>
         {DUSK_STYLES.map((style) => {
           const name = codeText(locale, "duskStyle", style);
-          const on = value.style === style;
+          const on = value?.style === style;
           return (
             <li key={style}>
               <button
@@ -82,7 +91,7 @@ export function DuskChoicePicker({
                     src={images[style]}
                     alt={t(locale, "dusk.exampleAlt", { style: name })}
                     fill
-                    sizes={SIZES}
+                    sizes={compact ? SIZES_COMPACT : SIZES}
                     className="object-cover"
                   />
                   <span aria-hidden="true" className={TAG}>
@@ -113,10 +122,10 @@ export function DuskChoicePicker({
               <button
                 key={sky}
                 type="button"
-                onClick={() => onChange(changeSky(value, sky))}
+                onClick={() => value !== null && onChange(changeSky(value, sky))}
                 disabled={disabled}
-                aria-pressed={value.sky === sky}
-                className={`${OPTION} ${value.sky === sky ? ON : OFF}`}
+                aria-pressed={value?.sky === sky}
+                className={`${OPTION} ${value?.sky === sky ? ON : OFF}`}
               >
                 {codeText(locale, "duskSky", sky)}
               </button>

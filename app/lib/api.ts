@@ -1040,6 +1040,40 @@ export interface ReviewCorrection {
   roundsLeft: number;
   /** Siste retterunde feilet; jobben har forrige bilde, og runden er ikke telt. */
   lastRoundFailed: boolean;
+  /**
+   * «Endre valg» (TG-NEW-145, KONTRAKT_ENDRE_VALG §3): valgene «Rett» tar imot,
+   * f.eks. ["dusk_style", "dusk_sky"] eller ["style", "decor_level"]. Tom naar
+   * feltet mangler (backend uten CORRECT_CHOICES) eller tjenesten ikke har valg.
+   * normalizeReview setter alltid feltet; mangler det (testdata), er det tomt.
+   */
+  choicesAccepted?: string[];
+  /** Valgene gjeldende bilde ble laget med, som utgangspunkt for velgeren; null (eller mangler) uten. */
+  currentChoices?: CurrentChoices | null;
+}
+
+/**
+ * `correction.current_choices` (KONTRAKT_ENDRE_VALG §3), som koder. Kveldsbilde
+ * har `duskStyle` og `duskSky` (stilen megleren ba om, ogsaa en gammel v1/v2),
+ * styling har `style` og `decorLevel`; resten er null.
+ */
+export interface CurrentChoices {
+  duskStyle: string | null;
+  duskSky: string | null;
+  style: string | null;
+  /** 1, 3 eller 5; null er stilens eget nivaa (eller ukjent). */
+  decorLevel: 1 | 3 | 5 | null;
+}
+
+/**
+ * `choices` i body for «Rett» (KONTRAKT_ENDRE_VALG §1): bare feltene som er
+ * endret. Et felt som mangler, beholder valget gjeldende bilde ble laget med.
+ * `decor_level: null` er stilens eget nivaa. `dusk_time` sendes aldri.
+ */
+export interface CorrectionChoices {
+  dusk_style?: string;
+  dusk_sky?: string;
+  style?: string;
+  decor_level?: 1 | 3 | 5 | null;
 }
 
 /** Body for «Rett»: hele avviket fra analysen, ikke endringen fra forrige runde. */
@@ -1058,6 +1092,14 @@ export interface RoundChoices {
   fireplaceFire: "yes" | "no" | null;
   /** Runden ble laget med lysene justert i forhold til analysen. */
   lightsChanged: boolean;
+  /**
+   * Stilen runden ble bestilt med (TG-NEW-145, V-a): `dusk_style` for
+   * Kveldsbilde, `styling_…` for styling; null naar feltet mangler. toRoundChoices
+   * setter alltid feltet; mangler det (testdata), gjelder null.
+   */
+  style?: string | null;
+  /** Pyntnivaaet runden ble bestilt med (styling): 1, 3, 5, eller null. */
+  decorLevel?: 1 | 3 | 5 | null;
 }
 
 /** En runde i `images.rounds`. Lenkene er merkede forhaandsvisninger eller null. */
@@ -1507,6 +1549,24 @@ function toRoundChoices(raw: unknown): RoundChoices | null {
     skyApplied: typeof raw.sky_applied === "boolean" ? raw.sky_applied : null,
     fireplaceFire: fire === "yes" || fire === "no" ? fire : null,
     lightsChanged: raw.lights_changed === true,
+    style: nonEmptyString(raw.style),
+    decorLevel: toDecorLevel(raw.decor_level),
+  };
+}
+
+/** 1, 3 eller 5 (heltall); alt annet er null. */
+function toDecorLevel(raw: unknown): 1 | 3 | 5 | null {
+  return raw === 1 || raw === 3 || raw === 5 ? raw : null;
+}
+
+/** `correction.current_choices`: strengt lest; ikke et objekt gir null. */
+function toCurrentChoices(raw: unknown): CurrentChoices | null {
+  if (!isRecord(raw)) return null;
+  return {
+    duskStyle: nonEmptyString(raw.dusk_style),
+    duskSky: nonEmptyString(raw.dusk_sky),
+    style: nonEmptyString(raw.style),
+    decorLevel: toDecorLevel(raw.decor_level),
   };
 }
 
@@ -1662,6 +1722,8 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     correction: {
       roundsLeft: roundsLeft !== null && roundsLeft > 0 ? roundsLeft : 0,
       lastRoundFailed: correction.last_round_failed === true,
+      choicesAccepted: stringList(correction.choices_accepted),
+      currentChoices: toCurrentChoices(correction.current_choices),
     },
     images: {
       originalUrl: stringOrNull(images.original_url),
@@ -1790,6 +1852,8 @@ export interface DecisionRequest {
   brightness_step?: BrightnessStep;
   /** Bare ved approve naar kontrollen ga `warning` (TG-NEW-199); ellers 422. */
   additions_acknowledged?: boolean;
+  /** Bare ved correct, og bare de endrede valgene (TG-NEW-145). Utelatt: samme valg. */
+  choices?: CorrectionChoices;
 }
 
 /**
@@ -1821,6 +1885,13 @@ export type DecisionOutcome =
  * Ren tolkning av svaret. FastAPI pakker feil i {"detail": {...}}; formen
  * uten innpakning godtas ogsaa.
  */
+/** 400-kodene for valgene i «Rett» (KONTRAKT_ENDRE_VALG §2). */
+export const CHOICE_ERROR_CODES: ReadonlySet<string> = new Set([
+  "invalid_choice",
+  "choices_not_accepted",
+  "choices_not_supported",
+]);
+
 export function parseDecisionResponse(httpStatus: number, body: unknown): DecisionOutcome {
   const outer = isRecord(body) ? body : {};
   const inner = isRecord(outer.detail) ? outer.detail : outer;
@@ -1843,6 +1914,11 @@ export function parseDecisionResponse(httpStatus: number, body: unknown): Decisi
       fields: stringList(inner.fields),
       overrideCode: stringOrNull(inner.override_code),
     };
+  }
+  if (httpStatus === 400 && code !== null && CHOICE_ERROR_CODES.has(code)) {
+    // «Endre valg» (KONTRAKT_ENDRE_VALG §2): 400 foer claim, 0 kr. `field` sier hvilket valg.
+    const field = stringOrNull(inner.field);
+    return { kind: "blocked", code, fields: field === null ? [] : [field], overrideCode: null };
   }
   if (httpStatus === 503) return { kind: "unavailable", code };
   return { kind: "error", httpStatus };

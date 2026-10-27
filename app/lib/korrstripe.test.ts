@@ -82,19 +82,21 @@ test("FE-1: «retry» har ny overskrift og nytt hint, uten «Lys i bildet: Ingen
     hintKey: "correct.retryHint",
     lightsList: false,
     footer: false,
+    footerKey: "correct.newImageFromOriginal",
   });
   assert.deepEqual(correctionView("retry", { lightsShown: false, lightCount: 0 }), {
     titleKey: "correct.retryTitle",
     hintKey: "correct.retryHint",
     lightsList: false,
     footer: false,
+    footerKey: "correct.newImageFromOriginal",
   });
   // Laaste lys staar fortsatt i lista («Kan ikke endres»).
   assert.equal(correctionView("retry", { lightsShown: true, lightCount: 2 }).lightsList, true);
 });
 
 test("FE-1: lys og peis som i dag", () => {
-  const today = { titleKey: "correct.title", hintKey: "correct.hint", lightsList: true, footer: true };
+  const today = { titleKey: "correct.title", hintKey: "correct.hint", lightsList: true, footer: true, footerKey: "correct.newImageFromOriginal" };
   assert.deepEqual(correctionView("lights", { lightsShown: true, lightCount: 2 }), today);
   assert.deepEqual(correctionView("fireplace", { lightsShown: true, lightCount: 0 }), today);
   assert.deepEqual(correctionView("fireplace", { lightsShown: false, lightCount: 0 }), {
@@ -102,6 +104,7 @@ test("FE-1: lys og peis som i dag", () => {
     hintKey: null,
     lightsList: false,
     footer: true,
+    footerKey: "correct.newImageFromOriginal",
   });
 });
 
@@ -116,11 +119,13 @@ test("FE-1: tekstene paa nb og en", () => {
 });
 
 test("FE-1: panelet bruker correctionView, og siden gir det correctionKind fra review-svaret", () => {
-  assert.match(panel, /const view = correctionView\(kind, \{ lightsShown, lightCount: rows\.length \}\);/);
+  // Dag 57 (TG-NEW-145): `choices` sier om velgeren vises.
+  assert.match(panel, /const view = correctionView\(kind, \{ lightsShown, lightCount: rows\.length, choices: choices !== null \}\);/);
   assert.match(panel, /\{t\(locale, view\.titleKey\)\}/);
   assert.match(panel, /\{view\.hintKey !== null && <p[^>]*>\{t\(locale, view\.hintKey\)\}<\/p>\}/);
   assert.match(panel, /\{view\.lightsList && \(/);
-  assert.match(panel, /\{view\.footer && <p[^>]*>\{t\(locale, "correct\.newImageFromOriginal"\)\}<\/p>\}/);
+  // Dag 57 (TG-NEW-145): teksten kommer fra correctionView (footerKey).
+  assert.match(panel, /\{view\.footer && <p[^>]*>\{t\(locale, view\.footerKey\)\}<\/p>\}/);
   assert.doesNotMatch(panel, /"correct\.title"|"correct\.hint"/);
   assert.match(page, /const kind = correctionKind\(review, fireplaceShown\);/);
   assert.match(page, /<CorrectionPanel[\s\S]*?kind=\{kind\}[\s\S]*?\/>/);

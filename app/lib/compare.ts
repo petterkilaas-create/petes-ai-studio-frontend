@@ -2,6 +2,7 @@ import type { DecisionAction, ReviewRound, RoundChoices } from "./api";
 import { codeText, t, type Locale, type UiKey } from "./i18n/index.ts";
 import { resultImageUrl, variantOptions, type ImageVariant, type ReviewPreviews } from "./review.ts";
 import { isStylingPreset, styleText } from "./styling.ts";
+import { displayStyle } from "./dusk.ts";
 
 /**
  * Variantene i «Sammenlign originalen med» (D2a). Rene funksjoner, saa de
@@ -113,15 +114,31 @@ function choiceParts(locale: Locale, choices: RoundChoices): string[] {
 }
 
 /**
+ * Stilen runden ble bestilt med (`choices.style`, «Endre valg», TG-NEW-145,
+ * V-a): stilnavnet for styling, kveldsstilen («Sen kveld») for Kveldsbilde.
+ * null naar runden ikke har feltet (backend uten CORRECT_CHOICES, eldre runder).
+ */
+export function roundStyleText(locale: Locale, choices: RoundChoices | null): string | null {
+  const style = choices?.style ?? null;
+  if (style === null) return null;
+  if (isStylingPreset(style)) return styleText(locale, style);
+  return codeText(locale, "duskStyle", displayStyle(style, choices?.time ?? null));
+}
+
+/**
  * Det som staar i parentes for admin: skumringsvalgene, eller stilen for
- * Digital styling (B2), der skumringsvalgene ikke gir mening.
+ * Digital styling (B2), der skumringsvalgene ikke gir mening. Har runden
+ * sin egen stil (TG-NEW-145), staar den foerst, og styling viser rundens stil
+ * i stedet for jobbens.
  */
 function labelParts(locale: Locale, variant: CompareVariant, presetId: string | null | undefined): string[] {
-  if (isStylingPreset(presetId)) {
-    const style = styleText(locale, presetId);
+  const roundStyle = roundStyleText(locale, variant.choices);
+  if (isStylingPreset(variant.choices?.style ?? presetId)) {
+    const style = roundStyle ?? styleText(locale, presetId);
     return style === null ? [] : [style];
   }
-  return variant.choices === null ? [] : choiceParts(locale, variant.choices);
+  const parts = variant.choices === null ? [] : choiceParts(locale, variant.choices);
+  return roundStyle === null ? parts : [roundStyle, ...parts];
 }
 
 /**
@@ -130,7 +147,9 @@ function labelParts(locale: Locale, variant: CompareVariant, presetId: string | 
  * lista (hull kan forekomme). Valgene i parentes bare med `choices`
  * (admin, TG-NEW-193); megleren ser «Versjon 2 · nå». For styling (`presetId`
  * `styling_…`) staar stilen i parentes: «Versjon 1 · nå (Fargerik eklektisk)».
- * Ordet er «Versjon», ikke «Runde» (FE-c, Dag 57, F2).
+ * Ordet er «Versjon», ikke «Runde» (FE-c, Dag 57, F2). Har runden sin egen
+ * stil («Endre valg», TG-NEW-145, V-a), ser ogsaa megleren den: «Versjon 2 ·
+ * nå (Funkis)» eller «Versjon 1 (Sen kveld)».
  */
 export function variantLabel(
   locale: Locale,
@@ -141,7 +160,8 @@ export function variantLabel(
   const base = t(locale, "compare.version", { n: (variant.round ?? 0) + 1 });
   if (variant.raw) return `${base} · ${t(locale, "compare.raw")}`;
   const head = variant.current ? `${base} · ${t(locale, "compare.now")}` : base;
-  const parts = opts.choices ? labelParts(locale, variant, opts.presetId) : [];
+  const roundStyle = roundStyleText(locale, variant.choices);
+  const parts = opts.choices ? labelParts(locale, variant, opts.presetId) : roundStyle === null ? [] : [roundStyle];
   return parts.length > 0 ? `${head} (${parts.join(", ")})` : head;
 }
 

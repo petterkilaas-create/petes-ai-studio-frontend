@@ -201,6 +201,7 @@ const nbUi = {
   "action.noneAllowed": "Ingen handlinger er tilgjengelige for denne jobben.",
   "action.correct": "Korriger bildet",
   "action.makeNewImage": "Lag nytt bilde",
+  "action.makeNewImageWithChoices": "Lag nytt bilde med valgene",
   // D-5c (Petter 25.10): fanene per bestilling og rammevarselet (TG-NEW-249, TG-NEW-260).
   "review.orderTabs.label": "Stilene i bestillingen",
   "review.framing.warning":
@@ -256,6 +257,11 @@ const nbUi = {
   "correct.retryHint": "Bildet lages på nytt fra originalen med de samme valgene.",
   "correct.roundsLeft": "Runder igjen: {n}",
   "correct.newImageFromOriginal": "Dette lager et nytt bilde fra originalen.",
+  // «Endre valg» (TG-NEW-145, FE-a, Dag 57).
+  "correct.choicesTitle": "Endre valgene",
+  "correct.fromOriginal": "Bildet lages på nytt fra originalen.",
+  "correct.style": "Stil",
+  "correct.styleHint": "Stiler som allerede er i bestillingen, vises ikke.",
   "correct.confirmExists": "Jeg bekrefter at lyskildene jeg har slått på, finnes i originalbildet.",
   "correct.lightOn": "På",
   "correct.lightOff": "Av",
@@ -792,6 +798,10 @@ const nb: Dictionary = {
       media_deleted: "Bildene er slettet, så jobben kan ikke godkjennes eller rettes lenger.",
       // TG-NEW-199 PR 4: «Godkjenn» ved advarsel uten krysset.
       additions_not_acknowledged: "Kryss av for at du har sjekket de markerte stedene, og godkjenn på nytt.",
+      // TG-NEW-145 (KONTRAKT_ENDRE_VALG §2): 400 for valgene i «Rett», 0 kr.
+      invalid_choice: "Valget kan ikke brukes for dette bildet. Velg på nytt og prøv igjen.",
+      choices_not_accepted: "Valgene kan ikke endres for dette bildet. Lag nytt bilde uten å endre dem.",
+      choices_not_supported: "Valgene kan bare endres når du korrigerer bildet.",
     },
     overrideCode: {
       too_many_lights: "For mange lyskilder er slått på. Slå av noen og prøv igjen.",
@@ -1150,6 +1160,7 @@ const en: Dictionary = {
     "action.noneAllowed": "No actions are available for this job.",
     "action.correct": "Correct image",
     "action.makeNewImage": "Create new image",
+    "action.makeNewImageWithChoices": "Create new image with the choices",
     "review.orderTabs.label": "Styles in this order",
     "review.framing.warning":
       "The image may show more of the room than the original: about {pct}% of the image lies outside the original photo. Compare the framing before you approve.",
@@ -1200,6 +1211,10 @@ const en: Dictionary = {
     "correct.retryHint": "The image is made again from the original with the same choices.",
     "correct.roundsLeft": "Rounds left: {n}",
     "correct.newImageFromOriginal": "This creates a new image from the original.",
+    "correct.choicesTitle": "Change the choices",
+    "correct.fromOriginal": "The image is made again from the original.",
+    "correct.style": "Style",
+    "correct.styleHint": "Styles that are already in the order are not shown.",
     "correct.confirmExists": "I confirm that the light sources I have turned on exist in the original image.",
     "correct.lightOn": "On",
     "correct.lightOff": "Off",
@@ -1686,6 +1701,9 @@ const en: Dictionary = {
       brightness_failed: "The image with the chosen brightness could not be created. Nothing was changed. Please try again.",
       media_deleted: "The images have been deleted, so the job can no longer be approved or corrected.",
       additions_not_acknowledged: "Tick the box to confirm you have checked the marked places, then approve again.",
+      invalid_choice: "The choice cannot be used for this image. Choose again and try again.",
+      choices_not_accepted: "The choices cannot be changed for this image. Create a new image without changing them.",
+      choices_not_supported: "The choices can only be changed when you correct the image.",
     },
     overrideCode: {
       too_many_lights: "Too many light sources are turned on. Turn some off and try again.",
