@@ -21,17 +21,21 @@ const VARIANTS: Record<ProcessStatus, { key: UiKey; tone: PillTone; pulse?: bool
   failed: { key: "status.failed", tone: "red" },
 };
 
+const NOT_CREATED: { key: UiKey; tone: PillTone; pulse?: boolean } = { key: "status.notCreated", tone: "neutral" };
+
 export interface StatusBadgeProps {
   status: ProcessStatus;
   /** Vises etter «Feilet» naar status er failed. */
   error?: string | null;
   /** «Godkjent» i stedet for «Ferdig» for kveldsbildet (som i Historikk). */
   service?: string | null;
+  /** P3b: vi laget ikke bildet: «Ikke laget», noeytralt (som statusVariant). */
+  notCreated?: boolean;
 }
 
-export function StatusBadge({ status, error, service }: StatusBadgeProps) {
+export function StatusBadge({ status, error, service, notCreated = false }: StatusBadgeProps) {
   const locale = useLocale();
-  const v = VARIANTS[status];
+  const v = status === "failed" && notCreated ? NOT_CREATED : VARIANTS[status];
   const key: UiKey = status === "done" && service === "scene_transform" ? "status.approved" : v.key;
   const label = status === "failed" && error ? `${t(locale, key)}: ${error}` : t(locale, key);
 

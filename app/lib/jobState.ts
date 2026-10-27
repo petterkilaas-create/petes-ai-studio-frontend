@@ -1,4 +1,4 @@
-import type { JobResult, Rejection, Review } from "./api";
+import type { JobResult, NotCreated, QuotaReturn, Rejection, Review } from "./api";
 import { POLL_TRANSIENT_DELAYS_MS, TransientError } from "./retry.ts";
 
 /**
@@ -24,6 +24,10 @@ export interface TerminalJobState {
   review: Review | null;
   /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
   reviewerReason: string | null;
+  /** P3b: grunnkodene naar vi ikke laget bildet (failed + not_created), ellers null. */
+  notCreated: NotCreated | null;
+  /** P3b: om gratisbildet er gitt tilbake (failed og avvist); ellers null. */
+  quotaReturn: QuotaReturn;
 }
 
 /**
@@ -38,6 +42,8 @@ export function terminalState(result: JobResult): TerminalJobState | null {
     rejection: null,
     review: null,
     reviewerReason: null,
+    notCreated: null,
+    quotaReturn: null,
   };
   switch (result.kind) {
     case "pending":
@@ -49,7 +55,12 @@ export function terminalState(result: JobResult): TerminalJobState | null {
     case "needs_review":
       return { ...base, status: "needs_review", review: result.review };
     case "rejected_by_reviewer":
-      return { ...base, status: "rejected_by_reviewer", reviewerReason: result.reason };
+      return {
+        ...base,
+        status: "rejected_by_reviewer",
+        reviewerReason: result.reason,
+        quotaReturn: result.quotaReturn ?? null,
+      };
     case "unknown":
       return { ...base, status: "unknown" };
     case "failed":
@@ -60,7 +71,13 @@ export function terminalState(result: JobResult): TerminalJobState | null {
             rejection: result.rejection,
             error: result.rejection.message,
           }
-        : { ...base, status: "failed", error: result.detail };
+        : {
+            ...base,
+            status: "failed",
+            error: result.detail,
+            notCreated: result.notCreated ?? null,
+            quotaReturn: result.quotaReturn ?? null,
+          };
   }
 }
 

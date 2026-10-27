@@ -25,6 +25,8 @@ import { JobMedia } from "@/app/components/JobMedia";
 import { workingView } from "@/app/lib/jobMedia";
 import { outputView } from "@/app/lib/jobState";
 import { ReviewerRejectedPanel } from "@/app/components/ReviewerRejectedPanel";
+import { NotCreatedPanel } from "@/app/components/NotCreatedPanel";
+import { pollFailedLines } from "@/app/lib/notCreated";
 import { OpenReviewLink } from "@/app/components/OpenReviewLink";
 import { DuskChoicePicker } from "@/app/components/DuskChoicePicker";
 import { DEFAULT_DUSK, duskParams, isDuskOrder, type DuskChoice } from "@/app/lib/dusk";
@@ -123,6 +125,12 @@ function ExpressContent() {
     !(job.errorCode === "free_quota_exhausted" && quotaShown.kind === "exhausted");
   const showOrderError =
     order.failed && !(order.errorCode === "free_quota_exhausted" && quotaShown.kind === "exhausted");
+  // P3b: grunnene naar vi ikke laget bildet, og gratisbildet bare ved "returned".
+  // Poll har ikke oppskriften: den er bestillingen siden selv sendte.
+  const jobLines = pollFailedLines(job, selectedTool?.presetId ?? null);
+  const notCreatedShown = isStyling
+    ? order.cards.length > 0 && order.cards.every((c) => c.notCreated !== null)
+    : job.notCreated !== null;
 
   // En jobb som ender failed av teknisk grunn har gitt bildet tilbake:
   // hent tallet paa nytt (KONTRAKT_KVOTE).
@@ -236,7 +244,11 @@ function ExpressContent() {
         subtitle={t(locale, "express.subtitle")}
         actions={
           /* Uten error: den raa teksten skal ikke vises (TG-NEW-121). */
-          <StatusBadge status={isStyling ? order.status : job.status} service={selectedTool?.service} />
+          <StatusBadge
+            status={isStyling ? order.status : job.status}
+            service={selectedTool?.service}
+            notCreated={notCreatedShown}
+          />
         }
       />
 
@@ -398,8 +410,13 @@ function ExpressContent() {
           {/* Aldri job.error (TG-NEW-121). Feil fra bestillingen med kode
               (TG-NEW-149) har egen tekst; uten kode, eller med ukjent kode,
               den generiske meldingen. */}
-          {showSubmitError && (
-            <ErrorPanel message={orderErrorText(locale, job.errorCode, job.errorReason)} />
+          {showSubmitError && job.notCreated !== null && <NotCreatedPanel lines={jobLines} />}
+
+          {showSubmitError && job.notCreated === null && (
+            <ErrorPanel
+              message={orderErrorText(locale, job.errorCode, job.errorReason)}
+              lines={jobLines.map((key) => t(locale, key))}
+            />
           )}
 
           {showOrderError && (
@@ -415,7 +432,7 @@ function ExpressContent() {
             job.jobId && <OpenReviewLink jobId={job.jobId} />}
 
           {job.status === "rejected_by_reviewer" && (
-            <ReviewerRejectedPanel reason={job.reviewerReason} />
+            <ReviewerRejectedPanel reason={job.reviewerReason} lines={jobLines} />
           )}
 
           {job.status === "unknown" && (

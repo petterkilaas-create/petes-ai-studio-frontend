@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { pollJob, type Rejection, type Review } from "./api";
+import { pollJob, type NotCreated, type QuotaReturn, type Rejection, type Review } from "./api";
 import { afterPoll, isTransientPollError, type JobStatus, type PollOutcome } from "./jobState";
 
 export type { JobStatus } from "./jobState";
@@ -26,6 +26,10 @@ export interface UseJobStatusResult {
   review: Review | null;
   /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
   reviewerReason: string | null;
+  /** P3b: grunnkodene naar vi ikke laget bildet, ellers null. */
+  notCreated: NotCreated | null;
+  /** P3b: om gratisbildet er gitt tilbake (failed og avvist), ellers null. */
+  quotaReturn: QuotaReturn;
   /** True mens pollingen venter etter en nettverksfeil eller 502-504 (TG-NEW-134). */
   waking: boolean;
 }
@@ -52,6 +56,8 @@ export function useJobStatus(jobId: string | null, options: UseJobStatusOptions 
   const [rejection, setRejection] = useState<Rejection | null>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [reviewerReason, setReviewerReason] = useState<string | null>(null);
+  const [notCreated, setNotCreated] = useState<NotCreated | null>(null);
+  const [quotaReturn, setQuotaReturn] = useState<QuotaReturn>(null);
   const [waking, setWaking] = useState(false);
 
   useEffect(() => {
@@ -63,6 +69,8 @@ export function useJobStatus(jobId: string | null, options: UseJobStatusOptions 
       setRejection(null);
       setReview(null);
       setReviewerReason(null);
+      setNotCreated(null);
+      setQuotaReturn(null);
       return;
     }
 
@@ -76,6 +84,8 @@ export function useJobStatus(jobId: string | null, options: UseJobStatusOptions 
     setRejection(null);
     setReview(null);
     setReviewerReason(null);
+    setNotCreated(null);
+    setQuotaReturn(null);
 
     // setTimeout-basert scheduling (ikke setInterval) slik at neste poll
     // kan utsettes per svar: backend-styrt via Retry-After paa 202, eller
@@ -117,6 +127,8 @@ export function useJobStatus(jobId: string | null, options: UseJobStatusOptions 
       setRejection(next.rejection);
       setReview(next.review);
       setReviewerReason(next.reviewerReason);
+      setNotCreated(next.notCreated);
+      setQuotaReturn(next.quotaReturn);
       setStatus(next.status);
     };
 
@@ -130,5 +142,5 @@ export function useJobStatus(jobId: string | null, options: UseJobStatusOptions 
     };
   }, [jobId, getToken]);
 
-  return { status, imageUrl, error, rejection, review, reviewerReason, waking };
+  return { status, imageUrl, error, rejection, review, reviewerReason, notCreated, quotaReturn, waking };
 }

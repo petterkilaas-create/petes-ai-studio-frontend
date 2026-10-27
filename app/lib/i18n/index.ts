@@ -124,6 +124,29 @@ const nbUi = {
   "stop.reason.furnish_as_mismatch": "Bildet passer ikke romtypen du valgte. Avbryt og bestill på nytt med riktig romtype.",
   "stop.reason.fireplace": "Vi er usikre på om bildet har en peis. Velg om den skal være tent.",
   "stop.reason.unknown": "Vi stoppet bildet før det ble laget.",
+  // Bekreftelsen etter «Ja, avbryt» (P3b): gratisbildet bare naar backend sier "returned".
+  "stop.cancelledByYou": "Avbrutt av deg",
+  "stop.done": "Bildet blir ikke laget.",
+  "stop.doneReturned": "Bildet blir ikke laget. Gratisbildet er gitt tilbake.",
+  // Jobber vi ikke laget (P3b, code not_created). Romtypen sendes ikke; retningen foelger av bildetypen.
+  "notCreated.title": "Bildet ble ikke laget.",
+  "notCreated.reason.image_type_not_supported":
+    "Blå himmel bytter himmelen på bilder tatt ute, og dette bildet er tatt innendørs.",
+  "notCreated.reason.sky_missing": "Vi fant ingen himmel i bildet, så det er ingenting å bytte.",
+  "notCreated.reason.sky_through_windows_only":
+    "Himmelen synes bare gjennom vinduer, og Blå himmel bytter bare himmel ute.",
+  "notCreated.reason.furnish_as_mismatch.inside":
+    "Bildet ser ut som et rom inne, men du valgte balkong eller terrasse. Bestill på nytt med riktig romtype.",
+  "notCreated.reason.furnish_as_mismatch.outside":
+    "Bildet ser ut som et uterom, men du valgte et rom inne. Bestill på nytt med riktig romtype.",
+  "notCreated.reason.furnish_as_mismatch": "Bildet passer ikke romtypen du valgte. Bestill på nytt med riktig romtype.",
+  "notCreated.reason.image_type_untested.kveldsbilde":
+    "Kveldsbilde er ikke laget for denne typen bilde ennå, for eksempel dronebilder.",
+  "notCreated.reason.image_type_untested.styling":
+    "Digital styling er ikke laget for denne typen bilde ennå, for eksempel dronebilder.",
+  "notCreated.reason.valid_runs_insufficient": "Analysen av bildet feilet, så vi har ikke laget det. Prøv igjen.",
+  "notCreated.reason.unknown": "Vi laget ikke dette bildet.",
+  "notCreated.quotaReturned": "Gratisbildet er gitt tilbake.",
   "note.analysis_light_unconfirmed":
     "Analysen fant noe som kan være en lampe, men var ikke sikker, så den er ikke tent. Er det en lampe, kan du tenne den i «Korriger bildet».",
   "note.analysis_sky_unclear":
@@ -511,6 +534,8 @@ const nbUi = {
   "status.approved": "Godkjent",
   "status.done": "Ferdig",
   "status.failed": "Feilet",
+  // P3b: en jobb vi ikke laget (not_created). Noeytral, ikke roed (Cowork 27.10, valg a).
+  "status.notCreated": "Ikke laget",
   "status.rejected": "Avvist",
   "status.unknown": "Ukjent status",
   "error.title": "Noe gikk galt",
@@ -912,6 +937,28 @@ const en: Dictionary = {
       "The image does not match the room type you chose. Cancel and order again with the right room type.",
     "stop.reason.fireplace": "We are not sure whether the image has a fireplace. Choose whether it should be lit.",
     "stop.reason.unknown": "We stopped the image before it was created.",
+    "stop.cancelledByYou": "Cancelled by you",
+    "stop.done": "The image will not be created.",
+    "stop.doneReturned": "The image will not be created. Your free image has been returned.",
+    "notCreated.title": "The image was not created.",
+    "notCreated.reason.image_type_not_supported":
+      "Blue sky replaces the sky in photos taken outdoors, and this photo was taken indoors.",
+    "notCreated.reason.sky_missing": "We found no sky in the image, so there is nothing to replace.",
+    "notCreated.reason.sky_through_windows_only":
+      "The sky is only visible through windows, and Blue sky only replaces the sky outdoors.",
+    "notCreated.reason.furnish_as_mismatch.inside":
+      "The image looks like an indoor room, but you chose balcony or terrace. Order again with the right room type.",
+    "notCreated.reason.furnish_as_mismatch.outside":
+      "The image looks like an outdoor space, but you chose an indoor room. Order again with the right room type.",
+    "notCreated.reason.furnish_as_mismatch":
+      "The image does not match the room type you chose. Order again with the right room type.",
+    "notCreated.reason.image_type_untested.kveldsbilde":
+      "Dusk image is not made for this type of image yet, for example drone photos.",
+    "notCreated.reason.image_type_untested.styling":
+      "Digital styling is not made for this type of image yet, for example drone photos.",
+    "notCreated.reason.valid_runs_insufficient": "The analysis of the image failed, so we did not create it. Please try again.",
+    "notCreated.reason.unknown": "We did not create this image.",
+    "notCreated.quotaReturned": "Your free image has been returned.",
     "note.analysis_light_unconfirmed":
       "The analysis found something that may be a lamp, but was not sure, so it is not lit. If it is a lamp, you can light it in “Correct image”.",
     "note.analysis_sky_unclear":
@@ -1271,6 +1318,7 @@ const en: Dictionary = {
     "status.approved": "Approved",
     "status.done": "Done",
     "status.failed": "Failed",
+    "status.notCreated": "Not created",
     "status.rejected": "Rejected",
     "status.unknown": "Unknown status",
     "error.title": "Something went wrong",

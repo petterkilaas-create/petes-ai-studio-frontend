@@ -75,6 +75,10 @@ interface JobStatusBody {
   reason?: unknown;
   /** TG-NEW-117: naar bildene ble slettet. Bare med naar det er satt. */
   media_deleted_at?: unknown;
+  /** P2 (Dag 56): grunnkodene naar vi ikke laget bildet (code not_created). */
+  reason_codes?: unknown;
+  /** P2 (Dag 56): om gratisbildet er gitt tilbake, for failed. */
+  quota_return?: unknown;
 }
 
 /**
@@ -189,6 +193,11 @@ export type SubmitResult =
  * {status:"failed", code:"job_failed"} -> "failed" med detail "job_failed",
  * ogsaa uten kode eller med ukjent kode. 500 taales til backend er endret
  * (pollJob kaster, og useJobStatus proever igjen).
+ *
+ * P2 (Dag 56): {status:"failed", code:"not_created", reason_codes} er en jobb
+ * vi ikke laget (porten) -> "failed" med detail "not_created" og
+ * `notCreated`. Alle failed-svarene kan ha `quota_return`; `quotaReturn` er
+ * bare med naar verdien er kjent og ikke null (som `mediaDeletedAt`).
  */
 export type JobResult =
   | { kind: "pending"; status: "queued" | "running"; retryAfterMs?: number }
@@ -196,11 +205,43 @@ export type JobResult =
   | { kind: "awaiting_approval"; previewUrl: string | null; jobId: string; mediaDeletedAt?: string }
   | { kind: "needs_review"; review: Review }
   | { kind: "unknown"; status: string | null; httpStatus: number }
-  | { kind: "rejected_by_reviewer"; reason: string | null }
-  | { kind: "failed"; detail: string; rejection?: Rejection };
+  | { kind: "rejected_by_reviewer"; reason: string | null; quotaReturn?: QuotaReturn }
+  | {
+      kind: "failed";
+      detail: string;
+      rejection?: Rejection;
+      notCreated?: NotCreated;
+      quotaReturn?: QuotaReturn;
+    };
 
 /** Fast detail for en feilet jobb (TG-NEW-156). Aldri tekst fra bodyen. */
 export const JOB_FAILED = "job_failed";
+
+/** P2 (Dag 56): koden for en jobb vi ikke laget (porten). */
+export const NOT_CREATED = "not_created";
+
+/** Grunnkodene for en jobb vi ikke laget; aldri tekst fra analysen. */
+export interface NotCreated {
+  reasonCodes: string[];
+}
+
+/**
+ * P2 (Dag 56): om gratisbildet er gitt tilbake for en feilet jobb.
+ * "returned" er det eneste som lover noe; "not_returned" og null (ingen
+ * reservasjon, eller ledgeren kunne ikke leses) gir ingen tekst.
+ */
+export type QuotaReturn = "returned" | "not_returned" | null;
+
+/** `quota_return` strengt lest: ukjent verdi eller ikke tekst gir null. */
+export function parseQuotaReturn(raw: unknown): QuotaReturn {
+  return raw === "returned" || raw === "not_returned" ? raw : null;
+}
+
+/** `quotaReturn` bare naar den er kjent (som pollDeleted). */
+function pollQuota(data: { quota_return?: unknown }): { quotaReturn?: QuotaReturn } {
+  const q = parseQuotaReturn(data.quota_return);
+  return q === null ? {} : { quotaReturn: q };
+}
 
 function unknownStatus(status: unknown, httpStatus: number): JobResult {
   return {
@@ -255,12 +296,21 @@ export function parseStatusBody(data: JobStatusBody, jobId: string): JobResult {
     };
   }
   if (data.status === "failed" && data.code === "rejected_by_reviewer") {
-    return { kind: "rejected_by_reviewer", reason: nonEmptyString(data.reason) };
+    return { kind: "rejected_by_reviewer", reason: nonEmptyString(data.reason), ...pollQuota(data) };
+  }
+  if (data.status === "failed" && data.code === NOT_CREATED) {
+    // P2: vi laget ikke bildet. Bare kodene, aldri feiltekst.
+    return {
+      kind: "failed",
+      detail: NOT_CREATED,
+      notCreated: { reasonCodes: stringList(data.reason_codes) },
+      ...pollQuota(data),
+    };
   }
   if (data.status === "failed") {
     // TG-NEW-156: feilet jobb, ogsaa uten kode eller med ukjent kode. Fast
     // detail, aldri tekst fra bodyen (TG-NEW-121).
-    return { kind: "failed", detail: JOB_FAILED };
+    return { kind: "failed", detail: JOB_FAILED, ...pollQuota(data) };
   }
   if (data.status === "needs_review") {
     const reasons = Array.isArray(data.reasons)
@@ -639,6 +689,10 @@ interface JobSummaryWire {
   preset_id?: unknown;
   /** TG-NEW-262: bestillingen jobben hoerer til, eller null (enkeltjobber og gamle jobber). */
   order_id?: unknown;
+  /** P2 (Dag 56): grunnkodene for code not_created, ellers []. */
+  reason_codes?: unknown;
+  /** P2 (Dag 56): "returned", "not_returned" eller null; bare for failed. */
+  quota_return?: unknown;
 }
 
 /**
@@ -738,6 +792,10 @@ export interface JobSummary {
    * feltet mangler (eldre backend).
    */
   orderId: string | null;
+  /** P2 (Dag 56): grunnkodene naar `code` er not_created, ellers tom. Mangler: tom. */
+  reasonCodes?: string[];
+  /** P2 (Dag 56): om gratisbildet er gitt tilbake (failed). Mangler: null. */
+  quotaReturn?: QuotaReturn;
 }
 
 /** Statusene i filteret «Venter paa meg» (GET /v1/jobs?status=, 2d-1a). */
@@ -837,6 +895,8 @@ export async function listJobs(opts: {
     thumbDeletedAt: nonEmptyString(row.thumb_deleted_at),
     presetId: nonEmptyString(row.preset_id),
     orderId: nonEmptyString(row.order_id),
+    reasonCodes: stringList(row.reason_codes),
+    quotaReturn: parseQuotaReturn(row.quota_return),
   }));
 }
 
@@ -1036,9 +1096,11 @@ export interface JobReviewDetail {
    * Mangler feltet (eldre backend), regnes jobben som egen.
    */
   isOwner: boolean;
-  /** gate_review | fireplace_answer_missing | null */
+  /** gate_review | fireplace_answer_missing | not_created (P2) | null */
   code: string | null;
   reasonCodes: string[];
+  /** P2 (Dag 56): om gratisbildet er gitt tilbake (bare failed); ellers null. */
+  quotaReturn: QuotaReturn;
   flagCodes: string[];
   /** Bare kjente handlinger; ukjente fra backend ignoreres. */
   allowedActions: DecisionAction[];
@@ -1396,6 +1458,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     isOwner: r.is_owner !== false,
     code: stringOrNull(r.code),
     reasonCodes: stringList(r.reason_codes),
+    quotaReturn: parseQuotaReturn(r.quota_return),
     flagCodes: stringList(r.flag_codes),
     allowedActions: stringList(r.allowed_actions).filter((a): a is DecisionAction =>
       DECISION_ACTIONS.has(a)
@@ -1550,7 +1613,8 @@ export interface DecisionRequest {
 
 /**
  * Utfallet av POST /v1/jobs/{id}/decision:
- * - updated (200): avgjort, hent review paa nytt.
+ * - updated (200): avgjort, hent review paa nytt. «Avbryt» i et stopp
+ *   (P2, Dag 56) har `quota_return`; `quotaReturn` er bare med da.
  * - poll (202): jobben kjoerer (continue); poll til awaiting_approval eller
  *   sluttstatus, hent saa review paa nytt.
  * - status_changed (409): noen andre har avgjort, eller siden viser en eldre
@@ -1564,7 +1628,7 @@ export interface DecisionRequest {
  * - not_found (404), error (alt annet).
  */
 export type DecisionOutcome =
-  | { kind: "updated"; status: string | null }
+  | { kind: "updated"; status: string | null; quotaReturn?: QuotaReturn }
   | { kind: "poll"; status: string | null }
   | { kind: "status_changed"; status: string | null }
   | { kind: "blocked"; code: string | null; fields: string[]; overrideCode: string | null }
@@ -1581,7 +1645,11 @@ export function parseDecisionResponse(httpStatus: number, body: unknown): Decisi
   const inner = isRecord(outer.detail) ? outer.detail : outer;
   const code = stringOrNull(inner.code);
   const status = stringOrNull(inner.status);
-  if (httpStatus === 200) return { kind: "updated", status };
+  if (httpStatus === 200) {
+    return "quota_return" in inner
+      ? { kind: "updated", status, quotaReturn: parseQuotaReturn(inner.quota_return) }
+      : { kind: "updated", status };
+  }
   if (httpStatus === 202) return { kind: "poll", status };
   if (httpStatus === 404) return { kind: "not_found" };
   if (httpStatus === 409 && code === "status_changed") {

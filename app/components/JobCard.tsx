@@ -18,6 +18,7 @@ import { cardClass } from "./ui/Card";
 import { Pill } from "./ui/Pill";
 import { messageText, t, type Locale, type UiKey } from "../lib/i18n";
 import { jobMessage } from "../lib/jobMessage";
+import { failedLines } from "../lib/notCreated";
 import { useLocale } from "../lib/i18n/useLocale";
 import { ownerBadge, rejectedLabelKey } from "../lib/roles";
 
@@ -48,17 +49,20 @@ function serviceLabel(locale: Locale, service: string, presetId: string | null):
 export function StatusPill({
   status,
   service,
+  code = null,
   rejectedKey = null,
 }: {
   status: JobSummaryStatus;
   service: string;
+  /** Koden fra lista: not_created gir «Ikke laget» (P3b). */
+  code?: string | null;
   /** Avvist ved godkjenning: «av deg» eller «av eieren» (TG-NEW-127). */
   rejectedKey?: UiKey | null;
 }) {
   const locale = useLocale();
   const v = rejectedKey !== null
     ? { labelKey: rejectedKey, tone: REVIEWER_REJECTED_TONE, pulse: false }
-    : statusVariant(status, service);
+    : statusVariant(status, service, code);
   return (
     <Pill tone={v.tone} pulse={v.pulse}>
       {t(locale, v.labelKey)}
@@ -74,6 +78,9 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
   // Kort melding ut fra status og `code`, aldri raa `error` (TG-NEW-121).
   // Avvist av megleren: merket sier det, og begrunnelsen vises under.
   const message = rejectedByYou ? null : jobMessage(job.status, job.code);
+  // P3b: grunnene naar vi ikke laget bildet, og gratisbildet bare ved "returned".
+  const lines = failedLines(job);
+  const reason = rejectedByYou && job.reason ? job.reason : null;
   const note = cardNote(job, thumb);
 
   return (
@@ -93,6 +100,7 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
           <StatusPill
             status={job.status}
             service={job.service}
+            code={job.code}
             rejectedKey={rejectedByYou ? rejectedLabelKey(job) : null}
           />
         </div>
@@ -115,15 +123,19 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
             )}
           </div>
         )}
-        {message && (
-          <p className="text-[13px] text-ink bg-surface-2 rounded-button p-3 leading-relaxed">
-            {messageText(locale, message)}
-          </p>
-        )}
-        {rejectedByYou && job.reason && (
-          <p className="text-[13px] text-ink bg-surface-2 rounded-button p-3 leading-relaxed break-words">
-            {t(locale, "review.reasonLabel")}: {job.reason}
-          </p>
+        {(message || reason || lines.length > 0) && (
+          // Én boks: meldingen eller begrunnelsen, og linjene fra failedLines under (P3b).
+          <div className="text-[13px] text-ink bg-surface-2 rounded-button p-3 leading-relaxed break-words flex flex-col gap-1">
+            {message && <p>{messageText(locale, message)}</p>}
+            {reason && (
+              <p>
+                {t(locale, "review.reasonLabel")}: {reason}
+              </p>
+            )}
+            {lines.map((key) => (
+              <p key={key}>{t(locale, key)}</p>
+            ))}
+          </div>
         )}
         {openKey && (
           <div>

@@ -5,7 +5,9 @@ import { useAuth } from "@clerk/nextjs";
 import {
   submitJob,
   SubmitError,
+  type NotCreated,
   type ProcessParams,
+  type QuotaReturn,
   type Rejection,
   type Review,
 } from "../lib/api";
@@ -59,6 +61,10 @@ export interface UseProcessJobResult {
   review: Review | null;
   /** Meglerens begrunnelse ved rejected_by_reviewer (2d-1), ellers null. */
   reviewerReason: string | null;
+  /** P3b: grunnkodene naar vi ikke laget bildet (fra pollingen), ellers null. */
+  notCreated: NotCreated | null;
+  /** P3b: om gratisbildet er gitt tilbake (fra pollingen), ellers null. */
+  quotaReturn: QuotaReturn;
   /** Async-jobbens id (for lenken til /godkjenning), ellers null. */
   jobId: string | null;
   /** True mens vi laster opp eller poller. */
@@ -211,6 +217,8 @@ export function useProcessJob(options: UseProcessJobOptions = {}): UseProcessJob
     rejection: job.rejection,
     review: job.review,
     reviewerReason: job.reviewerReason,
+    notCreated: job.notCreated,
+    quotaReturn: job.quotaReturn,
     jobId,
     isProcessing: isProcessingStatus(status),
     waking: job.waking,
