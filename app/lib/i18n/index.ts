@@ -177,8 +177,9 @@ const nbUi = {
   "dusk.cardText.late_evening_v1": "Dyp blå himmel, litt senere på kvelden.",
   "dusk.cardText.summer_night_v1": "Lys nordisk sommernatt med myke farger.",
   "dusk.cardsHint": "For utebilder og rom der himmelen synes. Uten himmel blir Varm skumring og Lys sommerkveld til Blå time.",
-  // Lys sommerkveld: bare en tekst, ingen sperre.
+  // Lys sommerkveld og Sen kveld med stjerner (Dag 56): bare en tekst, ingen sperre.
   "dusk.summerNote": "Ikke for bilder med snø.",
+  "dusk.starryNote": "Ikke for bilder fra mai–juli.",
   "dusk.exampleAlt": "Eksempel på {style}, laget med AI",
   "review.style": "Stil",
   "review.styleOrdered": "{applied} (bestilt: {requested})",
@@ -907,6 +908,7 @@ const en: Dictionary = {
     "dusk.cardText.summer_night_v1": "Light Nordic summer night with soft colours.",
     "dusk.cardsHint": "For exterior photos and rooms where the sky is visible. Without sky, Warm dusk and Light summer night become Blue hour.",
     "dusk.summerNote": "Not for photos with snow.",
+    "dusk.starryNote": "Not for photos taken in May–July.",
     "dusk.exampleAlt": "Example of {style}, created with AI",
     "review.style": "Style",
     "review.styleOrdered": "{applied} (ordered: {requested})",
