@@ -74,6 +74,7 @@ import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
 import { OrderTabs } from "@/app/components/godkjenning/OrderTabs";
 import { CorrectionPanel } from "@/app/components/godkjenning/CorrectionPanel";
 import { MoodPanel } from "@/app/components/godkjenning/MoodPanel";
+import { WishesPanel } from "@/app/components/godkjenning/WishesPanel";
 import { DetailsPanel } from "@/app/components/godkjenning/DetailsPanel";
 import { DisclosureBlock } from "@/app/components/godkjenning/DisclosureBlock";
 import { DownloadButton } from "@/app/components/godkjenning/DownloadButton";
@@ -683,6 +684,16 @@ export default function GodkjenningPage({
                         onAcknowledged={setAcknowledged}
                         framingPct={framingWarning(review.framing)}
                         message={messageText}
+                        locale={locale}
+                      />
+                    )}
+
+                    {/* TG-NEW-263: ønskene og svaret, for alle roller, under kortet med knappene. */}
+                    {review.wishes !== null && (
+                      <WishesPanel
+                        wishes={review.wishes}
+                        status={review.status}
+                        isOwner={review.isOwner}
                         locale={locale}
                       />
                     )}

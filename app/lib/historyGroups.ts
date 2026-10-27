@@ -4,6 +4,7 @@ import { t, type Locale, type Message, type UiKey } from "./i18n/index.ts";
 import { cardNote, type MediaView } from "./jobMedia.ts";
 import { jobMessage } from "./jobMessage.ts";
 import { failedLines } from "./notCreated.ts";
+import { wishesSummaryText } from "./wishes.ts";
 import { ownerBadge, rejectedLabelKey } from "./roles.ts";
 import { canOpenReview, isRejectedByReviewer } from "./statusVariants.ts";
 import { MAX_ORDER_JOBS, styleText } from "./styling.ts";
@@ -100,6 +101,8 @@ export interface OrderLine {
   message: Message | null;
   /** P3b: grunnene naar vi ikke laget bildet, og gratisbildet bare ved "returned" (failedLines). */
   lines: UiKey[];
+  /** TG-NEW-263: «Ønsker: 2 av 3 tatt med» for stilen (planen lages per stil), eller null. Aldri tekst fra ønsket. */
+  wishes: { key: UiKey; vars: Record<string, number> } | null;
 }
 
 export function orderLines(locale: Locale, jobs: readonly JobSummary[]): OrderLine[] {
@@ -112,6 +115,7 @@ export function orderLines(locale: Locale, jobs: readonly JobSummary[]): OrderLi
       reason: rejected && job.reason ? job.reason : null,
       message: rejected ? null : jobMessage(job.status, job.code),
       lines: failedLines(job),
+      wishes: wishesSummaryText(job.wishesSummary),
     };
   });
 }

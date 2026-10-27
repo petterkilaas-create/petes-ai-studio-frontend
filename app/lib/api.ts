@@ -693,6 +693,8 @@ interface JobSummaryWire {
   reason_codes?: unknown;
   /** P2 (Dag 56): "returned", "not_returned" eller null; bare for failed. */
   quota_return?: unknown;
+  /** TG-NEW-263: antall oensker tatt med (bare koder, aldri tekst), eller null. */
+  wishes_summary?: unknown;
 }
 
 /**
@@ -796,6 +798,8 @@ export interface JobSummary {
   reasonCodes?: string[];
   /** P2 (Dag 56): om gratisbildet er gitt tilbake (failed). Mangler: null. */
   quotaReturn?: QuotaReturn;
+  /** TG-NEW-263: oppsummeringen av oenskene (bare tall). null og undefined: ingen linje. */
+  wishesSummary?: WishesSummary | null;
 }
 
 /** Statusene i filteret «Venter paa meg» (GET /v1/jobs?status=, 2d-1a). */
@@ -897,6 +901,7 @@ export async function listJobs(opts: {
     orderId: nonEmptyString(row.order_id),
     reasonCodes: stringList(row.reason_codes),
     quotaReturn: parseQuotaReturn(row.quota_return),
+    wishesSummary: toWishesSummary(row.wishes_summary),
   }));
 }
 
@@ -1170,6 +1175,109 @@ export interface JobReviewDetail {
   order: ReviewOrder | null;
   /** D-5c (TG-NEW-260): rammen. Mangler feltet: ikke maalt. */
   framing: ReviewFraming;
+  /**
+   * TG-NEW-263: meglerens oensker og svaret paa dem. null uten oensker (og
+   * naar feltet mangler). Teksten er bare med for eieren og foer A1.
+   */
+  wishes: ReviewWishes | null;
+}
+
+// ---- Oenskene (TG-NEW-263, backend #254) ---------------------------------------
+// Bare kjente koder; ukjente blir null, saa siden aldri viser en kode raatt.
+
+export const WISH_VERSIONS = ["w1", "w2"] as const;
+export const PLAN_STATUSES = ["ok", "error", "skipped", "empty", "not_applicable"] as const;
+export const WISH_STATUSES = ["followed", "partly", "not_possible"] as const;
+export const WISH_REASONS = [
+  "none",
+  "rule_door",
+  "rule_fixed",
+  "not_in_list",
+  "no_space",
+  "conflict",
+  "unclear",
+  "rule_window",
+] as const;
+
+export type WishVersion = (typeof WISH_VERSIONS)[number];
+export type PlanStatus = (typeof PLAN_STATUSES)[number];
+export type WishStatus = (typeof WISH_STATUSES)[number];
+export type WishReason = (typeof WISH_REASONS)[number];
+
+/** Ett oenske i planen. `text` bare i w2, bare for eieren og foer A1. */
+export interface WishItem {
+  no: number;
+  /** null: planleggeren vurderte ikke linja (w2), eller ukjent kode. */
+  status: WishStatus | null;
+  reason: WishReason | null;
+  text: string | null;
+}
+
+export interface ReviewWishes {
+  /** null: ingen plan (porten stoppet foer planen, analysen feilet, eller planen var av). */
+  version: WishVersion | null;
+  planStatus: PlanStatus | null;
+  /** A1 har toemt teksten. */
+  cleared: boolean;
+  /** Hele oensket (w1 og uten plan), bare for eieren og foer A1; ellers null. */
+  text: string | null;
+  items: WishItem[];
+}
+
+/** Oppsummeringen i jobblisten: bare tall, aldri tekst. */
+export interface WishesSummary {
+  planStatus: PlanStatus | null;
+  count: number;
+  followed: number;
+  partly: number;
+}
+
+function oneOf<T extends string>(list: readonly T[], value: unknown): T | null {
+  return typeof value === "string" && (list as readonly string[]).includes(value) ? (value as T) : null;
+}
+
+function count(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+/**
+ * `wishes` i review-svaret, strengt lest. Ikke et objekt gir null. Rader
+ * uten et heltall `no` fra 1 hoppes over, og bare den foerste per nummer
+ * tas med. `text` bare naar den er tekst og ikke tom.
+ */
+export function toReviewWishes(raw: unknown): ReviewWishes | null {
+  if (!isRecord(raw)) return null;
+  const seen = new Set<number>();
+  const items: WishItem[] = [];
+  for (const item of records(raw.items)) {
+    const no = item.no;
+    if (typeof no !== "number" || !Number.isInteger(no) || no < 1 || seen.has(no)) continue;
+    seen.add(no);
+    items.push({
+      no,
+      status: oneOf(WISH_STATUSES, item.status),
+      reason: oneOf(WISH_REASONS, item.reason),
+      text: nonEmptyString(item.text),
+    });
+  }
+  return {
+    version: oneOf(WISH_VERSIONS, raw.version),
+    planStatus: oneOf(PLAN_STATUSES, raw.plan_status),
+    cleared: raw.cleared === true,
+    text: nonEmptyString(raw.text),
+    items,
+  };
+}
+
+/** `wishes_summary` i jobblisten, strengt lest. Ikke et objekt gir null. */
+export function toWishesSummary(raw: unknown): WishesSummary | null {
+  if (!isRecord(raw)) return null;
+  return {
+    planStatus: oneOf(PLAN_STATUSES, raw.plan_status),
+    count: count(raw.count),
+    followed: count(raw.followed),
+    partly: count(raw.partly),
+  };
 }
 
 /** En jobb i bestillingen (D-5c). `thumbUrl` er den merkede miniatyren, eller null. */
@@ -1510,6 +1618,7 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     reviewPanels: toReviewPanels(r.review_panels),
     order: toReviewOrder(r.order),
     framing: toFraming(r.framing),
+    wishes: toReviewWishes(r.wishes),
   };
 }
 
