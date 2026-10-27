@@ -1,6 +1,6 @@
 import type { ReviewRound, RoundChoices } from "./api";
 import { codeText, t, type Locale, type UiKey } from "./i18n/index.ts";
-import { variantOptions, type ImageVariant, type ReviewPreviews } from "./review.ts";
+import { resultImageUrl, variantOptions, type ImageVariant, type ReviewPreviews } from "./review.ts";
 import { isStylingPreset, styleText } from "./styling.ts";
 
 /**
@@ -125,11 +125,12 @@ function labelParts(locale: Locale, variant: CompareVariant, presetId: string | 
 }
 
 /**
- * Etiketten, f.eks. «Runde 2 · nå (tidlig, lette skyer)» eller «Runde 1 ·
+ * Etiketten, f.eks. «Versjon 2 · nå (tidlig, lette skyer)» eller «Versjon 1 ·
  * rått fra modellen». Nummeret er `round + 1` fra backend, aldri plassen i
  * lista (hull kan forekomme). Valgene i parentes bare med `choices`
- * (admin, TG-NEW-193); megleren ser «Runde 2 · nå». For styling (`presetId`
- * `styling_…`) staar stilen i parentes: «Runde 1 · nå (Fargerik eklektisk)».
+ * (admin, TG-NEW-193); megleren ser «Versjon 2 · nå». For styling (`presetId`
+ * `styling_…`) staar stilen i parentes: «Versjon 1 · nå (Fargerik eklektisk)».
+ * Ordet er «Versjon», ikke «Runde» (FE-c, Dag 57, F2).
  */
 export function variantLabel(
   locale: Locale,
@@ -137,9 +138,86 @@ export function variantLabel(
   opts: { choices: boolean; presetId?: string | null }
 ): string {
   if (variant.source.kind === "legacy") return t(locale, LEGACY_LABEL[variant.source.variant]);
-  const base = t(locale, "compare.round", { n: (variant.round ?? 0) + 1 });
+  const base = t(locale, "compare.version", { n: (variant.round ?? 0) + 1 });
   if (variant.raw) return `${base} · ${t(locale, "compare.raw")}`;
   const head = variant.current ? `${base} · ${t(locale, "compare.now")}` : base;
   const parts = opts.choices ? labelParts(locale, variant, opts.presetId) : [];
   return parts.length > 0 ? `${head} (${parts.join(", ")})` : head;
+}
+
+// ---------------------------------------------------------------------------
+// Versjonsstripa (FE-c, Dag 57): bare visning, ingen nye kall.
+// ---------------------------------------------------------------------------
+
+export const ORIGINAL_ID = "original";
+
+/** Originalen eller en variant i stripa, med lenken til miniatyren (null: plassholder). */
+export type StripEntry =
+  | { id: typeof ORIGINAL_ID; kind: "original"; url: string | null }
+  | { id: string; kind: "variant"; variant: CompareVariant; url: string | null };
+
+export interface StripImages extends ReviewPreviews {
+  originalUrl: string | null;
+}
+
+/** Gamle jobber uten `rounds`: forrige runde er eldst, saa løftet, saa rått. */
+const LEGACY_ORDER: Record<ImageVariant, number> = { previous: 0, lifted: 1, raw: 2 };
+
+function variantOrder(v: CompareVariant): number {
+  return v.source.kind === "legacy" ? LEGACY_ORDER[v.source.variant] : v.round ?? 0;
+}
+
+function variantUrl(images: ReviewPreviews, v: CompareVariant): string | null {
+  return v.source.kind === "legacy" ? resultImageUrl(images, v.source.variant) : v.source.url;
+}
+
+/**
+ * Stripa: originalen foerst, saa versjonene eldst foerst, og de raa (admin)
+ * til slutt, ogsaa eldst foerst. `variants` er de siden viser
+ * (compareVariants og visibleVariants); stripa endrer ikke hvilke.
+ */
+export function versionStrip(images: StripImages, variants: CompareVariant[]): StripEntry[] {
+  const sorted = [...variants].sort(
+    (a, b) => Number(a.raw) - Number(b.raw) || variantOrder(a) - variantOrder(b)
+  );
+  return [
+    { id: ORIGINAL_ID, kind: "original", url: images.originalUrl },
+    ...sorted.map((variant): StripEntry => ({ id: variant.id, kind: "variant", variant, url: variantUrl(images, variant) })),
+  ];
+}
+
+/** Stripa vises bare med minst to versjoner, som velgeren foer. */
+export function stripShown(strip: StripEntry[]): boolean {
+  return strip.filter((e) => e.kind === "variant").length > 1;
+}
+
+/** Versjonen som vises foerst og som «Godkjenn» gjelder: gjeldende, ellers den nyeste. Aldri originalen. */
+export function defaultEntry(strip: StripEntry[]): StripEntry | null {
+  const lifted = strip.filter((e) => e.kind === "variant" && !e.variant.raw);
+  const current = lifted.find((e) => e.kind === "variant" && e.variant.current);
+  return current ?? lifted[lifted.length - 1] ?? null;
+}
+
+/** Valgt fra id, eller standarden naar id-en ikke (lenger) finnes. */
+export function selectedEntry(strip: StripEntry[], id: string | null): StripEntry | null {
+  return strip.find((e) => e.id === id) ?? defaultEntry(strip);
+}
+
+/**
+ * «Godkjenn» er laast naar originalen eller en annen versjon enn den
+ * nyeste vises (AVVIK 5, Petters F4): backend godkjenner alltid gjeldende
+ * versjon. Uten versjoner er det ingenting aa laase.
+ */
+export function approveLocked(strip: StripEntry[], shown: StripEntry | null): boolean {
+  const latest = defaultEntry(strip);
+  return shown !== null && latest !== null && shown.id !== latest.id;
+}
+
+/** «Original», eller etiketten til varianten (variantLabel). */
+export function stripLabel(
+  locale: Locale,
+  entry: StripEntry,
+  opts: { choices: boolean; presetId?: string | null }
+): string {
+  return entry.kind === "original" ? t(locale, "review.original") : variantLabel(locale, entry.variant, opts);
 }

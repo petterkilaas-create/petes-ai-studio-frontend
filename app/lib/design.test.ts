@@ -998,7 +998,7 @@ test("TG147: Godkjenn-knappen viser «Godkjenner …» og er laast mens kallet p
   const card = withoutComments(read("components/godkjenning/DecisionCard.tsx"));
   assert.match(
     card,
-    /onClick=\{\(\) => onDecide\("approve"\)\}\s*disabled=\{locked \|\| !approveEnabled\(additions\.level, compared, acknowledged\)\}\s*aria-busy=\{approving\}[\s\S]*?\{approving \? t\(locale, "action\.approving"\) : t\(locale, "action\.approve"\)\}/
+    /onClick=\{\(\) => onDecide\("approve"\)\}\s*disabled=\{locked \|\| approveLock \|\| !approveEnabled\(additions\.level, compared, acknowledged\)\}\s*aria-busy=\{approving\}[\s\S]*?\{approving \? t\(locale, "action\.approving"\) : t\(locale, "action\.approve"\)\}/
   );
 });
 

@@ -56,6 +56,10 @@ import { choiceClass, FOCUS } from "./classes";
  * Bevegelsen settes rett paa elementene via ref i requestAnimationFrame,
  * ikke via React-state for hver bevegelse; tallene (prosent og skillet for
  * skjermlesere) oppdateres naar bevegelsen slutter.
+ *
+ * Versjonsstripa (FE-c, Dag 57): er «Original» valgt (`originalOnly`), er
+ * `aiUrl` originalen, og den vises alene med merkelappen «Original», uten
+ * Slider og Side ved side. Zoom og kart virker som foer.
  */
 
 type Mode = "slider" | "side" | "result";
@@ -84,6 +88,7 @@ export function Lightbox({
   aiAlt,
   placeholder,
   rounds,
+  originalOnly = false,
   onClose,
   locale,
 }: {
@@ -92,8 +97,10 @@ export function Lightbox({
   aiUrl: string | null;
   aiAlt: string;
   placeholder: ReactNode;
-  /** Rundene (VariantPicker), eller null naar det bare finnes én. */
+  /** Versjonene (VersionStrip), eller null naar det bare finnes én. */
   rounds: ReactNode;
+  /** «Original» er valgt i stripa: bare originalen vises (aiUrl er da originalen). */
+  originalOnly?: boolean;
   onClose: () => void;
   locale: Locale;
 }) {
@@ -106,7 +113,9 @@ export function Lightbox({
   const frameRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
 
-  const [mode, setMode] = useState<Mode>("slider");
+  const [chosenMode, setMode] = useState<Mode>("slider");
+  // «Original» i stripa: ett bilde, som «Kun resultat». Valget beholdes til neste versjon.
+  const mode: Mode = originalOnly ? "result" : chosenMode;
   const [stage, setStage] = useState({ width: 0, height: 0 });
   const [aspect, setAspect] = useState(3 / 2);
   // Tallene som vises og leses opp. Bevegelsen selv ligger i view og split.
@@ -345,19 +354,21 @@ export function Lightbox({
     >
       <div className="flex h-full flex-col gap-3 p-3 sm:p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap gap-1 rounded-pill bg-surface p-1" role="group" aria-label={t(locale, "compare.mode")}>
-            {MODES.map(({ mode: m, key }) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                aria-pressed={mode === m}
-                className={choiceClass(mode === m, "rounded-pill")}
-              >
-                {t(locale, key)}
-              </button>
-            ))}
-          </div>
+          {!originalOnly && (
+            <div className="flex flex-wrap gap-1 rounded-pill bg-surface p-1" role="group" aria-label={t(locale, "compare.mode")}>
+              {MODES.map(({ mode: m, key }) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  aria-pressed={mode === m}
+                  className={choiceClass(mode === m, "rounded-pill")}
+                >
+                  {t(locale, key)}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex items-center gap-1 rounded-pill bg-surface p-1">
             <button
               type="button"
@@ -447,7 +458,13 @@ export function Lightbox({
                 {pane(1, aiImg, <span className={`${CHIP} left-3`}>{t(locale, "review.result")}</span>)}
               </>
             )}
-            {ready && mode === "result" && pane(0, aiImg, <span className={`${CHIP} right-3`}>{t(locale, "compare.ai")}</span>)}
+            {ready &&
+              mode === "result" &&
+              pane(
+                0,
+                aiImg,
+                <span className={`${CHIP} right-3`}>{t(locale, originalOnly ? "review.original" : "compare.ai")}</span>
+              )}
           </div>
 
           {zoomed && (

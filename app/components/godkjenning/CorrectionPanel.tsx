@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReviewLight } from "../../lib/api";
-import { canToggle, isOn, type Lights, type Toggles } from "../../lib/correction";
+import { canToggle, correctionView, isOn, type CorrectionKind, type Lights, type Toggles } from "../../lib/correction";
 import { flatLights, lightNames } from "../../lib/lightsView";
 import { t, type Locale } from "../../lib/i18n";
 import type { FireplaceAnswer } from "../../lib/review";
@@ -26,6 +26,10 @@ const BTN_SECONDARY = buttonClass("secondary");
  *
  * Uten lyspanelet i oppskriften (`lightsShown` false, G3) vises verken
  * bryterne eller hintet om dem. Uten propen er alt som foer.
+ *
+ * Overskriften og hintet etter hva jobben har (FE-1, Dag 57, `kind` fra
+ * correctionKind): lys og peis som foer; uten noe aa endre «Lag et nytt
+ * forsøk» og at bildet lages paa nytt med de samme valgene (correctionView).
  */
 export function CorrectionPanel({
   lights,
@@ -33,6 +37,7 @@ export function CorrectionPanel({
   onToggle,
   fireplaceShown,
   lightsShown = true,
+  kind,
   answer,
   onAnswer,
   confirmNeeded,
@@ -53,6 +58,8 @@ export function CorrectionPanel({
   fireplaceShown: boolean;
   /** Lysbryterne og hintet om dem; false naar oppskriften mangler lyspanelet (G3). */
   lightsShown?: boolean;
+  /** Hva rettingen kan endre (correctionKind). */
+  kind: CorrectionKind;
   answer: FireplaceAnswer;
   onAnswer: (answer: "yes" | "no") => void;
   confirmNeeded: boolean;
@@ -69,14 +76,15 @@ export function CorrectionPanel({
 }) {
   const rows = flatLights(lights);
   const nameOf = lightNames(lights);
+  const view = correctionView(kind, { lightsShown, lightCount: rows.length });
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <p className="text-sm text-ink font-bold">{t(locale, "correct.title")}</p>
-        {lightsShown && <p className="text-xs text-ink-2 mt-1">{t(locale, "correct.hint")}</p>}
+        <p className="text-sm text-ink font-bold">{t(locale, view.titleKey)}</p>
+        {view.hintKey !== null && <p className="text-xs text-ink-2 mt-1">{t(locale, view.hintKey)}</p>}
       </div>
 
-      {lightsShown && (
+      {view.lightsList && (
         <div>
           <p className="text-xs font-bold text-ink mb-2">{t(locale, "correct.lightsTitle")}</p>
           {rows.length === 0 ? (
@@ -146,7 +154,7 @@ export function CorrectionPanel({
           {t(locale, "action.cancel")}
         </button>
       </div>
-      <p className="text-xs text-ink-2">{t(locale, "correct.newImageFromOriginal")}</p>
+      {view.footer && <p className="text-xs text-ink-2">{t(locale, "correct.newImageFromOriginal")}</p>}
     </div>
   );
 }

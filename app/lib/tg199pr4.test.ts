@@ -345,7 +345,7 @@ test("TG199 PR4 og D-5a: krysset er en ekte checkbox med label, og advarselen ku
   assert.match(card, /view\.notice === "warning" && \(\s*<div className="[^"]*text-red-fg bg-red-bg[^"]*" role="alert">/);
   assert.match(card, /view\.notice === "note" && \(\s*<p className="[^"]*text-amber-fg bg-amber-bg[^"]*" role="status">/);
   assert.match(card, /view\.notice === "unchecked" && \(\s*<p className="text-sm text-ink-2" role="status">/);
-  assert.match(card, /disabled=\{locked \|\| !approveEnabled\(additions\.level, compared, acknowledged\)\}/);
+  assert.match(card, /disabled=\{locked \|\| approveLock \|\| !approveEnabled\(additions\.level, compared, acknowledged\)\}/);
 });
 
 test("TG199 PR4: boksene på gjeldende rundes forhåndsvisning, plasseringen bare for admin", () => {
