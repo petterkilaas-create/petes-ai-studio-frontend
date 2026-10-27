@@ -151,6 +151,31 @@ const SCENE_PRESETS: readonly ScenePreset[] = [
     workingKey: "media.working.styling",
     fileSlug: "styling-urban-industri",
   },
+  // Aarstider (TG-NEW-271, Dag 57): én oppskrift per maalaarstid.
+  {
+    ids: ["aarstid_hoest"],
+    labelKey: "aarstid.preset.hoest",
+    workingKey: "media.working.aarstid",
+    fileSlug: "aarstid-hoest",
+  },
+  {
+    ids: ["aarstid_vaar"],
+    labelKey: "aarstid.preset.vaar",
+    workingKey: "media.working.aarstid",
+    fileSlug: "aarstid-vaar",
+  },
+  {
+    ids: ["aarstid_sommer"],
+    labelKey: "aarstid.preset.sommer",
+    workingKey: "media.working.aarstid",
+    fileSlug: "aarstid-sommer",
+  },
+  {
+    ids: ["aarstid_vinter"],
+    labelKey: "aarstid.preset.vinter",
+    workingKey: "media.working.aarstid",
+    fileSlug: "aarstid-vinter",
+  },
 ];
 
 /** Reserven mens `preset_id` mangler (null): skumring. */

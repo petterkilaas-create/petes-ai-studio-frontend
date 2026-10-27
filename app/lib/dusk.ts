@@ -75,9 +75,13 @@ export function skyChoices(style: DuskStyle): readonly DuskSky[] {
   return skies.length > 1 ? skies : [];
 }
 
-/** Nytt kort setter himmelen til standarden for stilen. Samme kort beholder himmelen. */
-export function changeStyle(choice: DuskChoice, style: DuskStyle): DuskChoice {
-  if (!isDuskStyle(style) || style === choice.style) return choice;
+/**
+ * Nytt kort setter himmelen til standarden for stilen. Samme kort beholder himmelen.
+ * Uten valg (null: en gammel stil i «Rett», TG-NEW-145) gir kortet stilen med standardhimmelen.
+ */
+export function changeStyle(choice: DuskChoice | null, style: DuskStyle): DuskChoice {
+  if (!isDuskStyle(style)) return choice ?? DEFAULT_DUSK;
+  if (choice !== null && style === choice.style) return choice;
   return { style, sky: DUSK_CARDS[style].skies[0] };
 }
 

@@ -39,12 +39,21 @@ import {
   correctionFireplaceShown,
   correctionKind,
   correctionResult,
+  correctionSubmitKey,
   initialToggles,
   needsConfirmation,
   previousFireplaceAnswer,
   setToggle,
   type Toggles,
 } from "@/app/lib/correction";
+import {
+  choicesBody,
+  choicesKind,
+  correctionStyles,
+  initialChoices,
+  NO_CHOICES,
+  type ChoiceState,
+} from "@/app/lib/correctionChoices";
 import { runDecision } from "@/app/lib/decide";
 import { canDownload } from "@/app/lib/download";
 import { formatDate } from "@/app/lib/dates";
@@ -88,6 +97,9 @@ import { Lightbox } from "@/app/components/godkjenning/Lightbox";
 import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
 import { OrderTabs } from "@/app/components/godkjenning/OrderTabs";
 import { CorrectionPanel } from "@/app/components/godkjenning/CorrectionPanel";
+import { DuskChoicePicker } from "@/app/components/DuskChoicePicker";
+import { StylingCorrectionPicker } from "@/app/components/styling/StylingCorrectionPicker";
+import { DUSK_IMAGES } from "@/app/(app)/tjenester/duskImages";
 import { MoodPanel } from "@/app/components/godkjenning/MoodPanel";
 import { WishesPanel } from "@/app/components/godkjenning/WishesPanel";
 import { DetailsPanel } from "@/app/components/godkjenning/DetailsPanel";
@@ -194,6 +206,8 @@ export default function GodkjenningPage({
   const [toggles, setToggles] = useState<Toggles>({});
   const [correctAnswer, setCorrectAnswer] = useState<FireplaceAnswer>(null);
   const [confirmed, setConfirmed] = useState(false);
+  // «Endre valg» (TG-NEW-145): valgene i velgeren, forvalgt fra current_choices ved «Korriger bildet».
+  const [choiceState, setChoiceState] = useState<ChoiceState>(NO_CHOICES);
   const [limitReached, setLimitReached] = useState(false);
   // «Jeg har sammenlignet bildet med originalen.» (D-5a). Ved advarsel setter
   // samme kryss ogsaa acknowledged (TG-NEW-199). Gjelder bare runden siden viser.
@@ -340,6 +354,7 @@ export default function GodkjenningPage({
     if (load.kind !== "ok") return;
     setToggles(initialToggles(load.review.lights));
     setCorrectAnswer(previousFireplaceAnswer(load.review.fireplace));
+    setChoiceState(initialChoices(load.review));
     setConfirmed(false);
     setRejectOpen(false);
     setMessage(null);
@@ -349,6 +364,7 @@ export default function GodkjenningPage({
   const cancelCorrection = () => {
     setEditing(false);
     setToggles({});
+    setChoiceState(NO_CHOICES);
     setConfirmed(false);
   };
 
@@ -364,7 +380,9 @@ export default function GodkjenningPage({
             review,
             toggles,
             correctionFireplaceShown(review.fireplace),
-            correctAnswer
+            correctAnswer,
+            // TG-NEW-145: bare de endrede valgene; uten endring er body som foer.
+            choicesBody(choicesKind(review), initialChoices(review), choiceState)
           ),
           getToken,
         }),
@@ -525,7 +543,11 @@ export default function GodkjenningPage({
             // Panelene per oppskrift (G3): uten peispanelet ingen peisspoersmaal.
             const fireplaceShown = correctionFireplaceShown(review.fireplace) && panelShown(review, "fireplace");
             const kind = correctionKind(review, fireplaceShown);
-            const correctionBody = buildCorrection(review, toggles, fireplaceShown, correctAnswer);
+            // «Endre valg» (TG-NEW-145): velgeren bare naar review-svaret sier det (choicesKind).
+            const choiceKind = choicesKind(review);
+            const choiceStart = initialChoices(review);
+            const choices = choicesBody(choiceKind, choiceStart, choiceState);
+            const correctionBody = buildCorrection(review, toggles, fireplaceShown, correctAnswer, choices);
             const overrides = correctionBody.overrides ?? { promote: [], disable: [], add: [] };
             const confirmNeeded = needsConfirmation(overrides);
             const submitEnabled = canSubmitCorrection({
@@ -750,6 +772,29 @@ export default function GodkjenningPage({
                               onCancel={cancelCorrection}
                               locked={locked}
                               admin={admin}
+                              choices={
+                                choiceKind === "dusk" ? (
+                                  <DuskChoicePicker
+                                    value={choiceState.dusk}
+                                    onChange={(dusk) => setChoiceState((prev) => ({ ...prev, dusk }))}
+                                    disabled={locked}
+                                    images={DUSK_IMAGES}
+                                    compact
+                                    locale={locale}
+                                  />
+                                ) : choiceKind === "styling" ? (
+                                  <StylingCorrectionPicker
+                                    styles={correctionStyles(review.order, jobId, choiceStart.style)}
+                                    style={choiceState.style}
+                                    decor={choiceState.decor}
+                                    onStyle={(style) => setChoiceState((prev) => ({ ...prev, style }))}
+                                    onDecor={(decor) => setChoiceState((prev) => ({ ...prev, decor }))}
+                                    disabled={locked}
+                                    locale={locale}
+                                  />
+                                ) : null
+                              }
+                              submitKey={correctionSubmitKey(choices)}
                               locale={locale}
                             />
                           ) : null

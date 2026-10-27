@@ -120,7 +120,8 @@ test("Stilkort: Vinterkveld finnes ikke (utelatt, ikke flagg)", () => {
 const picker = code("components/DuskChoicePicker.tsx");
 
 test("Stilkort: velgeren har fire kort i rutenett med bilde, aria-pressed og ett trykk", () => {
-  assert.match(picker, /<ul className="grid grid-cols-2 gap-2 md:grid-cols-4"/);
+  // Dag 57 (TG-NEW-145): fire per rad fra md, unntatt kompakt i «Rett».
+  assert.match(picker, /<ul className=\{`grid grid-cols-2 gap-2\$\{compact \? "" : " md:grid-cols-4"\}`\}/);
   const cards = picker.slice(picker.indexOf("DUSK_STYLES.map"), picker.indexOf("</ul>"));
   assert.match(cards, /onClick=\{\(\) => onChange\(changeStyle\(value, style\)\)\}/);
   assert.match(cards, /aria-pressed=\{on\}/);
@@ -137,15 +138,16 @@ test("Stilkort: velgeren har fire kort i rutenett med bilde, aria-pressed og ett
 });
 
 test("Stilkort: himmelknappene bare for stiler med himmelvalg, og ingen tidsknapper", () => {
-  assert.match(picker, /const skies = skyChoices\(value\.style\);/);
+  assert.match(picker, /const skies = value === null \? \[\] : skyChoices\(value\.style\);/);
   assert.match(picker, /\{skies\.length > 0 && \(/);
   const skies = picker.slice(picker.indexOf("skies.map"));
-  assert.match(skies, /onClick=\{\(\) => onChange\(changeSky\(value, sky\)\)\}/);
-  assert.match(skies, /aria-pressed=\{value\.sky === sky\}/);
+  // Dag 57 (TG-NEW-145): value kan vaere null i «Rett» (gammel stil); da er skies tom.
+  assert.match(skies, /onClick=\{\(\) => value !== null && onChange\(changeSky\(value, sky\)\)\}/);
+  assert.match(skies, /aria-pressed=\{value\?\.sky === sky\}/);
 });
 
 test("Stilkort: notatet ved Lys sommerkveld ligger alltid i en aria-live-boks", () => {
-  assert.match(picker, /const summer = value\.style === STYLE_SUMMER;/);
+  assert.match(picker, /const summer = value\?\.style === STYLE_SUMMER;/);
   assert.match(picker, /const note = summer \? t\(locale, "dusk\.summerNote"\) :/);
   assert.match(picker, /<p aria-live="polite"[^>]*>\s*\{note\}\s*<\/p>/);
   assert.doesNotMatch(picker, /\{(summer|note) && <p aria-live/);

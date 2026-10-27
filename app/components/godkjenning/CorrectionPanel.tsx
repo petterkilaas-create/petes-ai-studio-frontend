@@ -1,9 +1,10 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { ReviewLight } from "../../lib/api";
 import { canToggle, correctionView, isOn, type CorrectionKind, type Lights, type Toggles } from "../../lib/correction";
 import { flatLights, lightNames } from "../../lib/lightsView";
-import { t, type Locale } from "../../lib/i18n";
+import { t, type Locale, type UiKey } from "../../lib/i18n";
 import type { FireplaceAnswer } from "../../lib/review";
 import { buttonClass } from "../ui/Button";
 import { FOCUS } from "./classes";
@@ -30,6 +31,13 @@ const BTN_SECONDARY = buttonClass("secondary");
  * Overskriften og hintet etter hva jobben har (FE-1, Dag 57, `kind` fra
  * correctionKind): lys og peis som foer; uten noe aa endre «Lag et nytt
  * forsøk» og at bildet lages paa nytt med de samme valgene (correctionView).
+ *
+ * «Endre valg» (TG-NEW-145, FE-a): `choices` er velgeren fra siden
+ * (Kveldsbilde eller styling), vist oeverst naar review-svaret sier at valg
+ * kan endres. Da er overskriften «Endre valgene», og under knappene staar
+ * «Bildet lages på nytt fra originalen.». `submitKey` er «Lag nytt bilde»
+ * eller «Lag nytt bilde med valgene» (correctionSubmitKey). Uten propene er
+ * alt som foer.
  */
 export function CorrectionPanel({
   lights,
@@ -49,6 +57,8 @@ export function CorrectionPanel({
   onCancel,
   locked,
   admin,
+  choices = null,
+  submitKey = "action.makeNewImage",
   locale,
 }: {
   lights: Lights;
@@ -72,17 +82,23 @@ export function CorrectionPanel({
   locked: boolean;
   /** Vis «Usikker» (admin). */
   admin: boolean;
+  /** Velgeren for valgene (TG-NEW-145), eller null. */
+  choices?: ReactNode | null;
+  /** Teksten paa knappen (correctionSubmitKey). */
+  submitKey?: UiKey;
   locale: Locale;
 }) {
   const rows = flatLights(lights);
   const nameOf = lightNames(lights);
-  const view = correctionView(kind, { lightsShown, lightCount: rows.length });
+  const view = correctionView(kind, { lightsShown, lightCount: rows.length, choices: choices !== null });
   return (
     <div className="flex flex-col gap-4">
       <div>
         <p className="text-sm text-ink font-bold">{t(locale, view.titleKey)}</p>
         {view.hintKey !== null && <p className="text-xs text-ink-2 mt-1">{t(locale, view.hintKey)}</p>}
       </div>
+
+      {choices}
 
       {view.lightsList && (
         <div>
@@ -148,13 +164,13 @@ export function CorrectionPanel({
       <p className="text-xs text-ink-2">{t(locale, "correct.roundsLeft", { n: roundsLeft })}</p>
       <div className="flex flex-wrap gap-3">
         <button onClick={onSubmit} disabled={locked || !submitEnabled} className={BTN_PRIMARY}>
-          {t(locale, "action.makeNewImage")}
+          {t(locale, submitKey)}
         </button>
         <button onClick={onCancel} disabled={locked} className={BTN_SECONDARY}>
           {t(locale, "action.cancel")}
         </button>
       </div>
-      {view.footer && <p className="text-xs text-ink-2">{t(locale, "correct.newImageFromOriginal")}</p>}
+      {view.footer && <p className="text-xs text-ink-2">{t(locale, view.footerKey)}</p>}
     </div>
   );
 }

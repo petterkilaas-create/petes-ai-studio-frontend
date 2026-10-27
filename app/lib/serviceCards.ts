@@ -26,6 +26,10 @@ export const SERVICE_CARD_TEXT: Record<string, ServiceCardText> = {
     chips: ["express.card.klart_vaer.chip1", "express.card.klart_vaer.chip2"],
     cta: "express.card.klart_vaer.cta",
   },
+  aarstider: {
+    chips: ["express.card.aarstider.chip1", "express.card.aarstider.chip2"],
+    cta: "express.card.aarstider.cta",
+  },
   digital_styling: {
     chips: ["express.card.digital_styling.chip1", "express.card.digital_styling.chip2"],
     cta: "express.card.digital_styling.cta",

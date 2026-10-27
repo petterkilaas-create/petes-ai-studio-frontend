@@ -430,7 +430,8 @@ test("D-3: bestillingslinja viser riktig sammendrag, hva som mangler, og «Besti
   // Siden: samme knapp, samme handleRun og runDisabled, bare for styling; «Start paa nytt» staar der den stod.
   const page = read("(app)/tjenester/page.tsx");
   assert.match(page, /\{isStyling && \(\s*<StylingOrderBar \{\.\.\.stylingSummary\(locale, styling\)\}>\s*<Button onClick=\{handleRun\} disabled=\{runDisabled\}>\s*\{t\(locale, isProcessing \? "styling\.ordering" : "styling\.order"\)\}/);
-  assert.match(page, /\{!isStyling && \(\s*<Button onClick=\{handleRun\} disabled=\{runDisabled\}>\s*\{t\(locale, isProcessing \? "express\.running" : "express\.run"\)\}/);
+  // Dag 57: knappen «Lag bilde» gjelder ikke bestillingene (styling og aarstider, isOrder).
+  assert.match(page, /\{!isOrder && \(\s*<Button onClick=\{handleRun\} disabled=\{runDisabled\}>\s*\{t\(locale, isProcessing \? "express\.running" : "express\.run"\)\}/);
   assert.match(page, /<Button variant="secondary" onClick=\{handleReset\} disabled=\{isProcessing\}>/);
   assert.ok(page.indexOf("<StylingOrderBar") < page.indexOf('variant="secondary" onClick={handleReset}'));
   // Sticky nederst, kant til kant i kortet, over safe-area paa mobil; én kort linje paa mobil.

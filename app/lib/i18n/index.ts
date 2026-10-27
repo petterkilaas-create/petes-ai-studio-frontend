@@ -37,7 +37,9 @@ export type CodeGroup =
   | "disclosureBase"
   | "disclosureTime"
   | "disclosureEdited"
+  | "disclosureSeasonEdited"
   | "orderError"
+  | "aarstidOrderError"
   | "unsupportedImage"
   | "imageTypeHintNotSupported"
   | "furnishAs"
@@ -199,6 +201,7 @@ const nbUi = {
   "action.noneAllowed": "Ingen handlinger er tilgjengelige for denne jobben.",
   "action.correct": "Korriger bildet",
   "action.makeNewImage": "Lag nytt bilde",
+  "action.makeNewImageWithChoices": "Lag nytt bilde med valgene",
   // D-5c (Petter 25.10): fanene per bestilling og rammevarselet (TG-NEW-249, TG-NEW-260).
   "review.orderTabs.label": "Stilene i bestillingen",
   "review.framing.warning":
@@ -220,6 +223,11 @@ const nbUi = {
   "checklist.blaa_himmel.1": "Bare himmelen er byttet: bygning, terreng og beplantning er som i originalen.",
   "checklist.blaa_himmel.2": "Vinduer, dører og lamper: ingen lagt til eller fjernet.",
   "checklist.blaa_himmel.3": "Ingen ny sol, solflekker eller skygger som ikke var der.",
+  // Årstider (TG-NEW-271, Dag 57): sjekklister_v3.json.
+  "checklist.aarstider.1": "Bygning: vegger, vinduer, dører og tak som i originalen.",
+  "checklist.aarstider.2": "Ingen nye trær, busker eller ting, og ingenting fjernet.",
+  "checklist.aarstider.3": "Eviggrønne trær er grønne.",
+  "checklist.aarstider.4": "Løv på bakken: bare på gress og vei, ikke på terrassen, trappa eller balkongen.",
   // D-5a: «Hold for original» og lysboksen.
   "compare.hold": "Hold for original",
   "compare.expand": "Forstørr",
@@ -249,6 +257,11 @@ const nbUi = {
   "correct.retryHint": "Bildet lages på nytt fra originalen med de samme valgene.",
   "correct.roundsLeft": "Runder igjen: {n}",
   "correct.newImageFromOriginal": "Dette lager et nytt bilde fra originalen.",
+  // «Endre valg» (TG-NEW-145, FE-a, Dag 57).
+  "correct.choicesTitle": "Endre valgene",
+  "correct.fromOriginal": "Bildet lages på nytt fra originalen.",
+  "correct.style": "Stil",
+  "correct.styleHint": "Stiler som allerede er i bestillingen, vises ikke.",
   "correct.confirmExists": "Jeg bekrefter at lyskildene jeg har slått på, finnes i originalbildet.",
   "correct.lightOn": "På",
   "correct.lightOff": "Av",
@@ -398,6 +411,8 @@ const nbUi = {
   // APP1: Skjul ansikter sist, i egen kategori.
   "express.category.privacy": "Personvern",
   "express.tool.digital_styling.desc": "Møblerer tomme rom digitalt.",
+  "express.tool.aarstider.title": "Årstider",
+  "express.tool.aarstider.desc": "Samme bilde i en annen årstid: høst, vår, sommer eller vinter.",
   "express.tool.same_furniture_angles.title": "Samme møbler i flere vinkler",
   "express.tool.same_furniture_angles.desc": "Møbler rommet digitalt én gang, og få de samme møblene i flere bilder av rommet.",
   "express.tool.video.title": "Video",
@@ -423,6 +438,39 @@ const nbUi = {
   "express.card.privacy_blur.chip1": "Ingen valg, bare last opp",
   "express.card.privacy_blur.chip2": "Ikke KI-merket",
   "express.card.privacy_blur.cta": "Velg Skjul ansikter",
+  "express.card.aarstider.chip1": "Du velger årstidene",
+  "express.card.aarstider.chip2": "Bilder tatt utendørs",
+  "express.card.aarstider.cta": "Velg årstider",
+  // Årstider (TG-NEW-271, Dag 57): velgeren, bestillingslinja og etikettene.
+  "aarstid.source": "Når er bildet tatt?",
+  "aarstid.sourceHelp": "Bilder tatt om vinteren kan ikke brukes ennå.",
+  "aarstid.seasons": "Hvilke årstider vil du se?",
+  "aarstid.seasonsHelp": "Velg én til tre.",
+  "aarstid.seasonsNoSource": "Velg først når bildet er tatt.",
+  "aarstid.imageType": "Bildetype",
+  "aarstid.imageTypeHelp": "Fasade, hage og balkong støttes.",
+  "aarstid.orderNote": "Én bestilling, ett gratisbilde. Hver årstid blir et eget bilde.",
+  "aarstid.season.hoest": "Høst",
+  "aarstid.season.vaar": "Vår",
+  "aarstid.season.sommer": "Sommer",
+  "aarstid.season.vinter": "Vinter",
+  "aarstid.preset.hoest": "Årstider – høst",
+  "aarstid.preset.vaar": "Årstider – vår",
+  "aarstid.preset.sommer": "Årstider – sommer",
+  "aarstid.preset.vinter": "Årstider – vinter",
+  "aarstid.summary.seasons.0": "Ingen årstid valgt",
+  "aarstid.summary.seasons.1": "1 årstid",
+  "aarstid.summary.seasons.n": "{n} årstider",
+  "aarstid.summary.noSource": "Tidspunkt ikke valgt",
+  "aarstid.summary.source.sommer": "Tatt om sommeren",
+  "aarstid.summary.source.hoest": "Tatt om høsten",
+  "aarstid.summary.source.vaar": "Tatt om våren",
+  "aarstid.summary.missingSource": "Velg når bildet er tatt.",
+  "aarstid.summary.missingSeason": "Velg minst én årstid.",
+  "aarstid.summary.images.1": "1 bilde",
+  "aarstid.summary.images.n": "{n} bilder",
+  "aarstid.notStarted.capacity": "Denne årstiden ble ikke laget fordi tjenesten var travel. Bestillingen teller som én.",
+  "aarstid.notStarted": "Denne årstiden ble ikke laget. Bestillingen teller som én.",
   "express.comingTitle": "Kommer snart",
   "express.chooseImage": "Velg bilde",
   "express.run": "Lag bilde",
@@ -643,6 +691,7 @@ const nbUi = {
   "media.working.privacy_blur": "Skjuler ansikter …",
   "media.working.generic": "Lager bildet …",
   "media.working.styling": "Møblerer rommet …",
+  "media.working.aarstid": "Endrer årstiden …",
   "media.fireplaceQuestion": "Svar på spørsmålet om peisen",
   "media.originalAlt": "Dagsbildet som ble lastet opp",
   // TG-NEW-117: bildene er slettet. Ingen antall dager i tekstene; fristene kan endres.
@@ -749,6 +798,10 @@ const nb: Dictionary = {
       media_deleted: "Bildene er slettet, så jobben kan ikke godkjennes eller rettes lenger.",
       // TG-NEW-199 PR 4: «Godkjenn» ved advarsel uten krysset.
       additions_not_acknowledged: "Kryss av for at du har sjekket de markerte stedene, og godkjenn på nytt.",
+      // TG-NEW-145 (KONTRAKT_ENDRE_VALG §2): 400 for valgene i «Rett», 0 kr.
+      invalid_choice: "Valget kan ikke brukes for dette bildet. Velg på nytt og prøv igjen.",
+      choices_not_accepted: "Valgene kan ikke endres for dette bildet. Lag nytt bilde uten å endre dem.",
+      choices_not_supported: "Valgene kan bare endres når du korrigerer bildet.",
     },
     overrideCode: {
       too_many_lights: "For mange lyskilder er slått på. Slå av noen og prøv igjen.",
@@ -799,6 +852,11 @@ const nb: Dictionary = {
       evening_from_day: "Kveldsbilde laget med AI fra dagsbilde.",
       sky_replaced: "Bildet er redigert med AI: himmelen er byttet til klar himmel.",
       furniture_added: "Bildet er redigert med AI: rommet er møblert digitalt.",
+      // Årstider (backend versjon 9, TG-NEW-271): uten kilden, som teksten i bildet og XMP (Petter 27.10, 1 A).
+      season_autumn: "Bildet er redigert med AI: årstiden er endret til høst.",
+      season_spring: "Bildet er redigert med AI: årstiden er endret til vår.",
+      season_summer: "Bildet er redigert med AI: årstiden er endret til sommer.",
+      season_winter: "Bildet er redigert med AI: årstiden er endret til vinter.",
     },
     disclosureTime: {
       early: "Tidspunkt: tidlig skumring.",
@@ -813,6 +871,14 @@ const nb: Dictionary = {
       interior_lamps: "lamper i rommet",
       candles: "stearinlys",
       fireplace_fire: "ild i peisen",
+    },
+    // Årstider: kodene er hele ledd («fargene på løvet er endret»), satt sammen i disclosure.ts.
+    disclosureSeasonEdited: {
+      leaves_recoloured: "fargene på løvet er endret",
+      leaves_added: "løv er lagt til på trær og busker",
+      fallen_leaves_added: "løv er lagt på bakken",
+      snow_added: "snø er lagt til",
+      light_adapted: "lys og skygger er tilpasset årstiden",
     },
     // TG-NEW-199 PR 4: typene fra kontrollen av tillegg, i listene (additions.ts).
     additionType: {
@@ -874,6 +940,12 @@ const nb: Dictionary = {
       room_empty_not_confirmed: "Bekreft at rommet er tomt.",
       order_required: "Denne tjenesten må bestilles fra Tjenester.",
     },
+    // Årstider (TG-NEW-271): feil fra POST /v1/orders/aarstid. Andre koder: orderError.
+    aarstidOrderError: {
+      invalid_order: "Bestillingen er ikke gyldig. Velg når bildet er tatt og én til tre årstider.",
+      season_source_not_supported: "Bilder tatt om vinteren kan ikke brukes ennå. Velg sommer, høst eller vår.",
+      season_target_not_supported: "En av årstidene kan ikke lages fra et bilde tatt på denne tiden av året. Velg årstidene på nytt.",
+    },
     // S2-f: hvorfor en stil i bestillingen ikke ble startet (not_started).
     orderNotStarted: {
       capacity: "Denne stilen ble ikke laget fordi tjenesten var travel. Bestillingen teller som én.",
@@ -924,7 +996,9 @@ const nb: Dictionary = {
     disclosureBase: "Merketeksten kunne ikke lages.",
     disclosureTime: "Merketeksten kunne ikke lages.",
     disclosureEdited: "Merketeksten kunne ikke lages.",
+    disclosureSeasonEdited: "Merketeksten kunne ikke lages.",
     orderError: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
+    aarstidOrderError: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
     unsupportedImage: "Bildet kan ikke brukes. Lagre det som JPEG eller PNG og velg det på nytt.",
     imageTypeHintNotSupported: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
     furnishAs: "Ukjent romtype",
@@ -1086,6 +1160,7 @@ const en: Dictionary = {
     "action.noneAllowed": "No actions are available for this job.",
     "action.correct": "Correct image",
     "action.makeNewImage": "Create new image",
+    "action.makeNewImageWithChoices": "Create new image with the choices",
     "review.orderTabs.label": "Styles in this order",
     "review.framing.warning":
       "The image may show more of the room than the original: about {pct}% of the image lies outside the original photo. Compare the framing before you approve.",
@@ -1105,6 +1180,10 @@ const en: Dictionary = {
     "checklist.blaa_himmel.1": "Only the sky has changed: building, terrain and plants are as in the original.",
     "checklist.blaa_himmel.2": "Windows, doors and lamps: none added or removed.",
     "checklist.blaa_himmel.3": "No new sun, sun patches or shadows that were not there.",
+    "checklist.aarstider.1": "Building: walls, windows, doors and roof as in the original.",
+    "checklist.aarstider.2": "No new trees, shrubs or objects, and nothing removed.",
+    "checklist.aarstider.3": "Evergreen trees are green.",
+    "checklist.aarstider.4": "Leaves on the ground: only on grass and paths, not on the terrace, steps or balcony.",
     "compare.hold": "Hold for original",
     "compare.expand": "Enlarge",
     "lightbox.title": "Enlarged view",
@@ -1132,6 +1211,10 @@ const en: Dictionary = {
     "correct.retryHint": "The image is made again from the original with the same choices.",
     "correct.roundsLeft": "Rounds left: {n}",
     "correct.newImageFromOriginal": "This creates a new image from the original.",
+    "correct.choicesTitle": "Change the choices",
+    "correct.fromOriginal": "The image is made again from the original.",
+    "correct.style": "Style",
+    "correct.styleHint": "Styles that are already in the order are not shown.",
     "correct.confirmExists": "I confirm that the light sources I have turned on exist in the original image.",
     "correct.lightOn": "On",
     "correct.lightOff": "Off",
@@ -1269,6 +1352,8 @@ const en: Dictionary = {
     "express.category.more": "More",
     "express.category.privacy": "Privacy",
     "express.tool.digital_styling.desc": "Furnishes empty rooms digitally.",
+    "express.tool.aarstider.title": "Seasons",
+    "express.tool.aarstider.desc": "The same photo in another season: autumn, spring, summer or winter.",
     "express.tool.same_furniture_angles.title": "Same furniture, several angles",
     "express.tool.same_furniture_angles.desc": "Furnish a room digitally once and get the same furniture in several photos of it.",
     "express.tool.video.title": "Video",
@@ -1292,6 +1377,38 @@ const en: Dictionary = {
     "express.card.privacy_blur.chip1": "No choices, just upload",
     "express.card.privacy_blur.chip2": "Not AI-labelled",
     "express.card.privacy_blur.cta": "Choose Blur faces",
+    "express.card.aarstider.chip1": "You choose the seasons",
+    "express.card.aarstider.chip2": "Outdoor photos",
+    "express.card.aarstider.cta": "Choose seasons",
+    "aarstid.source": "When was the photo taken?",
+    "aarstid.sourceHelp": "Photos taken in winter cannot be used yet.",
+    "aarstid.seasons": "Which seasons do you want to see?",
+    "aarstid.seasonsHelp": "Choose one to three.",
+    "aarstid.seasonsNoSource": "First choose when the photo was taken.",
+    "aarstid.imageType": "Image type",
+    "aarstid.imageTypeHelp": "Façades, gardens and balconies are supported.",
+    "aarstid.orderNote": "One order, one free image. Each season becomes a separate image.",
+    "aarstid.season.hoest": "Autumn",
+    "aarstid.season.vaar": "Spring",
+    "aarstid.season.sommer": "Summer",
+    "aarstid.season.vinter": "Winter",
+    "aarstid.preset.hoest": "Seasons – autumn",
+    "aarstid.preset.vaar": "Seasons – spring",
+    "aarstid.preset.sommer": "Seasons – summer",
+    "aarstid.preset.vinter": "Seasons – winter",
+    "aarstid.summary.seasons.0": "No season chosen",
+    "aarstid.summary.seasons.1": "1 season",
+    "aarstid.summary.seasons.n": "{n} seasons",
+    "aarstid.summary.noSource": "Season of photo not chosen",
+    "aarstid.summary.source.sommer": "Taken in summer",
+    "aarstid.summary.source.hoest": "Taken in autumn",
+    "aarstid.summary.source.vaar": "Taken in spring",
+    "aarstid.summary.missingSource": "Choose when the photo was taken.",
+    "aarstid.summary.missingSeason": "Choose at least one season.",
+    "aarstid.summary.images.1": "1 image",
+    "aarstid.summary.images.n": "{n} images",
+    "aarstid.notStarted.capacity": "This season was not made because the service was busy. The order counts as one.",
+    "aarstid.notStarted": "This season was not made. The order counts as one.",
     "express.comingTitle": "Coming soon",
     "express.chooseImage": "Choose image",
     "express.run": "Create image",
@@ -1496,6 +1613,7 @@ const en: Dictionary = {
     "media.working.privacy_blur": "Blurring faces …",
     "media.working.generic": "Creating image …",
     "media.working.styling": "Furnishing the room …",
+    "media.working.aarstid": "Changing the season …",
     "media.fireplaceQuestion": "Answer the question about the fireplace",
     "media.originalAlt": "The uploaded daytime photo",
     "media.deleted": "Image deleted",
@@ -1583,6 +1701,9 @@ const en: Dictionary = {
       brightness_failed: "The image with the chosen brightness could not be created. Nothing was changed. Please try again.",
       media_deleted: "The images have been deleted, so the job can no longer be approved or corrected.",
       additions_not_acknowledged: "Tick the box to confirm you have checked the marked places, then approve again.",
+      invalid_choice: "The choice cannot be used for this image. Choose again and try again.",
+      choices_not_accepted: "The choices cannot be changed for this image. Create a new image without changing them.",
+      choices_not_supported: "The choices can only be changed when you correct the image.",
     },
     overrideCode: {
       too_many_lights: "Too many light sources are turned on. Turn some off and try again.",
@@ -1628,6 +1749,10 @@ const en: Dictionary = {
       evening_from_day: "Evening image created with AI from a daytime photo.",
       sky_replaced: "The image has been edited with AI: the sky has been replaced with a clear sky.",
       furniture_added: "The image has been edited with AI: the room has been furnished digitally.",
+      season_autumn: "The image has been edited with AI: the season has been changed to autumn.",
+      season_spring: "The image has been edited with AI: the season has been changed to spring.",
+      season_summer: "The image has been edited with AI: the season has been changed to summer.",
+      season_winter: "The image has been edited with AI: the season has been changed to winter.",
     },
     disclosureTime: {
       early: "Time of day: early dusk.",
@@ -1642,6 +1767,13 @@ const en: Dictionary = {
       interior_lamps: "lamps in the room",
       candles: "candles",
       fireplace_fire: "fire in the fireplace",
+    },
+    disclosureSeasonEdited: {
+      leaves_recoloured: "the colours of the leaves have been changed",
+      leaves_added: "leaves have been added to trees and shrubs",
+      fallen_leaves_added: "leaves have been added to the ground",
+      snow_added: "snow has been added",
+      light_adapted: "light and shadows have been adapted to the season",
     },
     additionType: {
       new_window: "new window",
@@ -1698,6 +1830,11 @@ const en: Dictionary = {
       room_empty_not_confirmed: "Please confirm that the room is empty.",
       order_required: "This service must be ordered from Services.",
     },
+    aarstidOrderError: {
+      invalid_order: "The order is not valid. Choose when the photo was taken and one to three seasons.",
+      season_source_not_supported: "Photos taken in winter cannot be used yet. Choose summer, autumn or spring.",
+      season_target_not_supported: "One of the seasons cannot be made from a photo taken at this time of year. Choose the seasons again.",
+    },
     orderNotStarted: {
       capacity: "This style was not made because the service was busy. The order counts as one.",
     },
@@ -1744,7 +1881,9 @@ const en: Dictionary = {
     disclosureBase: "The disclosure text could not be created.",
     disclosureTime: "The disclosure text could not be created.",
     disclosureEdited: "The disclosure text could not be created.",
+    disclosureSeasonEdited: "The disclosure text could not be created.",
     orderError: "The image could not be processed. Please try again, or contact us.",
+    aarstidOrderError: "The image could not be processed. Please try again, or contact us.",
     unsupportedImage: "The image cannot be used. Save it as JPEG or PNG and choose it again.",
     imageTypeHintNotSupported: "The image could not be processed. Please try again, or contact us.",
     furnishAs: "Unknown room type",
@@ -1805,6 +1944,17 @@ export function orderErrorText(locale: Locale, code: unknown, reason: unknown): 
   // TG-NEW-268: teksten etter valget (hint, lagt i reason av submitJob); ukjent gir den generelle.
   if (code === "image_type_hint_not_supported") return codeText(locale, "imageTypeHintNotSupported", reason);
   return codeText(locale, "orderError", code);
+}
+
+/**
+ * Tekst for en feilet bestilling av Aarstider (TG-NEW-271): kodene som bare
+ * gjelder aarstider (og `invalid_order`, som ellers ber om rom og stiler)
+ * fra aarstidOrderError; alt annet som orderErrorText.
+ */
+export function aarstidOrderErrorText(locale: Locale, code: unknown, reason: unknown): string {
+  const table = DICTIONARIES[locale].codes.aarstidOrderError;
+  if (typeof code === "string" && Object.hasOwn(table, code)) return table[code];
+  return orderErrorText(locale, code, reason);
 }
 
 /** Melding som enten er en ui-noekkel eller en kode fra backend. */

@@ -1,0 +1,92 @@
+{
+  "versjon": "sjekklister_v3",
+  "kilde": "Cowork-Claude 25.10.2026, forslag. Petter godkjenner teksten. Erstatter action.checkAdded paa godkjenningssiden. 25.10 kl. 13.53: punkt 5 (utsnitt) lagt til i styling (Petter: ja). 26.10.2026 (v2, Dag 55): punkt 5 i kveldsbilde (peisen) lagt til (Petter: ja, S3; Forbrukertilsynet: «flammer i en peis som ikke kan brukes» er ulovlig). 27.10.2026 (v3, Dag 57, TG-NEW-271): listen aarstider lagt til (AARSTID_FE_PROMPT punkt 3; teksten i RAPPORT_AARSTID_FE.md, Petter godkjenner ved stoppet foer commit).",
+  "tittel": {
+    "nb": "Sjekk mot originalen:",
+    "en": "Check against the original:"
+  },
+  "kryss": {
+    "nb": "Jeg har sammenlignet bildet med originalen.",
+    "en": "I have compared the image with the original.",
+    "nb_advarsel": "Jeg har sammenlignet bildet med originalen og sjekket de markerte stedene.",
+    "en_advarsel": "I have compared the image with the original and checked the marked places."
+  },
+  "lister": {
+    "styling": [
+      {
+        "nb": "Vinduer og dører: ingen lagt til, fjernet eller sperret av møbler, og ikke glass i dører.",
+        "en": "Windows and doors: none added, removed or blocked by furniture, and no glass in doors."
+      },
+      {
+        "nb": "Vegger, gulv, tak og kjøkken: samme farger og materialer.",
+        "en": "Walls, floor, ceiling and kitchen: same colours and materials."
+      },
+      {
+        "nb": "Faste ting: panelovner, stikkontakter og brytere står der de sto, og ingen nye spotter eller spotskinner.",
+        "en": "Fixed items: panel heaters, sockets and switches are where they were, and no new spotlights or light tracks."
+      },
+      {
+        "nb": "Utsikt og dagslys: som i originalen.",
+        "en": "View and daylight: as in the original."
+      },
+      {
+        "nb": "Utsnitt: som i originalen, uten deler av rommet som ikke er på originalfotoet.",
+        "en": "Framing: as in the original, with no part of the room that is not in the original photo."
+      }
+    ],
+    "kveldsbilde": [
+      {
+        "nb": "Vinduer og dører: ingen lagt til, fjernet eller flyttet.",
+        "en": "Windows and doors: none added, removed or moved."
+      },
+      {
+        "nb": "Lys: bare lamper og vinduer som finnes i originalen, er tent. Ingen nye lamper.",
+        "en": "Lights: only lamps and windows that are in the original are lit. No new lamps."
+      },
+      {
+        "nb": "Bygning, rom og omgivelser: samme former, farger og materialer, og ingen nye bygg, trær eller vann.",
+        "en": "Building, room and surroundings: same shapes, colours and materials, and no new buildings, trees or water."
+      },
+      {
+        "nb": "Himmelen passer med retningen: ingen solnedgang eller kveldssol der sola ikke går ned.",
+        "en": "The sky fits the direction: no sunset or evening sun where the sun does not set."
+      },
+      {
+        "nb": "Peis: flammer bare i en peis som kan brukes.",
+        "en": "Fireplace: flames only in a fireplace that can be used."
+      }
+    ],
+    "blaa_himmel": [
+      {
+        "nb": "Bare himmelen er byttet: bygning, terreng og beplantning er som i originalen.",
+        "en": "Only the sky has changed: building, terrain and plants are as in the original."
+      },
+      {
+        "nb": "Vinduer, dører og lamper: ingen lagt til eller fjernet.",
+        "en": "Windows, doors and lamps: none added or removed."
+      },
+      {
+        "nb": "Ingen ny sol, solflekker eller skygger som ikke var der.",
+        "en": "No new sun, sun patches or shadows that were not there."
+      }
+    ],
+    "aarstider": [
+      {
+        "nb": "Bygning: vegger, vinduer, dører og tak som i originalen.",
+        "en": "Building: walls, windows, doors and roof as in the original."
+      },
+      {
+        "nb": "Ingen nye trær, busker eller ting, og ingenting fjernet.",
+        "en": "No new trees, shrubs or objects, and nothing removed."
+      },
+      {
+        "nb": "Eviggrønne trær er grønne.",
+        "en": "Evergreen trees are green."
+      },
+      {
+        "nb": "Løv på bakken: bare på gress og vei, ikke på terrassen, trappa eller balkongen.",
+        "en": "Leaves on the ground: only on grass and paths, not on the terrace, steps or balcony."
+      }
+    ]
+  }
+}

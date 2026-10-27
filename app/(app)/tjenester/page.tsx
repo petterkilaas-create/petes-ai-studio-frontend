@@ -37,8 +37,10 @@ import { StylingChoicePicker } from "@/app/components/StylingChoicePicker";
 import { StylingOrderCards } from "@/app/components/StylingOrderCards";
 import { StylingOrderBar } from "@/app/components/styling/StylingOrderBar";
 import { EMPTY_STYLING, stylingParams, stylingSummary, type StylingChoice } from "@/app/lib/styling";
+import { AarstidChoicePicker } from "@/app/components/AarstidChoicePicker";
+import { aarstidParams, aarstidSummary, EMPTY_AARSTID, type AarstidChoice } from "@/app/lib/aarstid";
 import { privacyDownload, saveBlob } from "@/app/lib/download";
-import { orderErrorText, t } from "@/app/lib/i18n";
+import { aarstidOrderErrorText, orderErrorText, t } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import { SERVICE_PARAM, toolFromParam, visibleCategories } from "@/app/lib/services";
 import { Button } from "@/app/components/ui/Button";
@@ -89,13 +91,15 @@ function ExpressContent() {
   const [styling, setStyling] = useState<StylingChoice>(EMPTY_STYLING);
   // «Hvor er bildet tatt?» (TG-NEW-268): gjelder bildet, saa det nullstilles ved nytt bilde og ny tjeneste.
   const [imageType, setImageType] = useState<ImageTypeValue>("auto");
+  // Aarstider (TG-NEW-271): når bildet er tatt og aarstidene. Kilden gjelder bildet, saa alt nullstilles ved nytt bilde.
+  const [aarstid, setAarstid] = useState<AarstidChoice>(EMPTY_AARSTID);
 
   const locale = useLocale();
   const preview = useImagePreview();
   // Kvoten for gratisbilder (TG-NEW-149): fra GET /v1/quota, oppdatert fra bestillingen.
   const quota = useQuota();
   const job = useProcessJob({ onQuota: quota.apply });
-  // Digital styling: én bestilling med 1–3 av de 14 stilene (ENABLED.digital_styling, S4).
+  // Digital styling og Aarstider: én bestilling med 1–3 stiler eller aarstider.
   const order = useOrderJobs({ onQuota: quota.apply });
   const refreshQuota = quota.refresh;
 
@@ -105,6 +109,9 @@ function ExpressContent() {
     null;
 
   const isStyling = selectedTool?.kind === "styling";
+  const isAarstid = selectedTool?.kind === "aarstid";
+  // Bestillingene (POST /v1/orders/...): useOrderJobs og ett kort per jobb, ikke useProcessJob.
+  const isOrder = isStyling || isAarstid;
   const isProcessing = job.isProcessing || order.isProcessing;
   const output = outputView(job.status, job.imageUrl);
   // Personvern (dag 51): «Last ned» under Resultat, bare med et resultat.
@@ -123,7 +130,8 @@ function ExpressContent() {
     !preview.file ||
     isProcessing ||
     !canOrder(selectedTool.service, quota.quota) ||
-    (isStyling && stylingParams(styling) === null);
+    (isStyling && stylingParams(styling) === null) ||
+    (isAarstid && aarstidParams(aarstid) === null);
   // 402 vises av QuotaNotice naar kvoten er kjent; ellers av feilboksen.
   const showSubmitError =
     job.status === "failed" &&
@@ -134,7 +142,7 @@ function ExpressContent() {
   // P3b: grunnene naar vi ikke laget bildet, og gratisbildet bare ved "returned".
   // Poll har ikke oppskriften: den er bestillingen siden selv sendte.
   const jobLines = pollFailedLines(job, selectedTool?.presetId ?? null);
-  const notCreatedShown = isStyling
+  const notCreatedShown = isOrder
     ? order.cards.length > 0 && order.cards.every((c) => c.notCreated !== null)
     : job.notCreated !== null;
 
@@ -171,6 +179,7 @@ function ExpressContent() {
     setDusk(DEFAULT_DUSK);
     setStyling(EMPTY_STYLING);
     setImageType("auto");
+    setAarstid(EMPTY_AARSTID);
     job.reset();
     order.reset();
   };
@@ -184,8 +193,9 @@ function ExpressContent() {
     // Bekreftelsen av tomt rom gjelder bildet: et nytt bilde maa bekreftes paa nytt.
     order.reset();
     setStyling((s) => ({ ...s, roomEmpty: false }));
-    // Hvor bildet er tatt, gjelder ogsaa bildet (TG-NEW-268).
+    // Hvor bildet er tatt, gjelder ogsaa bildet (TG-NEW-268), og det samme gjoer aarstiden det er tatt i.
     setImageType("auto");
+    setAarstid(EMPTY_AARSTID);
   };
 
   const handleSceneTypeChange = (value: SceneType) => {
@@ -201,6 +211,12 @@ function ExpressContent() {
       // Egen bestilling (POST /v1/orders/styling): de valgte stilene, ett trekk.
       const params = stylingParams(styling);
       if (params !== null) void order.run(preview.file, params);
+      return;
+    }
+    if (selectedTool.kind === "aarstid") {
+      // Egen bestilling (POST /v1/orders/aarstid): kilden og aarstidene, ett trekk.
+      const params = aarstidParams(aarstid);
+      if (params !== null) void order.runAarstid(preview.file, params);
       return;
     }
     if (selectedTool.kind === "scene") {
@@ -233,6 +249,7 @@ function ExpressContent() {
     setDusk(DEFAULT_DUSK);
     setStyling(EMPTY_STYLING);
     setImageType("auto");
+    setAarstid(EMPTY_AARSTID);
   };
 
   const handleForceExterior = () => {
@@ -257,7 +274,7 @@ function ExpressContent() {
         actions={
           /* Uten error: den raa teksten skal ikke vises (TG-NEW-121). */
           <StatusBadge
-            status={isStyling ? order.status : job.status}
+            status={isOrder ? order.status : job.status}
             service={selectedTool?.service}
             notCreated={notCreatedShown}
           />
@@ -394,6 +411,10 @@ function ExpressContent() {
             />
           )}
 
+          {isAarstid && (
+            <AarstidChoicePicker value={aarstid} onChange={setAarstid} disabled={isProcessing} locale={locale} />
+          )}
+
           <QuotaNotice view={quotaShown} locale={locale} />
 
           {/* Digital styling: «Bestill» i den faste linja (D-3 kompakt); «Start på nytt» står under. */}
@@ -405,8 +426,17 @@ function ExpressContent() {
             </StylingOrderBar>
           )}
 
+          {/* Aarstider: samme faste linje som Digital styling. */}
+          {isAarstid && (
+            <StylingOrderBar {...aarstidSummary(locale, aarstid)}>
+              <Button onClick={handleRun} disabled={runDisabled}>
+                {t(locale, isProcessing ? "styling.ordering" : "styling.order")}
+              </Button>
+            </StylingOrderBar>
+          )}
+
           <div className="flex flex-wrap gap-3">
-            {!isStyling && (
+            {!isOrder && (
               <Button onClick={handleRun} disabled={runDisabled}>
                 {t(locale, isProcessing ? "express.running" : "express.run")}
               </Button>
@@ -443,7 +473,9 @@ function ExpressContent() {
           )}
 
           {showOrderError && (
-            <ErrorPanel message={orderErrorText(locale, order.errorCode, order.errorReason)} />
+            <ErrorPanel
+              message={(isAarstid ? aarstidOrderErrorText : orderErrorText)(locale, order.errorCode, order.errorReason)}
+            />
           )}
 
           {job.status === "needs_review" && job.review && (
@@ -464,8 +496,8 @@ function ExpressContent() {
         </Card>
       )}
 
-      {/* --- RESULTAT (Digital styling): originalen og ett kort per stil --- */}
-      {selectedTool && isStyling && (
+      {/* --- RESULTAT (Digital styling og Aarstider): originalen og ett kort per stil eller aarstid --- */}
+      {selectedTool && isOrder && (
         <section className="space-y-6">
           <Card>
             <p className="text-sm font-medium text-ink-2 mb-4">{t(locale, "review.original")}</p>
@@ -485,7 +517,7 @@ function ExpressContent() {
       )}
 
       {/* --- RESULTAT: input/output side om side --- */}
-      {selectedTool && !isStyling && (
+      {selectedTool && !isOrder && (
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>
             <p className="text-sm font-medium text-ink-2 mb-4">{t(locale, "review.original")}</p>

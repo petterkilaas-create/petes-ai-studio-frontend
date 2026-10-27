@@ -1,4 +1,5 @@
 import type {
+  CorrectionChoices,
   CorrectionOverrides,
   DecisionOutcome,
   DecisionRequest,
@@ -106,18 +107,31 @@ export function previousFireplaceAnswer(fireplace: JobReviewDetail["fireplace"])
  * Body for «Lag nytt bilde». Peissvaret er bare med naar spoersmaalet vises,
  * og aldri naar oppskriften mangler peispanelet (G3; backend avviser det).
  * `expected_version` er versjonen i review-svaret (TG-NEW-130), utelatt uten version.
+ * `choices` (TG-NEW-145) er bare med naar minst ett valg er endret (choicesBody);
+ * lys og peis sendes som foer, ogsaa sammen med nye valg.
  */
 export function buildCorrection(
   review: Pick<JobReviewDetail, "lights" | "version"> & Partial<Pick<JobReviewDetail, "reviewPanels">>,
   toggles: Toggles,
   fireplaceShown: boolean,
-  answer: FireplaceAnswer
+  answer: FireplaceAnswer,
+  choices: CorrectionChoices = {}
 ): DecisionRequest {
   const body: DecisionRequest = { action: "correct", overrides: buildOverrides(review.lights, toggles) };
   if (fireplaceShown && panelShown(review, "fireplace") && answer !== null) body.fireplace_fire = answer;
   if (review.version !== null) body.expected_version = review.version;
+  if (Object.keys(choices).length > 0) body.choices = choices;
   return body;
 }
+
+// «Endre valg» (TG-NEW-145): velgerne og body for valgene ligger i
+// correctionChoices.ts, saa reglene her ikke kjenner tjenestene.
+
+/** «Lag nytt bilde», eller «Lag nytt bilde med valgene» naar noe er endret. */
+export function correctionSubmitKey(choices: CorrectionChoices): UiKey {
+  return Object.keys(choices).length > 0 ? "action.makeNewImageWithChoices" : "action.makeNewImage";
+}
+
 
 /**
  * Bekreftelsen kreves naar minst én kandidat er slaatt paa. Hele avviket
@@ -186,21 +200,39 @@ export interface CorrectionView {
   hintKey: UiKey | null;
   /** «Lys i bildet» med lista (eller «Ingen»). */
   lightsList: boolean;
-  /** «Dette lager et nytt bilde fra originalen.» under knappene; hintet sier det ved retry. */
+  /** Linja under knappene; hintet sier det ved retry. */
   footer: boolean;
+  /** «Dette lager et nytt bilde fra originalen.», eller «Bildet lages på nytt fra originalen.» med valg. */
+  footerKey: UiKey;
 }
 
 /**
  * Lys og peis: som foer (Dag 57). Uten noe aa endre: «Lag et nytt forsøk»,
  * og «Lys i bildet: Ingen» vises ikke. Laaste lyskilder vises fortsatt i lista.
+ * Med velgeren (`choices`, TG-NEW-145): «Endre valgene», hintet om lysene bare
+ * naar de kan endres, og «Bildet lages på nytt fra originalen.» under knappene
+ * (aldri «med de samme valgene»).
  */
-export function correctionView(kind: CorrectionKind, opts: { lightsShown: boolean; lightCount: number }): CorrectionView {
+export function correctionView(
+  kind: CorrectionKind,
+  opts: { lightsShown: boolean; lightCount: number; choices?: boolean }
+): CorrectionView {
+  if (opts.choices === true) {
+    return {
+      titleKey: "correct.choicesTitle",
+      hintKey: kind === "lights" && opts.lightsShown ? "correct.hint" : null,
+      lightsList: kind === "retry" ? opts.lightsShown && opts.lightCount > 0 : opts.lightsShown,
+      footer: true,
+      footerKey: "correct.fromOriginal",
+    };
+  }
   if (kind === "retry") {
     return {
       titleKey: "correct.retryTitle",
       hintKey: "correct.retryHint",
       lightsList: opts.lightsShown && opts.lightCount > 0,
       footer: false,
+      footerKey: "correct.newImageFromOriginal",
     };
   }
   return {
@@ -208,6 +240,7 @@ export function correctionView(kind: CorrectionKind, opts: { lightsShown: boolea
     hintKey: opts.lightsShown ? "correct.hint" : null,
     lightsList: opts.lightsShown,
     footer: true,
+    footerKey: "correct.newImageFromOriginal",
   };
 }
 
@@ -225,6 +258,9 @@ export interface CodeMessage {
  * - blocked (409 original_missing/action_not_allowed): melding, knappene laases.
  * - retry (422, 503, annen feil): melding, valgene staar.
  */
+/** Samme koder som CHOICE_ERROR_CODES i api.ts (som ikke kan importeres her). */
+const CHOICE_ERRORS: ReadonlySet<string> = new Set(["invalid_choice", "choices_not_accepted", "choices_not_supported"]);
+
 export type CorrectionResult =
   | { kind: "poll" }
   | { kind: "reload"; message: CodeMessage | null }
@@ -244,6 +280,10 @@ export function correctionResult(out: DecisionOutcome): CorrectionResult {
     case "blocked":
       if (out.code === "correction_limit") {
         return { kind: "limit", message: { group: "decisionError", code: out.code } };
+      }
+      if (out.code !== null && CHOICE_ERRORS.has(out.code)) {
+        // TG-NEW-145: 400 for valgene (0 kr). Valgene staar, saa brukeren kan velge paa nytt.
+        return { kind: "retry", message: { group: "decisionError", code: out.code } };
       }
       if (out.code === "invalid_decision") {
         return out.overrideCode !== null

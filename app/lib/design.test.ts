@@ -421,7 +421,7 @@ test("D1c: services.ts har bare noekler til ordlista, ingen tekst eller emoji", 
   assert.doesNotMatch(code, /^\s*(title|desc|icon):/m);
   assert.doesNotMatch(code, EMOJI);
   const count = (re: RegExp) => code.match(re)?.length ?? 0;
-  const tools = count(/^\s*kind: "(simple|scene|styling)",/gm);
+  const tools = count(/^\s*kind: "(simple|scene|styling|aarstid)",/gm);
   assert.ok(tools >= 4);
   // Fem kategorier etter APP1: Lys og himmel, Rydd, Innredning, Mer og Personvern.
   assert.equal(count(/^\s*titleKey: "/gm), tools + 5, "hvert verktoey og de fem kategoriene");
@@ -629,7 +629,8 @@ test("D2b: rettingen er én flat liste med «Usikker», uten grunner, tidspunkt 
   // Siden sender kandidat-flagget videre til setToggle, og body bygges som foer.
   const page = read("(app)/godkjenning/[jobId]/page.tsx");
   assert.match(page, /setToggles\(\(prev\) => setToggle\(prev, light, uncertain, on\)\)/);
-  assert.match(page, /buildCorrection\(\s*review,\s*toggles,\s*correctionFireplaceShown\(review\.fireplace\),\s*correctAnswer\s*\)/);
+  // Dag 57 (TG-NEW-145): de endrede valgene som femte argument; lys og peis som foer.
+  assert.match(page, /buildCorrection\(\s*review,\s*toggles,\s*correctionFireplaceShown\(review\.fireplace\),\s*correctAnswer,(\s*\/\/[^\n]*)?\s*choicesBody\(choicesKind\(review\), initialChoices\(review\), choiceState\)\s*\)/);
   // LightLabel viser grunnen bare naar `reason` er satt, og «Usikker» bare med `uncertain`.
   const label = withoutComments(read("components/godkjenning/LightLabel.tsx"));
   assert.match(label, /\{reason && light\.reasonCode !== null && \(/);

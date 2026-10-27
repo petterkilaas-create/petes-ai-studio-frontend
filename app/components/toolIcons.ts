@@ -5,6 +5,7 @@ import {
   Eraser,
   FileText,
   Images,
+  Leaf,
   ScanFace,
   Sofa,
   Sun,
@@ -22,6 +23,7 @@ export const TOOL_ICONS: Record<string, LucideIcon> = {
   privacy_blur: ScanFace,
   klart_vaer: Sun,
   skumring: Sunset,
+  aarstider: Leaf,
   // «Kommer»-kortene (dag 45).
   digital_styling: Sofa,
   same_furniture_angles: Images,

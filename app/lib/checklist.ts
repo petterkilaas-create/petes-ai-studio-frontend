@@ -3,15 +3,17 @@ import type { UiKey } from "./i18n/index.ts";
 import { additionsView } from "./additions.ts";
 import { presetLabelKey } from "./presets.ts";
 import { isStylingPreset } from "./styling.ts";
+import { isAarstidPreset } from "./aarstid.ts";
 
 /**
  * Sjekklista og krysset foer «Godkjenn» (D-5a, Petter 25.10, AVVIK 2 a og
  * §3 b). Én liste per tjeneste; tekstene staar i ordlista og er generert fra
- * sjekklister_v2.json (kopi i testdata/; v2 la til peisen i kveldsbilde, Dag 55).
+ * sjekklister_v3.json (kopi i testdata/; v2 la til peisen i kveldsbilde, Dag 55;
+ * v3 la til aarstider, Dag 57).
  * Rene funksjoner, saa de kan testes med node --test.
  */
 
-export type ChecklistId = "styling" | "kveldsbilde" | "blaa_himmel";
+export type ChecklistId = "styling" | "kveldsbilde" | "blaa_himmel" | "aarstider";
 
 /** Punktene i hver liste, i rekkefoelgen fra sjekklister_v2.json. */
 export const CHECKLISTS: Readonly<Record<ChecklistId, readonly UiKey[]>> = {
@@ -30,17 +32,20 @@ export const CHECKLISTS: Readonly<Record<ChecklistId, readonly UiKey[]>> = {
     "checklist.kveldsbilde.5",
   ],
   blaa_himmel: ["checklist.blaa_himmel.1", "checklist.blaa_himmel.2", "checklist.blaa_himmel.3"],
+  aarstider: ["checklist.aarstider.1", "checklist.aarstider.2", "checklist.aarstider.3", "checklist.aarstider.4"],
 };
 
 /**
  * Lista for jobben, valgt paa samme maate som siden ellers skiller
  * tjenestene: styling paa `styling_`-prefikset (isStylingPreset, som
  * «Detaljer» og rundeetiketten), skumring og Klart vaer paa oppskriften i
- * presets.ts (som etiketten og filnavnet). Uten `preset_id` (eldre jobber)
+ * presets.ts (som etiketten og filnavnet), aarstider paa `aarstid_`-prefikset
+ * (isAarstidPreset). Uten `preset_id` (eldre jobber)
  * gjelder reserven der, skumring. Ukjent oppskrift: ingen liste, bare krysset.
  */
 export function checklistFor(presetId: string | null | undefined): ChecklistId | null {
   if (isStylingPreset(presetId)) return "styling";
+  if (isAarstidPreset(presetId)) return "aarstider";
   switch (presetLabelKey("scene_transform", presetId)) {
     case "service.scene_transform":
       return "kveldsbilde";

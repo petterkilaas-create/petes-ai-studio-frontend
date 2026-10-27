@@ -341,12 +341,12 @@ test("TG-153: menyen viser bare ikonet under 640 px, og Start er ikke et hus", (
 // paa, vises som «Kommer» og kan ikke bestilles. ENABLED er uendret.
 // ---------------------------------------------------------------------------
 
-test("dag 45 / S4: visibleCategories gir alle kortene i rekkefoelge, fire «Kommer» og fire bestillbare", () => {
+test("dag 45 / S4 / Dag 57: visibleCategories gir alle kortene i rekkefoelge, fire «Kommer» og fem bestillbare", () => {
   const cats = visibleCategories();
   assert.deepEqual(
     cats.map((c) => [c.id, c.items.map((t) => t.id)]),
     [
-      ["timetraveler", ["skumring", "klart_vaer"]],
+      ["timetraveler", ["skumring", "klart_vaer", "aarstider"]],
       ["fixit", ["magic_cleanup"]],
       ["furnishing", ["digital_styling", "same_furniture_angles"]],
       ["more", ["video", "copywriter"]],
@@ -356,7 +356,7 @@ test("dag 45 / S4: visibleCategories gir alle kortene i rekkefoelge, fire «Komm
   const tools = cats.flatMap((c) => c.items);
   assert.deepEqual(
     tools.filter((t) => t.orderable).map((t) => t.id),
-    ["skumring", "klart_vaer", "digital_styling", "privacy_blur"]
+    ["skumring", "klart_vaer", "aarstider", "digital_styling", "privacy_blur"]
   );
   assert.deepEqual(
     tools.filter((t) => !t.orderable).map((t) => t.id),
@@ -368,10 +368,12 @@ test("dag 45 / S4: visibleCategories gir alle kortene i rekkefoelge, fire «Komm
 });
 
 test("dag 45 / S4: det som kan bestilles og ?tjeneste= (Klart vaer aapnet i K3, Digital styling i S4)", () => {
-  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "digital_styling", "privacy_blur"]);
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "aarstider", "digital_styling", "privacy_blur"]);
   assert.deepEqual(expressCategories().map((c) => c.id), ["timetraveler", "furnishing", "privacy"]);
   assert.deepEqual(toolFromParam("klart_vaer"), { categoryId: "timetraveler", toolId: "klart_vaer" });
   assert.deepEqual(toolFromParam("digital_styling"), { categoryId: "furnishing", toolId: "digital_styling" });
+  // Dag 57: Aarstider etter Blaa himmel, i Lys og himmel.
+  assert.deepEqual(toolFromParam("aarstider"), { categoryId: "timetraveler", toolId: "aarstider" });
   for (const id of ["magic_cleanup", "virtual_stage", "video", "copywriter"]) {
     assert.equal(toolFromParam(id), null, id);
   }
@@ -563,19 +565,19 @@ test("S3: «Samme møbler i flere vinkler» er et «Kommer»-kort etter Digital 
   }
 });
 
-test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENABLED er uendret", () => {
+test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENABLED er uendret (Dag 57: aarstider)", () => {
   assert.deepEqual(
     visibleCategories()
       .filter((c) => c.id !== "privacy")
       .map((c) => [c.id, c.items.map((t) => t.id)]),
     [
-      ["timetraveler", ["skumring", "klart_vaer"]],
+      ["timetraveler", ["skumring", "klart_vaer", "aarstider"]],
       ["fixit", ["magic_cleanup"]],
       ["furnishing", ["digital_styling", "same_furniture_angles"]],
       ["more", ["video", "copywriter"]],
     ]
   );
-  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "digital_styling", "privacy_blur"]);
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "aarstider", "digital_styling", "privacy_blur"]);
   assert.deepEqual(ENABLED, {
     klart_vaer: true,
     magic_cleanup: false,
@@ -584,6 +586,7 @@ test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENA
     privacy_blur: true,
     skumring: true,
     digital_styling: true,
+    aarstider: true,
   });
 });
 

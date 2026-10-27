@@ -7,12 +7,15 @@ import { CHECKLISTS, checklistFor, comparedKey, type ChecklistId } from "./check
 import { DICTIONARIES, t, type Locale } from "./i18n/index.ts";
 
 // D-5a (Petter 25.10): sjekklista per tjeneste (AVVIK 2 a) og ett kryss
-// (§3 b). Tekstene i ordlista er generert fra sjekklister_v2.json (Dag 55:
-// peisen i kveldsbilde); testene sammenligner med en byte-lik kopi, saa ingen
-// tekst kan gli fra kilden. v1 staar igjen og laaser forskjellen mot v2.
+// (§3 b). Tekstene i ordlista er generert fra sjekklister_v3.json (Dag 55:
+// peisen i kveldsbilde; Dag 57: aarstider); testene sammenligner med en
+// byte-lik kopi, saa ingen tekst kan gli fra kilden. v1 og v2 staar igjen og
+// laaser forskjellene.
 
-const BYTES = readFileSync(new URL("./testdata/sjekklister_v2.json", import.meta.url));
-const SHA256 = "f8fc3ff441acc3d3dd213a854150aac6e448f8c9712e27823b8b68bb000ba8c3";
+const BYTES = readFileSync(new URL("./testdata/sjekklister_v3.json", import.meta.url));
+const SHA256 = "e19321f34d35ea87cf150b5eef06c1de86b80cfb0fc413fac3ddfb89cdd066ad";
+const V2_BYTES = readFileSync(new URL("./testdata/sjekklister_v2.json", import.meta.url));
+const V2_SHA256 = "f8fc3ff441acc3d3dd213a854150aac6e448f8c9712e27823b8b68bb000ba8c3";
 const V1_BYTES = readFileSync(new URL("./testdata/sjekklister_v1.json", import.meta.url));
 const V1_SHA256 = "615a5b634a301b513c2d093be73fe6b58bfc6ba499ec8776076106efc4343ca8";
 
@@ -25,15 +28,38 @@ interface Source {
 const SOURCE = JSON.parse(BYTES.toString("utf8")) as Source;
 const LOCALES: Locale[] = ["nb", "en"];
 
-test("D-5a og Dag 55: kopien av sjekklister_v2.json er byte-lik kilden", () => {
+test("D-5a, Dag 55 og Dag 57: kopien av sjekklister_v3.json er byte-lik kilden", () => {
   assert.equal(createHash("sha256").update(BYTES).digest("hex"), SHA256);
-  assert.equal(SOURCE.versjon, "sjekklister_v2");
+  assert.equal(SOURCE.versjon, "sjekklister_v3");
+});
+
+test("Dag 57: v3 skiller seg fra v2 bare i versjon, kilde og den nye lista aarstider", () => {
+  assert.equal(createHash("sha256").update(V2_BYTES).digest("hex"), V2_SHA256);
+  const v2 = JSON.parse(V2_BYTES.toString("utf8")) as Source & { kilde: string };
+  const v3 = SOURCE as Source & { kilde: string };
+  assert.equal(v2.versjon, "sjekklister_v2");
+  assert.ok(v3.kilde.startsWith(v2.kilde), "v3 legger til i kilden, endrer ikke");
+  assert.deepEqual(v3.tittel, v2.tittel);
+  assert.deepEqual(v3.kryss, v2.kryss);
+  const { aarstider, ...rest } = v3.lister;
+  assert.deepEqual(rest, v2.lister);
+  assert.deepEqual(Object.keys(v3).sort(), Object.keys(v2).sort());
+  // Punktene fra oppdraget: bygningen, ingenting nytt, eviggroenne og loevet bare paa gress og vei.
+  assert.deepEqual(
+    aarstider.map((item) => item.nb),
+    [
+      "Bygning: vegger, vinduer, dører og tak som i originalen.",
+      "Ingen nye trær, busker eller ting, og ingenting fjernet.",
+      "Eviggrønne trær er grønne.",
+      "Løv på bakken: bare på gress og vei, ikke på terrassen, trappa eller balkongen.",
+    ]
+  );
 });
 
 test("Dag 55: v2 skiller seg fra v1 bare i versjon, kilde og peisen sist i kveldsbilde", () => {
   assert.equal(createHash("sha256").update(V1_BYTES).digest("hex"), V1_SHA256);
   const v1 = JSON.parse(V1_BYTES.toString("utf8")) as Source & { kilde: string };
-  const v2 = SOURCE as Source & { kilde: string };
+  const v2 = JSON.parse(V2_BYTES.toString("utf8")) as Source & { kilde: string };
   assert.equal(v1.versjon, "sjekklister_v1");
   assert.notEqual(v2.kilde, v1.kilde);
   assert.deepEqual(v2.tittel, v1.tittel);
@@ -62,7 +88,7 @@ test("D-5a: tittelen og krysset i ordlista er teksten i JSON-en", () => {
   }
 });
 
-test("D-5a: de tre listene har punktene fra JSON-en, i samme rekkefølge, på nb og en", () => {
+test("D-5a og Dag 57: de fire listene har punktene fra JSON-en, i samme rekkefølge, på nb og en", () => {
   assert.deepEqual(Object.keys(CHECKLISTS).sort(), Object.keys(SOURCE.lister).sort());
   for (const id of Object.keys(SOURCE.lister) as ChecklistId[]) {
     assert.equal(CHECKLISTS[id].length, SOURCE.lister[id].length, id);
@@ -95,6 +121,10 @@ test("D-5a: lista velges ut fra oppskriften, som ellers på siden", () => {
   }
   // Klart vaer («Blå himmel»).
   assert.equal(checklistFor("klart_vaer"), "blaa_himmel");
+  // Aarstider (Dag 57): alle fire maalaarstidene.
+  for (const id of ["aarstid_hoest", "aarstid_vaar", "aarstid_sommer", "aarstid_vinter"]) {
+    assert.equal(checklistFor(id), "aarstider", id);
+  }
   // Ukjent tjeneste: ingen liste, bare krysset.
   for (const id of ["magic_cleanup", "virtual_stage", "styling", "", "Skumring", "__proto__"]) {
     assert.equal(checklistFor(id), null, id);

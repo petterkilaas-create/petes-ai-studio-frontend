@@ -18,6 +18,10 @@ import { FOCUS } from "./classes";
  *
  * Valgt kort har moerk ramme og fylt hake. Med tre valgt dempes de andre.
  * PC: 7 per rad (to rader). Mobil: én rad som sveipes, ca. 2,5 kort synlig.
+ *
+ * «Endre valg» (TG-NEW-145): `shown` er stilene som vises (uten stilene i
+ * bestillingen), og `compact` gir to kort per rad (kolonnen i «Rett»).
+ * `focus` kan vaere null (ingen stil valgt).
  */
 export function StyleCards({
   styles,
@@ -27,21 +31,31 @@ export function StyleCards({
   onFocus,
   onToggle,
   onOpen,
+  shown = STYLING_STYLES,
+  compact = false,
   locale,
 }: {
   styles: readonly StylingStyle[];
-  focus: StylingStyle;
+  focus: StylingStyle | null;
   atLimit: boolean;
   disabled: boolean;
   onFocus: (style: StylingStyle) => void;
   onToggle: (style: StylingStyle) => void;
   /** Aapner moodboardet; knappen faar fokus tilbake naar dialogen lukkes. */
   onOpen: (style: StylingStyle, opener: HTMLElement) => void;
+  shown?: readonly StylingStyle[];
+  compact?: boolean;
   locale: Locale;
 }) {
   return (
-    <ul className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pt-1 pb-2 md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-7">
-      {STYLING_STYLES.map((style) => {
+    <ul
+      className={
+        compact
+          ? "grid grid-cols-2 gap-2"
+          : "-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pt-1 pb-2 md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-7"
+      }
+    >
+      {shown.map((style) => {
         const short = styleShort(style);
         const name = t(locale, `styling.style.${short}`);
         const on = styles.includes(style);
@@ -50,7 +64,7 @@ export function StyleCards({
         return (
           <li
             key={style}
-            className={`relative h-[88px] w-[38%] shrink-0 snap-start overflow-hidden rounded-button border md:w-auto ${
+            className={`relative h-[88px] overflow-hidden rounded-button border ${compact ? "" : "w-[38%] shrink-0 snap-start md:w-auto "}${
               on ? "border-ink ring-1 ring-ink" : "border-line"
             } ${focused ? "bg-surface-2" : "bg-surface"} ${locked ? "opacity-60" : ""}`}
           >
