@@ -24,6 +24,8 @@ const VARIANTS: Record<JobSummaryStatus, StatusVariant> = {
   unknown: { labelKey: "status.unknown", tone: "neutral" },
 };
 
+const NOT_CREATED_VARIANT: StatusVariant = { labelKey: "status.notCreated", tone: "neutral" };
+
 /**
  * Pill-variant for en status. listJobs normaliserer allerede ukjente
  * verdier til "unknown"; oppslaget faller i tillegg tilbake ved kjoeretid,
@@ -32,8 +34,12 @@ const VARIANTS: Record<JobSummaryStatus, StatusVariant> = {
  * succeeded heter «Godkjent» for kveldsbildet (scene_transform), som bare
  * blir ferdig ved godkjenning, og «Ferdig» for andre tjenester (Skjul
  * ansikter og skilt har ingen godkjenning). Petter 01.10.
+ *
+ * failed med `code` not_created (P3b) heter «Ikke laget», noeytralt: vi
+ * valgte aa ikke lage bildet, det er ikke en feil (Cowork 27.10, valg a).
  */
-export function statusVariant(status: string, service?: string): StatusVariant {
+export function statusVariant(status: string, service?: string, code?: string | null): StatusVariant {
+  if (status === "failed" && code === "not_created") return NOT_CREATED_VARIANT;
   // hasOwn: "toString"/"__proto__" skal ikke treffe prototypen.
   const v = Object.hasOwn(VARIANTS, status)
     ? VARIANTS[status as JobSummaryStatus]

@@ -3,6 +3,7 @@ import { formatDate } from "./dates.ts";
 import { t, type Locale, type Message, type UiKey } from "./i18n/index.ts";
 import { cardNote, type MediaView } from "./jobMedia.ts";
 import { jobMessage } from "./jobMessage.ts";
+import { failedLines } from "./notCreated.ts";
 import { ownerBadge, rejectedLabelKey } from "./roles.ts";
 import { canOpenReview, isRejectedByReviewer } from "./statusVariants.ts";
 import { MAX_ORDER_JOBS, styleText } from "./styling.ts";
@@ -97,6 +98,8 @@ export interface OrderLine {
   reason: string | null;
   /** Den korte meldingen (jobMessage), aldri raa `error`; null naar jobben er avvist av megleren. */
   message: Message | null;
+  /** P3b: grunnene naar vi ikke laget bildet, og gratisbildet bare ved "returned" (failedLines). */
+  lines: UiKey[];
 }
 
 export function orderLines(locale: Locale, jobs: readonly JobSummary[]): OrderLine[] {
@@ -108,6 +111,7 @@ export function orderLines(locale: Locale, jobs: readonly JobSummary[]): OrderLi
       rejectedKey: rejected ? rejectedLabelKey(job) : null,
       reason: rejected && job.reason ? job.reason : null,
       message: rejected ? null : jobMessage(job.status, job.code),
+      lines: failedLines(job),
     };
   });
 }

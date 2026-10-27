@@ -255,10 +255,14 @@ test("P3a: merknadene i fast rekkefoelge, uten duplikater, ukjente gir noeytral 
   }
 });
 
-test("P3a: ingen tekst lover gratisbildet tilbake (kommer med P2)", () => {
+// P3b (Dag 56): testen «ingen tekst lover gratisbildet» er byttet ut. Stoppet og
+// merknadene lover fortsatt ingenting; bare bekreftelsen etter «Ja, avbryt»
+// (stop.doneReturned) gjoer det, og bare ved "returned" (portkvote.test.ts).
+test("P3a/P3b: stopp- og merknadstekstene lover ikke gratisbildet; bare stop.doneReturned gjoer det", () => {
   for (const locale of ["nb", "en"] as const) {
     for (const [key, text] of Object.entries(DICTIONARIES[locale].ui)) {
-      if (key.startsWith("stop.") || key.startsWith("note.")) assert.doesNotMatch(text, /gratis|free|tilbake|back/i, key);
+      if (key === "stop.doneReturned") continue;
+      if (key.startsWith("stop.") || key.startsWith("note.")) assert.doesNotMatch(text, /gratis|free|tilbake|back|returned/i, key);
     }
   }
 });

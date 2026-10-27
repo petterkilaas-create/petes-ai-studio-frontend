@@ -6,6 +6,8 @@ import { presetLabelKey } from "../lib/presets";
 import { workingView } from "../lib/jobMedia";
 import { outputView } from "../lib/jobState";
 import { codeText, t, type Locale } from "../lib/i18n";
+import { pollFailedLines } from "../lib/notCreated";
+import { NotCreatedPanel } from "./NotCreatedPanel";
 import { ApprovalNotice } from "./ApprovalNotice";
 import { ErrorPanel } from "./ErrorPanel";
 import { JobMedia } from "./JobMedia";
@@ -31,6 +33,8 @@ export function StylingOrderCards({ cards, locale }: { cards: readonly OrderCard
       {cards.map((card) => {
         const label = t(locale, presetLabelKey("scene_transform", card.presetId) ?? "service.virtual_stage");
         const output = outputView(card.status, card.imageUrl);
+        // P3b: grunnene og gratisbildet; oppskriften er stilen paa kortet.
+        const lines = pollFailedLines(card, card.presetId);
         return (
           <Card key={card.presetId} className="space-y-4">
             <p className="text-sm font-medium text-ink-2">{label}</p>
@@ -59,8 +63,13 @@ export function StylingOrderCards({ cards, locale }: { cards: readonly OrderCard
                 {(card.status === "awaiting_approval" || card.status === "needs_review") && card.jobId && (
                   <OpenReviewLink jobId={card.jobId} />
                 )}
-                {card.status === "rejected_by_reviewer" && <ReviewerRejectedPanel reason={card.reviewerReason} />}
-                {card.status === "failed" && <ErrorPanel message={t(locale, "job.failed")} />}
+                {card.status === "rejected_by_reviewer" && (
+                  <ReviewerRejectedPanel reason={card.reviewerReason} lines={lines} />
+                )}
+                {card.status === "failed" && card.notCreated !== null && <NotCreatedPanel lines={lines} />}
+                {card.status === "failed" && card.notCreated === null && (
+                  <ErrorPanel message={t(locale, "job.failed")} lines={lines.map((key) => t(locale, key))} />
+                )}
                 {card.status === "unknown" && <UnknownStatusPanel />}
               </>
             )}

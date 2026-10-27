@@ -8,6 +8,8 @@ import type { Message } from "./i18n";
  *
  * - needs_review: koden fra port 1 via ordlista (ukjent/tom gir generisk).
  * - failed + rejected_by_reviewer: «Avvist av deg».
+ * - failed + not_created (P3b): «Bildet ble ikke laget.» Grunnene og
+ *   gratisbildet kommer fra failedLines (notCreated.ts).
  * - failed ellers (teknisk feil, ogsaa uten kode): generisk melding.
  * - rejected (scene-gate): generisk melding.
  * - alle andre statuser: ingen melding (null).
@@ -17,9 +19,9 @@ export function jobMessage(status: string, code: unknown): Message | null {
     case "needs_review":
       return { group: "reviewCode", code };
     case "failed":
-      return code === "rejected_by_reviewer"
-        ? { key: "status.rejectedByYou" }
-        : { key: "job.failed" };
+      if (code === "rejected_by_reviewer") return { key: "status.rejectedByYou" };
+      if (code === "not_created") return { key: "notCreated.title" };
+      return { key: "job.failed" };
     case "rejected":
       return { key: "job.rejected" };
     default:

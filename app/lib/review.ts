@@ -171,10 +171,12 @@ export function variantOptions(images: ReviewPreviews, isAdmin: boolean): ImageV
 
 /**
  * Linje for en jobb som ikke venter paa megleren (etter en avgjoerelse),
- * eller null naar den venter (awaiting_approval/needs_review).
+ * eller null naar den venter (awaiting_approval/needs_review). En jobb vi
+ * ikke laget (P3b, `not_created`) faar «Bildet ble ikke laget.»; grunnene
+ * kommer fra failedLines (notCreated.ts).
  */
 export function outcome(
-  review: Pick<JobReviewDetail, "status" | "decisions"> & Partial<Pick<JobReviewDetail, "isOwner">>
+  review: Pick<JobReviewDetail, "status" | "decisions"> & Partial<Pick<JobReviewDetail, "isOwner" | "code">>
 ): { key: UiKey; reason: string | null } | null {
   switch (review.status) {
     case "awaiting_approval":
@@ -186,6 +188,7 @@ export function outcome(
     case "running":
       return { key: "review.statusRunning", reason: null };
     case "failed": {
+      if (review.code === "not_created") return { key: "notCreated.title", reason: null };
       const last = review.decisions.at(-1);
       if (last?.action === "reject") {
         // TG-NEW-127: paa en annen brukers jobb var det eieren som avviste.
@@ -203,8 +206,8 @@ export function outcome(
 // Petter 27.10: megleren skal se hva som er funnet og hvilket valg hen har.
 // Tekstene staar i ordlista (stop.* og note.*); de korte kodene i
 // reasonCode/flagCode er bare for admin i «Detaljer». Ukjente koder gir en
-// noeytral tekst, aldri en tom boks. Ingen tekst lover gratisbildet tilbake
-// (det kommer med kvote-PR-en, P2).
+// noeytral tekst, aldri en tom boks. Ingen tekst her lover gratisbildet
+// tilbake; det gjoer bare notCreated.ts, og bare ved "returned" (P3b).
 
 /** Rekkefoelgen grunnene vises i. Koder utenfor lista er ukjente. */
 export const STOP_REASON_ORDER = [

@@ -5,7 +5,9 @@ import { useAuth } from "@clerk/nextjs";
 import {
   submitStylingOrder,
   SubmitError,
+  type NotCreated,
   type OrderJob,
+  type QuotaReturn,
   type Review,
   type StylingOrderParams,
 } from "../lib/api";
@@ -28,6 +30,10 @@ export interface OrderCard {
   imageUrl: string | null;
   review: Review | null;
   reviewerReason: string | null;
+  /** P3b: grunnkodene naar vi ikke laget bildet, ellers null. */
+  notCreated: NotCreated | null;
+  /** P3b: om gratisbildet er gitt tilbake, ellers null. */
+  quotaReturn: QuotaReturn;
 }
 
 export interface UseOrderJobsResult {
@@ -148,6 +154,8 @@ export function useOrderJobs(options: UseOrderJobsOptions = {}): UseOrderJobsRes
       imageUrl: jobId === null ? null : poll.imageUrl,
       review: jobId === null ? null : poll.review,
       reviewerReason: jobId === null ? null : poll.reviewerReason,
+      notCreated: jobId === null ? null : poll.notCreated,
+      quotaReturn: jobId === null ? null : poll.quotaReturn,
     };
   });
 

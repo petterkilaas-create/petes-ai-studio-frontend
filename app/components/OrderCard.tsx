@@ -78,7 +78,12 @@ export function OrderCard({ jobs, thumbs }: { jobs: JobSummary[]; thumbs: (strin
             <li key={line.job.jobId} className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-3">
                 <span className="min-w-0 truncate text-[14px] text-ink">{line.label}</span>
-                <StatusPill status={line.job.status} service={line.job.service} rejectedKey={line.rejectedKey} />
+                <StatusPill
+                  status={line.job.status}
+                  service={line.job.service}
+                  code={line.job.code}
+                  rejectedKey={line.rejectedKey}
+                />
               </div>
               {line.reason !== null && (
                 <p className="text-[13px] text-ink-2 leading-relaxed break-words">
@@ -88,6 +93,11 @@ export function OrderCard({ jobs, thumbs }: { jobs: JobSummary[]; thumbs: (strin
               {line.message !== null && (
                 <p className="text-[13px] text-ink-2 leading-relaxed">{messageText(locale, line.message)}</p>
               )}
+              {line.lines.map((key) => (
+                <p key={key} className="text-[13px] text-ink-2 leading-relaxed">
+                  {t(locale, key)}
+                </p>
+              ))}
             </li>
           ))}
         </ul>

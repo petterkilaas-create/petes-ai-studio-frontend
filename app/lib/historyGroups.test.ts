@@ -211,7 +211,11 @@ test("dag 55: OrderCard har ingen tekst skrevet rett inn, og bildet kommer fra s
   const card = read("components/OrderCard.tsx");
   assert.doesNotMatch(card, /thumbSrc|\.thumbUrl|\.originalThumbUrl|\.error\b|<img/);
   assert.match(card, /view=\{tileView\(mediaView\(line\.job, thumbs\[i\] \?\? null\)\)\}/);
-  assert.match(card, /<StatusPill status=\{line\.job\.status\} service=\{line\.job\.service\} rejectedKey=\{line\.rejectedKey\} \/>/);
+  // P3b: koden gir «Ikke laget» for en jobb vi ikke laget.
+  assert.match(
+    card,
+    /<StatusPill\s+status=\{line\.job\.status\}\s+service=\{line\.job\.service\}\s+code=\{line\.job\.code\}\s+rejectedKey=\{line\.rejectedKey\}\s*\/>/
+  );
   assert.match(card, /<OpenReviewLink jobId=\{open\.jobId\} labelKey=\{open\.labelKey\} \/>/);
   // Samme bredde som JobCard: ingen col-span, og bildeflaten 3:2 med en tynn skillelinje.
   assert.doesNotMatch(card, /col-span/);

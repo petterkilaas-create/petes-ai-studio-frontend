@@ -51,6 +51,7 @@ import { panelShown } from "@/app/lib/presets";
 import { canShowAdditions } from "@/app/lib/additions";
 import { checklistFor } from "@/app/lib/checklist";
 import { framingWarning, orderTabs } from "@/app/lib/orderTabs";
+import { doneTitleKey, failedLines, stopDoneKey } from "@/app/lib/notCreated";
 import {
   blockedResult,
   brightnessResultUrl,
@@ -160,6 +161,8 @@ export default function GodkjenningPage({
   const [resultLoaded, setResultLoaded] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
+  // P3b: bekreftelsen etter «Ja, avbryt» i et stopp, fra svaret paa avgjoerelsen.
+  const [stopDone, setStopDone] = useState<UiKey | null>(null);
   // «Korriger bildet» (2d-2b). Bryterne holdes paa key og nullstilles ved Avbryt.
   const [editing, setEditing] = useState(false);
   const [toggles, setToggles] = useState<Toggles>({});
@@ -202,6 +205,8 @@ export default function GodkjenningPage({
     setCompared(false);
     setAcknowledged(false);
     setLightbox(false);
+    // P3b: bekreftelsen gjelder bare svaret den kom fra (settes etter refetch, i handle).
+    setStopDone(null);
   }, [jobId, getToken]);
 
   useEffect(() => {
@@ -242,6 +247,7 @@ export default function GodkjenningPage({
   const decide = (action: DecisionAction, brightnessStep: BrightnessStep | null) => {
     if (locked || load.kind !== "ok") return;
     const review = load.review;
+    const fromStop = action === "reject" && isStopped(review);
     void runDecision({
       inFlight,
       send: () =>
@@ -256,6 +262,7 @@ export default function GodkjenningPage({
         setBusy(true);
         setPending(action);
         setMessage(null);
+        setStopDone(null);
       },
       onError: () => setMessage({ key: "decision.error" }),
       onSettled: () => {
@@ -267,6 +274,8 @@ export default function GodkjenningPage({
           case "updated":
             setRejectOpen(false);
             setReasonText("");
+            // «Ja, avbryt» i et stopp: gratisbildet bare naar svaret sier "returned".
+            if (fromStop) setStopDone(stopDoneKey(out.quotaReturn));
             break;
           case "poll":
             setRejectOpen(false);
@@ -429,6 +438,12 @@ export default function GodkjenningPage({
             const review = load.review;
             const controls = decisionControls(review, answer);
             const done = outcome(review);
+            // P3b: grunnene naar vi ikke laget bildet, og gratisbildet ved "returned".
+            // Rett etter «Ja, avbryt» staar bekreftelsen i stedet (den har gratisbildet med).
+            const doneLines =
+              stopDone !== null
+                ? [stopDone]
+                : failedLines({ ...review, imageType: review.imageType.value });
             // «Rått fra modellen» skjules naar lysstyrke finnes (TG-NEW-147, valg (a)).
             const variants = visibleVariants(
               compareVariants(review.images, { isAdmin: caps.viewAll }),
@@ -585,12 +600,17 @@ export default function GodkjenningPage({
                     {done !== null ? (
                       // Nedlasting og tekst til annonsen der resultatet vises (etter godkjenning).
                       <section className={CARD}>
-                        <p className="text-ink font-bold">{t(locale, done.key)}</p>
+                        <p className="text-ink font-bold">{t(locale, doneTitleKey(done.key, stopDone))}</p>
                         {done.reason && (
                           <p className="text-sm text-ink mt-2 break-words">
                             {t(locale, "review.reasonLabel")}: {done.reason}
                           </p>
                         )}
+                        {doneLines.map((key) => (
+                          <p key={key} className="text-sm text-ink mt-2">
+                            {t(locale, key)}
+                          </p>
+                        ))}
                         {canDownload(review) && <DownloadButton jobId={review.jobId} presetId={review.presetId} locale={locale} />}
                         {review.status === "succeeded" && (
                           <DisclosureBlock disclosure={review.disclosure} locale={locale} />

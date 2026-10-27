@@ -1,6 +1,6 @@
 "use client";
 
-import { t } from "../lib/i18n";
+import { t, type UiKey } from "../lib/i18n";
 import { useLocale } from "../lib/i18n/useLocale";
 
 /**
@@ -10,9 +10,11 @@ import { useLocale } from "../lib/i18n/useLocale";
  */
 export interface ReviewerRejectedPanelProps {
   reason?: string | null;
+  /** P3b: «Gratisbildet er gitt tilbake.» bare ved "returned" (pollFailedLines). */
+  lines?: readonly UiKey[];
 }
 
-export function ReviewerRejectedPanel({ reason }: ReviewerRejectedPanelProps) {
+export function ReviewerRejectedPanel({ reason, lines = [] }: ReviewerRejectedPanelProps) {
   const locale = useLocale();
   return (
     <div className="bg-neutral-bg text-neutral-fg rounded-button p-4 text-sm space-y-2">
@@ -24,6 +26,9 @@ export function ReviewerRejectedPanel({ reason }: ReviewerRejectedPanelProps) {
           {t(locale, "review.reasonLabel")}: {reason}
         </p>
       )}
+      {lines.map((key) => (
+        <p key={key}>{t(locale, key)}</p>
+      ))}
     </div>
   );
 }

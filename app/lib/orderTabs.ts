@@ -31,11 +31,13 @@ export function reviewHref(jobId: string): string {
 /**
  * Statusen paa fanen ut fra `status` og `code` (TG-NEW-262): en jobb megleren
  * har avvist (`failed` med `rejected_by_reviewer`, isRejectedByReviewer som i
- * Historikken) staar som «Avvist». `failed` uten koden er fortsatt «Feilet».
+ * Historikken) staar som «Avvist». En jobb vi ikke laget (`not_created`, P3b)
+ * staar som «Ikke laget». `failed` uten koden er fortsatt «Feilet».
  * `rejected` er avslaget fra port 0. Ukjent status gir «Ukjent status».
  */
 export function orderStatusKey(status: string, code: string | null = null): UiKey {
   if (isRejectedByReviewer({ status, code })) return "status.rejected";
+  if (status === "failed" && code === "not_created") return "status.notCreated";
   switch (status) {
     case "queued":
     case "running":
