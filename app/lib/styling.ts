@@ -1,6 +1,6 @@
 import type { OrderJob, StylingOrderParams } from "./api";
 import type { ProcessStatus } from "../hooks/processStatus";
-import { codeText, t, type Locale } from "./i18n/index.ts";
+import { codeText, t, type Locale, type UiKey } from "./i18n/index.ts";
 import { presetLabelKey } from "./presets.ts";
 
 /**
@@ -130,6 +130,21 @@ export function wishesLength(text: string): number {
   return Array.from(text).length;
 }
 
+/** Fra hit sier telleren fra (gul, «… tegn igjen»), foer feltet er fullt (Cowork 27.10, 1B). */
+export const WISHES_WARN = 270;
+
+/**
+ * Telleren under feltet: «{n} / 300» til WISHES_WARN, saa gul med «{left}
+ * tegn igjen», og «Feltet er fullt.» ved WISHES_MAX. Feltet klemmes fortsatt
+ * i onChange (clampWishes); dette er bare teksten og fargen.
+ */
+export function wishesCounter(text: string): { key: UiKey; vars: Record<string, number>; warn: boolean } {
+  const n = Math.min(wishesLength(text), WISHES_MAX);
+  if (n >= WISHES_MAX) return { key: "styling.wishesFull", vars: { n }, warn: true };
+  if (n >= WISHES_WARN) return { key: "styling.wishesLeft", vars: { n, left: WISHES_MAX - n }, warn: true };
+  return { key: "styling.wishesCount", vars: { n }, warn: false };
+}
+
 /** Teksten klemt til WISHES_MAX kodepunkter (feltet, som paa lerretet). */
 export function clampWishes(text: string): string {
   return wishesLength(text) <= WISHES_MAX ? text : Array.from(text).slice(0, WISHES_MAX).join("");
@@ -147,17 +162,36 @@ export const WISH_SUGGESTIONS = {
   table_window: "Spisebordet ved vinduet",
   no_armchair: "Ingen lenestol",
   door_free: "Hold området ved døra fritt",
+  // Loese ting (TG-NEW-263, BE-1): planleggeren legger dem bare til med STYLING_WISH_ITEMS paa.
+  tv_wall: "TV på veggen og TV-benk",
+  bookcase_corner: "Bokhylle i hjørnet",
+  curtains: "Gardiner ved vinduene",
 } as const;
 export type WishSuggestion = keyof typeof WISH_SUGGESTIONS;
 
 const SUGGESTIONS_BY_ROOM: Readonly<Record<(typeof WISH_ROOMS)[number], readonly WishSuggestion[]>> = {
-  living: ["sofa_window", "no_armchair", "door_free"],
-  living_dining: ["sofa_window", "round_table", "long_table", "table_window", "no_armchair", "door_free"],
+  living: ["sofa_window", "no_armchair", "door_free", "tv_wall", "bookcase_corner", "curtains"],
+  living_dining: [
+    "sofa_window",
+    "round_table",
+    "long_table",
+    "table_window",
+    "no_armchair",
+    "door_free",
+    "tv_wall",
+    "bookcase_corner",
+    "curtains",
+  ],
 };
 
 /** Forslagene for rommet, i fast rekkefoelge; ingen for andre rom. */
 export function wishSuggestions(room: FurnishAs | null): readonly WishSuggestion[] {
   return room === "living" || room === "living_dining" ? SUGGESTIONS_BY_ROOM[room] : [];
+}
+
+/** Minst ett forslag for rommet faar ikke plass: «Det er ikke plass til flere forslag.» */
+export function suggestionsFull(text: string, room: FurnishAs | null): boolean {
+  return wishSuggestions(room).some((id) => addSuggestion(text, id) === null);
 }
 
 /**

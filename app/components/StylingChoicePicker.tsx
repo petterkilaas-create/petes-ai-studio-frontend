@@ -11,10 +11,10 @@ import {
   MAX_ORDER_JOBS,
   STYLING_STYLES,
   styleShort,
+  suggestionsFull,
   toggleStyle,
-  wishesLength,
+  wishesCounter,
   wishSuggestions,
-  WISHES_MAX,
   type DecorLevel,
   type StylingChoice,
   type StylingStyle,
@@ -85,6 +85,7 @@ export function StylingChoicePicker({
   const wishesId = useId();
   const wishesHelpId = useId();
   const wishesCountId = useId();
+  const counter = wishesCounter(value.wishes);
   const [focus, setFocus] = useState<StylingStyle>(value.styles[0] ?? STYLING_STYLES[0]);
   const [sheet, setSheet] = useState<StylingStyle | null>(null);
   const opener = useRef<HTMLElement | null>(null);
@@ -236,6 +237,9 @@ export function StylingChoicePicker({
         {wishRoom && (
           <div className="space-y-2.5">
             <p id={wishesHelpId} className="text-sm text-ink-2">{t(locale, "styling.wishesHelp")}</p>
+            {suggestionsFull(value.wishes, value.furnishAs) && (
+              <p className="text-xs text-amber-fg">{t(locale, "styling.wishesNoRoom")}</p>
+            )}
             <div className="flex flex-wrap gap-2" role="group" aria-label={t(locale, "styling.wishesSuggestions")}>
               {wishSuggestions(value.furnishAs).map((id) => {
                 const next = addSuggestion(value.wishes, id);
@@ -264,8 +268,12 @@ export function StylingChoicePicker({
               aria-describedby={`${wishesHelpId} ${wishesCountId}`}
               className="block w-full scroll-mb-28 rounded-button border border-line-strong bg-surface px-3 py-2 text-sm text-ink disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
             />
-            <p id={wishesCountId} className="text-right text-xs text-ink-2 tabular-nums">
-              {t(locale, "styling.wishesCount", { n: Math.min(wishesLength(value.wishes), WISHES_MAX) })}
+            {/* Telleren sier fra foer grensen: gul fra WISHES_WARN, «Feltet er fullt.» ved 300 (TG-NEW-263). */}
+            <p
+              id={wishesCountId}
+              className={`text-right text-xs tabular-nums ${counter.warn ? "text-amber-fg" : "text-ink-2"}`}
+            >
+              {t(locale, counter.key, counter.vars)}
             </p>
           </div>
         )}

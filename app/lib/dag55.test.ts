@@ -20,10 +20,13 @@ const {
   WISH_ROOMS,
   WISH_SUGGESTIONS,
   WISHES_MAX,
+  WISHES_WARN,
   addSuggestion,
   clampWishes,
   isWishRoom,
   stylingParams,
+  suggestionsFull,
+  wishesCounter,
   wishesLength,
   wishSuggestions,
 } = await import("./styling.ts");
@@ -172,13 +175,15 @@ test("Dag 55: idempotensnøkkelen skiller ulike ønsker, og er som før uten øn
 // --- Forslagene -----------------------------------------------------------------
 
 test("Dag 55: forslagene per rom, i fast rekkefølge, med norsk tekst som sendes", () => {
+  // Dag 56 (TG-NEW-263): de tre loese tingene bakerst i begge stuene.
+  const loose = ["TV på veggen og TV-benk", "Bokhylle i hjørnet", "Gardiner ved vinduene"];
   assert.deepEqual(
     wishSuggestions("living_dining").map((id) => WISH_SUGGESTIONS[id]),
-    ["Sofaen mot vinduet", "Rundt spisebord", "Langbord til åtte personer", "Spisebordet ved vinduet", "Ingen lenestol", "Hold området ved døra fritt"]
+    ["Sofaen mot vinduet", "Rundt spisebord", "Langbord til åtte personer", "Spisebordet ved vinduet", "Ingen lenestol", "Hold området ved døra fritt", ...loose]
   );
   assert.deepEqual(
     wishSuggestions("living").map((id) => WISH_SUGGESTIONS[id]),
-    ["Sofaen mot vinduet", "Ingen lenestol", "Hold området ved døra fritt"]
+    ["Sofaen mot vinduet", "Ingen lenestol", "Hold området ved døra fritt", ...loose]
   );
   for (const room of OTHER_ROOMS) assert.deepEqual(wishSuggestions(room), [], room);
   assert.deepEqual(wishSuggestions(null), []);
@@ -188,6 +193,57 @@ test("Dag 55: forslagene per rom, i fast rekkefølge, med norsk tekst som sendes
     assert.notEqual(t("en", `styling.wish.${id}`), WISH_SUGGESTIONS[id], id);
   }
   assert.equal(t("en", "styling.wish.round_table"), "Round dining table");
+  assert.equal(t("en", "styling.wish.tv_wall"), "Wall TV and TV bench");
+  assert.equal(t("en", "styling.wish.bookcase_corner"), "Bookcase in the corner");
+  assert.equal(t("en", "styling.wish.curtains"), "Curtains at the windows");
+});
+
+test("Dag 56: alle forslagene i stua faar plass sammen, og knappene er korte nok for 390 px", () => {
+  let text = "";
+  for (const id of wishSuggestions("living_dining")) {
+    const next = addSuggestion(text, id);
+    assert.notEqual(next, null, id);
+    text = next!;
+  }
+  assert.ok(wishesLength(text) <= WISHES_MAX, String(wishesLength(text)));
+  // Den lengste knappen («Hold området ved døra fritt», 27 tegn) fikk plass paa 390 px; de nye er ikke lengre.
+  for (const id of Object.keys(WISH_SUGGESTIONS) as (keyof typeof WISH_SUGGESTIONS)[]) {
+    for (const locale of ["nb", "en"] as const) {
+      assert.ok(t(locale, `styling.wish.${id}`).length <= 32, `${locale} ${id}`);
+    }
+  }
+});
+
+test("Dag 56: telleren sier fra foer grensen: gul fra 270, «Feltet er fullt.» ved 300 (1B)", () => {
+  const fill = (n: number) => "a".repeat(n);
+  const shown = (n: number) => {
+    const c = wishesCounter(fill(n));
+    return [t("nb", c.key, c.vars), c.warn];
+  };
+  assert.equal(WISHES_WARN, 270);
+  assert.deepEqual(shown(0), ["0 / 300", false]);
+  assert.deepEqual(shown(269), ["269 / 300", false]);
+  assert.deepEqual(shown(270), ["270 / 300 · 30 tegn igjen", true]);
+  assert.deepEqual(shown(299), ["299 / 300 · 1 tegn igjen", true]);
+  assert.deepEqual(shown(300), ["300 / 300 · Feltet er fullt.", true]);
+  // Kodepunkter som i backend: 270 emoji er 270 tegn.
+  assert.equal(wishesCounter("😀".repeat(270)).key, "styling.wishesLeft");
+  const en = wishesCounter(fill(280));
+  assert.equal(t("en", en.key, en.vars), "280 / 300 · 20 characters left");
+  assert.equal(t("en", "styling.wishesFull", { n: 300 }), "300 / 300 · The field is full.");
+});
+
+test("Dag 56: «Det er ikke plass til flere forslag.» naar et forslag for rommet ikke faar plass", () => {
+  assert.equal(suggestionsFull("", "living_dining"), false);
+  assert.equal(suggestionsFull("a".repeat(250), "living_dining"), false);
+  // «Langbord til åtte personer» (26) + «. » faar ikke plass etter 273 tegn.
+  assert.equal(suggestionsFull("a".repeat(273), "living_dining"), true);
+  assert.equal(suggestionsFull("a".repeat(300), "living"), true);
+  // Andre rom har ingen forslag.
+  assert.equal(suggestionsFull("a".repeat(300), "bedroom"), false);
+  assert.equal(suggestionsFull("a".repeat(300), null), false);
+  assert.equal(t("nb", "styling.wishesNoRoom"), "Det er ikke plass til flere forslag.");
+  assert.equal(t("en", "styling.wishesNoRoom"), "There is no room for more suggestions.");
 });
 
 test("Dag 55: et trykk legger forslaget til med «. » mellom, og ingenting uten plass", () => {
@@ -222,7 +278,12 @@ test("Dag 55: velgeren viser feltet bare i stuene, ellers én linje, og telleren
   assert.doesNotMatch(picker, /maxLength/);
   // Forslaget er av naar det ikke er plass.
   assert.match(picker, /disabled=\{disabled \|\| next === null\}/);
-  assert.match(picker, /t\(locale, "styling\.wishesCount", \{ n: Math\.min\(wishesLength\(value\.wishes\), WISHES_MAX\) \}\)/);
+  // Dag 56 (1B): telleren og fargen fra wishesCounter, og linja over forslagene.
+  assert.match(picker, /const counter = wishesCounter\(value\.wishes\);/);
+  assert.match(picker, /\{t\(locale, counter\.key, counter\.vars\)\}/);
+  assert.match(picker, /counter\.warn \? "text-amber-fg" : "text-ink-2"/);
+  assert.match(picker, /\{suggestionsFull\(value\.wishes, value\.furnishAs\) && \(/);
+  assert.ok(picker.indexOf("suggestionsFull(") < picker.indexOf("wishSuggestions(value.furnishAs)"), "over forslagene");
   assert.equal(t("nb", "styling.wishesCount", { n: 300 }), "300 / 300");
   assert.equal(t("en", "styling.wishesCount", { n: 12 }), "12 / 300");
 });
@@ -232,14 +293,18 @@ test("Dag 55: tekstene for ønskefeltet på nb og en", () => {
   assert.equal(t("en", "styling.wishes"), "Wishes (optional)");
   assert.equal(t("nb", "styling.wishesOnlyLiving"), "Ønsker gjelder foreløpig bare stuene.");
   assert.equal(t("en", "styling.wishesOnlyLiving"), "Wishes only apply to living rooms for now.");
+  // Dag 56 (TG-NEW-263): løse ting, og flere faste ting som aldri endres.
   assert.equal(
     t("nb", "styling.wishesHelp"),
-    "Skriv kort hvor møblene skal stå og hvilken form de skal ha. Vinduer, dører, peis og andre faste ting endres aldri. Ikke skriv navn eller adresse."
+    "Skriv hvor møblene skal stå, hvilken form de skal ha, og løse ting du vil ha med, for eksempel TV på veggen, bokhylle, speil, gardiner eller en pendel. Faste ting som vinduer, dører, peis, panelovner, kjøkken og fastmonterte lamper endres aldri. Ikke skriv navn eller adresse."
   );
+  assert.doesNotMatch(t("nb", "styling.wishesHelp"), /spisebordet/);
+  assert.match(t("en", "styling.wishesHelp"), /a TV on the wall, a bookcase, a mirror, curtains or a pendant lamp\./);
   assert.match(t("en", "styling.wishesHelp"), /Do not write names or addresses\.$/);
   for (const locale of ["nb", "en"] as const) {
     const keys = Object.keys(DICTIONARIES[locale].ui).filter((k) => k.startsWith("styling.wish"));
-    assert.equal(keys.length, 5 + Object.keys(WISH_SUGGESTIONS).length, locale);
+    // 5 + telleren med «tegn igjen» og «fullt», og linja om plass (Dag 56).
+    assert.equal(keys.length, 8 + Object.keys(WISH_SUGGESTIONS).length, locale);
   }
 });
 
