@@ -16,7 +16,7 @@ test("pickLocale: nb, no og nn gir norsk, alt annet engelsk", () => {
 
 test("kodene fra audit 2d §8 har norsk tekst", () => {
   assert.equal(codeText("nb", "reviewCode", "fireplace_answer_missing"), "Venter på svar om peisen.");
-  assert.equal(codeText("nb", "reviewCode", "gate_review"), "Bildet må sjekkes før vi lager det.");
+  assert.equal(codeText("nb", "reviewCode", "gate_review"), "Vi trenger et svar fra deg før vi lager bildet.");
   assert.equal(codeText("nb", "reasonCode", "analysis_uncertain"), "Analysen var usikker.");
   assert.equal(
     codeText("nb", "reasonCode", "image_type_disagreement"),

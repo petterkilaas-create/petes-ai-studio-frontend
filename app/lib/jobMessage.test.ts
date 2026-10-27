@@ -20,8 +20,10 @@ test("kjente koder for Til gjennomgang gir riktig noekkel og tekst", () => {
     assert.deepEqual(jobMessage("needs_review", code), { group: "reviewCode", code });
   }
   assert.equal(shown("nb", "needs_review", "fireplace_answer_missing"), "Venter på svar om peisen.");
-  assert.equal(shown("nb", "needs_review", "gate_review"), "Bildet må sjekkes før vi lager det.");
-  assert.equal(shown("nb", "needs_review", "needs_review"), "Bildet må sjekkes før vi lager det.");
+  // Porten (Dag 56, P3a): «Bildet må sjekkes …» er byttet ut.
+  assert.equal(shown("nb", "needs_review", "gate_review"), "Vi trenger et svar fra deg før vi lager bildet.");
+  assert.equal(shown("nb", "needs_review", "needs_review"), "Vi trenger et svar fra deg før vi lager bildet.");
+  assert.equal(shown("en", "needs_review", "gate_review"), "We need an answer from you before we create the image.");
   assert.equal(shown("en", "needs_review", "fireplace_answer_missing"), "Waiting for an answer about the fireplace.");
 });
 

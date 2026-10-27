@@ -17,13 +17,16 @@ import { useJobStatus } from "@/app/lib/useJobStatus";
 import { codeText, t, type CodeGroup, type UiKey } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import {
+  analysisNotes,
   buildDecision,
   decisionControls,
+  isFireplaceStop,
+  isStopped,
   mediaDeleted,
-  meglerReason,
   outcome,
   resultImageUrl,
   shouldPoll,
+  stopReasons,
   type FireplaceAnswer,
 } from "@/app/lib/review";
 import { adminView, isReadOnlyOther, showDetails } from "@/app/lib/roles";
@@ -603,9 +606,13 @@ export default function GodkjenningPage({
                       </section>
                     ) : (
                       <DecisionCard
-                        reviewCode={admin ? review.code : null}
-                        // TG-NEW-219: grunnen ved stopp i port 1, for alle roller.
-                        reason={meglerReason(review)}
+                        // Porten (Dag 56, P3a): stoppboksen og merknadene for alle roller.
+                        stop={
+                          isStopped(review)
+                            ? { reasons: stopReasons(review), fireplace: isFireplaceStop(review) }
+                            : null
+                        }
+                        notes={analysisNotes(review)}
                         controls={controls}
                         canCorrect={canCorrect}
                         roundFailed={correction.roundFailed}
