@@ -200,7 +200,7 @@ test("D-5c: rammevarselet staar over sjekklista i stilen til merknaden (gult, AV
   );
   // Advarselen fra kontrollen er fortsatt roed; rammevarselet endrer ikke «Godkjenn».
   assert.match(block, /text-red-fg bg-red-bg rounded-button p-3 break-words" role="alert"/);
-  assert.match(card, /disabled=\{locked \|\| !approveEnabled\(additions\.level, compared, acknowledged\)\}/);
+  assert.match(card, /disabled=\{locked \|\| approveLock \|\| !approveEnabled\(additions\.level, compared, acknowledged\)\}/);
 });
 
 test("D-5c: tom alt er ikke tekst i literalTexts, men alt med tekst er det fortsatt", () => {

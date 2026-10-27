@@ -244,6 +244,9 @@ const nbUi = {
   "additions.kindNote": "merknad",
   "correct.title": "Korriger lyskildene",
   "correct.hint": "Slå lysene av eller på nedenfor.",
+  // FE-1: retting uten lys og peis (Dag 57).
+  "correct.retryTitle": "Lag et nytt forsøk",
+  "correct.retryHint": "Bildet lages på nytt fra originalen med de samme valgene.",
   "correct.roundsLeft": "Runder igjen: {n}",
   "correct.newImageFromOriginal": "Dette lager et nytt bilde fra originalen.",
   "correct.confirmExists": "Jeg bekrefter at lyskildene jeg har slått på, finnes i originalbildet.",
@@ -296,7 +299,7 @@ const nbUi = {
   "compare.mode.side": "Side ved side",
   "compare.mode.result": "Kun resultat",
   "compare.ai": "AI",
-  "compare.round": "Runde {n}",
+  "compare.version": "Versjon {n}",
   "compare.now": "nå",
   "compare.raw": "rått fra modellen",
   "compare.noSky": "uten himmel",
@@ -307,6 +310,9 @@ const nbUi = {
   "compare.sliderValue": "{n} % original",
   "compare.altOriginal": "Originalbildet",
   "compare.altResult": "AI-bildet: {label}",
+  // FE-c: versjonsstripa (Dag 57). «Godkjenn» gjelder bare den nyeste versjonen.
+  "compare.versions": "Versjoner",
+  "compare.approveLatest": "Gå til den nyeste versjonen for å godkjenne.",
   // D2b: handlingskortet, sidepanelet og «Detaljer».
   "correct.lightsTitle": "Lys i bildet",
   "correct.uncertain": "Usikker",
@@ -1113,6 +1119,9 @@ const en: Dictionary = {
     "additions.kindNote": "note",
     "correct.title": "Correct the light sources",
     "correct.hint": "Turn the lights on or off below.",
+    // FE-1: retting uten lys og peis (Dag 57).
+    "correct.retryTitle": "Make a new attempt",
+    "correct.retryHint": "The image is made again from the original with the same choices.",
     "correct.roundsLeft": "Rounds left: {n}",
     "correct.newImageFromOriginal": "This creates a new image from the original.",
     "correct.confirmExists": "I confirm that the light sources I have turned on exist in the original image.",
@@ -1162,7 +1171,7 @@ const en: Dictionary = {
     "compare.mode.side": "Side by side",
     "compare.mode.result": "Result only",
     "compare.ai": "AI",
-    "compare.round": "Round {n}",
+    "compare.version": "Version {n}",
     "compare.now": "now",
     "compare.raw": "raw from the model",
     "compare.noSky": "no sky",
@@ -1173,6 +1182,9 @@ const en: Dictionary = {
     "compare.sliderValue": "{n}% original",
     "compare.altOriginal": "The original image",
     "compare.altResult": "The AI image: {label}",
+    // FE-c: versjonsstripa (Dag 57). «Godkjenn» gjelder bare den nyeste versjonen.
+    "compare.versions": "Versions",
+    "compare.approveLatest": "Go to the latest version to approve.",
     // D2b: handlingskortet, sidepanelet og «Detaljer».
     "correct.lightsTitle": "Lights in the image",
     "correct.uncertain": "Uncertain",

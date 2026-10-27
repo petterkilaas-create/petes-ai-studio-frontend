@@ -228,7 +228,7 @@ test("slettet: godkjenningssiden viser banneret og laaser knappene, slideren og 
   const branch = page.slice(page.indexOf("{deleted ? ("));
   assert.match(branch, /^\{deleted \? \(\s*\/\/[^\n]*\n\s*<PreviewPlaceholder reason="deleted" \/>\s*\) : \(/);
   const elseEnd = branch.indexOf("</section>");
-  for (const part of ["<VariantPicker", "<CompareViewer", "<BrightnessControl"]) {
+  for (const part of ["<VersionStrip", "<CompareViewer", "<BrightnessControl"]) {
     const at = branch.indexOf(part);
     assert.ok(at > 0 && at < elseEnd, `${part} bare naar bildene ikke er slettet`);
   }

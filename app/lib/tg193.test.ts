@@ -21,7 +21,7 @@ const page = code("(app)/godkjenning/[jobId]/page.tsx");
 const mood = code("components/godkjenning/MoodPanel.tsx");
 const correction = code("components/godkjenning/CorrectionPanel.tsx");
 const markers = code("components/godkjenning/LightMarkers.tsx");
-const picker = code("components/godkjenning/VariantPicker.tsx");
+const picker = code("components/godkjenning/VersionStrip.tsx");
 
 // ---------------------------------------------------------------------------
 // Rollen: samme view_all-sjekk som «Detaljer».
@@ -52,7 +52,7 @@ test("TG193 #3: job-id-en vises bare for admin", () => {
 });
 
 // ---------------------------------------------------------------------------
-// #7 Rundeetiketten: «Runde N · nå» for megler, valgene for admin.
+// #7 Rundeetiketten: «Versjon N · nå» for megler (FE-c, Dag 57), valgene for admin.
 // ---------------------------------------------------------------------------
 
 const CHOICES: RoundChoices = {
@@ -75,25 +75,26 @@ function images(): CompareImages {
   };
 }
 
-test("TG193 #7: megleren ser «Runde N · nå» uten valgene i parentes", () => {
+test("TG193 #7: megleren ser «Versjon N · nå» uten valgene i parentes", () => {
   const vs = compareVariants(images(), { isAdmin: false });
-  assert.equal(variantLabel("nb", vs[0], { choices: false }), "Runde 2 · nå");
-  assert.equal(variantLabel("nb", vs[1], { choices: false }), "Runde 1");
-  assert.equal(variantLabel("en", vs[0], { choices: false }), "Round 2 · now");
+  assert.equal(variantLabel("nb", vs[0], { choices: false }), "Versjon 2 · nå");
+  assert.equal(variantLabel("nb", vs[1], { choices: false }), "Versjon 1");
+  assert.equal(variantLabel("en", vs[0], { choices: false }), "Version 2 · now");
 });
 
 test("TG193 #7: admin beholder dagens etikett med valgene", () => {
   const vs = compareVariants(images(), { isAdmin: true });
-  assert.equal(variantLabel("nb", vs[0], { choices: true }), "Runde 2 · nå (tidlig, lette skyer, peis tent, lys justert)");
-  assert.equal(variantLabel("nb", vs[1], { choices: true }), "Runde 1 (tidlig, uten himmel, peis tent, lys justert)");
+  assert.equal(variantLabel("nb", vs[0], { choices: true }), "Versjon 2 · nå (tidlig, lette skyer, peis tent, lys justert)");
+  assert.equal(variantLabel("nb", vs[1], { choices: true }), "Versjon 1 (tidlig, uten himmel, peis tent, lys justert)");
 });
 
 // B2 (dag 51): oppskriften sendes med, saa styling viser stilen i parentes.
 test("TG193 #7: siden og variantvalget sender choices = admin", () => {
-  assert.equal(page.match(/variantLabel\(locale, shown, \{ choices: admin, presetId: review\.presetId \}\)/g)?.length, 2);
-  assert.doesNotMatch(page, /variantLabel\(locale, shown\)/);
-  assert.match(page, /<VariantPicker[\s\S]*?choices=\{admin\}[\s\S]*?presetId=\{review\.presetId\}[\s\S]*?\/>/);
-  assert.match(picker, /\{variantLabel\(locale, v, \{ choices, presetId \}\)\}/);
+  // FE-c (Dag 57): etiketten via stripLabel, og stripa paa siden og i lysboksen.
+  assert.equal(page.match(/stripLabel\(locale, entry, \{ choices: admin, presetId: review\.presetId \}\)/g)?.length, 2);
+  assert.doesNotMatch(page, /(variantLabel|stripLabel)\(locale, (shown|entry)\)/);
+  assert.equal(page.match(/<VersionStrip[\s\S]*?choices=\{admin\}[\s\S]*?presetId=\{review\.presetId\}[\s\S]*?\/>/g)?.length, 2);
+  assert.match(picker, /\{stripLabel\(locale, entry, \{ choices, presetId \}\)\}/);
 });
 
 // ---------------------------------------------------------------------------

@@ -318,7 +318,7 @@ test("Stilkort: summer_night i tid, himmel, runde-etiketten og merketeksten", ()
     ],
   };
   const variant = compareVariants(images, { isAdmin: false })[0];
-  assert.equal(variantLabel("nb", variant, { choices: true }), "Runde 1 · nå (sommerkveld, lys sommerhimmel)");
+  assert.equal(variantLabel("nb", variant, { choices: true }), "Versjon 1 · nå (sommerkveld, lys sommerhimmel)");
 
   const disclosure: ReviewDisclosure = {
     version: "8",

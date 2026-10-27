@@ -37,6 +37,7 @@ import {
   canSubmitCorrection,
   correctionControls,
   correctionFireplaceShown,
+  correctionKind,
   correctionResult,
   initialToggles,
   needsConfirmation,
@@ -47,7 +48,7 @@ import {
 import { runDecision } from "@/app/lib/decide";
 import { canDownload } from "@/app/lib/download";
 import { formatDate } from "@/app/lib/dates";
-import { compareVariants, selectedVariant, variantLabel } from "@/app/lib/compare";
+import { approveLocked, compareVariants, selectedEntry, stripLabel, stripShown, versionStrip } from "@/app/lib/compare";
 import { canShowMarkers } from "@/app/lib/lightsView";
 import { panelShown } from "@/app/lib/presets";
 import { canShowAdditions } from "@/app/lib/additions";
@@ -70,7 +71,7 @@ import { cardClass } from "@/app/components/ui/Card";
 import { CompareViewer } from "@/app/components/godkjenning/CompareViewer";
 import { LightMarkers } from "@/app/components/godkjenning/LightMarkers";
 import { AdditionMarkers } from "@/app/components/godkjenning/AdditionMarkers";
-import { VariantPicker } from "@/app/components/godkjenning/VariantPicker";
+import { VersionStrip } from "@/app/components/godkjenning/VersionStrip";
 import { Lightbox } from "@/app/components/godkjenning/Lightbox";
 import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
 import { OrderTabs } from "@/app/components/godkjenning/OrderTabs";
@@ -129,6 +130,14 @@ import { FOCUS } from "@/app/components/godkjenning/classes";
  * staar en rad med én fane per stil over bildet. Fanene er lenker, saa siden
  * monteres paa nytt ved bytte. Rammevarselet (TG-NEW-260) staar i kortet
  * over sjekklista naar `framing` er maalt og over grensen (orderTabs.ts).
+ *
+ * Versjonsstripa (FE-c, Dag 57): «Original», «Versjon 1», «Versjon 2 · nå»
+ * paa siden og i lysboksen (versionStrip). Med «Original» valgt vises bare
+ * originalen. Vises originalen eller en eldre versjon, er «Godkjenn» laast
+ * (approveLocked), fordi backend alltid godkjenner gjeldende versjon.
+ *
+ * Retting uten lys og peis (FE-1, Dag 57): overskriften og hintet kommer fra
+ * correctionKind (review-svaret), ikke fra tjenesten.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -149,7 +158,7 @@ export default function GodkjenningPage({
   const locale = useLocale();
 
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
-  // Valgt variant i «Sammenlign originalen med»; null gir gjeldende runde.
+  // Valgt versjon i stripa («original» eller en variant); null gir gjeldende runde.
   const [variantId, setVariantId] = useState<string | null>(null);
   // Admin (view_all fra /me) ser rått. Feil eller manglende svar: ikke admin.
   const [caps, setCaps] = useState<Capabilities>(NO_CAPABILITIES);
@@ -454,31 +463,38 @@ export default function GodkjenningPage({
               compareVariants(review.images, { isAdmin: caps.viewAll }),
               review.brightness
             );
-            const shown = selectedVariant(variants, variantId);
+            const strip = versionStrip(review.images, variants);
+            const entry = selectedEntry(strip, variantId);
+            const originalShown = entry?.kind === "original";
+            const shown = entry?.kind === "variant" ? entry.variant : null;
+            const approveLock = approveLocked(strip, entry);
             const brightness = brightnessView(review, shown);
             const step = brightness.kind === "control" ? selectedStep(brightness, chosenStep) : null;
             // Gjeldende runde med slideren: trinnets lenke fra backend, aldri et CSS-filter.
             const stepShown = brightness.kind === "control" && !brightness.locked ? step : null;
             // Gamle jobber uten rounds: lenken velges fra de merkede feltene som foer.
             // Runder: lenken som den er, null gir plassholder (ingen tilbakefall).
-            const roundUrl =
-              shown === null
+            // «Original» i stripa: originalen, bare i lysboksen (siden viser den uten resultat).
+            const roundUrl = originalShown
+              ? review.images.originalUrl
+              : shown === null
                 ? null
                 : shown.source.kind === "legacy"
                   ? resultImageUrl(review.images, shown.source.variant)
                   : shown.source.url;
             const shownUrl = stepShown !== null ? brightnessResultUrl(review.brightness, stepShown) : roundUrl;
             const shownLabel =
-              shown === null
+              entry === null
                 ? ""
                 : stepShown !== null
-                  ? `${variantLabel(locale, shown, { choices: admin, presetId: review.presetId })} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
-                  : variantLabel(locale, shown, { choices: admin, presetId: review.presetId });
+                  ? `${stripLabel(locale, entry, { choices: admin, presetId: review.presetId })} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
+                  : stripLabel(locale, entry, { choices: admin, presetId: review.presetId });
             const correction = correctionControls(review);
             const canCorrect = correction.show && !limitReached && done === null;
             const isEditing = editing && canCorrect;
             // Panelene per oppskrift (G3): uten peispanelet ingen peisspoersmaal.
             const fireplaceShown = correctionFireplaceShown(review.fireplace) && panelShown(review, "fireplace");
+            const kind = correctionKind(review, fireplaceShown);
             const correctionBody = buildCorrection(review, toggles, fireplaceShown, correctAnswer);
             const overrides = correctionBody.overrides ?? { promote: [], disable: [], add: [] };
             const confirmNeeded = needsConfirmation(overrides);
@@ -526,9 +542,9 @@ export default function GodkjenningPage({
                       <PreviewPlaceholder reason="deleted" />
                     ) : (
                       <>
-                        <VariantPicker
-                          variants={variants}
-                          selectedId={shown?.id ?? null}
+                        <VersionStrip
+                          strip={strip}
+                          selectedId={entry?.id ?? null}
                           onSelect={setVariantId}
                           choices={admin}
                           presetId={review.presetId}
@@ -579,13 +595,17 @@ export default function GodkjenningPage({
                           <Lightbox
                             originalUrl={review.images.originalUrl}
                             aiUrl={shownUrl}
-                            aiAlt={t(locale, "compare.altResult", { label: shownLabel })}
+                            aiAlt={
+                              originalShown
+                                ? t(locale, "compare.altOriginal")
+                                : t(locale, "compare.altResult", { label: shownLabel })
+                            }
                             placeholder={<PreviewPlaceholder />}
                             rounds={
-                              variants.length > 1 ? (
-                                <VariantPicker
-                                  variants={variants}
-                                  selectedId={shown?.id ?? null}
+                              stripShown(strip) ? (
+                                <VersionStrip
+                                  strip={strip}
+                                  selectedId={entry?.id ?? null}
                                   onSelect={setVariantId}
                                   choices={admin}
                                   presetId={review.presetId}
@@ -593,6 +613,7 @@ export default function GodkjenningPage({
                                 />
                               ) : null
                             }
+                            originalOnly={originalShown}
                             onClose={() => setLightbox(false)}
                             locale={locale}
                           />
@@ -667,6 +688,7 @@ export default function GodkjenningPage({
                               }
                               fireplaceShown={fireplaceShown}
                               lightsShown={panelShown(review, "lights")}
+                              kind={kind}
                               answer={correctAnswer}
                               onAnswer={setCorrectAnswer}
                               confirmNeeded={confirmNeeded}
@@ -688,6 +710,7 @@ export default function GodkjenningPage({
                         onCompared={setCompared}
                         acknowledged={acknowledged}
                         onAcknowledged={setAcknowledged}
+                        approveLock={approveLock}
                         framingPct={framingWarning(review.framing)}
                         message={messageText}
                         locale={locale}

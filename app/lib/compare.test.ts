@@ -62,8 +62,8 @@ test("«nå» staar bare paa gjeldende runde, og den vises foerst", () => {
   const vs = compareVariants(images([round(0), round(1, { current: true })]), { isAdmin: false });
   assert.deepEqual(vs.map((v) => v.current), [true, false]);
   assert.equal(defaultVariant(vs)?.id, "r1");
-  assert.equal(variantLabel("nb", vs[0], ADMIN), "Runde 2 · nå (tidlig, lette skyer)");
-  assert.equal(variantLabel("nb", vs[1], ADMIN), "Runde 1 (tidlig, lette skyer)");
+  assert.equal(variantLabel("nb", vs[0], ADMIN), "Versjon 2 · nå (tidlig, lette skyer)");
+  assert.equal(variantLabel("nb", vs[1], ADMIN), "Versjon 1 (tidlig, lette skyer)");
 });
 
 test("uten gjeldende runde (running): ingen «nå», og den nyeste vises", () => {
@@ -86,19 +86,19 @@ test("etikettene lages fra choices, paa nb og en", () => {
     compareVariants(images([round(0, { current: true, choices: { ...CHOICES, ...choices } })]), {
       isAdmin: false,
     })[0];
-  assert.equal(variantLabel("nb", r({ sky: "clear" }), ADMIN), "Runde 1 · nå (tidlig, klar himmel)");
-  assert.equal(variantLabel("en", r({ sky: "clear" }), ADMIN), "Round 1 · now (early, clear sky)");
-  assert.equal(variantLabel("nb", r({ time: "late", sky: "starry" }), ADMIN), "Runde 1 · nå (sen, stjernehimmel)");
-  assert.equal(variantLabel("nb", r({ skyApplied: false }), ADMIN), "Runde 1 · nå (tidlig, uten himmel)");
-  assert.equal(variantLabel("en", r({ skyApplied: false }), ADMIN), "Round 1 · now (early, no sky)");
-  assert.equal(variantLabel("nb", r({ lightsChanged: true }), ADMIN), "Runde 1 · nå (tidlig, lette skyer, lys justert)");
-  assert.equal(variantLabel("en", r({ lightsChanged: true }), ADMIN), "Round 1 · now (early, light clouds, lights adjusted)");
-  assert.equal(variantLabel("nb", r({ fireplaceFire: "yes" }), ADMIN), "Runde 1 · nå (tidlig, lette skyer, peis tent)");
-  assert.equal(variantLabel("nb", r({ fireplaceFire: "no" }), ADMIN), "Runde 1 · nå (tidlig, lette skyer, peis ikke tent)");
+  assert.equal(variantLabel("nb", r({ sky: "clear" }), ADMIN), "Versjon 1 · nå (tidlig, klar himmel)");
+  assert.equal(variantLabel("en", r({ sky: "clear" }), ADMIN), "Version 1 · now (early, clear sky)");
+  assert.equal(variantLabel("nb", r({ time: "late", sky: "starry" }), ADMIN), "Versjon 1 · nå (sen, stjernehimmel)");
+  assert.equal(variantLabel("nb", r({ skyApplied: false }), ADMIN), "Versjon 1 · nå (tidlig, uten himmel)");
+  assert.equal(variantLabel("en", r({ skyApplied: false }), ADMIN), "Version 1 · now (early, no sky)");
+  assert.equal(variantLabel("nb", r({ lightsChanged: true }), ADMIN), "Versjon 1 · nå (tidlig, lette skyer, lys justert)");
+  assert.equal(variantLabel("en", r({ lightsChanged: true }), ADMIN), "Version 1 · now (early, light clouds, lights adjusted)");
+  assert.equal(variantLabel("nb", r({ fireplaceFire: "yes" }), ADMIN), "Versjon 1 · nå (tidlig, lette skyer, peis tent)");
+  assert.equal(variantLabel("nb", r({ fireplaceFire: "no" }), ADMIN), "Versjon 1 · nå (tidlig, lette skyer, peis ikke tent)");
   // Ukjent kode gir generisk tekst, aldri koden selv.
-  assert.equal(variantLabel("nb", r({ sky: "neon" }), ADMIN), "Runde 1 · nå (tidlig, ukjent himmel)");
+  assert.equal(variantLabel("nb", r({ sky: "neon" }), ADMIN), "Versjon 1 · nå (tidlig, ukjent himmel)");
   const none = compareVariants(images([round(0, { current: true, choices: null })]), { isAdmin: false })[0];
-  assert.equal(variantLabel("nb", none, ADMIN), "Runde 1 · nå");
+  assert.equal(variantLabel("nb", none, ADMIN), "Versjon 1 · nå");
 });
 
 test("rått bare for admin, nyeste foerst etter de vanlige rundene", () => {
@@ -109,8 +109,8 @@ test("rått bare for admin, nyeste foerst etter de vanlige rundene", () => {
   const admin = compareVariants(images(rounds), { isAdmin: true });
   assert.deepEqual(admin.map((v) => v.id), ["r1", "r0", "r1-raw", "r0-raw"]);
   assert.deepEqual(urls(admin), ["p1.jpg", "p0.jpg", "raw1.jpg", "raw0.jpg"]);
-  assert.equal(variantLabel("nb", admin[2], ADMIN), "Runde 2 · rått fra modellen");
-  assert.equal(variantLabel("en", admin[3], ADMIN), "Round 1 · raw from the model");
+  assert.equal(variantLabel("nb", admin[2], ADMIN), "Versjon 2 · rått fra modellen");
+  assert.equal(variantLabel("en", admin[3], ADMIN), "Version 1 · raw from the model");
   assert.equal(defaultVariant(admin)?.id, "r1", "rått er aldri standard");
   // Megler: ingen rå variant, ogsaa om backend skulle sende en lenke.
   const owner = compareVariants(images(rounds), { isAdmin: false });
@@ -164,34 +164,34 @@ function stylingVariants(isAdmin: boolean) {
 
 test("B2: admin ser stilen i parentes for styling, ikke skumringsvalgene", () => {
   const [now] = stylingVariants(true);
-  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_dansk_farge" }), "Runde 1 · nå (Fargerik eklektisk)");
-  assert.equal(variantLabel("en", now, { choices: true, presetId: "styling_dansk_farge" }), "Round 1 · now (Colourful eclectic)");
-  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_japandi" }), "Runde 1 · nå (Japandi)");
+  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_dansk_farge" }), "Versjon 1 · nå (Fargerik eklektisk)");
+  assert.equal(variantLabel("en", now, { choices: true, presetId: "styling_dansk_farge" }), "Version 1 · now (Colourful eclectic)");
+  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_japandi" }), "Versjon 1 · nå (Japandi)");
   // De tre fra S2-f: kortetiketten.
   assert.equal(
     variantLabel("nb", now, { choices: true, presetId: "styling_skandinavisk" }),
-    "Runde 1 · nå (Digital styling – skandinavisk)"
+    "Versjon 1 · nå (Digital styling – skandinavisk)"
   );
   // Ukjent stil: ingen parentes, og aldri skumringsvalgene.
-  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_ukjent" }), "Runde 1 · nå");
+  assert.equal(variantLabel("nb", now, { choices: true, presetId: "styling_ukjent" }), "Versjon 1 · nå");
   for (const presetId of ["styling_dansk_farge", "styling_skandinavisk", "styling_ukjent"]) {
     const label = variantLabel("nb", now, { choices: true, presetId });
     assert.doesNotMatch(label, /tidlig|uten himmel|skyer|peis|lys justert/, presetId);
   }
 });
 
-test("B2: megleren ser «Runde 1 · nå» for styling, og rått er uendret", () => {
+test("B2: megleren ser «Versjon 1 · nå» for styling, og rått er uendret", () => {
   const admin = stylingVariants(true);
   const [now] = stylingVariants(false);
-  assert.equal(variantLabel("nb", now, { choices: false, presetId: "styling_dansk_farge" }), "Runde 1 · nå");
-  assert.equal(variantLabel("nb", admin[1], { choices: true, presetId: "styling_dansk_farge" }), "Runde 1 · rått fra modellen");
+  assert.equal(variantLabel("nb", now, { choices: false, presetId: "styling_dansk_farge" }), "Versjon 1 · nå");
+  assert.equal(variantLabel("nb", admin[1], { choices: true, presetId: "styling_dansk_farge" }), "Versjon 1 · rått fra modellen");
 });
 
 test("B2: skumring, Klart vaer og jobber uten oppskrift har skumringsvalgene som foer", () => {
   const [now] = stylingVariants(true);
   for (const presetId of ["skumring", "skumring_interior", "klart_vaer", null, undefined]) {
-    assert.equal(variantLabel("nb", now, { choices: true, presetId }), "Runde 1 · nå (tidlig, uten himmel)", String(presetId));
+    assert.equal(variantLabel("nb", now, { choices: true, presetId }), "Versjon 1 · nå (tidlig, uten himmel)", String(presetId));
   }
-  assert.equal(variantLabel("en", now, { choices: true, presetId: "skumring" }), "Round 1 · now (early, no sky)");
-  assert.equal(variantLabel("nb", now, { choices: false, presetId: "skumring" }), "Runde 1 · nå");
+  assert.equal(variantLabel("en", now, { choices: true, presetId: "skumring" }), "Version 1 · now (early, no sky)");
+  assert.equal(variantLabel("nb", now, { choices: false, presetId: "skumring" }), "Versjon 1 · nå");
 });

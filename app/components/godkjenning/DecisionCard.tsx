@@ -55,6 +55,10 @@ const BTN_DANGER = buttonClass("danger");
  * Bildetypen (TG-NEW-268): merknadene kan ha ord (noteText), og linja
  * «Bildetype: Utendørs (valgt ved bestilling)» staar over dem naar megleren
  * valgte typen ved bestilling.
+ *
+ * Versjonsstripa (FE-c, Dag 57): vises originalen eller en eldre versjon
+ * (`approveLock`), er «Godkjenn» laast med «Gå til den nyeste versjonen for
+ * å godkjenne.». Krysset og advarselen staar som foer.
  */
 export function DecisionCard({
   stop,
@@ -81,6 +85,7 @@ export function DecisionCard({
   checklist,
   compared,
   onCompared,
+  approveLock,
   acknowledged,
   onAcknowledged,
   framingPct,
@@ -119,6 +124,8 @@ export function DecisionCard({
   /** Krysset «Jeg har sammenlignet bildet med originalen.» */
   compared: boolean;
   onCompared: (on: boolean) => void;
+  /** Originalen eller en eldre versjon vises (approveLocked): «Godkjenn» er laast. */
+  approveLock: boolean;
   /** Ved advarsel: settes av samme kryss og sendes som `additions_acknowledged`. */
   acknowledged: boolean;
   onAcknowledged: (on: boolean) => void;
@@ -218,6 +225,12 @@ export function DecisionCard({
             </div>
           )}
 
+          {controls.approve && approveLock && (
+            <p className="text-sm text-ink-2" role="status">
+              {t(locale, "compare.approveLatest")}
+            </p>
+          )}
+
           {controls.none ? (
             // Linja om bare lesing sier det samme lenger opp.
             !readOnly && <p className="text-sm text-ink-2">{t(locale, "action.noneAllowed")}</p>
@@ -226,7 +239,7 @@ export function DecisionCard({
               {controls.approve && (
                 <button
                   onClick={() => onDecide("approve")}
-                  disabled={locked || !approveEnabled(additions.level, compared, acknowledged)}
+                  disabled={locked || approveLock || !approveEnabled(additions.level, compared, acknowledged)}
                   aria-busy={approving}
                   className={BTN_PRIMARY}
                 >

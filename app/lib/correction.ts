@@ -5,7 +5,7 @@ import type {
   JobReviewDetail,
   ReviewLight,
 } from "./api";
-import type { CodeGroup } from "./i18n";
+import type { CodeGroup, UiKey } from "./i18n";
 import type { FireplaceAnswer } from "./review";
 import { panelShown } from "./presets.ts";
 
@@ -155,6 +155,59 @@ export function correctionControls(
     show: review.allowedActions.includes("correct") && roundsLeft > 0 && panelShown(review, "correct"),
     roundsLeft,
     roundFailed: lastRoundFailed,
+  };
+}
+
+/**
+ * Hva rettingen kan endre (FE-1, Dag 57), lest fra review-svaret og ikke fra
+ * tjenestenavnet:
+ * - lights: minst én lyskilde kan slaas av eller paa (lyspanelet finnes);
+ * - fireplace: ingen slik lyskilde, men peisspoersmaalet vises;
+ * - retry: ingen av delene. «Lag nytt bilde» lager bildet paa nytt fra
+ *   originalen med de samme valgene. Gjelder ogsaa Klart vaer og styling
+ *   naar backend sender `correct` for dem (RETRY_ALL_SERVICES).
+ */
+export type CorrectionKind = "lights" | "fireplace" | "retry";
+
+export function correctionKind(
+  review: Pick<JobReviewDetail, "lights"> & Partial<Pick<JobReviewDetail, "reviewPanels">>,
+  fireplaceShown: boolean
+): CorrectionKind {
+  const { approved, unstable, rejected } = review.lights;
+  const toggleable =
+    approved.some((l) => canToggle(l, false)) || [...unstable, ...rejected].some((l) => canToggle(l, true));
+  if (panelShown(review, "lights") && toggleable) return "lights";
+  return fireplaceShown ? "fireplace" : "retry";
+}
+
+/** Overskriften, hintet og hva panelet viser for hver `CorrectionKind`. */
+export interface CorrectionView {
+  titleKey: UiKey;
+  hintKey: UiKey | null;
+  /** «Lys i bildet» med lista (eller «Ingen»). */
+  lightsList: boolean;
+  /** «Dette lager et nytt bilde fra originalen.» under knappene; hintet sier det ved retry. */
+  footer: boolean;
+}
+
+/**
+ * Lys og peis: som foer (Dag 57). Uten noe aa endre: «Lag et nytt forsøk»,
+ * og «Lys i bildet: Ingen» vises ikke. Laaste lyskilder vises fortsatt i lista.
+ */
+export function correctionView(kind: CorrectionKind, opts: { lightsShown: boolean; lightCount: number }): CorrectionView {
+  if (kind === "retry") {
+    return {
+      titleKey: "correct.retryTitle",
+      hintKey: "correct.retryHint",
+      lightsList: opts.lightsShown && opts.lightCount > 0,
+      footer: false,
+    };
+  }
+  return {
+    titleKey: "correct.title",
+    hintKey: opts.lightsShown ? "correct.hint" : null,
+    lightsList: opts.lightsShown,
+    footer: true,
   };
 }
 
