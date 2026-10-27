@@ -313,6 +313,14 @@ const nbUi = {
   // FE-c: versjonsstripa (Dag 57). «Godkjenn» gjelder bare den nyeste versjonen.
   "compare.versions": "Versjoner",
   "compare.approveLatest": "Gå til den nyeste versjonen for å godkjenne.",
+  // FE-3: mens en ny versjon lages, og råbildet som bryter (bare admin).
+  "compare.makingTitle": "Lager versjon {n} …",
+  "compare.makingHint": "Det tar vanligvis rundt ett minutt.",
+  "compare.makingShort": "Lages …",
+  "compare.showRaw": "Vis rått svar fra modellen (bare admin)",
+  // FE-2: lerretet i korreksjonsstudioet (Dag 57, ikke i bruk ennå).
+  "studio.canvas":
+    "Markering på bildet. Én finger eller mus markerer, to fingre zoomer og flytter. Ctrl eller Cmd og Z angrer, Esc avbryter.",
   // D2b: handlingskortet, sidepanelet og «Detaljer».
   "correct.lightsTitle": "Lys i bildet",
   "correct.uncertain": "Usikker",
@@ -1185,6 +1193,14 @@ const en: Dictionary = {
     // FE-c: versjonsstripa (Dag 57). «Godkjenn» gjelder bare den nyeste versjonen.
     "compare.versions": "Versions",
     "compare.approveLatest": "Go to the latest version to approve.",
+    // FE-3: mens en ny versjon lages, og råbildet som bryter (bare admin).
+    "compare.makingTitle": "Making version {n} …",
+    "compare.makingHint": "It usually takes about a minute.",
+    "compare.makingShort": "In progress …",
+    "compare.showRaw": "Show the raw output from the model (admin only)",
+    // FE-2: lerretet i korreksjonsstudioet (Dag 57, ikke i bruk ennå).
+    "studio.canvas":
+      "Marking on the image. One finger or the mouse marks, two fingers zoom and move. Ctrl or Cmd and Z undoes, Esc cancels.",
     // D2b: handlingskortet, sidepanelet og «Detaljer».
     "correct.lightsTitle": "Lights in the image",
     "correct.uncertain": "Uncertain",

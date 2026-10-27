@@ -67,7 +67,8 @@ test("D-5b1: lysboksen er en <dialog> med showModal(), og siden gir den samme bi
   // Siden: samme lenke som visningen (trinnet med), og rundene som en egen velger.
   assert.match(page, /onExpand=\{\(\) => setLightbox\(true\)\}/);
   assert.match(page, /<Lightbox\s+originalUrl=\{review\.images\.originalUrl\}\s+aiUrl=\{shownUrl\}/);
-  assert.match(page, /rounds=\{\s*stripShown\(strip\) \? \(\s*<VersionStrip/);
+  // FE-3: stripa vises ogsaa mens en ny versjon lages (plassholderen).
+  assert.match(page, /rounds=\{\s*stripShown\(strip, making\) \? \(\s*<VersionStrip/);
   assert.match(viewer, /\{canSlide && onExpand !== undefined && \(/);
 });
 
