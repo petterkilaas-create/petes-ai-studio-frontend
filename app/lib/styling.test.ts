@@ -253,7 +253,7 @@ test("S2-f/S3-f/D-3: rommet staar foerst med krysset i samme rad, saa stilene og
   // ønskene (overskriften som etikett eller tekst, linja for andre rom,
   // hjelpeteksten, forslagsgruppen og forslagene, TG-NEW-250; se dag55.test.ts).
   // (nameOf staar oeverst i komponenten; pyntvalgene har " i noekkelen og telles ikke her,
-  // heller ikke telleren, som har {n}.)
+  // heller ikke telleren, som har vars. «Ikke plass til flere forslag» staar over forslagene.)
   assert.deepEqual(picker.match(/t\(locale, ["`][^"`]+["`]\)/g), [
     "t(locale, `styling.style.${styleShort(style)}`)",
     't(locale, "styling.furnishAs")',
@@ -270,6 +270,7 @@ test("S2-f/S3-f/D-3: rommet staar foerst med krysset i samme rad, saa stilene og
     't(locale, "styling.wishes")',
     't(locale, "styling.wishesOnlyLiving")',
     't(locale, "styling.wishesHelp")',
+    't(locale, "styling.wishesNoRoom")',
     't(locale, "styling.wishesSuggestions")',
     "t(locale, `styling.wish.${id}`)",
   ]);
