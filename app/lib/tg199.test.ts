@@ -64,7 +64,7 @@ test("TG199 og D-5a: siden og kortet har ingen egen kopi av tekstene", () => {
     .concat(Object.entries(DICTIONARIES.en.ui))
     .filter(([key]) => key.startsWith("checklist."))
     .map(([, text]) => text);
-  assert.equal(texts.length, 32, "16 nøkler på nb og en (peisen i kveldsbilde, sjekklister_v2)");
+  assert.equal(texts.length, 40, "20 nøkler på nb og en (aarstider, sjekklister_v3)");
   for (const text of texts) {
     assert.ok(!page.includes(text) && !card.includes(text), `bare i ordlista: ${text}`);
   }

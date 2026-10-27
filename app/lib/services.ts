@@ -28,6 +28,11 @@ export const ENABLED = {
   skumring: true,
   /** Digital styling (S2-f, S3-f): aapnet i S4 (Dag 51), sammen med backend. */
   digital_styling: true,
+  /**
+   * Aarstider (TG-NEW-271, Dag 57): paa fra start (Petter 22.05: ingen meglere
+   * bruker tjenestene ennaa). Backend aapnes i dag57-aarstid-paa, som merges foerst.
+   */
+  aarstider: true,
 } as const;
 
 /** Ukjent id gir av: en ny tjeneste maa legges inn over foer den vises. */
@@ -94,7 +99,8 @@ export function navLinks(): NavLink[] {
 // "simple"  = service alene (ingen params, backend-defaults gjelder).
 // "scene"   = scene_transform med preset_id + scene-type-gate (TG-NEW-58).
 // "styling" = Digital styling: egen bestilling med 1–3 stiler (S2-f, S3-f, POST /v1/orders/styling).
-export type ToolKind = "simple" | "scene" | "styling";
+// "aarstid" = Aarstider: egen bestilling med kilden og 1–3 aarstider (TG-NEW-271, POST /v1/orders/aarstid).
+export type ToolKind = "simple" | "scene" | "styling" | "aarstid";
 
 export interface Tool {
   /** Id-en i ENABLED. Skiller Klart vaer fra skumring (samme service). */
@@ -157,6 +163,16 @@ const CATEGORIES: Category[] = [
         imageTypeHints: ["exterior", "aerial"],
         titleKey: "express.tool.klart_vaer.title",
         descKey: "express.tool.klart_vaer.desc",
+      },
+      // Etter Blaa himmel (TG-NEW-271, Dag 57; «Bildestudio» paa markedssiden).
+      // Én bestilling med 1–3 aarstider (kind "aarstid", ingen presetId); bildetypen
+      // er alltid «Utendørs» og velges i AarstidChoicePicker, ikke i ImageTypeChoice.
+      {
+        id: "aarstider",
+        service: "scene_transform",
+        kind: "aarstid",
+        titleKey: "express.tool.aarstider.title",
+        descKey: "express.tool.aarstider.desc",
       },
     ],
   },

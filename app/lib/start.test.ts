@@ -106,8 +106,8 @@ test("TG-153 start: den automatiske hentingen gaar bare mens en jobb lages", () 
 
 test("TG-153: snarveiene viser bare tjenester som kan bestilles i prod", () => {
   // Speiler services/enabled.py i backend (TG-NEW-138): skumring, klart_vaer (K3), de 14
-  // stilene i Digital styling (S4, stilene v3) og privacy_blur.
-  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "digital_styling", "privacy_blur"]);
+  // stilene i Digital styling (S4, stilene v3), de fire aarstidene (dag57-aarstid-paa) og privacy_blur.
+  assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "aarstider", "digital_styling", "privacy_blur"]);
   for (const tool of orderableTools()) assert.equal(ENABLED[tool.id as keyof typeof ENABLED], true, tool.id);
 });
 

@@ -2,6 +2,7 @@ import type { ReviewFraming, ReviewOrder } from "./api";
 import { DATE_LOCALES } from "./dates.ts";
 import { t, type Locale, type UiKey } from "./i18n/index.ts";
 import { styleText } from "./styling.ts";
+import { seasonText } from "./aarstid.ts";
 import { isRejectedByReviewer } from "./statusVariants.ts";
 
 /**
@@ -59,14 +60,15 @@ export function orderStatusKey(status: string, code: string | null = null): UiKe
 /**
  * Fanene for bestillingen, i rekkefoelgen fra backend (eldst foerst). null
  * uten bestilling eller med faerre enn to jobber: da vises ingen rad.
- * Navnet er stilen (styleText); en ukjent stil heter «Digital styling».
+ * Navnet er stilen (styleText) eller aarstiden (seasonText, «Høst»); noe
+ * ukjent heter «Digital styling».
  */
 export function orderTabs(order: ReviewOrder | null, jobId: string, locale: Locale): OrderTab[] | null {
   if (order === null || order.jobs.length < 2) return null;
   return order.jobs.map((job) => ({
     jobId: job.jobId,
     href: reviewHref(job.jobId),
-    label: styleText(locale, job.presetId) ?? t(locale, "service.virtual_stage"),
+    label: styleText(locale, job.presetId) ?? seasonText(locale, job.presetId) ?? t(locale, "service.virtual_stage"),
     statusKey: orderStatusKey(job.status, job.code),
     thumbUrl: job.thumbUrl,
     current: job.jobId === jobId,

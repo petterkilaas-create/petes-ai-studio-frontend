@@ -35,11 +35,25 @@ export const DISCLOSURE_DETAIL: DisclosureDetail = "edited";
 export const DISCLOSURE_LOCALE: Locale = "nb";
 
 /**
+ * Aarstidene (backend versjon 9, TG-NEW-271): én base per maalaarstid. Kodene
+ * er hele ledd (disclosureSeasonEdited), ikke ord i en liste: «Fargene på
+ * løvet er endret, løv er lagt på bakken, og lys og skygger er tilpasset
+ * årstiden.» Grunnsetningen har ikke kilden (Petter 27.10, 1 A): backend sender
+ * den ikke, og teksten i bildet og XMP sier det samme.
+ */
+export const SEASON_BASES: ReadonlySet<string | null> = new Set([
+  "season_autumn",
+  "season_spring",
+  "season_summer",
+  "season_winter",
+]);
+
+/**
  * Baser der tidspunktet ikke er en del av teksten (Klart vaer, Petter 19.10;
- * Digital styling, GS): med "full" legges det ikke til, og manglende
+ * Digital styling, GS; Aarstider): med "full" legges det ikke til, og manglende
  * tidspunkt gir ikke "missing".
  */
-const BASES_WITHOUT_TIME: ReadonlySet<string | null> = new Set(["sky_replaced", "furniture_added"]);
+const BASES_WITHOUT_TIME: ReadonlySet<string | null> = new Set(["sky_replaced", "furniture_added", ...SEASON_BASES]);
 
 export type DisclosureResult = { kind: "text"; text: string } | { kind: "missing" };
 
@@ -65,8 +79,18 @@ function editedSentence(locale: Locale, items: string[]): string {
 }
 
 /**
+ * Leddene for aarstider som én setning: «A, B, og C.» Leddene er
+ * hovedsetninger, saa det staar komma foran «og» (nb) og «and» (en).
+ */
+export function clauseSentence(locale: Locale, items: readonly string[]): string {
+  if (items.length <= 1) return `${capitalize(locale, items.join(""))}.`;
+  const and = locale === "nb" ? "og" : "and";
+  return `${capitalize(locale, items.slice(0, -1).join(", "))}, ${and} ${items[items.length - 1]}.`;
+}
+
+/**
  * Merketeksten for en jobb. null naar backend ikke sender disclosure (ikke
- * skumring, Klart vaer eller Digital styling): da vises ingen boks. `base` og `edited` sjekkes alltid, ogsaa
+ * skumring, Klart vaer, Digital styling eller Aarstider): da vises ingen boks. `base` og `edited` sjekkes alltid, ogsaa
  * med "base"; `time` bare naar det vises ("full", ikke for BASES_WITHOUT_TIME).
  */
 export function disclosureText(
@@ -82,9 +106,12 @@ export function disclosureText(
   const base = lookup(codes.disclosureBase, disclosure.base);
   if (base === null) return missing;
   if (new Set(disclosure.edited).size !== disclosure.edited.length) return missing;
+  // Aarstider slaar opp i egen tabell: en kode fra den andre gruppen gir "missing".
+  const season = SEASON_BASES.has(disclosure.base);
+  const editedTable = season ? codes.disclosureSeasonEdited : codes.disclosureEdited;
   const items: string[] = [];
   for (const code of disclosure.edited) {
-    const text = lookup(codes.disclosureEdited, code);
+    const text = lookup(editedTable, code);
     if (text === null) return missing;
     items.push(text);
   }
@@ -95,6 +122,8 @@ export function disclosureText(
     if (time === null) return missing;
     parts.push(time);
   }
-  if (detail !== "base" && items.length > 0) parts.push(editedSentence(locale, items));
+  if (detail !== "base" && items.length > 0) {
+    parts.push(season ? clauseSentence(locale, items) : editedSentence(locale, items));
+  }
   return { kind: "text", text: parts.join(" ") };
 }

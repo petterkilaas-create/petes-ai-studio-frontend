@@ -37,12 +37,14 @@ test("D-1: knappene sier «Velg …» til stegflyten kommer (D1_SVAR punkt 8)", 
   assert.deepEqual(cta("nb"), {
     skumring: "Velg kveldsbilde",
     klart_vaer: "Velg blå himmel",
+    aarstider: "Velg årstider",
     digital_styling: "Velg digital styling",
     privacy_blur: "Velg Skjul ansikter",
   });
   assert.deepEqual(cta("en"), {
     skumring: "Choose dusk image",
     klart_vaer: "Choose blue sky",
+    aarstider: "Choose seasons",
     digital_styling: "Choose virtual staging",
     privacy_blur: "Choose Blur faces",
   });

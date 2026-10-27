@@ -547,6 +547,46 @@ export async function submitStylingOrder(opts: {
   idempotencyKey?: string;
   getToken: GetToken;
 }): Promise<StylingOrderResult> {
+  return submitOrder("/v1/orders/styling", "submitStylingOrder", opts);
+}
+
+// ---------------------------------------------------------------------------
+// Bestilling av Aarstider (TG-NEW-271, Dag 57)
+// ---------------------------------------------------------------------------
+
+/**
+ * `params_json` i POST /v1/orders/aarstid. Ukjente felt avvises (400
+ * invalid_order). Backend sjekker kilden og parene foer kvoten:
+ * season_source_not_supported (vinter) og season_target_not_supported.
+ */
+export interface AarstidOrderParams {
+  /** 1-3 ulike maalaarstider, i den rekkefoelgen jobbene startes. */
+  seasons: string[];
+  /** Aarstiden bildet er tatt i: sommer, hoest eller vaar. */
+  source_season: string;
+  /** Bare «Utendørs»: backend godtar ikke andre valg for aarstider. */
+  image_type_hint: "exterior";
+}
+
+/**
+ * POST /v1/orders/aarstid: som submitStylingOrder (ett bilde, én
+ * Idempotency-Key, én kvote-enhet, samme 202-svar med én jobb per aarstid).
+ */
+export async function submitAarstidOrder(opts: {
+  image: File;
+  params: AarstidOrderParams;
+  idempotencyKey?: string;
+  getToken: GetToken;
+}): Promise<StylingOrderResult> {
+  return submitOrder("/v1/orders/aarstid", "submitAarstidOrder", opts);
+}
+
+/** Felles for bestillingene: samme skjema, samme svar og samme feilform. */
+async function submitOrder(
+  path: string,
+  name: string,
+  opts: { image: File; params: StylingOrderParams | AarstidOrderParams; idempotencyKey?: string; getToken: GetToken }
+): Promise<StylingOrderResult> {
   const { image, params, idempotencyKey, getToken } = opts;
 
   // Uten `service`: bestillingen er alltid scene_transform.
@@ -557,7 +597,7 @@ export async function submitStylingOrder(opts: {
   const headers = new Headers(await authHeader(getToken));
   if (idempotencyKey !== undefined) headers.set("Idempotency-Key", idempotencyKey);
 
-  const res = await fetch(`${API_BASE}/v1/orders/styling`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers,
     body: form,
@@ -581,7 +621,7 @@ export async function submitStylingOrder(opts: {
     throw new ValidationError(detailText(body, raw, res));
   }
 
-  throw new Error(`submitStylingOrder failed (${res.status}): ${detailText(body, raw, res)}`);
+  throw new Error(`${name} failed (${res.status}): ${detailText(body, raw, res)}`);
 }
 
 /**

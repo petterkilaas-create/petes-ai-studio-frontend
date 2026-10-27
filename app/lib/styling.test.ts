@@ -490,7 +490,9 @@ test("S2-f: én noekkel per bestilling, ogsaa ved dobbeltklikk og nytt forsoek",
   // Hooken: noekkelen lages foer kallet, og et klikk mens kallet gaar, sendes ikke.
   const hook = read("hooks/useOrderJobs.ts");
   assert.match(hook, /if \(inFlightRef\.current\) return;/);
-  assert.match(hook, /orderKeys\.keyFor\(\{ file, service: STYLING_ORDER_SERVICE, params \}\)/);
+  // Dag 57: felles innsending for styling og aarstider; noekkelen skilles paa `service`.
+  assert.match(hook, /orderKeys\.keyFor\(\{ file, service, params \}\)/);
+  assert.match(hook, /place\(file, STYLING_ORDER_SERVICE, params, submitStylingOrder\)/);
   assert.match(hook, /orderKeys\.accepted\(\);/);
 });
 

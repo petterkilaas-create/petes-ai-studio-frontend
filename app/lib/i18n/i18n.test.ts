@@ -146,7 +146,23 @@ test("merketeksten: nb og en har noeklene og alle kodene fra kontrakten", () => 
   for (const locale of ["nb", "en"] as const) {
     const dict = DICTIONARIES[locale];
     for (const key of keys) assert.ok(dict.ui[key].trim().length > 0, `${locale} ${key}`);
-    assert.deepEqual(Object.keys(dict.codes.disclosureBase), ["evening_from_day", "sky_replaced", "furniture_added"]);
+    // Dag 57: de fire aarstidene (backend versjon 9) etter de tre gamle.
+    assert.deepEqual(Object.keys(dict.codes.disclosureBase), [
+      "evening_from_day",
+      "sky_replaced",
+      "furniture_added",
+      "season_autumn",
+      "season_spring",
+      "season_summer",
+      "season_winter",
+    ]);
+    assert.deepEqual(Object.keys(dict.codes.disclosureSeasonEdited), [
+      "leaves_recoloured",
+      "leaves_added",
+      "fallen_leaves_added",
+      "snow_added",
+      "light_adapted",
+    ]);
     assert.deepEqual(Object.keys(dict.codes.disclosureTime).sort(), ["early", "late", "summer_night"]);
     assert.deepEqual(Object.keys(dict.codes.disclosureEdited), edited);
   }

@@ -7,6 +7,7 @@ import { workingView } from "../lib/jobMedia";
 import { outputView } from "../lib/jobState";
 import { codeText, t, type Locale } from "../lib/i18n";
 import { pollFailedLines } from "../lib/notCreated";
+import { isAarstidPreset } from "../lib/aarstid";
 import { NotCreatedPanel } from "./NotCreatedPanel";
 import { ApprovalNotice } from "./ApprovalNotice";
 import { ErrorPanel } from "./ErrorPanel";
@@ -25,7 +26,8 @@ const EMPTY_FRAME =
  * Ett kort per stil i en bestilling av Digital styling (S2-f). En stil som
  * ikke ble startet (`not_started`), har ingen jobb og vises uten polling.
  * De andre viser det samme som kveldsbildet: ventebildet, det merkede
- * bildet og lenken til godkjenningen.
+ * bildet og lenken til godkjenningen. Brukes ogsaa for Aarstider
+ * (TG-NEW-271): ett kort per aarstid, med egen tekst naar den ikke ble startet.
  */
 export function StylingOrderCards({ cards, locale }: { cards: readonly OrderCard[]; locale: Locale }) {
   return (
@@ -39,7 +41,11 @@ export function StylingOrderCards({ cards, locale }: { cards: readonly OrderCard
           <Card key={card.presetId} className="space-y-4">
             <p className="text-sm font-medium text-ink-2">{label}</p>
             {card.notStarted ? (
-              <div className={EMPTY_FRAME}>{codeText(locale, "orderNotStarted", card.notStartedCode)}</div>
+              <div className={EMPTY_FRAME}>
+                {isAarstidPreset(card.presetId)
+                  ? t(locale, card.notStartedCode === "capacity" ? "aarstid.notStarted.capacity" : "aarstid.notStarted")
+                  : codeText(locale, "orderNotStarted", card.notStartedCode)}
+              </div>
             ) : (
               <>
                 {card.status === "awaiting_approval" && <ApprovalNotice />}

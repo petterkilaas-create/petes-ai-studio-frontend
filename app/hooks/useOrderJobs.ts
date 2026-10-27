@@ -3,21 +3,25 @@
 import { useCallback, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import {
+  submitAarstidOrder,
   submitStylingOrder,
   SubmitError,
+  type AarstidOrderParams,
   type NotCreated,
   type OrderJob,
   type QuotaReturn,
   type Review,
   type StylingOrderParams,
+  type StylingOrderResult,
 } from "../lib/api";
 import { useJobStatus, type UseJobStatusResult } from "../lib/useJobStatus";
 import { OrderKeys } from "../lib/orderKey";
 import type { QuotaEvent } from "../lib/quota";
 import { orderPollDelayMs, orderStatus, pollJobId, STYLING_ORDER_SERVICE } from "../lib/styling";
+import { AARSTID_ORDER_SERVICE } from "../lib/aarstid";
 import { deriveProcessStatus, isProcessingStatus, type ProcessStatus } from "./processStatus";
 
-/** Ett kort per stil i bestillingen. */
+/** Ett kort per stil (eller aarstid) i bestillingen. */
 export interface OrderCard {
   presetId: string;
   /** null for `not_started`: kortet vises uten polling. */
@@ -48,6 +52,8 @@ export interface UseOrderJobsResult {
   isProcessing: boolean;
   waking: boolean;
   run: (file: File, params: StylingOrderParams) => Promise<void>;
+  /** Aarstider (TG-NEW-271): POST /v1/orders/aarstid, ellers som `run`. */
+  runAarstid: (file: File, params: AarstidOrderParams) => Promise<void>;
   reset: () => void;
 }
 
@@ -59,7 +65,9 @@ export interface UseOrderJobsOptions {
 /**
  * Bestilling av Digital styling med N jobber (S2-f): ett kall til
  * POST /v1/orders/styling, og hver startet stil polles som i dag
- * (useJobStatus). `not_started` har ingen jobb og polles ikke.
+ * (useJobStatus). `not_started` har ingen jobb og polles ikke. Aarstider
+ * (TG-NEW-271) bestilles likt, i POST /v1/orders/aarstid (runAarstid), med
+ * én jobb per aarstid; svaret og pollingen er de samme.
  *
  * useProcessJob har én jobId; her er det hoeyst tre (MAX_ORDER_JOBS, F1),
  * men backend godtar aatte til B1 er live, og reglene for hooks krever et
@@ -95,8 +103,14 @@ export function useOrderJobs(options: UseOrderJobsOptions = {}): UseOrderJobsRes
     useJobStatus(pollJobId(jobs[7]), pollOptions),
   ];
 
-  const run = useCallback(
-    async (file: File, params: StylingOrderParams) => {
+  // Felles for bestillingene: `service` skiller noeklene, `submit` er kallet.
+  const place = useCallback(
+    async <P,>(
+      file: File,
+      service: string,
+      params: P,
+      submit: (opts: { image: File; params: P; idempotencyKey: string; getToken: typeof getToken }) => Promise<StylingOrderResult>
+    ) => {
       if (inFlightRef.current) return;
       inFlightRef.current = true;
       setJobs([]);
@@ -106,10 +120,10 @@ export function useOrderJobs(options: UseOrderJobsOptions = {}): UseOrderJobsRes
       setIsSubmitting(true);
 
       const orderKeys = orderKeysRef.current!;
-      const idempotencyKey = orderKeys.keyFor({ file, service: STYLING_ORDER_SERVICE, params });
+      const idempotencyKey = orderKeys.keyFor({ file, service, params });
 
       try {
-        const result = await submitStylingOrder({ image: file, params, idempotencyKey, getToken });
+        const result = await submit({ image: file, params, idempotencyKey, getToken });
         // Mottatt (ogsaa duplicate: true): neste klikk er en ny bestilling.
         orderKeys.accepted();
         onQuota?.({ kind: "accepted", quota: result.quota });
@@ -129,6 +143,15 @@ export function useOrderJobs(options: UseOrderJobsOptions = {}): UseOrderJobsRes
       }
     },
     [getToken, onQuota]
+  );
+
+  const run = useCallback(
+    (file: File, params: StylingOrderParams) => place(file, STYLING_ORDER_SERVICE, params, submitStylingOrder),
+    [place]
+  );
+  const runAarstid = useCallback(
+    (file: File, params: AarstidOrderParams) => place(file, AARSTID_ORDER_SERVICE, params, submitAarstidOrder),
+    [place]
   );
 
   const reset = useCallback(() => {
@@ -170,6 +193,7 @@ export function useOrderJobs(options: UseOrderJobsOptions = {}): UseOrderJobsRes
     isProcessing: isProcessingStatus(status),
     waking: polls.some((p) => p.waking),
     run,
+    runAarstid,
     reset,
   };
 }

@@ -421,7 +421,7 @@ test("D1c: services.ts har bare noekler til ordlista, ingen tekst eller emoji", 
   assert.doesNotMatch(code, /^\s*(title|desc|icon):/m);
   assert.doesNotMatch(code, EMOJI);
   const count = (re: RegExp) => code.match(re)?.length ?? 0;
-  const tools = count(/^\s*kind: "(simple|scene|styling)",/gm);
+  const tools = count(/^\s*kind: "(simple|scene|styling|aarstid)",/gm);
   assert.ok(tools >= 4);
   // Fem kategorier etter APP1: Lys og himmel, Rydd, Innredning, Mer og Personvern.
   assert.equal(count(/^\s*titleKey: "/gm), tools + 5, "hvert verktoey og de fem kategoriene");

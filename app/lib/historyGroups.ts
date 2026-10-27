@@ -8,6 +8,7 @@ import { wishesSummaryText } from "./wishes.ts";
 import { ownerBadge, rejectedLabelKey } from "./roles.ts";
 import { canOpenReview, isRejectedByReviewer } from "./statusVariants.ts";
 import { MAX_ORDER_JOBS, styleText } from "./styling.ts";
+import { isAarstidPreset, seasonText } from "./aarstid.ts";
 
 /**
  * Historikken per bestilling (TG-NEW-262). Rene funksjoner, saa reglene kan
@@ -63,9 +64,15 @@ export function groupHistory(jobs: readonly JobSummary[]): HistoryEntry[] {
 /**
  * Tittelen: «Digital styling · 3 stiler». Antallet er jobbene som er lastet.
  * Rommet staar ikke med: jobblista sender det ikke (AVVIK 1, valg A).
+ * En bestilling av aarstider (alle jobbene `aarstid_…`, TG-NEW-271) heter
+ * «Årstider · 3 bilder».
  */
 export function orderTitle(locale: Locale, jobs: readonly JobSummary[]): string {
   const n = jobs.length;
+  if (n > 0 && jobs.every((j) => isAarstidPreset(j.presetId))) {
+    const images = t(locale, n === 1 ? "aarstid.summary.images.1" : "aarstid.summary.images.n", { n });
+    return [t(locale, "express.tool.aarstider.title"), images].join(" · ");
+  }
   const styles = t(locale, n === 1 ? "styling.summary.styles.1" : "styling.summary.styles.n", { n });
   return [t(locale, "service.virtual_stage"), styles].join(" · ");
 }
@@ -90,7 +97,7 @@ export function orderOpen(jobs: readonly JobSummary[]): { jobId: string; labelKe
 
 /** En linje per stil: navnet, merket som paa JobCard og teksten under. */
 export interface OrderLine {
-  /** Stilnavnet alene («Funkis»); en ukjent stil heter «Digital styling». */
+  /** Stilnavnet alene («Funkis») eller aarstiden («Høst»); noe ukjent heter «Digital styling». */
   label: string;
   job: JobSummary;
   /** «Avvist av deg» eller «Avvist av eieren» i stedet for statusen (som JobCard). */
@@ -109,7 +116,7 @@ export function orderLines(locale: Locale, jobs: readonly JobSummary[]): OrderLi
   return jobs.map((job) => {
     const rejected = isRejectedByReviewer(job);
     return {
-      label: styleText(locale, job.presetId) ?? t(locale, "service.virtual_stage"),
+      label: styleText(locale, job.presetId) ?? seasonText(locale, job.presetId) ?? t(locale, "service.virtual_stage"),
       job,
       rejectedKey: rejected ? rejectedLabelKey(job) : null,
       reason: rejected && job.reason ? job.reason : null,
