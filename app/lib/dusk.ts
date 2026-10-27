@@ -11,12 +11,14 @@
  * Stilkortene (Dag 55, TG-NEW-259): megleren velger ett av fire kort, og
  * tidspunktet foelger kortet. `warm_dusk` og `summer_night` er koder backend
  * viser i godkjenningen for runder uten himmelvalg, aldri valg megleren kan
- * sende, saa de ligger bare i ordlista. Det samme gjelder `starry` og de gamle
- * stilene (`nordic_blue_hour_v1`, `warm_dusk_v2`) fra eldre jobber.
+ * sende, saa de ligger bare i ordlista. Det samme gjelder de gamle stilene
+ * (`nordic_blue_hour_v1`, `warm_dusk_v2`) fra eldre jobber.
+ * Stjernehimmel (Dag 56, TG-NEW-265): `starry` er et himmelvalg under Sen
+ * kveld, med `dark` som standard (backend dag56-stjerner).
  */
 
 export type DuskTime = "early" | "late";
-export type DuskSky = "clear" | "light_clouds" | "pink_clouds" | "dark";
+export type DuskSky = "clear" | "light_clouds" | "pink_clouds" | "dark" | "starry";
 export type DuskStyle = "nordic_blue_hour_v2" | "warm_dusk_v3" | "late_evening_v1" | "summer_night_v1";
 
 export interface DuskChoice {
@@ -33,19 +35,21 @@ export interface DuskCard {
 /**
  * Stilkortene (Dag 55, TG-NEW-259), i den rekkefoelgen de vises. Kontrakten er
  * `dusk_styles.STYLES` i backend: tid og himmel sendes som foer, og backend
- * svarer 400 paa et par som ikke passer stilen. Bare Blå time har himmelvalg;
- * de andre sender standarden. Vinterkveld er ikke med (ingen bilder ennaa).
+ * svarer 400 paa et par som ikke passer stilen. Blå time og Sen kveld har
+ * himmelvalg; de andre sender standarden. Vinterkveld er ikke med (ingen
+ * bilder ennaa).
  */
 export const DUSK_CARDS: Readonly<Record<DuskStyle, DuskCard>> = {
   nordic_blue_hour_v2: { time: "early", skies: ["light_clouds", "clear", "pink_clouds"] },
   warm_dusk_v3: { time: "early", skies: ["light_clouds"] },
-  late_evening_v1: { time: "late", skies: ["dark"] },
+  late_evening_v1: { time: "late", skies: ["dark", "starry"] },
   summer_night_v1: { time: "early", skies: ["light_clouds"] },
 };
 
 /** Stilene i den rekkefoelgen kortene vises. Den foerste er standarden. */
 export const DUSK_STYLES: readonly DuskStyle[] = ["nordic_blue_hour_v2", "warm_dusk_v3", "late_evening_v1", "summer_night_v1"];
 export const STYLE_BLUE: DuskStyle = "nordic_blue_hour_v2";
+export const STYLE_LATE: DuskStyle = "late_evening_v1";
 export const STYLE_SUMMER: DuskStyle = "summer_night_v1";
 
 /** Koder fra jobber foer stilkortene. De kan ikke bestilles, bare vises. */
@@ -65,7 +69,7 @@ export function isValidChoice(style: string, sky: string): boolean {
   return isDuskStyle(style) && (DUSK_CARDS[style].skies as readonly string[]).includes(sky);
 }
 
-/** Himmelknappene under kortene: bare for stiler med mer enn én himmel (Blå time). */
+/** Himmelknappene under kortene: bare for stiler med mer enn én himmel (Blå time, Sen kveld). */
 export function skyChoices(style: DuskStyle): readonly DuskSky[] {
   const { skies } = DUSK_CARDS[style];
   return skies.length > 1 ? skies : [];
@@ -138,18 +142,21 @@ export function duskFacts(dusk: ReviewDusk | null): DuskFacts | null {
  * tilbake dit). Andre koder staar som de er.
  */
 export function displayStyle(code: string, time: string | null): string {
-  return code === STYLE_V1 && time === "late" ? "late_evening_v1" : code;
+  return code === STYLE_V1 && time === "late" ? STYLE_LATE : code;
 }
 
-/** Stilene der himmelen er et valg, og derfor staar i meglerlinja. */
+/** Blå time: himmelen staar alltid i meglerlinja, ogsaa standarden. */
 const BLUE_HOUR: ReadonlySet<string> = new Set([STYLE_V1, STYLE_BLUE]);
 
 /**
  * Den korte linja for megleren (TG-NEW-193, stilkortene Dag 55): stilen, og
  * himmelen for Blå time, som koder, f.eks. «Blå time · Lette skyer» eller
- * «Lys sommerkveld». Stilen er den runden ble laget med, ellers den bestilte.
- * Himmelen utelates naar den ikke ble brukt (sky_applied false). null: ingen
- * linje (dusk- eller stil-panelet er skjult; de vises sammen for skumring).
+ * «Lys sommerkveld». Sen kveld viser himmelen bare naar den ikke er
+ * standarden («Sen kveld · Stjernehimmel», men «Sen kveld» med moerk himmel;
+ * Dag 56), saa eldre jobber vises som foer. Stilen er den runden ble laget
+ * med, ellers den bestilte. Himmelen utelates naar den ikke ble brukt
+ * (sky_applied false). null: ingen linje (dusk- eller stil-panelet er
+ * skjult; de vises sammen for skumring).
  */
 export function duskLine(
   dusk: ReviewDusk | null,
@@ -157,7 +164,8 @@ export function duskLine(
 ): { style: string; sky: string | null } | null {
   if (dusk === null || style === null) return null;
   const name = displayStyle(style.applied ?? style.requested, dusk.time);
-  const sky = BLUE_HOUR.has(name) && dusk.skyApplied !== false ? dusk.sky : null;
+  const shown = BLUE_HOUR.has(name) || (name === STYLE_LATE && dusk.sky !== DUSK_CARDS[STYLE_LATE].skies[0]);
+  const sky = shown && dusk.skyApplied !== false ? dusk.sky : null;
   return { style: name, sky };
 }
 

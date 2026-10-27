@@ -21,8 +21,9 @@ const CARD = cardClass("md");
  *
  * Megleren (`admin` false, TG-NEW-193) ser valget i én kort linje: stilen,
  * og himmelen for Blå time («Blå time · Lette skyer», «Lys sommerkveld»;
- * stilkortene, Dag 55), uten «ikke brukt» om himmelen og uten peisen. Admin
- * ser alt som foer.
+ * stilkortene, Dag 55) og for Sen kveld med stjerner («Sen kveld ·
+ * Stjernehimmel», Dag 56; duskLine i dusk.ts), uten «ikke brukt» om himmelen
+ * og uten peisen. Admin ser alt som foer.
  *
  * Stil v2 (TG-NEW-189) og stilkortene: begge roller faar en linje naar
  * runden ble laget med en annen stil enn den bestilte («Varm skumring passet

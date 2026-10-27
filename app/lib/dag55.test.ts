@@ -258,12 +258,13 @@ test("Dag 55: ønsket logges aldri (ingen console og ingen analyse i filene som 
 });
 
 // --- Stjernehimmel --------------------------------------------------------------
-// Stjernehimmelen og teksten om den ble fjernet med stilkortene (Dag 55,
-// TG-NEW-259); merknaden ved Lys sommerkveld testes i stilkort.test.ts.
+// Stjernehimmelen ble fjernet med stilkortene (Dag 55, TG-NEW-259) og kom
+// tilbake som himmelvalg under Sen kveld (Dag 56, TG-NEW-265); resten testes
+// i stjerner.test.ts.
 
-test("Dag 55 (S4): stjernehimmelen kan ikke velges lenger, men vises for gamle jobber", () => {
-  assert.equal(Object.hasOwn(DICTIONARIES.nb.ui, "dusk.starryNote"), false);
-  assert.equal(Object.hasOwn(DICTIONARIES.en.ui, "dusk.starryNote"), false);
-  assert.doesNotMatch(read("components/DuskChoicePicker.tsx"), /starry/);
+test("Dag 56 (snudd fra Dag 55 S4): stjernehimmelen kan velges igjen, med merknad", () => {
+  assert.equal(t("nb", "dusk.starryNote"), "Ikke for bilder fra mai–juli.");
+  assert.equal(t("en", "dusk.starryNote"), "Not for photos taken in May–July.");
+  assert.match(read("components/DuskChoicePicker.tsx"), /starry/);
   assert.equal(codeText("nb", "duskSky", "starry"), "Stjernehimmel");
 });

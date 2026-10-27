@@ -6,6 +6,7 @@ import {
   changeStyle,
   DUSK_STYLES,
   skyChoices,
+  STYLE_LATE,
   STYLE_SUMMER,
   type DuskChoice,
   type DuskStyle,
@@ -33,10 +34,12 @@ const SIZES = "(min-width: 768px) 270px, 50vw";
  * Stilkortene for Kveldsbilde (Dag 55, TG-NEW-259): fire kort med
  * eksempelbilde, AI-lappen, navnet og én linje tekst. Ett trykk velger
  * stilen; tidspunktet foelger kortet (dusk.ts). Himmelknappene finnes bare
- * under Blå time, saa et ugyldig valg ikke kan lages.
+ * under Blå time og Sen kveld (Stjernehimmel, Dag 56), saa et ugyldig valg
+ * ikke kan lages.
  *
- * Merknaden for Lys sommerkveld ligger i en aria-live-boks som alltid
- * finnes, saa skjermlesere leser den opp naar teksten kommer.
+ * Merknaden for Lys sommerkveld og for Sen kveld med stjerner ligger i en
+ * aria-live-boks som alltid finnes, saa skjermlesere leser den opp naar
+ * teksten kommer.
  *
  * Bildene kommer som prop fra siden (duskImages.ts), fordi node --test ikke
  * kan laste .jpg.
@@ -55,6 +58,8 @@ export function DuskChoicePicker({
   locale: Locale;
 }) {
   const summer = value.style === STYLE_SUMMER;
+  const stars = value.style === STYLE_LATE && value.sky === "starry";
+  const note = summer ? t(locale, "dusk.summerNote") : stars ? t(locale, "dusk.starryNote") : "";
   const skies = skyChoices(value.style);
   return (
     <div className="border-t border-line pt-6 space-y-4">
@@ -96,8 +101,8 @@ export function DuskChoicePicker({
       <div>
         <p className="text-[13px] text-ink-2">{t(locale, "dusk.cardsHint")}</p>
         {/* Alltid i treet (ikke display:none); tom har den ingen hoeyde. */}
-        <p aria-live="polite" className={`text-[13px] text-ink${summer ? " mt-2" : ""}`}>
-          {summer ? t(locale, "dusk.summerNote") : ""}
+        <p aria-live="polite" className={`text-[13px] text-ink${note ? " mt-2" : ""}`}>
+          {note}
         </p>
       </div>
       {skies.length > 0 && (

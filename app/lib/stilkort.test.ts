@@ -64,9 +64,10 @@ test("Stilkort: standarden er Blå time med lette skyer", () => {
   assert.match(page, /useState<DuskChoice>\(DEFAULT_DUSK\)/);
 });
 
-test("Stilkort: himmelvalg bare for Blå time, i rekkefoelgen lette, klar, rosa", () => {
+test("Stilkort: himmelvalg for Blå time (lette, klar, rosa) og Sen kveld (Dag 56)", () => {
   assert.deepEqual(skyChoices(BLUE), ["light_clouds", "clear", "pink_clouds"]);
-  for (const style of [WARM, LATE, SUMMER]) assert.deepEqual(skyChoices(style), [], style);
+  assert.deepEqual(skyChoices(LATE), ["dark", "starry"]);
+  for (const style of [WARM, SUMMER]) assert.deepEqual(skyChoices(style), [], style);
   const blue: DuskChoice = { style: BLUE, sky: "light_clouds" };
   for (const sky of ["clear", "pink_clouds"] as const) {
     assert.deepEqual(duskParams("scene_transform", "skumring", changeSky(blue, sky)), {
@@ -75,7 +76,7 @@ test("Stilkort: himmelvalg bare for Blå time, i rekkefoelgen lette, klar, rosa"
       dusk_style: BLUE,
     });
   }
-  // De tre andre ignorerer et himmelvalg.
+  // De andre ignorerer et himmelvalg de ikke har.
   const warm: DuskChoice = { style: WARM, sky: "light_clouds" };
   assert.deepEqual(changeSky(warm, "pink_clouds"), warm);
   assert.deepEqual(changeSky({ style: LATE, sky: "dark" }, "light_clouds"), { style: LATE, sky: "dark" });
@@ -94,7 +95,8 @@ test("Stilkort: ukjent stil, gammel kode eller ulovlig himmel kaster i duskParam
     { style: "aurora", sky: "clear" },
     { style: V1, sky: "clear" },
     { style: V2, sky: "clear" },
-    { style: LATE, sky: "starry" },
+    { style: LATE, sky: "clear" },
+    { style: WARM, sky: "starry" },
     { style: WARM, sky: "pink_clouds" },
     { style: SUMMER, sky: "clear" },
   ]) {
@@ -130,11 +132,11 @@ test("Stilkort: velgeren har fire kort i rutenett med bilde, aria-pressed og ett
   // Samme valgt-ramme som stilkortene i Digital styling.
   assert.match(picker, /const CARD_ON = "border-ink ring-1 ring-ink";/);
   assert.match(picker, /images: Record<DuskStyle, StaticImageData>;/);
-  // Tidsknappene og stjernehimmelen er borte.
-  assert.doesNotMatch(picker, /DUSK_TIMES|changeTime|duskTime|starry|STYLE_BUTTON/);
+  // Tidsknappene er borte (stjernehimmelen er et himmelvalg, Dag 56).
+  assert.doesNotMatch(picker, /DUSK_TIMES|changeTime|duskTime|STYLE_BUTTON/);
 });
 
-test("Stilkort: himmelknappene bare under Blå time, og ingen tidsknapper", () => {
+test("Stilkort: himmelknappene bare for stiler med himmelvalg, og ingen tidsknapper", () => {
   assert.match(picker, /const skies = skyChoices\(value\.style\);/);
   assert.match(picker, /\{skies\.length > 0 && \(/);
   const skies = picker.slice(picker.indexOf("skies.map"));
@@ -144,8 +146,9 @@ test("Stilkort: himmelknappene bare under Blå time, og ingen tidsknapper", () =
 
 test("Stilkort: notatet ved Lys sommerkveld ligger alltid i en aria-live-boks", () => {
   assert.match(picker, /const summer = value\.style === STYLE_SUMMER;/);
-  assert.match(picker, /<p aria-live="polite"[^>]*>\s*\{summer \? t\(locale, "dusk\.summerNote"\) : ""\}\s*<\/p>/);
-  assert.doesNotMatch(picker, /\{summer && <p aria-live/);
+  assert.match(picker, /const note = summer \? t\(locale, "dusk\.summerNote"\) :/);
+  assert.match(picker, /<p aria-live="polite"[^>]*>\s*\{note\}\s*<\/p>/);
+  assert.doesNotMatch(picker, /\{(summer|note) && <p aria-live/);
   assert.equal(t("nb", "dusk.summerNote"), "Ikke for bilder med snø.");
   assert.equal(t("en", "dusk.summerNote"), "Not for photos with snow.");
 });
@@ -193,7 +196,8 @@ test("Stilkort: tekstene paa kortene og under dem, nb og en", () => {
 
 test("Stilkort: de gamle velgertekstene er fjernet", () => {
   for (const locale of ["nb", "en"] as const) {
-    for (const key of ["dusk.styleStandard", "dusk.styleWarm", "dusk.styleHint", "dusk.styleFallbackNote", "dusk.starryNote"]) {
+    // dusk.starryNote kom tilbake med ny tekst (Dag 56, stjerner.test.ts).
+    for (const key of ["dusk.styleStandard", "dusk.styleWarm", "dusk.styleHint", "dusk.styleFallbackNote"]) {
       assert.equal(Object.hasOwn(DICTIONARIES[locale].ui, key), false, `${locale} ${key}`);
     }
     for (const text of Object.values(DICTIONARIES[locale].ui)) assert.doesNotMatch(text, /\(test\)/);
@@ -231,7 +235,9 @@ test("Stilkort: en gammel jobb med v1 og sen tid vises som Sen kveld", () => {
   assert.equal(displayStyle(V2, "early"), V2);
   assert.equal(displayStyle(BLUE, "late"), BLUE);
   const old = { requested: V1, applied: V1 };
-  assert.deepEqual(duskLine({ time: "late", sky: "starry", skyApplied: true }, old), { style: LATE, sky: null });
+  assert.deepEqual(duskLine({ time: "late", sky: "dark", skyApplied: true }, old), { style: LATE, sky: null });
+  // Stjerner er ikke standarden for Sen kveld, og vises (Dag 56).
+  assert.deepEqual(duskLine({ time: "late", sky: "starry", skyApplied: true }, old), { style: LATE, sky: "starry" });
   assert.deepEqual(duskLine({ time: "early", sky: "clear", skyApplied: true }, old), { style: V1, sky: "clear" });
 });
 
