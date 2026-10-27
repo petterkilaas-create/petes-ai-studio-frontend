@@ -13,6 +13,7 @@
  * importer), saa modulen kan testes med node --test.
  */
 
+import type { ImageTypeHint } from "./api";
 import type { UiKey } from "./i18n";
 import { START_PATH } from "./marketingAccess.ts";
 
@@ -107,6 +108,11 @@ export interface Tool {
    * Klart vaer).
    */
   sceneGate?: boolean;
+  /**
+   * «Hvor er bildet tatt?» (TG-NEW-268): valgene backend godtar for tjenesten
+   * (`Recipe.image_type_hints`). Mangler feltet, faar tjenesten ikke valget.
+   */
+  imageTypeHints?: readonly ImageTypeHint[];
   /** Tekstene staar i ordlista (D1c, brief §7); ikonet i tjenester/page.tsx. */
   titleKey: UiKey;
   descKey: UiKey;
@@ -134,6 +140,8 @@ const CATEGORIES: Category[] = [
         presetId: "skumring",
         kind: "scene",
         sceneGate: false,
+        // Ikke Drone: Kveldsbilde kan ikke lages fra dronebilder ennaa (backend gir 400).
+        imageTypeHints: ["interior", "exterior"],
         titleKey: "service.scene_transform",
         descKey: "express.tool.skumring.desc",
       },
@@ -145,6 +153,8 @@ const CATEGORIES: Category[] = [
         presetId: "klart_vaer",
         kind: "scene",
         sceneGate: false,
+        // Ikke Innendoers: Blaa himmel bytter bare himmelen ute (backend gir 400).
+        imageTypeHints: ["exterior", "aerial"],
         titleKey: "express.tool.klart_vaer.title",
         descKey: "express.tool.klart_vaer.desc",
       },

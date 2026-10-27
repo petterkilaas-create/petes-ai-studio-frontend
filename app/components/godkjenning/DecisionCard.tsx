@@ -7,10 +7,12 @@ import { CHECKLISTS, comparedKey, type ChecklistId } from "../../lib/checklist";
 import { framingText } from "../../lib/orderTabs";
 import { t, type Locale, type UiKey } from "../../lib/i18n";
 import {
+  noteText,
   reasonLength,
   reasonTooLong,
   type DecisionControls,
   type FireplaceAnswer,
+  type Note,
 } from "../../lib/review";
 import { buttonClass } from "../ui/Button";
 import { cardClass } from "../ui/Card";
@@ -49,10 +51,15 @@ const BTN_DANGER = buttonClass("danger");
  * laget.» med «Ja, avbryt» / «Tilbake», uten begrunnelse (Cowork 27.10, 2A).
  * Merknadene fra analysen (`notes`) staar over sjekklista i samme stil som
  * merknaden fra kontrollen. Etter at bildet er laget, er knappene som foer.
+ *
+ * Bildetypen (TG-NEW-268): merknadene kan ha ord (noteText), og linja
+ * «Bildetype: Utendørs (valgt ved bestilling)» staar over dem naar megleren
+ * valgte typen ved bestilling.
  */
 export function DecisionCard({
   stop,
   notes,
+  imageTypeLine,
   controls,
   canCorrect,
   roundFailed,
@@ -82,8 +89,10 @@ export function DecisionCard({
 }: {
   /** Stoppboksen (needs_review): grunnene (stopReasons) og om det er peisstoppet. null: ikke stoppet. */
   stop: { reasons: UiKey[]; fireplace: boolean } | null;
-  /** Merknadene fra analysen (analysisNotes); tom: ingen boks. */
-  notes: UiKey[];
+  /** Merknadene (reviewNotes); tom: ingen boks. */
+  notes: Note[];
+  /** «Bildetype: … (valgt ved bestilling)» (imageTypeLine), eller null. */
+  imageTypeLine: Note | null;
   controls: DecisionControls;
   canCorrect: boolean;
   roundFailed: boolean;
@@ -173,10 +182,11 @@ export function DecisionCard({
                   {framingText(locale, framingPct)}
                 </p>
               )}
+              {imageTypeLine !== null && <p className="text-sm text-ink">{noteText(locale, imageTypeLine)}</p>}
               {notes.length > 0 && (
                 <div className="flex flex-col gap-2 text-sm text-amber-fg bg-amber-bg rounded-button p-3 break-words" role="status">
-                  {notes.map((key) => (
-                    <p key={key}>{t(locale, key)}</p>
+                  {notes.map((note) => (
+                    <p key={note.key}>{noteText(locale, note)}</p>
                   ))}
                 </div>
               )}
