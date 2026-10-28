@@ -148,7 +148,6 @@ test("MS2: innholdet har alle feltene, og alle har tekst", () => {
     "home.hero.secondary.label",
     "home.hero.freeNote",
     "home.hero.mosaic.label",
-    "home.hero.aiLabel",
     // F5: slideren staar i eksemplene.
     "home.examples.lead",
     "home.examples.aiLabel",
@@ -177,8 +176,8 @@ test("MS2: bildene har alt-tekst og finnes i images.ts, og bare images.ts import
   for (const m of images.matchAll(/^import \w+ from "\.\/(images\/[\w-]+\.jpg)";$/gm)) {
     assert.ok(existsSync(join(CONTENT_DIR, m[1])), m[1]);
   }
-  // F7: de to gamle toppbildene er slettet (11 -> 9).
-  assert.equal([...images.matchAll(/^import \w+ from "\.\/images\//gm)].length, 9);
+  // F7: de to gamle toppbildene er slettet (11 -> 9). Dag 58 (F2): to par og eksempelet fra Tjenester (9 -> 14).
+  assert.equal([...images.matchAll(/^import \w+ from "\.\/images\//gm)].length, 14);
   for (const f of filesIn("content").filter((f) => f !== "content/marketing/images.ts")) {
     assert.doesNotMatch(read(f), /\.(jpe?g|png|webp|avif)"/, f);
   }
@@ -528,17 +527,25 @@ test("MS3a: seksjonene finnes i rekkefoelgen paa siden, med tekst og riktig _typ
     "Du godkjenner hvert bilde før levering",
     "Data lagret i EU",
   ]);
-  assert.deepEqual(home.examples.tabs.map((t) => t.label), ["Kveldsbilde", "Rydd opp", "Digital styling"]);
-  // F4: seks kort i studioer (Petter og Cowork 20.10). Skjul ansikter og skilt er tatt ut (2e).
+  // Dag 58 (F2): eksemplene og kortene er bare det som kan bestilles.
+  assert.deepEqual(home.examples.tabs.map((t) => t.label), ["Kveldsbilde", "Årstider", "Blå himmel"]);
+  // F4: kort i studioer (Petter og Cowork 20.10). Skjul ansikter og skilt er tatt ut (2e).
   assert.deepEqual(
-    home.services.items.map((s) => [s.title, s.studio, s.status]),
+    home.services.items.map((s) => [s.title, s.studio, s.size]),
     [
-      ["Kveldsbilde", "Bildestudio", "available"],
-      ["Digital styling", "Bildestudio", "soon"],
-      ["Rydd opp", "Bildestudio", "soon"],
-      ["Boligfilm", "Filmstudio", "soon"],
-      ["Annonsetekst", "Tekststudio", "soon"],
-      ["Plantegning", "Tegnestudio", "soon"],
+      ["Kveldsbilde", "Bildestudio", "large"],
+      ["Årstider", "Bildestudio", "large"],
+      ["Digital styling", "Bildestudio", "large"],
+      ["Blå himmel", "Bildestudio", "small"],
+    ]
+  );
+  assert.deepEqual(
+    home.services.coming.items.map((s) => [s.title, s.studio]),
+    [
+      ["Rydd opp", "Bildestudio"],
+      ["Boligfilm", "Filmstudio"],
+      ["Annonsetekst", "Tekststudio"],
+      ["Plantegning", "Tegnestudio"],
     ]
   );
 });
@@ -566,16 +573,15 @@ test("MS3a: alle bilder og plassholdere har alt-tekst, og plassholderne har teks
       assert.match(images, new RegExp(`^  ${pic.image},$`, "m"), path);
     }
   }
-  // F5: kveldsbildet er ekte (AI-merket i bildet); rydd opp og styling er midlertidige.
-  const [kveld, rydd, styling] = home.examples.tabs;
+  // Dag 58 (F2): alle tre parene er ekte (AI-merket i bildet), uten pending.
+  const [kveld, aarstid, himmel] = home.examples.tabs;
   assert.deepEqual([kveld.before.image, kveld.after.image], ["pairEveningOriginal", "pairEveningResult"]);
-  for (const ref of [kveld.before, kveld.after]) assert.ok(!("pending" in ref), ref.image);
-  assert.ok(!("pending" in kveld.caption));
-  assert.deepEqual([rydd.before.image, rydd.after.image], ["pairCleanupOriginal", "pairCleanupResult"]);
-  assert.deepEqual([styling.before.image, styling.after.image], ["pairStylingOriginal", "pairStylingResult"]);
-  for (const t of [rydd, styling]) {
-    for (const ref of [t.before, t.after]) assert.equal((ref as { pending?: string }).pending, "image", ref.image);
-    assert.equal((t.caption as { pending?: string }).pending, "image", t.id);
+  assert.deepEqual([aarstid.before.image, aarstid.after.image], ["pairSeasonOriginal", "pairSeasonResult"]);
+  assert.deepEqual([himmel.before.image, himmel.after.image], ["pairSkyOriginal", "pairSkyResult"]);
+  for (const t of [kveld, aarstid, himmel]) {
+    for (const ref of [t.before, t.after]) assert.ok(!("pending" in ref), ref.image);
+    assert.ok(!("pending" in t.caption), t.id);
+    assert.equal(t.caption.text, "Ekte resultat laget med {brand}. AI-merket står nede til venstre i bildet.");
   }
   // Plassholderen viser tekst og merkelapp, og bildet har alt fra innholdet.
   const pic = withoutComments(read("app/components/marketing/MarketingPicture.tsx"));
@@ -606,18 +612,11 @@ test("MS3a: tjenestene heter det samme som i appen", () => {
 const PENDING_NOW = [
   ["site.contact.email", "email"],
   ["site.footer.companyName", "companyName"],
-  // F3: mosaikken. Kveldsbildet (tiles[0]) er ekte og venter ikke.
-  ["home.hero.mosaic.tiles[1].image", "image"],
-  ["home.hero.mosaic.tiles[3].image", "image"],
-  ["home.hero.mosaic.tiles[4].video", "image"],
   ["home.trustStrip.items[3]", "dataRegion"],
   // F6a (Petter 20.10, 2c): tjenestene uten pris.
   ["home.pricing.others[0].price", "price"],
   ["home.pricing.others[1].price", "price"],
   ["home.pricing.others[2].price", "price"],
-  ["home.pricing.others[3].price", "price"],
-  ["home.pricing.others[4].price", "price"],
-  ["home.pricing.others[5].price", "price"],
   // F6b (Petter 20.10, 2f): svaret om eierskap venter paa vilkaarene.
   ["faq[1]", "legal"],
   ["faq[4].slots.time", "time"],
@@ -630,24 +629,23 @@ test("MS3a: lansering er sperret saa lenge noe venter (MARKETING_PUBLIC)", () =>
   if (MARKETING_PUBLIC) {
     assert.deepEqual(items, [], "MARKETING_PUBLIC er true, men noe i innholdet venter fortsatt");
   }
-  // Lista i dag (oppdateres bevisst etter hvert som ting avklares). Alle
-  // eksempelbildene er plassholdere eller midlertidige, unntatt merkebildet
-  // (beslutning 4).
+  // Lista i dag (oppdateres bevisst etter hvert som ting avklares).
   const notPictures = items.filter((i) => i.key !== "image" || i.path.startsWith("home.hero"));
   assert.deepEqual(notPictures.map((i) => [i.path, i.key]), PENDING_NOW);
-  // F5: mosaikken 3, eksemplene 4 bilder og 2 tekster (F7: uten stemningene).
-  assert.ok(items.filter((i) => i.key === "image").length >= 3 + 6);
+  // Dag 58 (F2): eksemplene og tjenestene har bare ekte bilder. Filmen og
+  // linja i bunnen venter fortsatt paa de ekte eksemplene.
+  const pictures = items.filter((i) => i.key === "image" && !i.path.startsWith("home.hero")).map((i) => i.path);
+  for (const path of ["home.film.video", "site.footer.note"]) assert.ok(pictures.includes(path), path);
+  assert.ok(!pictures.some((p) => p.startsWith("home.examples") || p.startsWith("home.services")), pictures.join(", "));
   // Hver noekkel har en merkelapp.
   for (const i of items) assert.ok(site.pendingLabels[i.key].startsWith("["), i.key);
 });
 
 test("MS3a: det som venter, vises med merkelapp der det staar", () => {
   assert.match(read("app/components/marketing/TrustStrip.tsx"), /item\.pending && <PendingMark label=\{site\.pendingLabels\[item\.pending\]\} \/>/);
-  // F3: en lapp under mosaikken hvis noen rute venter (foer: under slideren).
-  assert.match(
-    withoutComments(read("app/components/marketing/HeroMosaic.tsx")),
-    /\{pending && \(\s*<p[^>]*>\s*<PendingMark label=\{site\.pendingLabels\.image\} \/>/
-  );
+  // Dag 58 (Petter 28.10): mosaikken har bare ekte bilder og ingen lapp lenger.
+  assert.doesNotMatch(withoutComments(read("app/components/marketing/HeroMosaic.tsx")), /PendingMark|pending/);
+  assert.deepEqual(pendingItems(home.hero, "hero"), []);
   const pic = withoutComments(read("app/components/marketing/MarketingPicture.tsx"));
   assert.match(pic, /<PendingMark label=\{pendingLabel\} \/>/);
   assert.match(pic, /\{picture\.pending && \(/);
@@ -1342,51 +1340,50 @@ test("F2: Film.tsx er en serverkomponent paa night, uten tekst i JSX, med filmen
 test("F3: toppen har tekstene Petter bestemte, og freeNote og «Prøv gratis» er uendret", () => {
   const { hero } = home;
   assert.equal(hero.eyebrow, "AI-studio for eiendomsmeglere");
-  assert.equal(hero.title, "Bilder, film og tekst til boligannonsen.");
+  // Dag 58 (Petter 28.10): bare det som kan bestilles.
+  assert.equal(hero.title, "Kveldsbilder, årstider og digital styling til boligannonsen.");
   assert.equal(hero.titleEmphasis, "Ett sted.");
   assert.equal(
     hero.lead,
-    "Gjør dagsbilder til kveldsbilder, rydd og møbler rommene, lag film og skriv annonseteksten. Du godkjenner alt, og hvert bilde får synlig AI-merke og ferdig tekst til annonsen."
+    "Gjør dagsbilder til kveldsbilder, vis boligen i en annen årstid, møbler tomme rom digitalt og bytt grå himmel med blå. Du godkjenner alt, og hvert bilde får synlig AI-merke og ferdig tekst til annonsen."
   );
   assert.deepEqual(hero.secondary, { label: "Se filmen", href: "#film" });
   assert.equal(hero.freeNote, "{n} gratis bilder når du registrerer deg. Uten kort.");
-  assert.equal(hero.aiLabel, "AI");
+  // Dag 58 (F2): ingen CSS-lapp «AI» i mosaikken lenger; merket staar i bildene.
+  assert.ok(!("aiLabel" in hero));
   // Designets tekster som ikke brukes (Cowork 20.10).
   for (const [path, text] of strings(home, "home")) {
     assert.ok(!text.includes("Prøv gratis med") && !text.includes("Uten kort. Originalen"), path);
   }
 });
 
-test("F3: mosaikken har fem ruter, kveldsbildet foerst og ekte, de andre med pending «image»", () => {
+test("F3: mosaikken, kveldsbildet foerst; Dag 58: fire ruter med de bestillbare tjenestene, uten filmen", () => {
   const { tiles } = home.hero.mosaic;
+  assert.equal(home.hero.mosaic.label, "Eksempler på bilder");
   assert.deepEqual(
     tiles.map((t) => t.label),
-    ["Kveldsbilde", "Rydd opp", "Annonsetekst", "Digital styling", "Film"]
+    ["Kveldsbilde", "Årstider", "Blå himmel", "Digital styling"]
   );
-  // Det foerste bildet er det ekte kveldsbildet med AI-merket, uten lapp (LCP).
+  // Det foerste bildet er det ekte kveldsbildet med AI-merket (LCP).
   assert.deepEqual(tiles[0], {
     label: "Kveldsbilde",
     image: { image: "pairEveningResult", alt: "Stue som kveldsbilde laget med AI, med AI-merket nede til venstre" },
   });
-  assert.ok(!("pending" in tiles[0].image), "kveldsbildet er ekte");
-  // Alle andre resultatbilder og videoen er midlertidige.
-  const rest = tiles
-    .slice(1)
-    .flatMap((t): { pending?: string }[] => ("image" in t ? [t.image] : "video" in t ? [t.video] : []));
-  assert.equal(rest.length, 3);
-  for (const media of rest) assert.equal(media.pending, "image", JSON.stringify(media));
-  assert.deepEqual(tiles.map((t) => ("image" in t ? t.image.image : null)), [
+  // Dag 58 (F2): bildene er ekte, med AI-merket i bildet, uten pending. Digital
+  // styling er originalen med «Eksempel», som paa Tjenester.
+  assert.deepEqual(tiles.map((t) => t.image.image), [
     "pairEveningResult",
-    "pairCleanupResult",
-    null,
-    "pairStylingResult",
-    null,
+    "pairSeasonResult",
+    "pairSkyResult",
+    "stylingExample",
   ]);
-  assert.deepEqual(tiles[2], { label: "Annonsetekst", quote: "«Lys hjørnestue med utgang til vestvendt balkong …»" });
-  assert.deepEqual(tiles[4], {
-    label: "Film",
-    video: { video: "loop", label: "Utdrag fra produktfilmen", pending: "image" },
-  });
+  for (const t of tiles) assert.ok(!("pending" in t.image), t.label);
+  assert.deepEqual(tiles.map((t) => t.example ?? null), [null, null, null, "Eksempel"]);
+  // Resultatene sier i alt-teksten at de er laget med AI og har merket; originalen sier at den er originalen.
+  for (const t of tiles.slice(0, 3)) assert.match(t.image.alt, /laget med AI, med AI-merket nede til venstre$/);
+  assert.ok(!/AI/.test(tiles[3].image.alt) && /originalbildet/.test(tiles[3].image.alt));
+  // Filmen er ute av mosaikken (Petter 28.10); den staar i filmseksjonen.
+  for (const t of tiles) assert.ok(!("video" in t), t.label);
 });
 
 test("F3: HeroMosaic er en serverkomponent uten tekst i JSX, med kveldsbildet nede til venstre og hoey prioritet", () => {
@@ -1400,11 +1397,20 @@ test("F3: HeroMosaic er en serverkomponent uten tekst i JSX, med kveldsbildet ne
   assert.match(src, /className="grid grid-cols-2 [^"]*md:grid-cols-6 md:grid-rows-5/);
   assert.match(src, /role="group"\s+aria-label=\{mosaic\.label\}/);
   const areas = [...src.matchAll(/area: "([^"]+)"/g)].map((m) => m[1]);
+  // Dag 58: fire ruter som fyller 6x5: kveldsbildet 4x3, Årstider 2x2, Blå himmel 2x1, Digital styling 6x2.
   assert.deepEqual(
     areas.map((a) => a.match(/md:col-span-\d md:row-span-\d/)?.[0]),
-    ["md:col-span-4 md:row-span-3", "md:col-span-2 md:row-span-2", "md:col-span-2 md:row-span-1", "md:col-span-3 md:row-span-2", "md:col-span-3 md:row-span-2"]
+    ["md:col-span-4 md:row-span-3", "md:col-span-2 md:row-span-2", "md:col-span-2 md:row-span-1", "md:col-span-6 md:row-span-2"]
   );
+  const cells = areas.map((a) => {
+    const [, c, r] = a.match(/md:col-span-(\d) md:row-span-(\d)/)!;
+    return Number(c) * Number(r);
+  });
+  assert.equal(cells.reduce((x, y) => x + y, 0), 6 * 5);
+  assert.equal(areas.length, home.hero.mosaic.tiles.length);
+  // Paa mobil (2 kolonner): kveldsbildet og Digital styling i full bredde, de to andre ved siden av hverandre.
   assert.match(areas[0], /^col-span-2 /);
+  assert.match(areas[3], /^col-span-2 /);
   // To <Image>: det foerste (kveldsbildet, i === 0) med hoey prioritet og utsnittet nede til venstre.
   assert.match(src, /const lead = i === 0;/);
   const images = [...src.matchAll(/<Image\n([\s\S]*?)\/>/g)].map((m) => m[1]);
@@ -1413,31 +1419,30 @@ test("F3: HeroMosaic er en serverkomponent uten tekst i JSX, med kveldsbildet ne
   for (const attr of ['loading="eager"', 'fetchPriority="high"', "object-left-bottom", "sizes={sizes}", "fill"]) {
     assert.ok(lead.includes(attr), `kveldsbildet: ${attr}`);
   }
-  for (const attr of ["loading=", "fetchPriority", "object-left-bottom", "priority"]) {
+  for (const attr of ["loading=", "fetchPriority", "priority"]) {
     assert.ok(!other.includes(attr), `de andre bildene: ${attr}`);
   }
+  // Dag 58 (F2): alle bildene har AI-merket nede til venstre, saa utsnittet holdes der.
+  assert.ok(other.includes("object-left-bottom"), "de andre bildene: object-left-bottom");
   for (const img of images) {
     assert.match(img, /src=\{IMAGES\[tile\.image\.image\]\}/);
     assert.match(img, /alt=\{tile\.image\.alt\}/);
   }
-  // AI-lappen (CSS) bare paa de andre bildene; etiketten oeverst til venstre.
-  assert.match(src, /\{!lead && \(\s*<span aria-hidden="true" className=\{AI_TAG\}>\s*\{aiLabel\}/);
-  assert.match(src, /const AI_TAG =\s*"[^"]*bottom-2\.5 left-2\.5/);
+  // Dag 58 (F2): ingen CSS-lapp «AI»; «Eksempel» nede til venstre paa en original. Etiketten oeverst til venstre.
+  assert.doesNotMatch(src, /AI_TAG|aiLabel/);
+  assert.match(src, /\{tile\.example && \(\s*<span aria-hidden="true" className=\{EXAMPLE_TAG\}>\s*\{tile\.example\}/);
+  assert.match(src, /const EXAMPLE_TAG =\s*"[^"]*bottom-2\.5 left-2\.5/);
   assert.match(src, /const TAG =\s*"[^"]*left-2\.5 top-2\.5/);
-  // Loekka: MarketingVideo i loop-modus med plakaten og knappetekstene.
-  const video = src.slice(src.indexOf("<MarketingVideo"), src.indexOf("/>", src.indexOf("<MarketingVideo")));
-  for (const attr of ["src={VIDEOS.loop.src}", "poster={IMAGES.loopPoster.src}", "label={tile.video.label}", 'mode="loop"', "labels={site.video}"]) {
-    assert.ok(video.includes(attr), attr);
-  }
-  // Annonseteksten: moerk rute med sitatet i font-display.
-  assert.match(src, /bg-ink [^"`]*text-paper/);
-  assert.match(src, /className="[^"]*font-display[^"]*">\{tile\.quote\}/);
+  // Dag 58 (Petter 28.10): ingen videoloekke i mosaikken.
+  assert.doesNotMatch(src, /MarketingVideo|VIDEOS/);
+  // Dag 58 (F2): Annonsetekst (sitatet) er ute av mosaikken; den kan ikke bestilles.
+  assert.doesNotMatch(src, /tile\.quote/);
 });
 
 test("F3: Hero.tsx viser mosaikken, ikke slideren, med kursiv titleEmphasis og ikonet paa «Se filmen»", () => {
   const src = withoutComments(read("app/components/marketing/Hero.tsx"));
   assert.doesNotMatch(src, /HeroSlider/);
-  assert.match(src, /<HeroMosaic mosaic=\{hero\.mosaic\} aiLabel=\{hero\.aiLabel\} site=\{site\} \/>/);
+  assert.match(src, /<HeroMosaic mosaic=\{hero\.mosaic\} \/>/);
   assert.match(src, /\{hero\.title\} <em className="italic">\{hero\.titleEmphasis\}<\/em>/);
   // Ekte kursiv i Instrument Serif (Petter 20.10, valg B), ikke en skraa variant fra nettleseren.
   assert.match(read("app/lib/fonts.ts"), /Instrument_Serif\(\{[^}]*style: \["normal", "italic"\],/);
@@ -1450,7 +1455,8 @@ test("F3: Hero.tsx viser mosaikken, ikke slideren, med kursiv titleEmphasis og i
 });
 
 // ---------------------------------------------------------------------------
-// F4: tjenestene som seks kort i studioer (Petter og Cowork 20.10).
+// F4: tjenestene som kort i studioer (Petter og Cowork 20.10). Dag 58 (F2,
+// Petter 28.10): bare det som kan bestilles, og «Kommer snart» under.
 // ---------------------------------------------------------------------------
 
 test("F4: tjenestene har tekstene Petter bestemte, og Skjul ansikter og skilt er ikke med", () => {
@@ -1462,79 +1468,106 @@ test("F4: tjenestene har tekstene Petter bestemte, og Skjul ansikter og skilt er
     "Last opp bildene én gang, og velg hva som skal gjøres med hvert av dem. Alt kommer tilbake på samme sted, klart til annonsen."
   );
   assert.equal(services.aiLabel, "AI");
-  assert.deepEqual(services.earlyAccess, { label: "Få tidlig tilgang", href: CONTACT_PATH });
-  assert.deepEqual(services.also, {
-    label: "Også i Bildestudio:",
-    text: "Blå himmel, der grå himmel byttes med klar, blå himmel.",
-  });
   assert.deepEqual(
-    services.items.map((s) => [s.id, s.status === "available" ? s.orderLabel : null, s.media.kind]),
+    services.items.map((s) => [s.id, s.orderLabel, s.size === "large" ? s.media.kind : null]),
     [
       ["scene_transform", "Bestill kveldsbilde", "split"],
-      ["virtual_stage", null, "split"],
-      ["rydd_opp", null, "split"],
-      ["video", null, "video"],
-      ["copywriter", null, "ad"],
-      ["plantegning", null, "plan"],
+      ["aarstider", "Bestill årstider", "split"],
+      ["virtual_stage", "Bestill digital styling", "example"],
+      ["klart_vaer", "Bestill blå himmel", null],
     ]
   );
   assert.equal(
     services.items[0].text,
     "Dagsbildet blir kveldsbilde, med himmel i blåtimen og lys i vinduer og lamper som finnes i bildet."
   );
-  // 2e: Skjul ansikter og skilt blir i appen; prisene og bunnen tas i F6.
-  for (const [path, text] of strings(services, "services")) assert.ok(!text.includes("Skjul ansikter"), path);
-  const plan = services.items[5].media;
-  assert.equal(plan.kind, "plan");
-  if (plan.kind === "plan") {
-    assert.deepEqual(plan.sketch, { caption: "Skisse", rooms: ["stue", "sov", "kjøkken", "bad"] });
-    assert.deepEqual(plan.plan, { caption: "Plantegning", rooms: ["Stue", "Sov", "Kjøkken", "Bad", "Gang"] });
+  // Tekstene har kilde i dagens tekst: Årstider fra appen, Blå himmel fra den gamle linja under kortene.
+  assert.equal(services.items[1].text, (DICTIONARIES.nb.ui as Record<string, string>)["express.tool.aarstider.desc"]);
+  assert.equal(services.items[3].text, "Grå himmel byttes med klar, blå himmel.");
+  assert.equal(services.coming.title, "Kommer snart");
+  assert.deepEqual(
+    services.coming.items.map((s) => s.id),
+    ["rydd_opp", "video", "copywriter", "plantegning"]
+  );
+  // «Kommer snart» har ingen lenke, ingen bestilling og ingen bilder.
+  for (const s of services.coming.items) {
+    assert.deepEqual(Object.keys(s).sort(), ["id", "studio", "text", "title"], s.id);
   }
+  // 2e: Skjul ansikter og skilt blir i appen, ogsaa i «Kommer snart».
+  for (const [path, text] of strings(services, "services")) assert.ok(!text.includes("Skjul ansikter"), path);
+  assert.ok(!services.coming.items.some((s) => s.id === "privacy_blur"));
+  // Ingen «Få tidlig tilgang» paa forsiden lenger (Petter 28.10).
+  for (const [path, text] of strings(home, "home")) assert.ok(!text.includes("tidlig tilgang"), path);
 });
 
 test("F4: TG-142 paa markedssiden: bare det som er slaatt paa i appen kan bestilles", () => {
   // TG-NEW-142: forsiden skal ikke selge en tjeneste appen ikke leverer. Alle
-  // tjenestene vises (Petter dag 48), men bare de som er slaatt paa, har
-  // bestillingslenken; de andre har «Få tidlig tilgang» til kontaktsiden.
+  // kortene har bestillingslenken, saa alle maa vaere slaatt paa i appen.
   // Id-en paa markedssiden er tjenestens kode; appen styrer verktoeyet (ENABLED).
-  const APP_TOOL: Record<string, string> = { scene_transform: "skumring" };
+  const APP_TOOL: Record<string, string> = {
+    scene_transform: "skumring",
+    aarstider: "aarstider",
+    virtual_stage: "digital_styling",
+    klart_vaer: "klart_vaer",
+  };
   for (const s of home.services.items) {
-    if (s.status === "soon") assert.ok(!("orderLabel" in s), s.id);
-    else {
-      assert.ok(Object.hasOwn(APP_TOOL, s.id), `${s.id}: mangler i kartet`);
-      assert.equal(isServiceEnabled(APP_TOOL[s.id]), true, s.id);
-    }
+    assert.ok(Object.hasOwn(APP_TOOL, s.id), `${s.id}: mangler i kartet`);
+    assert.equal(isServiceEnabled(APP_TOOL[s.id]), true, s.id);
   }
-  // «Også i Bildestudio» er Blå himmel, som er aapnet i appen (K3) og heter det samme der.
-  assert.match(home.services.also.text, /^Blå himmel,/);
-  assert.equal(isServiceEnabled("klart_vaer"), true);
-  assert.equal((DICTIONARIES.nb.ui as Record<string, string>)["express.tool.klart_vaer.title"], "Blå himmel");
-  assert.equal(home.services.earlyAccess.href, CONTACT_PATH);
-  // Lenkene i Services.tsx: bestillingen gaar til site.cta, de andre til earlyAccess.
+  // Det som ikke er slaatt paa, staar under «Kommer snart» og har ingen lenke.
+  assert.equal(isServiceEnabled("magic_cleanup"), false);
+  assert.equal(isServiceEnabled("video"), false);
+  assert.equal(isServiceEnabled("copywriter"), false);
+  // Titlene er de samme som i appen.
+  const ui = DICTIONARIES.nb.ui as Record<string, string>;
+  assert.equal(ui["express.tool.aarstider.title"], "Årstider");
+  assert.equal(ui["express.tool.klart_vaer.title"], "Blå himmel");
+  // Lenkene i Services.tsx: alle kortene bestiller via site.cta; «Kommer snart» har ingen <a>.
   const src = withoutComments(read("app/components/marketing/Services.tsx"));
-  assert.match(
-    src,
-    /const link = s\.status === "available" \? \{ label: s\.orderLabel, href: site\.cta\.href \} : services\.earlyAccess;/
-  );
+  assert.equal(src.match(/<a href=\{site\.cta\.href\} aria-describedby=\{titleId\} className=\{LINK\}>\s*\{s\.orderLabel\}/g)?.length, 2);
+  assert.doesNotMatch(src, /earlyAccess|CONTACT_PATH/);
+  const coming = src.slice(src.indexOf("services.coming.items.map("));
+  assert.ok(coming.length > 0);
+  assert.doesNotMatch(coming.slice(0, coming.indexOf("</ul>")), /<a\b|href=|<Image\b/);
   assert.equal(site.cta.href, START_PATH);
+  // Kontaktsiden finnes fortsatt (bunnen og andre lenker).
+  assert.equal(CONTACT_PATH, "/no/kontakt");
 });
 
 test("F4: det ekte AI-merket synes: resultatet til venstre, nede til venstre i utsnittet", () => {
-  const evening = home.services.items[0].media;
-  assert.equal(evening.kind, "split");
-  if (evening.kind === "split") {
-    assert.deepEqual(evening.after, {
+  const evening = home.services.items[0];
+  assert.ok(evening.size === "large" && evening.media.kind === "split");
+  if (evening.size === "large" && evening.media.kind === "split") {
+    assert.deepEqual(evening.media.after, {
       image: "pairEveningResult",
       alt: "Stue som kveldsbilde laget med AI, med AI-merket nede til venstre",
     });
-    assert.ok(!("pending" in evening.after), "kveldsbildet er ekte");
-    assert.deepEqual(evening.before, { image: "pairEveningOriginal", alt: "Samme stue tatt på dagtid" });
-    assert.deepEqual(evening.labels, { after: "Kveld", before: "Dag" });
+    assert.ok(!("pending" in evening.media.after), "kveldsbildet er ekte");
+    assert.deepEqual(evening.media.before, { image: "pairEveningOriginal", alt: "Samme stue tatt på dagtid" });
+    assert.deepEqual(evening.media.labels, { after: "Kveld", before: "Dag" });
   }
-  // Mediet tegnes i Media (isPending over har de samme if-ene).
+  // Dag 58 (F2): Årstider er det samme paret som paa Tjenester, ekte.
+  const season = home.services.items[1];
+  assert.ok(season.size === "large" && season.media.kind === "split");
+  if (season.size === "large" && season.media.kind === "split") {
+    assert.equal(season.media.after.image, "pairSeasonResult");
+    assert.equal(season.media.before.image, "pairSeasonOriginal");
+    assert.ok(!("pending" in season.media.after) && !("pending" in season.media.before));
+    assert.deepEqual(season.media.labels, { after: "Vinter", before: "Sommer" });
+  }
+  // Digital styling: bare originalen, med «Eksempel» og uten AI-lapp.
+  const styling = home.services.items[2];
+  assert.ok(styling.size === "large");
+  if (styling.size === "large") {
+    assert.deepEqual(styling.media, {
+      kind: "example",
+      image: { image: "stylingExample", alt: "Tom stue med hvite panelvegger, originalbildet uten møbler" },
+      label: "Eksempel",
+    });
+  }
   const src = withoutComments(read("app/components/marketing/Services.tsx"));
-  const media = src.slice(src.indexOf("function Media("));
-  const split = media.slice(media.indexOf('if (media.kind === "split")'), media.indexOf('if (media.kind === "video")'));
+  const media = src.slice(src.indexOf("function Media("), src.indexOf("export function Services("));
+  const split = media.slice(media.indexOf('if (media.kind === "split")'), media.indexOf("  return (\n    <div className={`${MEDIA} bg-surface-2`}>\n      <Image"));
   const images = [...split.matchAll(/<Image\n([\s\S]*?)\/>/g)].map((m) => m[1]);
   assert.equal(images.length, 2);
   const [after, before] = images;
@@ -1554,33 +1587,41 @@ test("F4: det ekte AI-merket synes: resultatet til venstre, nede til venstre i u
   // Sirkelen er lys paa den moerke lappen, som i designet (Petter 20.10).
   assert.match(src, /const AI_DOT =\s*"[^"]*\bbg-surface\b[^"]*\btext-ink"/);
   assert.doesNotMatch(src, /AI_CHIP/);
-  // Bildet i annonseteksten: utsnittet nede til venstre og ingen CSS-lapp (som i mosaikken).
-  const ad = media.slice(media.indexOf('if (media.kind === "ad")'), media.indexOf("<PlanIllustration"));
-  assert.ok(ad.length > 0);
-  assert.match(ad, /<Image\n[^/]*className="object-cover object-left-bottom"/);
-  assert.doesNotMatch(ad, /AI_DOT|aiLabel/);
+  // Eksempelet: ett bilde nede til venstre og lappen «Eksempel», uten AI_DOT.
+  const example = media.slice(media.lastIndexOf("  return ("));
+  assert.equal([...example.matchAll(/<Image\n/g)].length, 1);
+  assert.match(example, /src=\{IMAGES\[media\.image\.image\]\}/);
+  assert.match(example, /className="object-cover object-left-bottom"/);
+  assert.match(example, /<span className=\{`\$\{TAG\} left-2\.5`\}>\{media\.label\}<\/span>/);
+  assert.doesNotMatch(example, /AI_DOT|aiLabel/);
 });
 
-test("F4: F1-vakta finner de midlertidige bildene og videoen i tjenestene", () => {
+test("Dag 58 (F2): bildene fra Tjenester er byte-like kopier, og forsiden viser det samme som kortene der", () => {
+  // Samme bildepar som paa Tjenester (Petter 28.10): kopiert, ikke importert fra appmappa.
+  const COPIES: [string, string][] = [
+    ["par-aarstid-original.jpg", "aarstid-for.jpg"],
+    ["par-aarstid-resultat.jpg", "aarstid-etter.jpg"],
+    ["par-himmel-original.jpg", "himmel-for.jpg"],
+    ["par-himmel-resultat.jpg", "himmel-etter.jpg"],
+    ["styling-eksempel.jpg", "styling-for.jpg"],
+  ];
+  for (const [copy, source] of COPIES) {
+    const a = readFileSync(join(CONTENT_DIR, "images", copy));
+    const b = readFileSync(join(REPO_DIR, "app/(app)/tjenester/bilder", source));
+    assert.ok(a.equals(b), `${copy} er ikke lik ${source}`);
+  }
+  assert.doesNotMatch(withoutComments(read("content/marketing/images.ts")), /tjenester\/bilder/);
+  // Tjenester viser Digital styling som original med «Eksempel» (cardImages.ts); forsiden det samme.
+  assert.match(withoutComments(read("app/(app)/tjenester/cardImages.ts")), /digital_styling: \{ before: stylingBefore \}/);
+  const styling = home.services.items.find((s) => s.id === "virtual_stage");
+  assert.ok(styling && styling.size === "large" && styling.media.kind === "example");
+});
+
+test("F4: F1-vakta: tjenestene har ingen midlertidige bilder lenger (Dag 58)", () => {
   assert.deepEqual(missingTemporaryLabel(home.services, "services"), []);
-  const stripped = JSON.parse(JSON.stringify(home.services, (k, v) => (k === "pending" ? undefined : v)));
-  assert.deepEqual(missingTemporaryLabel(stripped, "services"), [
-    "services.items[1].media.after",
-    "services.items[1].media.before",
-    "services.items[2].media.after",
-    "services.items[2].media.before",
-    "services.items[3].media.video",
-  ]);
-  assert.deepEqual(home.services.items[3].media, {
-    kind: "video",
-    video: { video: "loop", label: "Utdrag fra produktfilmen", pending: "image" },
-    label: "Film",
-  });
-  // Lappen [BILDE] under kortene naar noe medium venter, i samme moenster som mosaikken.
-  assert.match(
-    withoutComments(read("app/components/marketing/Services.tsx")),
-    /\{pending && \(\s*<p[^>]*>\s*<PendingMark label=\{site\.pendingLabels\.image\} \/>/
-  );
+  assert.deepEqual(pendingItems(home.services, "services"), []);
+  // Ingen lapp [BILDE] under kortene, fordi ingen bilder venter.
+  assert.doesNotMatch(withoutComments(read("app/components/marketing/Services.tsx")), /PendingMark|pending/);
 });
 
 test("F4: Services og PlanIllustration er serverkomponenter uten tekst i JSX og uten hex", () => {
@@ -1593,9 +1634,14 @@ test("F4: Services og PlanIllustration er serverkomponenter uten tekst i JSX og 
     assert.doesNotMatch(read(f), /#[0-9a-fA-F]{3,8}\b/, f);
   }
   const src = withoutComments(read("app/components/marketing/Services.tsx"));
-  // Toppen: «Prøv gratis» (site.cta) som knapp; rutenettet 1, 2 og 3 kolonner.
+  // Toppen: «Prøv gratis» (site.cta) som knapp.
   assert.match(src, /<a href=\{site\.cta\.href\} className=\{`\$\{BIG_BUTTON\} shrink-0`\}>\s*\{site\.cta\.label\}/);
-  assert.match(src, /className="grid grid-cols-1 [^"]*md:grid-cols-2 lg:grid-cols-3"/);
+  // Dag 58 (F2): de store tre i én rad fra 1024 px (ikke 2 + 1), de smaa og «Kommer snart» under.
+  assert.match(src, /<div className="grid grid-cols-1 gap-5 lg:grid-cols-3">\s*\{large\.map\(/);
+  assert.match(src, /<div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">\s*\{small\.map\(/);
+  assert.match(src, /md:grid-cols-2 lg:grid-cols-4">\s*\{services\.coming\.items\.map\(/);
+  assert.ok(src.indexOf("{large.map(") < src.indexOf("{small.map(") && src.indexOf("{small.map(") < src.indexOf("services.coming.items.map("));
+  assert.match(src, /\{services\.coming\.title\}/);
   assert.match(src, /<section id=\{services\.anchor\}/);
   // Kortet: article, studio, h3 med id og lenken som peker paa h3.
   assert.match(src, /<article\s/);
@@ -1603,26 +1649,13 @@ test("F4: Services og PlanIllustration er serverkomponenter uten tekst i JSX og 
   assert.match(src, /<h3 id=\{titleId\}/);
   assert.match(src, /aria-describedby=\{titleId\}/);
   assert.match(src, /const MEDIA = "relative h-\[230px\] overflow-hidden";/);
-  // Videoen: loekka som i mosaikken, med Play foran etiketten.
-  const video = src.slice(src.indexOf("<MarketingVideo"), src.indexOf("/>", src.indexOf("<MarketingVideo")));
-  for (const attr of [
-    "src={VIDEOS.loop.src}",
-    "poster={IMAGES.loopPoster.src}",
-    "label={media.video.label}",
-    'mode="loop"',
-    "labels={site.video}",
-  ]) {
-    assert.ok(video.includes(attr), attr);
-  }
-  assert.match(src, /<Play aria-hidden="true"[^>]*\/>\s*\{media\.label\}/);
-  assert.match(src, /import \{ ArrowRight, PenLine, Play \} from "lucide-react";/);
-  // Annonseteksten paa moerk flate, etiketten i amber.
-  assert.match(src, /bg-ink p-\[18px\] text-paper/);
-  assert.match(src, /bg-amber-bg [^"]*text-amber-fg/);
-  assert.match(src, /text-paper\/75">\{media\.excerpt\}/);
-  // Linja under kortene.
-  assert.match(src, /\{services\.also\.label\}<\/span>\s*<span>\{services\.also\.text\}<\/span>/);
-  // Plantegningen: SVG med role="img", aria-label fra innholdet og bare tokens.
+  // Smaa kort og «Kommer snart» har ikke bilde.
+  const small = src.slice(src.indexOf("{small.map("), src.indexOf("services.coming.items.map("));
+  assert.doesNotMatch(small, /<Media\b|<Image\b/);
+  // Video, annonsetekst og plantegning er ikke lenger kort med medium.
+  assert.doesNotMatch(src, /MarketingVideo|PlanIllustration|media\.excerpt|services\.also/);
+  assert.match(src, /import \{ ArrowRight \} from "lucide-react";/);
+  // Plantegningen (staar til en egen opprydnings-PR): SVG med role="img", aria-label og bare tokens.
   const plan = withoutComments(read("app/components/marketing/PlanIllustration.tsx"));
   assert.match(plan, /<svg viewBox=\{VIEW_BOX\} role="img" aria-label=\{plan\.label\}/);
   assert.match(plan, /\{plan\.sketch\.caption\}/);
@@ -1681,7 +1714,7 @@ test("F6a: den aerlige versjonen er en kort blokk rett etter merkingen, med de s
   ]);
 });
 
-test("F6a: prisene har ikke Skjul ansikter og skilt, og linja med [PRIS] har de seks tjenestene", () => {
+test("F6a: prisene har ikke Skjul ansikter og skilt, og linja med [PRIS] har de bestillbare tjenestene (Dag 58)", () => {
   // 2e: tillegget er ute av innholdet, typen og komponenten.
   for (const [path, text] of strings(home.pricing, "pricing")) assert.ok(!text.includes("Skjul ansikter"), path);
   assert.ok(!("addOn" in home.pricing) && !("chains" in home.pricing));
@@ -1692,7 +1725,8 @@ test("F6a: prisene har ikke Skjul ansikter og skilt, og linja med [PRIS] har de 
   assert.equal(home.pricing.otherFormat, "{name}:");
   assert.deepEqual(
     home.pricing.others.map((o) => [o.name, o.price]),
-    ["Digital styling", "Rydd opp", "Blå himmel", "Boligfilm", "Annonsetekst", "Plantegning"].map((n) => [n, { pending: "price" }])
+    // Dag 58 (F2): bare de som kan bestilles, i rekkefoelgen fra kortene. Ingen ny pris.
+    ["Årstider", "Digital styling", "Blå himmel"].map((n) => [n, { pending: "price" }])
   );
   assert.equal(fill(home.pricing.otherFormat, { name: "Blå himmel" }), "Blå himmel:");
   assert.equal(site.pendingLabels.price, "[PRIS]");
@@ -1711,7 +1745,7 @@ test("F6a: lanseringssperren finner prisene som venter", () => {
   const items = pendingItems({ site, home, faq, faqPage, labelingPage, contactPage });
   assert.deepEqual(
     items.filter((i) => i.key === "price").map((i) => i.path),
-    [0, 1, 2, 3, 4, 5].map((n) => `home.pricing.others[${n}].price`)
+    [0, 1, 2].map((n) => `home.pricing.others[${n}].price`)
   );
   // MARKETING_PUBLIC kan ikke vaere true mens noe venter (se MS3a-testen).
   assert.ok(!MARKETING_PUBLIC);
@@ -1798,27 +1832,25 @@ test("F6b: den siste knappen er lys og har {brand} i tittelen", () => {
   assert.match(withoutComments(read("app/(marketing)/no/page.tsx")), /<FinalCta finalCta=\{home\.finalCta\} site=\{site\} brand=\{brand\} \/>/);
 });
 
-test("F6b: bunnen har de seks tjenestene og Priser, og linja nederst venter paa bildene", () => {
+test("F6b: bunnen har tjenestene fra kortene (Dag 58: de bestillbare) og Priser, og linja nederst venter paa bildene", () => {
   assert.equal(site.footer.tagline, "AI-studio for eiendomsmeglere.");
   const [services] = site.footer.columns;
   assert.equal(services.title, "Tjenester");
   assert.deepEqual(services.links, [
     { label: "Kveldsbilde", href: "#tjenester" },
+    { label: "Årstider", href: "#tjenester" },
     { label: "Digital styling", href: "#tjenester" },
-    { label: "Rydd opp", href: "#tjenester" },
-    { label: "Boligfilm", href: "#tjenester" },
-    { label: "Annonsetekst", href: "#tjenester" },
-    { label: "Plantegning", href: "#tjenester" },
+    { label: "Blå himmel", href: "#tjenester" },
     { label: "Priser", href: "#priser" },
     { label: "Guide: AI-bilder i boligannonsen" },
   ]);
   // Samme navn som tjenestekortene, i samme rekkefoelge.
-  assert.deepEqual(services.links.slice(0, 6).map((l) => l.label), home.services.items.map((i) => i.title));
+  assert.deepEqual(services.links.slice(0, 4).map((l) => l.label), home.services.items.map((i) => i.title));
   assert.equal(`#${home.services.anchor}`, "#tjenester");
   // Paa en underside gaar ankrene til forsiden.
   assert.deepEqual(
     onPage(services.links, MARKETING_HOME).map((l) => l.href),
-    [...Array(6).fill("/no#tjenester"), "/no#priser", undefined]
+    [...Array(4).fill("/no#tjenester"), "/no#priser", undefined]
   );
   assert.deepEqual(site.footer.note, { text: "Alle eksempelbilder er laget med tjenesten og merket som AI.", pending: "image" });
   assert.ok(pendingItems({ site }).some((i) => i.path === "site.footer.note" && i.key === "image"));
