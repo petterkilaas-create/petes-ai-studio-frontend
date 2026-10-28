@@ -2,7 +2,7 @@ import Image from "next/image";
 import { ArrowRight, Check } from "lucide-react";
 import { t, type Locale } from "../lib/i18n";
 import type { VisibleTool } from "../lib/services";
-import type { ServiceCardText } from "../lib/serviceCards";
+import type { CardSize, ServiceCardText } from "../lib/serviceCards";
 import type { CardImages } from "../(app)/tjenester/cardImages";
 import { cardClass } from "./ui/Card";
 
@@ -20,6 +20,9 @@ import { cardClass } from "./ui/Card";
  * Bildene er pynt inne i knappen (alt=""): navnet er tittelen og
  * beskrivelsen er linja, saa skjermleseren ikke leser bilder og brikker som
  * en del av navnet.
+ *
+ * Lite kort (`size="small"`, Dag 58 del 4): samme knapp og tekster, uten
+ * bilde og med mindre tittel.
  */
 
 const FOCUS =
@@ -40,6 +43,7 @@ export function ServiceCard({
   disabled,
   onSelect,
   locale,
+  size = "large",
 }: {
   tool: VisibleTool;
   text: ServiceCardText;
@@ -48,7 +52,9 @@ export function ServiceCard({
   disabled: boolean;
   onSelect: () => void;
   locale: Locale;
+  size?: CardSize;
 }) {
+  const small = size === "small";
   const titleId = `tjeneste-${tool.id}`;
   const descId = `tjeneste-${tool.id}-linje`;
   return (
@@ -66,32 +72,37 @@ export function ServiceCard({
         }`
       )}
     >
-      <span className="relative block aspect-[3/2] w-full overflow-hidden bg-surface-2">
-        {images?.after ? (
-          <>
-            <Image src={images.after} alt="" fill sizes={SIZES} className={IMAGE} />
-            <span className="absolute inset-0 [clip-path:inset(0_0_0_50%)]">
+      {!small && (
+        <span className="relative block aspect-[3/2] w-full overflow-hidden bg-surface-2">
+          {images?.after ? (
+            <>
+              <Image src={images.after} alt="" fill sizes={SIZES} className={IMAGE} />
+              <span className="absolute inset-0 [clip-path:inset(0_0_0_50%)]">
+                <Image src={images.before} alt="" fill sizes={SIZES} className={IMAGE} />
+              </span>
+              <span aria-hidden="true" className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-surface" />
+              <span aria-hidden="true" className={`${TAG} left-4`}>
+                {t(locale, "express.card.afterAi")}
+              </span>
+              <span aria-hidden="true" className={`${TAG} right-4`}>
+                {t(locale, "express.card.before")}
+              </span>
+            </>
+          ) : images ? (
+            <>
               <Image src={images.before} alt="" fill sizes={SIZES} className={IMAGE} />
-            </span>
-            <span aria-hidden="true" className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-surface" />
-            <span aria-hidden="true" className={`${TAG} left-4`}>
-              {t(locale, "express.card.afterAi")}
-            </span>
-            <span aria-hidden="true" className={`${TAG} right-4`}>
-              {t(locale, "express.card.before")}
-            </span>
-          </>
-        ) : images ? (
-          <>
-            <Image src={images.before} alt="" fill sizes={SIZES} className={IMAGE} />
-            <span aria-hidden="true" className={`${TAG} left-4`}>
-              {t(locale, "express.card.example")}
-            </span>
-          </>
-        ) : null}
-      </span>
-      <span className="flex flex-1 flex-col gap-3.5 p-6 lg:p-7">
-        <h3 id={titleId} className="font-display text-[30px] font-normal leading-[1.05] text-ink lg:text-[38px]">
+              <span aria-hidden="true" className={`${TAG} left-4`}>
+                {t(locale, "express.card.example")}
+              </span>
+            </>
+          ) : null}
+        </span>
+      )}
+      <span className={`flex flex-1 flex-col ${small ? "gap-3 p-5" : "gap-3.5 p-6 lg:p-7"}`}>
+        <h3
+          id={titleId}
+          className={`font-display font-normal leading-[1.05] text-ink ${small ? "text-[24px]" : "text-[30px] lg:text-[38px]"}`}
+        >
           {t(locale, tool.titleKey)}
         </h3>
         <span id={descId} className="block text-base leading-relaxed text-ink-2">

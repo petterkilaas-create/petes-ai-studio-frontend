@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { LayoutGrid } from "lucide-react";
 import { TOOL_ICONS } from "@/app/components/toolIcons";
 import { ServiceCard } from "@/app/components/ServiceCard";
-import { SERVICE_CARD_TEXT, UPLOAD_CARD_ID, uploadScrollBehavior } from "@/app/lib/serviceCards";
+import { SERVICE_CARD_TEXT, UPLOAD_CARD_ID, splitBySize, uploadScrollBehavior } from "@/app/lib/serviceCards";
 import { CARD_IMAGES } from "./cardImages";
 import { DUSK_IMAGES } from "./duskImages";
 import { STYLE_IMAGES } from "./styleImages";
@@ -57,6 +57,8 @@ const CATEGORIES = visibleCategories();
 const ALL_TOOLS = CATEGORIES.flatMap((c) => c.items);
 const ORDERABLE_TOOLS = ALL_TOOLS.filter((t) => t.orderable);
 const COMING_TOOLS = ALL_TOOLS.filter((t) => !t.orderable);
+// Dag 58 del 4: store kort med bilde for de tre demotjenestene, små kort uten bilde under.
+const { large: LARGE_TOOLS, small: SMALL_TOOLS } = splitBySize(ORDERABLE_TOOLS);
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
@@ -286,7 +288,7 @@ function ExpressContent() {
         <h2 className="text-sm font-medium text-ink">{t(locale, "express.chooseService")}</h2>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
-          {ORDERABLE_TOOLS.map((tool) => (
+          {LARGE_TOOLS.map((tool) => (
             <ServiceCard
               key={tool.id}
               tool={tool}
@@ -299,6 +301,23 @@ function ExpressContent() {
             />
           ))}
         </div>
+        {SMALL_TOOLS.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:gap-6">
+            {SMALL_TOOLS.map((tool) => (
+              <ServiceCard
+                key={tool.id}
+                tool={tool}
+                text={SERVICE_CARD_TEXT[tool.id]}
+                images={undefined}
+                selected={tool.id === selectedToolId}
+                disabled={isProcessing}
+                onSelect={() => selectTool(tool.id)}
+                locale={locale}
+                size="small"
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* --- OPPLASTING + KJOERING (naar en tjeneste er valgt) --- */}

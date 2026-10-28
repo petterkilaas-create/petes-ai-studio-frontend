@@ -429,7 +429,10 @@ test("dag 45: «Kommer»-kortet er ikke en knapp, og bare bestillbare kort kan v
   // uten kategorier, og de store kortene viser bare de bestillbare.
   assert.match(page, /const ORDERABLE_TOOLS = ALL_TOOLS\.filter\(\(t\) => t\.orderable\);/);
   assert.match(page, /const COMING_TOOLS = ALL_TOOLS\.filter\(\(t\) => !t\.orderable\);/);
-  assert.match(page, /\{ORDERABLE_TOOLS\.map\(\(tool\) => \(\s*<ServiceCard/);
+  // Dag 58 del 4: delt i store og små kort, begge bare de bestillbare.
+  assert.match(page, /splitBySize\(ORDERABLE_TOOLS\)/);
+  assert.match(page, /\{LARGE_TOOLS\.map\(\(tool\) => \(\s*<ServiceCard/);
+  assert.match(page, /\{SMALL_TOOLS\.map\(\(tool\) => \(\s*<ServiceCard/);
   // Seksjonen for «Kommer» har ingen onClick eller knapp.
   const start = page.indexOf("{COMING_TOOLS.map((tool) => {");
   assert.ok(start > 0);

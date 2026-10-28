@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { SERVICE_CARD_TEXT, UPLOAD_CARD_ID, uploadScrollBehavior } from "./serviceCards.ts";
-import { orderableTools, visibleCategories } from "./services.ts";
+import { SERVICE_CARD_TEXT, UPLOAD_CARD_ID, cardSize, splitBySize, uploadScrollBehavior } from "./serviceCards.ts";
+import { isServiceEnabled, orderableTools, visibleCategories } from "./services.ts";
 import { DICTIONARIES } from "./i18n/index.ts";
 import { withoutComments } from "./testing/jsxText.ts";
 
@@ -85,7 +85,9 @@ test("D-1: hele kortet er én knapp med aria-pressed, uten knapp eller lenke inn
   assert.equal(alts.length, 3);
   for (const alt of alts) assert.equal(alt, '""');
   // Tittelen med Instrument Serif fra 28 px, knappeflaten minst 44 px, ingen skygge.
-  assert.match(card, /font-display text-\[30px\][^"]*lg:text-\[38px\]/);
+  // Dag 58: det lille kortet har 24 px.
+  assert.match(card, /font-display font-normal/);
+  assert.match(card, /"text-\[30px\] lg:text-\[38px\]"/);
   assert.match(card, /min-h-12/);
   assert.doesNotMatch(card, /shadow|#[0-9a-f]{3,8}\b|-\[(#|rgb)/i);
   // Siden sender valget videre til selectTool, som foer.
@@ -136,7 +138,7 @@ test("D-1: rekkefoelgen er kortene, saa opplastingen, saa «Kommer», og kortene
   const upload = page.indexOf("<Card id={UPLOAD_CARD_ID}");
   const coming = page.indexOf("{COMING_TOOLS.map(");
   assert.ok(cards > 0 && cards < upload && upload < coming, `${cards} ${upload} ${coming}`);
-  assert.match(page, /<div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">\s*\{ORDERABLE_TOOLS\.map/);
+  assert.match(page, /<div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">\s*\{LARGE_TOOLS\.map/);
   // «Kommer» har en overskrift, og alle kortene som ikke kan bestilles staar der.
   assert.match(page, /t\(locale, "express\.comingTitle"\)/);
   const coming_ = visibleCategories().flatMap((c) => c.items).filter((t) => !t.orderable).map((t) => t.id);
@@ -159,4 +161,46 @@ test("D-1: et valgt kort ruller opplastingskortet inn, uten animasjon ved reduse
   assert.match(effect, /scrollIntoView\(\{ block: "start", behavior: uploadScrollBehavior\(reducedMotion\) \}\)/);
   // Kortet havner under den faste topplinja.
   assert.match(page, /<Card id=\{UPLOAD_CARD_ID\} padding="lg" className="scroll-mt-24 space-y-6">/);
+});
+
+// ---------------------------------------------------------------------------
+// Dag 58 del 4: store kort for de tre demotjenestene, små uten bilde under.
+// ---------------------------------------------------------------------------
+
+test("Dag 58: Kveldsbilde, Digital styling og Årstider er store; Blå himmel og Skjul ansikter er små", () => {
+  const { large, small } = splitBySize(orderableTools());
+  assert.deepEqual(large.map((t) => t.id).sort(), ["aarstider", "digital_styling", "skumring"]);
+  assert.deepEqual(small.map((t) => t.id).sort(), ["klart_vaer", "privacy_blur"]);
+  assert.equal(cardSize("skumring"), "large");
+  assert.equal(cardSize("klart_vaer"), "small");
+  assert.equal(cardSize("privacy_blur"), "small");
+  // Ukjent id er lite, aldri stort med bilde.
+  assert.equal(cardSize("ukjent"), "small");
+});
+
+test("Dag 58: ingen tjeneste forsvinner, rekkefoelgen er som foer, og ENABLED er urort", () => {
+  const tools = orderableTools();
+  const { large, small } = splitBySize(tools);
+  assert.equal(large.length + small.length, tools.length);
+  const order = tools.map((t) => t.id);
+  const inOrder = (ids: string[]) => ids.every((id, i) => i === 0 || order.indexOf(ids[i - 1]) < order.indexOf(id));
+  assert.ok(inOrder(large.map((t) => t.id)));
+  assert.ok(inOrder(small.map((t) => t.id)));
+  for (const id of ["skumring", "digital_styling", "aarstider", "klart_vaer", "privacy_blur"]) {
+    assert.equal(isServiceEnabled(id), true, id);
+  }
+});
+
+test("Dag 58: siden viser de små kortene uten bilde, med samme valg og bestilling", () => {
+  const page = withoutComments(read(PAGE));
+  assert.match(page, /splitBySize\(ORDERABLE_TOOLS\)/);
+  assert.match(page, /LARGE_TOOLS\.map/);
+  // De små vises naar det finnes noen, uten andre vilkaar.
+  assert.match(page, /\n\s*\{SMALL_TOOLS\.length > 0 && \(\s*<div[^>]*>\s*\{SMALL_TOOLS\.map/);
+  assert.match(page, /images=\{undefined\}[\s\S]*?size="small"/);
+  // Begge kortstoerrelsene velger med selectTool, som foer.
+  assert.equal(page.match(/onSelect=\{\(\) => selectTool\(tool\.id\)\}/g)?.length, 2);
+  assert.doesNotMatch(page, /ORDERABLE_TOOLS\.map/);
+  const card = withoutComments(read(CARD));
+  assert.match(card, /\{!small && \(/);
 });
