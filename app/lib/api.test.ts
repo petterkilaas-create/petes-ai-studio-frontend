@@ -667,11 +667,15 @@ test("normalizeReview beholder disclosure med alle felt, og taaler at den mangle
     source: "recorded",
     status: "ok",
   };
-  assert.deepEqual(api.normalizeReview({ ...REVIEW_BODY, disclosure }, "j1").disclosure, disclosure);
+  // Uten source_season (alt foer versjon 10, og alt som ikke er aarstider) er sourceSeason null.
+  assert.deepEqual(api.normalizeReview({ ...REVIEW_BODY, disclosure }, "j1").disclosure, {
+    ...disclosure,
+    sourceSeason: null,
+  });
   assert.equal(api.normalizeReview(REVIEW_BODY, "j1").disclosure, null);
   assert.equal(api.normalizeReview({ ...REVIEW_BODY, disclosure: null }, "j1").disclosure, null);
   assert.deepEqual(api.normalizeReview({ disclosure: { edited: [] } }, "j1").disclosure, {
-    version: null, base: null, time: null, scope: null, edited: [], source: null, status: null,
+    version: null, base: null, time: null, scope: null, edited: [], source: null, sourceSeason: null, status: null,
   });
 });
 

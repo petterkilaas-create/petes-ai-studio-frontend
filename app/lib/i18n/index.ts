@@ -40,6 +40,9 @@ export type CodeGroup =
   | "disclosureSeasonEdited"
   | "orderError"
   | "aarstidOrderError"
+  | "aarstidBytteError"
+  | "disclosureSeasonFrom"
+  | "disclosureSeasonSource"
   | "unsupportedImage"
   | "imageTypeHintNotSupported"
   | "furnishAs"
@@ -471,6 +474,14 @@ const nbUi = {
   "aarstid.summary.images.n": "{n} bilder",
   "aarstid.notStarted.capacity": "Denne årstiden ble ikke laget fordi tjenesten var travel. Bestillingen teller som én.",
   "aarstid.notStarted": "Denne årstiden ble ikke laget. Bestillingen teller som én.",
+  // «Lag i en annen årstid» (Dag 58, TG-NEW-273): ny bestilling fra originalen, koster ett bilde.
+  "aarstidBytte.open": "Lag i en annen årstid",
+  "aarstidBytte.cost": "Koster 1 bilde ({remaining} igjen)",
+  "aarstidBytte.costUnknown": "Koster 1 bilde",
+  "aarstidBytte.help": "Bildet lages på nytt fra originalen og blir en ny bestilling.",
+  "aarstidBytte.sameSeason": "Prøv igjen i samme årstid er gratis (Korriger bildet).",
+  "aarstidBytte.order": "Bestill",
+  "aarstidBytte.ordering": "Bestiller …",
   "express.comingTitle": "Kommer snart",
   "express.chooseImage": "Velg bilde",
   "express.run": "Lag bilde",
@@ -858,6 +869,18 @@ const nb: Dictionary = {
       season_summer: "Bildet er redigert med AI: årstiden er endret til sommer.",
       season_winter: "Bildet er redigert med AI: årstiden er endret til vinter.",
     },
+    // Med kilden (backend versjon 10, TG-NEW-273): «fra <kilde> til <mål>» naar source_season finnes.
+    disclosureSeasonFrom: {
+      season_autumn: "Bildet er redigert med AI: årstiden er endret fra {source} til høst.",
+      season_spring: "Bildet er redigert med AI: årstiden er endret fra {source} til vår.",
+      season_summer: "Bildet er redigert med AI: årstiden er endret fra {source} til sommer.",
+      season_winter: "Bildet er redigert med AI: årstiden er endret fra {source} til vinter.",
+    },
+    disclosureSeasonSource: {
+      sommer: "sommer",
+      hoest: "høst",
+      vaar: "vår",
+    },
     disclosureTime: {
       early: "Tidspunkt: tidlig skumring.",
       late: "Tidspunkt: sen kveld.",
@@ -946,6 +969,18 @@ const nb: Dictionary = {
       season_source_not_supported: "Bilder tatt om vinteren kan ikke brukes ennå. Velg sommer, høst eller vår.",
       season_target_not_supported: "En av årstidene kan ikke lages fra et bilde tatt på denne tiden av året. Velg årstidene på nytt.",
     },
+    // «Lag i en annen årstid» (Dag 58): feil fra POST /v1/jobs/{job_id}/aarstid. Andre koder: orderError.
+    aarstidBytteError: {
+      invalid_order: "Bestillingen er ikke gyldig. Velg én eller flere årstider.",
+      season_already_in_job: "Bildet har allerede denne årstiden. Prøv igjen i samme årstid er gratis (Korriger bildet).",
+      season_target_not_supported: "En av årstidene kan ikke lages fra dette bildet. Velg årstidene på nytt.",
+      season_source_not_supported: "Bilder tatt om vinteren kan ikke brukes ennå.",
+      season_source_missing: "Vi vet ikke når bildet er tatt, så det kan ikke lages i en annen årstid. Bestill på nytt fra Tjenester.",
+      season_job_required: "Bare bilder fra Årstider kan lages i en annen årstid.",
+      media_deleted: "Bildet er slettet, så det kan ikke lages i en annen årstid.",
+      original_missing: "Originalen finnes ikke lenger. Bestill på nytt fra Tjenester.",
+      action_not_allowed: "Bildet kan ikke lages i en annen årstid nå. Last siden på nytt.",
+    },
     // S2-f: hvorfor en stil i bestillingen ikke ble startet (not_started).
     orderNotStarted: {
       capacity: "Denne stilen ble ikke laget fordi tjenesten var travel. Bestillingen teller som én.",
@@ -999,6 +1034,9 @@ const nb: Dictionary = {
     disclosureSeasonEdited: "Merketeksten kunne ikke lages.",
     orderError: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
     aarstidOrderError: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
+    aarstidBytteError: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
+    disclosureSeasonFrom: "Merketeksten kunne ikke lages.",
+    disclosureSeasonSource: "Merketeksten kunne ikke lages.",
     unsupportedImage: "Bildet kan ikke brukes. Lagre det som JPEG eller PNG og velg det på nytt.",
     imageTypeHintNotSupported: "Bildet kunne ikke behandles. Prøv igjen, eller kontakt oss.",
     furnishAs: "Ukjent romtype",
@@ -1409,6 +1447,13 @@ const en: Dictionary = {
     "aarstid.summary.images.n": "{n} images",
     "aarstid.notStarted.capacity": "This season was not made because the service was busy. The order counts as one.",
     "aarstid.notStarted": "This season was not made. The order counts as one.",
+    "aarstidBytte.open": "Make in another season",
+    "aarstidBytte.cost": "Costs 1 image ({remaining} left)",
+    "aarstidBytte.costUnknown": "Costs 1 image",
+    "aarstidBytte.help": "The image is made again from the original and becomes a new order.",
+    "aarstidBytte.sameSeason": "Trying again in the same season is free (Correct the image).",
+    "aarstidBytte.order": "Order",
+    "aarstidBytte.ordering": "Ordering …",
     "express.comingTitle": "Coming soon",
     "express.chooseImage": "Choose image",
     "express.run": "Create image",
@@ -1754,6 +1799,17 @@ const en: Dictionary = {
       season_summer: "The image has been edited with AI: the season has been changed to summer.",
       season_winter: "The image has been edited with AI: the season has been changed to winter.",
     },
+    disclosureSeasonFrom: {
+      season_autumn: "The image has been edited with AI: the season has been changed from {source} to autumn.",
+      season_spring: "The image has been edited with AI: the season has been changed from {source} to spring.",
+      season_summer: "The image has been edited with AI: the season has been changed from {source} to summer.",
+      season_winter: "The image has been edited with AI: the season has been changed from {source} to winter.",
+    },
+    disclosureSeasonSource: {
+      sommer: "summer",
+      hoest: "autumn",
+      vaar: "spring",
+    },
     disclosureTime: {
       early: "Time of day: early dusk.",
       late: "Time of day: late evening.",
@@ -1835,6 +1891,17 @@ const en: Dictionary = {
       season_source_not_supported: "Photos taken in winter cannot be used yet. Choose summer, autumn or spring.",
       season_target_not_supported: "One of the seasons cannot be made from a photo taken at this time of year. Choose the seasons again.",
     },
+    aarstidBytteError: {
+      invalid_order: "The order is not valid. Choose one or more seasons.",
+      season_already_in_job: "The image already has this season. Trying again in the same season is free (Correct the image).",
+      season_target_not_supported: "One of the seasons cannot be made from this image. Choose the seasons again.",
+      season_source_not_supported: "Photos taken in winter cannot be used yet.",
+      season_source_missing: "We don't know when the photo was taken, so it cannot be made in another season. Order again from Services.",
+      season_job_required: "Only images from Seasons can be made in another season.",
+      media_deleted: "The image has been deleted, so it cannot be made in another season.",
+      original_missing: "The original no longer exists. Order again from Services.",
+      action_not_allowed: "The image cannot be made in another season right now. Reload the page.",
+    },
     orderNotStarted: {
       capacity: "This style was not made because the service was busy. The order counts as one.",
     },
@@ -1884,6 +1951,9 @@ const en: Dictionary = {
     disclosureSeasonEdited: "The disclosure text could not be created.",
     orderError: "The image could not be processed. Please try again, or contact us.",
     aarstidOrderError: "The image could not be processed. Please try again, or contact us.",
+    aarstidBytteError: "The image could not be processed. Please try again, or contact us.",
+    disclosureSeasonFrom: "The disclosure text could not be created.",
+    disclosureSeasonSource: "The disclosure text could not be created.",
     unsupportedImage: "The image cannot be used. Save it as JPEG or PNG and choose it again.",
     imageTypeHintNotSupported: "The image could not be processed. Please try again, or contact us.",
     furnishAs: "Unknown room type",
@@ -1955,6 +2025,17 @@ export function aarstidOrderErrorText(locale: Locale, code: unknown, reason: unk
   const table = DICTIONARIES[locale].codes.aarstidOrderError;
   if (typeof code === "string" && Object.hasOwn(table, code)) return table[code];
   return orderErrorText(locale, code, reason);
+}
+
+/**
+ * Tekst for en feilet «Lag i en annen årstid» (Dag 58, POST /v1/jobs/{job_id}/aarstid):
+ * kodene som bare gjelder den, fra aarstidBytteError; alt annet (402, 429, 503
+ * og resten) som orderErrorText.
+ */
+export function aarstidBytteErrorText(locale: Locale, code: unknown): string {
+  const table = DICTIONARIES[locale].codes.aarstidBytteError;
+  if (typeof code === "string" && Object.hasOwn(table, code)) return table[code];
+  return orderErrorText(locale, code, null);
 }
 
 /** Melding som enten er en ui-noekkel eller en kode fra backend. */

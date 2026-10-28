@@ -22,6 +22,12 @@ export interface ReviewDisclosure {
   /** null naar lista ikke er en liste eller har noe som ikke er tekst. */
   edited: string[] | null;
   source: string | null;
+  /**
+   * Aarstiden bildet er tatt i (backend versjon 10, TG-NEW-273): sommer, hoest
+   * eller vaar for aarstidsbasene, ellers null. Valgfri, saa faste eksempler
+   * (markedssiden) ikke maa ha den; mangler den, er det som null.
+   */
+  sourceSeason?: string | null;
   status: string | null;
 }
 
@@ -38,8 +44,10 @@ export const DISCLOSURE_LOCALE: Locale = "nb";
  * Aarstidene (backend versjon 9, TG-NEW-271): én base per maalaarstid. Kodene
  * er hele ledd (disclosureSeasonEdited), ikke ord i en liste: «Fargene på
  * løvet er endret, løv er lagt på bakken, og lys og skygger er tilpasset
- * årstiden.» Grunnsetningen har ikke kilden (Petter 27.10, 1 A): backend sender
- * den ikke, og teksten i bildet og XMP sier det samme.
+ * årstiden.» Fra versjon 10 (Dag 58, TG-NEW-273) sier grunnsetningen «fra
+ * <kilde> til <mål>» naar backend sender `source_season`
+ * (disclosureSeasonFrom); uten den er den som foer. Teksten i bildet og XMP
+ * har fortsatt ikke kilden (Petter 28.10).
  */
 export const SEASON_BASES: ReadonlySet<string | null> = new Set([
   "season_autumn",
@@ -70,6 +78,20 @@ function capitalize(locale: Locale, text: string): string {
 
 function lookup(table: Record<string, string>, code: string | null): string | null {
   return code !== null && Object.hasOwn(table, code) ? table[code] : null;
+}
+
+/**
+ * Grunnsetningen for en aarstidsbase: med kilden «… endret fra sommer til
+ * høst.», uten kilden som foer. En kilde som ikke er kjent, gir null
+ * (ingen tekst), aldri en setning uten den.
+ */
+function seasonBase(locale: Locale, base: string | null, sourceSeason: string | null | undefined): string | null {
+  const codes = DICTIONARIES[locale].codes;
+  if (sourceSeason == null) return lookup(codes.disclosureBase, base);
+  const template = lookup(codes.disclosureSeasonFrom, base);
+  const source = lookup(codes.disclosureSeasonSource, sourceSeason);
+  if (template === null || source === null) return null;
+  return template.replace("{source}", source);
 }
 
 function editedSentence(locale: Locale, items: string[]): string {
@@ -103,11 +125,14 @@ export function disclosureText(
   if (disclosure.status !== "ok" || disclosure.edited === null) return missing;
 
   const codes = DICTIONARIES[locale].codes;
-  const base = lookup(codes.disclosureBase, disclosure.base);
-  if (base === null) return missing;
-  if (new Set(disclosure.edited).size !== disclosure.edited.length) return missing;
   // Aarstider slaar opp i egen tabell: en kode fra den andre gruppen gir "missing".
   const season = SEASON_BASES.has(disclosure.base);
+  // Kilden brukes bare for aarstidsbasene; andre baser faar den aldri fra backend.
+  const base = season
+    ? seasonBase(locale, disclosure.base, disclosure.sourceSeason)
+    : lookup(codes.disclosureBase, disclosure.base);
+  if (base === null) return missing;
+  if (new Set(disclosure.edited).size !== disclosure.edited.length) return missing;
   const editedTable = season ? codes.disclosureSeasonEdited : codes.disclosureEdited;
   const items: string[] = [];
   for (const code of disclosure.edited) {

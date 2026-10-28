@@ -14,6 +14,8 @@ import {
   type ReviewFetchResult,
 } from "@/app/lib/api";
 import { useJobStatus } from "@/app/lib/useJobStatus";
+import { useQuota } from "@/app/hooks/useQuota";
+import { seasonSwitch } from "@/app/lib/aarstidBytte";
 import { codeText, t, type CodeGroup, type UiKey } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import {
@@ -105,6 +107,7 @@ import { WishesPanel } from "@/app/components/godkjenning/WishesPanel";
 import { DetailsPanel } from "@/app/components/godkjenning/DetailsPanel";
 import { DisclosureBlock } from "@/app/components/godkjenning/DisclosureBlock";
 import { DownloadButton } from "@/app/components/godkjenning/DownloadButton";
+import { SeasonSwitchPanel } from "@/app/components/godkjenning/SeasonSwitchPanel";
 import { BrightnessApproved, BrightnessControl } from "@/app/components/godkjenning/BrightnessControl";
 import { choiceClass, FOCUS } from "@/app/components/godkjenning/classes";
 
@@ -162,6 +165,10 @@ import { choiceClass, FOCUS } from "@/app/components/godkjenning/classes";
  *
  * Retting uten lys og peis (FE-1, Dag 57): overskriften og hintet kommer fra
  * correctionKind (review-svaret), ikke fra tjenesten.
+ *
+ * «Lag i en annen årstid» (Dag 58, TG-NEW-273): for eieren av en
+ * aarstidsjobb (seasonSwitch) staar knappen under kortet med handlingene,
+ * med kostlinja fra GET /v1/quota. Etter 202 aapnes den nye bestillingen.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -180,6 +187,8 @@ export default function GodkjenningPage({
   const { jobId } = use(params);
   const { getToken } = useAuth();
   const locale = useLocale();
+  // «Lag i en annen årstid» koster ett bilde: kostlinja og den grå knappen.
+  const quota = useQuota();
 
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
   // Valgt versjon i stripa («original» eller en variant); null gir gjeldende runde.
@@ -560,6 +569,7 @@ export default function GodkjenningPage({
             const readOnly = isReadOnlyOther(review);
             const deleted = mediaDeleted(review);
             const tabs = orderTabs(review.order, jobId, locale);
+            const sw = seasonSwitch(review);
 
             return (
               <>
@@ -808,6 +818,16 @@ export default function GodkjenningPage({
                         approveLock={approveLock}
                         framingPct={framingWarning(review.framing)}
                         message={messageText}
+                        locale={locale}
+                      />
+                    )}
+
+                    {sw !== null && (
+                      <SeasonSwitchPanel
+                        jobId={review.jobId}
+                        view={sw}
+                        quota={quota.quota}
+                        onQuota={quota.apply}
                         locale={locale}
                       />
                     )}
