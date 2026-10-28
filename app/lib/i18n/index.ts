@@ -1102,6 +1102,8 @@ const nb: Dictionary = {
     disclosureLocal: {
       objects_removed: "Gjenstander er fjernet digitalt.",
       objects_added: "Gjenstander er lagt til digitalt.",
+      // Fritekst i «Marker og beskriv» (RAPPORT_FRITEKST_BE, merketeksten versjon 11).
+      areas_edited: "Markerte områder er redigert digitalt.",
     },
   },
   generic: {
@@ -2108,6 +2110,7 @@ const en: Dictionary = {
     disclosureLocal: {
       objects_removed: "Objects have been removed digitally.",
       objects_added: "Objects have been added digitally.",
+      areas_edited: "Marked areas have been edited digitally.",
     },
   },
   generic: {
