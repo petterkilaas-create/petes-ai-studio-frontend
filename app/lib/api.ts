@@ -1031,10 +1031,10 @@ export async function getCapabilities(opts: { getToken: GetToken }): Promise<Cap
 // Godkjenning (2d-1): GET /v1/jobs/{id}/review og POST /v1/jobs/{id}/decision
 // ---------------------------------------------------------------------------
 
-export type DecisionAction = "approve" | "reject" | "continue" | "correct" | "choose";
+export type DecisionAction = "approve" | "reject" | "continue" | "correct";
 
-/** `choose` (FE-3, Dag 58): velg kandidat i en lokal runde («Marker og beskriv»). */
-const DECISION_ACTIONS: ReadonlySet<string> = new Set(["approve", "reject", "continue", "correct", "choose"]);
+/** `choose` (FE-3) er tatt ut i studio v2 (Dag 58): én runde gir ett resultat, uten kandidater. */
+const DECISION_ACTIONS: ReadonlySet<string> = new Set(["approve", "reject", "continue", "correct"]);
 
 /** Maks lengde paa begrunnelsen (backend renser og sjekker igjen, 422 over). */
 export const REASON_MAX_LEN = 500;
@@ -1099,19 +1099,28 @@ export interface ReviewCorrection {
   lastRoundError?: string | null;
 }
 
-/** En kandidat i den lokale runden: k (1 eller 2) og den merkede forhaandsvisningen (null naar den mangler). */
-export interface LocalCandidate {
-  k: 1 | 2;
-  previewUrl: string | null;
+/** Nummeret paa en endring i en lokal runde (studio v2: inntil 4). */
+export type LocalEditNumber = 1 | 2 | 3 | 4;
+
+/**
+ * En endring i den lokale runden (studio v2, `local.edits[]`): nummeret,
+ * instruksen, boksen (hjoernene i 0–1, null naar den mangler), lengden paa
+ * teksten og status: "ok" eller koden for hvorfor endringen ikke ble gjort.
+ */
+export interface ReviewLocalEdit {
+  k: LocalEditNumber;
+  instruction: LocalInstruction | null;
+  box: { from: { x: number; y: number }; to: { x: number; y: number } } | null;
+  textLen: number | null;
+  status: string;
 }
 
-/** `local` i review-svaret (BE-7b): den lokale runden bak gjeldende bilde. */
+/** `local` i review-svaret (studio v2, lr2): runden bak gjeldende bilde og endringene i den. */
 export interface ReviewLocal {
-  instruction: string | null;
   round: number | null;
-  /** Kandidaten som er i bruk (1 eller 2), eller null. */
-  chosen: 1 | 2 | null;
-  candidates: LocalCandidate[];
+  /** Endringen runden proevde igjen («Prøv igjen»), eller null. */
+  retryOf: LocalEditNumber | null;
+  edits: ReviewLocalEdit[];
 }
 
 /**
@@ -1349,8 +1358,9 @@ export interface JobReviewDetail {
    */
   wishes: ReviewWishes | null;
   /**
-   * «Marker og beskriv» (FE-3, Dag 58): den lokale runden bak gjeldende bilde og
-   * kandidatene. null uten lokal runde, uten LOCAL_EDIT og naar feltet mangler.
+   * «Marker og beskriv» (studio v2, Dag 58): den lokale runden bak gjeldende
+   * bilde og endringene i den. null uten lokal runde, uten LOCAL_EDIT, for en
+   * gammel runde med kandidater (FE-3) og naar feltet mangler.
    */
   local?: ReviewLocal | null;
 }
@@ -1829,29 +1839,54 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
   };
 }
 
-function candidateNumber(value: unknown): 1 | 2 | null {
-  return value === 1 || value === 2 ? value : null;
+function editNumber(value: unknown): LocalEditNumber | null {
+  return value === 1 || value === 2 || value === 3 || value === 4 ? value : null;
+}
+
+const LOCAL_INSTRUCTION_SET: ReadonlySet<string> = new Set(["fire_out", "light", "remove", "add"]);
+
+/**
+ * Boksen som [[x0, y0], [x1, y1]] i 0–1, eller null ved feil form. Formen
+ * fra forespoerselen ({shape: "box", points}) godtas ogsaa: kontrakten sier
+ * `box`, men ikke formen (AVVIK i rapporten).
+ */
+function toEditBox(value: unknown): ReviewLocalEdit["box"] {
+  const raw = isRecord(value) ? value.points : value;
+  if (!Array.isArray(raw) || raw.length !== 2) return null;
+  const pts: number[][] = [];
+  for (const p of raw) {
+    if (!Array.isArray(p) || p.length !== 2) return null;
+    const [x, y] = p;
+    if (typeof x !== "number" || typeof y !== "number" || !(x >= 0 && x <= 1 && y >= 0 && y <= 1)) return null;
+    pts.push([x, y]);
+  }
+  return {
+    from: { x: Math.min(pts[0][0], pts[1][0]), y: Math.min(pts[0][1], pts[1][1]) },
+    to: { x: Math.max(pts[0][0], pts[1][0]), y: Math.max(pts[0][1], pts[1][1]) },
+  };
 }
 
 /**
- * `local` (BE-7b, `decisions.local_view`) strengt lest: bare kandidater med k 1
- * eller 2, hver én gang. Uten kandidater: null (backend sender da null).
+ * `local` (studio v2, `decisions.local_view`) strengt lest: endringer med k
+ * 1–4, hver én gang, sortert etter k. Uten status blir den "unknown", saa
+ * siden aldri viser ✓ uten at backend sa "ok". Uten endringer (ogsaa en
+ * gammel runde med kandidater): null.
  */
 export function toReviewLocal(raw: unknown): ReviewLocal | null {
   if (!isRecord(raw)) return null;
-  const candidates: LocalCandidate[] = [];
-  for (const c of records(raw.candidates)) {
-    const k = candidateNumber(c.k);
-    if (k === null || candidates.some((x) => x.k === k)) continue;
-    candidates.push({ k, previewUrl: nonEmptyString(c.preview_url) });
+  const edits: ReviewLocalEdit[] = [];
+  for (const e of records(raw.edits)) {
+    const k = editNumber(e.k);
+    if (k === null || edits.some((x) => x.k === k)) continue;
+    const instruction = typeof e.instruction === "string" && LOCAL_INSTRUCTION_SET.has(e.instruction)
+      ? (e.instruction as LocalInstruction)
+      : null;
+    const textLen = typeof e.text_len === "number" && Number.isInteger(e.text_len) && e.text_len >= 0 ? e.text_len : null;
+    edits.push({ k, instruction, box: toEditBox(e.box), textLen, status: nonEmptyString(e.status) ?? "unknown" });
   }
-  if (candidates.length === 0) return null;
-  return {
-    instruction: stringOrNull(raw.instruction),
-    round: numberOrNull(raw.round),
-    chosen: candidateNumber(raw.chosen),
-    candidates,
-  };
+  if (edits.length === 0) return null;
+  edits.sort((a, b) => a.k - b.k);
+  return { round: numberOrNull(raw.round), retryOf: editNumber(raw.retry_of), edits };
 }
 
 export type ReviewFetchResult =
@@ -1952,21 +1987,25 @@ export interface DecisionRequest {
   additions_acknowledged?: boolean;
   /** Bare ved correct, og bare de endrede valgene (TG-NEW-145). Utelatt: samme valg. */
   choices?: CorrectionChoices;
-  /** «Marker og beskriv» ved correct (FE-3, BE-7b); aldri sammen med overrides, choices eller peissvar. */
+  /** «Marker og beskriv» ved correct (studio v2); aldri sammen med overrides, choices eller peissvar. */
   local?: LocalRequest;
-  /** Kandidaten ved choose (FE-3, BE-7b A1). */
-  candidate?: 1 | 2;
 }
 
 /** Instruksene i «Marker og beskriv»: Slukk, Tenn, Fjern dette og Legg til. */
 export type LocalInstruction = "fire_out" | "light" | "remove" | "add";
 
-/** `local` i body: én boks (B1) med hjoernene i 0–1 i resultatets ramme, og teksten bare ved add. */
-export interface LocalRequest {
+/** En endring i body: boksen med hjoernene i 0–1 i resultatets ramme, og teksten bare ved add. */
+export interface LocalEditRequest {
   shape: { shape: "box"; points: [number, number][] };
   instruction: LocalInstruction;
   text?: string;
 }
+
+/**
+ * `local` i body (studio v2): 1–4 endringer, eller «Prøv igjen» paa endring k
+ * i gjeldende runde. Aldri begge (backend: 400 local_invalid).
+ */
+export type LocalRequest = { edits: LocalEditRequest[] } | { retry: LocalEditNumber };
 
 /**
  * Utfallet av POST /v1/jobs/{id}/decision:
@@ -2004,18 +2043,21 @@ export const CHOICE_ERROR_CODES: ReadonlySet<string> = new Set([
   "choices_not_supported",
 ]);
 
-/** 400-kodene for «Marker og beskriv» og `choose` (BE-7b), foer claim og 0 kr. */
+/** 400-kodene for «Marker og beskriv» (BE-7b og studio v2), foer claim og 0 kr. */
 export const LOCAL_ERROR_CODES: ReadonlySet<string> = new Set([
   "local_not_accepted",
   "local_exclusive",
   "local_not_supported",
+  "local_invalid",
   "shape_not_supported",
   "shape_invalid",
   "instruction_invalid",
   "text_required",
   "text_too_long",
   "text_not_accepted",
-  "candidate_invalid",
+  "edits_count",
+  "edits_overlap",
+  "retry_invalid",
 ]);
 
 export function parseDecisionResponse(httpStatus: number, body: unknown): DecisionOutcome {

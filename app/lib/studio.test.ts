@@ -348,13 +348,13 @@ function sources(dir: string): string[] {
   return out;
 }
 
-test("StudioCanvas: bare godkjenningssiden bruker den, med én boks (FE-3, Dag 58)", () => {
+test("StudioCanvas: bare godkjenningssiden bruker den, med nummererte bokser (studio v2, Dag 58)", () => {
   const users = [...sources("(app)"), ...sources("(marketing)"), ...sources("components")].filter(
     (f) => f !== "components/studio/StudioCanvas.tsx" && /StudioCanvas/.test(code(f))
   );
   assert.deepEqual(users, ["(app)/godkjenning/[jobId]/page.tsx"]);
   const page = code("(app)/godkjenning/[jobId]/page.tsx");
-  assert.match(page, /<StudioCanvas[\s\S]*?tool="box"[\s\S]*?onChange=\{\(next\) => setLocalStudio\(keepOneBox\(next\)\)\}/);
+  assert.match(page, /<StudioCanvas[\s\S]*?tool="box"[\s\S]*?onBox=\{addBoxFromCanvas\}\s*numbered\s*activeId=\{localActive\}\s*onActive=\{setLocalActive\}/);
 });
 
 test("StudioCanvas: ingen kall, regningen fra studio.ts og zoom.ts, og touch-none bare paa lerretet", () => {
