@@ -23,8 +23,8 @@ import { addBox, serializeMark, type ImagePoint, type Mark, type StudioState } f
  * - Inntil 4 bokser, nummerert 1–4 i rekkefoelgen de ble tegnet. Hver boks
  *   har sin instruks og (ved Legg til) sin tekst.
  * - Bokser som overlapper, avvises her foer de sendes. Margen er den backend
- *   bruker foer claim (AVVIK 3): 3 % av kortsiden rundt hver boks, 10 % for
- *   Tenn. Ny boks sjekkes med 3 %; foer innsending sjekkes med instruksen.
+ *   bruker foer claim (AVVIK 3): 7 % av kortsiden rundt hver boks, 10 % for
+ *   Tenn. Ny boks sjekkes med 7 %; foer innsending sjekkes med instruksen.
  * - Ett resultat (ingen kandidater). Etter runden har hver endring ✓ eller
  *   en feilmelding, og «Prøv igjen» sender `retry` (teller som runde).
  */
@@ -42,8 +42,8 @@ export const LOCAL_INSTRUCTION_KEYS: Record<LocalInstruction, UiKey> = {
 export const LOCAL_TEXT_MAX = 200;
 /** Hoeyst saa mange endringer per runde (backend `MAX_EDITS`). */
 export const MAX_LOCAL_EDITS = 4;
-/** Margen rundt boksen, i broek av kortsiden (backend: E utvides med 3 %, Tenn 10 %). */
-export const EDIT_MARGIN = 0.03;
+/** Margen rundt boksen, i broek av kortsiden (backend: E utvides med 7 %, Tenn 10 %). */
+export const EDIT_MARGIN = 0.07;
 export const EDIT_MARGIN_LIGHT = 0.1;
 
 export type LocalBox = Extract<Mark, { kind: "box" }>;
@@ -122,7 +122,7 @@ export const BOX_REJECTION_KEYS: Record<BoxRejection, UiKey> = {
 
 /**
  * Lerretet vil legge til en boks (`addBox`). Er det allerede 4, eller
- * overlapper den nye boksen en annen (med 3 % margin rundt begge), staar
+ * overlapper den nye boksen en annen (med 7 % margin rundt begge), staar
  * tilstanden uendret, og siden viser hvorfor.
  */
 export function addLocalBox(

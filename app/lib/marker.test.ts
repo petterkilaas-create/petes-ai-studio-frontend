@@ -158,13 +158,23 @@ test("Studio v2: inntil 4 bokser, nummerert 1–4 i rekkefoelgen de ble tegnet; 
   });
 });
 
-test("Studio v2: overlappende bokser avvises med forklaring; margen er 3 % av kortsiden, 10 % for Tenn", () => {
+test("Studio v2: overlappende bokser avvises med forklaring; margen er 7 % av kortsiden, 10 % for Tenn", () => {
+  // Backend krever 7 % rundt hver boks (Dag 58), Tenn fortsatt 10 %.
+  assert.equal(local.EDIT_MARGIN, 0.07);
+  assert.equal(local.EDIT_MARGIN_LIGHT, 0.1);
+  assert.equal(local.editMargin("remove"), 0.07);
+  assert.equal(local.editMargin(null), 0.07);
+  assert.equal(local.editMargin("light"), 0.1);
   // Rett inni og over kanten: avvist.
   assert.equal(local.addLocalBox(ONE_BOX, { x: 0.2, y: 0.3 }, { x: 0.6, y: 0.6 }, ASPECT).rejected, "overlap");
-  // 1 % av bredden fra kanten: innenfor 3 % av kortsiden (= 2 % av bredden ved 3:2). Avvist.
+  // 1 % av bredden fra kanten: avvist.
   assert.equal(local.addLocalBox(ONE_BOX, { x: 0.41, y: 0.2 }, { x: 0.6, y: 0.5 }, ASPECT).rejected, "overlap");
-  // 5 % av bredden fra kanten (begge marger er 2 %, til sammen 4 %): godtatt.
-  assert.equal(local.addLocalBox(ONE_BOX, { x: 0.45, y: 0.2 }, { x: 0.6, y: 0.5 }, ASPECT).rejected, null);
+  // Ved 3:2 er 7 % av kortsiden 4,67 % av bredden per boks, til sammen 9,33 %.
+  // 5 % og 9 % mellom (godtatt med 3 % foer): avvist naa.
+  assert.equal(local.addLocalBox(ONE_BOX, { x: 0.45, y: 0.2 }, { x: 0.6, y: 0.5 }, ASPECT).rejected, "overlap");
+  assert.equal(local.addLocalBox(ONE_BOX, { x: 0.49, y: 0.2 }, { x: 0.6, y: 0.5 }, ASPECT).rejected, "overlap");
+  // 10 % av bredden mellom: godtatt.
+  assert.equal(local.addLocalBox(ONE_BOX, { x: 0.5, y: 0.2 }, { x: 0.6, y: 0.5 }, ASPECT).rejected, null);
   // 5 % av bredden mellom boksene: liggende 3:2 gir 2 % margin i x per boks (4 % < 5 %), mens
   // kvadratisk og staaende (kortsiden er bredden) gir 3 % per boks (6 % > 5 %).
   const left = { from: { x: 0.1, y: 0.1 }, to: { x: 0.3, y: 0.3 } };
@@ -178,8 +188,10 @@ test("Studio v2: overlappende bokser avvises med forklaring; margen er 3 % av ko
   assert.equal(local.boxesOverlap(top, below, 0.03, 0.03, 2 / 3), false);
   // Kanter som bare beroerer hverandre (uten margin): ikke overlapp.
   assert.equal(local.boxesOverlap(left, { from: { x: 0.3, y: 0.1 }, to: { x: 0.4, y: 0.3 } }, 0, 0, 1), false);
-  // Tenn har 10 %: to bokser som er greie med Fjern, ligger for tett naar den ene er Tenn.
-  const near = local.addLocalBox(ONE_BOX, { x: 0.45, y: 0.2 }, { x: 0.6, y: 0.5 }, ASPECT).studio;
+  // Tenn har 10 %: to bokser som er greie med Fjern (9,33 % < 10 %), ligger for tett naar den
+  // ene er Tenn (6,67 % + 4,67 % = 11,33 % > 10 %).
+  const near = local.addLocalBox(ONE_BOX, { x: 0.5, y: 0.2 }, { x: 0.6, y: 0.5 }, ASPECT).studio;
+  assert.equal(near.marks.length, 2);
   const b2 = near.marks[1].id;
   const drafts = (i1: "remove" | "light") => ({
     [id1]: { instruction: i1, text: "" },
