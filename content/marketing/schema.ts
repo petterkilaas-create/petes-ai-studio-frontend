@@ -18,6 +18,11 @@ export type ImageKey =
   | "pairCleanupResult"
   | "pairStylingOriginal"
   | "pairStylingResult"
+  | "pairSeasonOriginal"
+  | "pairSeasonResult"
+  | "pairSkyOriginal"
+  | "pairSkyResult"
+  | "stylingExample"
   | "filmPoster"
   | "loopPoster";
 
@@ -80,6 +85,13 @@ export type Site = {
      * en linje i bildet, saa testen har en lengdegrense.
      */
     ogTitle: string;
+    /**
+     * Den samme overskriften delt i linjer, slik den tegnes i delingsbildet
+     * (Dag 58, Petter 28.10, valg A: tre linjer i 64 px). ogText bryter ikke
+     * linja, saa hver linje maa faa plass for seg. Satt sammen med mellomrom
+     * er de ogTitle.
+     */
+    ogTitleLines: readonly string[];
     /** Alt-teksten til delingsbildet (MS4). Mal med {brand} og {title} = ogTitle. */
     ogImageAlt: string;
   };
@@ -143,11 +155,13 @@ export type Site = {
  * En rute i mosaikken i toppen (F3, designet Main.dc.html linje 70-90).
  * `label` er etiketten oeverst til venstre. Plassen i rutenettet foelger
  * rekkefoelgen (HeroMosaic.tsx); den foerste ruta er det store bildet.
+ *
+ * Dag 58 (F2): bildene er ekte og har AI-merket nede til venstre i selve
+ * bildet. `example` er en original uten resultat (Digital styling); teksten
+ * («Eksempel») staar nede til venstre, som paa Tjenester. Filmen er tatt ut
+ * (Petter 28.10).
  */
-export type MosaicTile =
-  | { label: string; image: ImageRef }
-  | { label: string; quote: string }
-  | { label: string; video: VideoRef };
+export type MosaicTile = { label: string; image: ImageRef; example?: string };
 
 export type Hero = {
   _type: "hero";
@@ -163,8 +177,6 @@ export type Hero = {
   freeNote: string;
   /** Mosaikken til hoeyre (F3). `label` er aria-label paa gruppen. */
   mosaic: { label: string; tiles: readonly MosaicTile[] };
-  /** Merkelappen paa resultatbildene i mosaikken (ikke paa bildet med AI-merket i bildet). */
-  aiLabel: string;
 };
 
 /** Tillitsstripen under toppen (MS3, utkastet linje 76-81). */
@@ -212,16 +224,22 @@ export type ServiceMedia =
       before: ImageRef;
       labels: { after: string; before: string };
     }
-  | { kind: "video"; video: VideoRef; label: string }
-  | { kind: "ad"; image: ImageRef; label: string; title: string; excerpt: string }
-  | {
-      kind: "plan";
-      /** aria-label paa tegningen (PlanIllustration.tsx). */
-      label: string;
-      /** Rommene staar i rekkefoelgen tegningen plasserer dem. */
-      sketch: { caption: string; rooms: readonly string[] };
-      plan: { caption: string; rooms: readonly string[] };
-    };
+  /** Dag 58 (F2): bare originalen, med `label` («Eksempel»), til et godkjent resultat finnes (som paa Tjenester). */
+  | { kind: "example"; image: ImageRef; label: string };
+
+/**
+ * Plantegningen (PlanIllustration.tsx). Dag 58 (F2): ikke lenger i et
+ * tjenestekort («Kommer snart» har ikke bilde); komponenten staar til en
+ * egen opprydnings-PR.
+ */
+export type PlanMedia = {
+  kind: "plan";
+  /** aria-label paa tegningen (PlanIllustration.tsx). */
+  label: string;
+  /** Rommene staar i rekkefoelgen tegningen plasserer dem. */
+  sketch: { caption: string; rooms: readonly string[] };
+  plan: { caption: string; rooms: readonly string[] };
+};
 
 type ServiceItem = {
   /** Tjenestens kode i appen (ordlista `service.<id>`), eller en egen id paa markedssiden. */
@@ -230,14 +248,14 @@ type ServiceItem = {
   studio: string;
   title: string;
   text: string;
-  media: ServiceMedia;
 };
 
 /**
  * Tjenestene som kort i studioer (F4, designet Main.dc.html linje 104-256).
- * Alle vises som om de er klare (Petter dag 48): en `available` har
- * bestillingslenken (`orderLabel` til site.cta), en `soon` har
- * `earlyAccess` (kontaktsiden).
+ * Dag 58 (F2, Petter 28.10): `items` er bare det som kan bestilles, med
+ * bestillingslenken (`orderLabel` til site.cta). Store kort har bilde, smaa
+ * ikke (som paa Tjenester). `coming` er «Kommer snart» under, uten bilde og
+ * uten lenke.
  */
 export type Services = {
   _type: "services";
@@ -246,14 +264,8 @@ export type Services = {
   lead: string;
   /** Lappen oeverst til venstre paa resultatbildene i de delte bildene. */
   aiLabel: string;
-  /** «Få tidlig tilgang» paa tjenestene som ikke er klare (Petter 20.10, 2b). */
-  earlyAccess: Link;
-  /** Linja under kortene. */
-  also: { label: string; text: string };
-  items: readonly (
-    | (ServiceItem & { status: "available"; orderLabel: string })
-    | (ServiceItem & { status: "soon" })
-  )[];
+  items: readonly (ServiceItem & { orderLabel: string } & ({ size: "large"; media: ServiceMedia } | { size: "small" }))[];
+  coming: { title: string; items: readonly ServiceItem[] };
 };
 
 /**

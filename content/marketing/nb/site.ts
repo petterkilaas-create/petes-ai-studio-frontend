@@ -20,8 +20,10 @@ export const site = {
   seo: {
     title: "{brand} – AI-studio for eiendomsmeglere",
     description:
-      "Kveldsbilder, digital styling, boligfilm og annonsetekst for eiendomsmeglere. Synlig AI-merke på hvert bilde, og du godkjenner alt før levering.",
-    ogTitle: "Bilder, film og tekst. Ett sted.",
+      "Kveldsbilder, årstider, digital styling og blå himmel for eiendomsmeglere. Synlig AI-merke på hvert bilde, og du godkjenner alt før levering.",
+    // Dag 58 (Petter 28.10): samme overskrift som toppen, tre linjer i bildet (valg A).
+    ogTitle: "Kveldsbilder, årstider og digital styling til boligannonsen. Ett sted.",
+    ogTitleLines: ["Kveldsbilder, årstider og", "digital styling til", "boligannonsen. Ett sted."],
     ogImageAlt: "{brand}: {title}",
   },
   topBar: {
@@ -58,14 +60,13 @@ export const site = {
       {
         title: "Tjenester",
         links: [
-          // F6b: de seks tjenestene som paa forsiden (designet linje 415-422).
+          // F6b: tjenestene som paa forsiden (designet linje 415-422). Dag 58
+          // (F2): bare de som kan bestilles, i samme rekkefoelge som kortene.
           // Skjul ansikter og skilt er ikke paa forsiden (Petter 20.10, 2e).
           { label: "Kveldsbilde", href: "#tjenester" },
+          { label: "Årstider", href: "#tjenester" },
           { label: "Digital styling", href: "#tjenester" },
-          { label: "Rydd opp", href: "#tjenester" },
-          { label: "Boligfilm", href: "#tjenester" },
-          { label: "Annonsetekst", href: "#tjenester" },
-          { label: "Plantegning", href: "#tjenester" },
+          { label: "Blå himmel", href: "#tjenester" },
           { label: "Priser", href: "#priser" },
           { label: "Guide: AI-bilder i boligannonsen" },
         ],

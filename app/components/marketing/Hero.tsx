@@ -50,7 +50,7 @@ export function Hero({ hero, site }: { hero: HeroContent; site: Site }) {
             </p>
           </div>
         </div>
-        <HeroMosaic mosaic={hero.mosaic} aiLabel={hero.aiLabel} site={site} />
+        <HeroMosaic mosaic={hero.mosaic} />
       </div>
     </section>
   );

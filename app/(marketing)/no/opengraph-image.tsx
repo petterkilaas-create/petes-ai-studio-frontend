@@ -9,7 +9,8 @@ import { getHome, getSite } from "@/content/marketing";
 // eksempelbildene er klare (originalen er laget med AI). Fonten er Geist,
 // som next/og har med seg (Petter 02.10, valg A1). Bygges statisk. Teksten
 // gaar gjennom ogText, ellers blir mellomrommene for brede (seo.ts), og
-// overskriften staar paa en linje (64 px, ogText bryter ikke linja). Bare
+// overskriften staar paa linjene fra site.seo.ogTitleLines, én <div> per linje
+// (64 px, ogText bryter ikke linja; Dag 58: tre linjer). Bare
 // latinske tegn: et tegn Geist mangler, faar next/og til aa hente en font
 // fra Google uten tidsgrense (testen sjekker det).
 const site = getSite("no");
@@ -20,7 +21,7 @@ export const alt = fill(site.seo.ogImageAlt, { brand: brand.displayName, title: 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-function Card({ brand, eyebrow, title }: { brand: Brand; eyebrow: string; title: string }) {
+function Card({ brand, eyebrow, lines }: { brand: Brand; eyebrow: string; lines: readonly string[] }) {
   const ink = brand.colors.primary;
   const icon = brand.logo.icon;
   return (
@@ -60,12 +61,18 @@ function Card({ brand, eyebrow, title }: { brand: Brand; eyebrow: string; title:
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
         <div style={{ display: "flex", fontSize: 32, opacity: 0.7 }}>{ogText(eyebrow)}</div>
-        <div style={{ display: "flex", fontSize: 64, lineHeight: 1.05, letterSpacing: -2 }}>{ogText(title)}</div>
+        <div style={{ display: "flex", flexDirection: "column", fontSize: 64, lineHeight: 1.05, letterSpacing: -2 }}>
+          {lines.map((line) => (
+            <div key={line} style={{ display: "flex" }}>
+              {ogText(line)}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
 export default function OpengraphImage() {
-  return new ImageResponse(<Card brand={brand} eyebrow={hero.eyebrow} title={site.seo.ogTitle} />, size);
+  return new ImageResponse(<Card brand={brand} eyebrow={hero.eyebrow} lines={site.seo.ogTitleLines} />, size);
 }

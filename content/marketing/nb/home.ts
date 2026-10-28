@@ -6,9 +6,9 @@ import type { Home } from "../schema.ts";
 // Midlertidige bilder er merket pending "image" (Petter 02.10, valg E).
 // F3 (den nye forsiden, designet Main.dc.html linje 49-92): ny overlinje,
 // overskrift og ingress, «Se filmen» og mosaikken i stedet for slideren
-// (Petter og Cowork 20.10). Kveldsbildet i mosaikken er ekte; rydd opp,
-// styling og loekka er midlertidige (pending "image"). freeNote er laast
-// (TG-NEW-220).
+// (Petter og Cowork 20.10). freeNote er laast (TG-NEW-220). Dag 58 (F2,
+// Petter 28.10): toppen, mosaikken, eksemplene, tjenestene, prisene og bunnen
+// viser bare det som kan bestilles; resten staar under «Kommer snart».
 // F5 (designet linje 279-305): slideren fra toppen staar i eksemplene, med
 // tre faner. Feltene til slideren er flyttet fra toppen til examples.slider
 // (verdien er som i D2).
@@ -25,35 +25,38 @@ export const home = {
     _type: "hero",
     anchor: "topp",
     eyebrow: "AI-studio for eiendomsmeglere",
-    title: "Bilder, film og tekst til boligannonsen.",
+    // Dag 58 (Petter 28.10): bare det som kan bestilles.
+    title: "Kveldsbilder, årstider og digital styling til boligannonsen.",
     titleEmphasis: "Ett sted.",
-    lead: "Gjør dagsbilder til kveldsbilder, rydd og møbler rommene, lag film og skriv annonseteksten. Du godkjenner alt, og hvert bilde får synlig AI-merke og ferdig tekst til annonsen.",
+    // Dag 58 (F2): bare det som kan bestilles (kortene i tjenestene).
+    lead: "Gjør dagsbilder til kveldsbilder, vis boligen i en annen årstid, møbler tomme rom digitalt og bytt grå himmel med blå. Du godkjenner alt, og hvert bilde får synlig AI-merke og ferdig tekst til annonsen.",
     secondary: { label: "Se filmen", href: "#film" },
     freeNote: "{n} gratis bilder når du registrerer deg. Uten kort.",
+    // Dag 58 (F2): de bestillbare tjenestene, uten filmen (Petter 28.10).
+    // Bildene er ekte og har AI-merket i bildet; Digital styling er
+    // originalen med «Eksempel», som paa Tjenester.
     mosaic: {
-      label: "Eksempler på bilder, film og annonsetekst",
+      label: "Eksempler på bilder",
       tiles: [
         {
           label: "Kveldsbilde",
           image: { image: "pairEveningResult", alt: "Stue som kveldsbilde laget med AI, med AI-merket nede til venstre" },
         },
         {
-          label: "Rydd opp",
-          image: { image: "pairCleanupResult", alt: "Spiseplass etter at rotet er fjernet, laget med AI", pending: "image" },
+          label: "Årstider",
+          image: { image: "pairSeasonResult", alt: "Hus om vinteren med snø, laget med AI, med AI-merket nede til venstre" },
         },
-        { label: "Annonsetekst", quote: "«Lys hjørnestue med utgang til vestvendt balkong …»" },
+        {
+          label: "Blå himmel",
+          image: { image: "pairSkyResult", alt: "Balkong med utsikt og blå himmel, laget med AI, med AI-merket nede til venstre" },
+        },
         {
           label: "Digital styling",
-          image: {
-            image: "pairStylingResult",
-            alt: "Tom stue møblert digitalt i skandinavisk stil, laget med AI",
-            pending: "image",
-          },
+          image: { image: "stylingExample", alt: "Tom stue med hvite panelvegger, originalbildet uten møbler" },
+          example: "Eksempel",
         },
-        { label: "Film", video: { video: "loop", label: "Utdrag fra produktfilmen", pending: "image" } },
       ],
     },
-    aiLabel: "AI",
   },
 
   // Linje 76-81.
@@ -69,9 +72,9 @@ export const home = {
     ],
   },
 
-  // Linje 85-121 og 472-480. F5: tre faner med slideren. Kveldsbildet er
-  // ekte og har AI-merket i bildet; rydd opp og styling er midlertidige
-  // (pending "image" paa bildene og teksten under).
+  // Linje 85-121 og 472-480. F5: tre faner med slideren. Dag 58 (F2): de
+  // bestillbare tjenestene med ekte par (AI-merket i bildet): kveldsbilde,
+  // aarstider og blaa himmel. Digital styling har ikke noe godkjent resultat.
   examples: {
     _type: "examples",
     anchor: "eksempler",
@@ -97,56 +100,53 @@ export const home = {
         caption: { text: "Ekte resultat laget med {brand}. AI-merket står nede til venstre i bildet." },
       },
       {
-        id: "rydd",
-        label: "Rydd opp",
-        result: "Ryddet",
-        before: { image: "pairCleanupOriginal", alt: "Spiseplass med ting på bordet", pending: "image" },
+        id: "aarstid",
+        label: "Årstider",
+        result: "Vinter",
+        before: { image: "pairSeasonOriginal", alt: "Huset tatt om sommeren" },
         after: {
-          image: "pairCleanupResult",
-          alt: "Samme spiseplass etter at rotet er fjernet, laget med AI",
-          pending: "image",
+          image: "pairSeasonResult",
+          alt: "Samme hus om vinteren, laget med AI, med AI-merket nede til venstre",
         },
-        caption: { text: "Ekte resultat laget med {brand}.", pending: "image" },
+        caption: { text: "Ekte resultat laget med {brand}. AI-merket står nede til venstre i bildet." },
       },
       {
-        id: "styling",
-        label: "Digital styling",
-        result: "Møblert",
-        before: { image: "pairStylingOriginal", alt: "Tom stue uten møbler", pending: "image" },
+        id: "himmel",
+        label: "Blå himmel",
+        result: "Blå himmel",
+        before: { image: "pairSkyOriginal", alt: "Balkong med utsikt under grå himmel" },
         after: {
-          image: "pairStylingResult",
-          alt: "Samme stue møblert digitalt i skandinavisk stil, laget med AI",
-          pending: "image",
+          image: "pairSkyResult",
+          alt: "Samme balkong med blå himmel, laget med AI, med AI-merket nede til venstre",
         },
-        caption: { text: "Ekte resultat laget med {brand}.", pending: "image" },
+        caption: { text: "Ekte resultat laget med {brand}. AI-merket står nede til venstre i bildet." },
       },
     ],
   },
 
-  // F4: tjenestene som seks kort i studioer (designet Main.dc.html linje
-  // 104-256). Alle vises som om de er klare (Petter dag 48); de som ikke er
-  // det, har «Få tidlig tilgang» til kontaktsiden (20.10, 2b). Skjul ansikter
-  // og skilt er tatt ut av forsiden og blir i appen (20.10, 2e). rydd_opp er
-  // en egen id, fordi appen kaller magic_cleanup «Fjern gjenstander» (auditen
-  // §6). I de delte bildene staar resultatet til venstre, saa det ekte
-  // AI-merket nede til venstre i kveldsbildet synes (auditen §3). Styling,
-  // rydd opp og loekka er midlertidige (pending "image").
+  // F4: tjenestene som kort i studioer (designet Main.dc.html linje 104-256).
+  // Dag 58 (F2, Petter 28.10): bare det som kan bestilles, som paa Tjenester:
+  // Kveldsbilde, Årstider og Digital styling store, Blå himmel lite. Resten
+  // staar under «Kommer snart», uten bilde og uten lenke. Skjul ansikter og
+  // skilt er fortsatt ikke paa forsiden (20.10, 2e). rydd_opp er en egen id,
+  // fordi appen kaller magic_cleanup «Fjern gjenstander» (auditen §6). I de
+  // delte bildene staar resultatet til venstre, saa det ekte AI-merket nede
+  // til venstre synes (auditen §3). Tekstene er de samme som foer; Årstider
+  // fra appen (express.tool.aarstider.desc) og Blå himmel fra linja under kortene.
   services: {
     _type: "services",
     anchor: "tjenester",
     title: "Alt annonsen trenger, i ett studio.",
     lead: "Last opp bildene én gang, og velg hva som skal gjøres med hvert av dem. Alt kommer tilbake på samme sted, klart til annonsen.",
     aiLabel: "AI",
-    earlyAccess: { label: "Få tidlig tilgang", href: "/no/kontakt" },
-    also: { label: "Også i Bildestudio:", text: "Blå himmel, der grå himmel byttes med klar, blå himmel." },
     items: [
       {
         id: "scene_transform",
         studio: "Bildestudio",
         title: "Kveldsbilde",
         text: "Dagsbildet blir kveldsbilde, med himmel i blåtimen og lys i vinduer og lamper som finnes i bildet.",
-        status: "available",
         orderLabel: "Bestill kveldsbilde",
+        size: "large",
         media: {
           kind: "split",
           after: { image: "pairEveningResult", alt: "Stue som kveldsbilde laget med AI, med AI-merket nede til venstre" },
@@ -155,68 +155,70 @@ export const home = {
         },
       },
       {
+        id: "aarstider",
+        studio: "Bildestudio",
+        title: "Årstider",
+        text: "Samme bilde i en annen årstid: høst, vår, sommer eller vinter.",
+        orderLabel: "Bestill årstider",
+        size: "large",
+        media: {
+          kind: "split",
+          after: { image: "pairSeasonResult", alt: "Hus om vinteren laget med AI, med AI-merket nede til venstre" },
+          before: { image: "pairSeasonOriginal", alt: "Samme hus tatt om sommeren" },
+          labels: { after: "Vinter", before: "Sommer" },
+        },
+      },
+      {
         id: "virtual_stage",
         studio: "Bildestudio",
         title: "Digital styling",
         text: "Tomme rom møbleres digitalt i en av fjorten stiler, fra moderne nordisk til tradisjonell hytte. Vegger, vinduer og dører beholdes, og du godkjenner hvert bilde.",
-        status: "soon",
+        orderLabel: "Bestill digital styling",
+        size: "large",
         media: {
-          kind: "split",
-          after: { image: "pairStylingResult", alt: "Stue møblert digitalt i skandinavisk stil, laget med AI", pending: "image" },
-          before: { image: "pairStylingOriginal", alt: "Samme stue, tom", pending: "image" },
-          labels: { after: "Møblert", before: "Tomt" },
+          kind: "example",
+          image: { image: "stylingExample", alt: "Tom stue med hvite panelvegger, originalbildet uten møbler" },
+          label: "Eksempel",
         },
       },
       {
-        id: "rydd_opp",
+        id: "klart_vaer",
         studio: "Bildestudio",
-        title: "Rydd opp",
-        text: "Løse gjenstander på benker, bord og gulv fjernes. Faste ting og pynt blir stående, som kraner, lamper og planter.",
-        status: "soon",
-        media: {
-          kind: "split",
-          after: { image: "pairCleanupResult", alt: "Spiseplass etter at rotet er fjernet, laget med AI", pending: "image" },
-          before: { image: "pairCleanupOriginal", alt: "Samme spiseplass med ting på bordet", pending: "image" },
-          labels: { after: "Ryddet", before: "Før" },
-        },
-      },
-      {
-        id: "video",
-        studio: "Filmstudio",
-        title: "Boligfilm",
-        text: "Korte filmer av boligen, laget fra bildene du allerede har. Klare for annonsen og sosiale medier.",
-        status: "soon",
-        // Vi har ingen ekte boligfilm ennaa: lappen hindrer lansering til den finnes.
-        media: { kind: "video", video: { video: "loop", label: "Utdrag fra produktfilmen", pending: "image" }, label: "Film" },
-      },
-      {
-        id: "copywriter",
-        studio: "Tekststudio",
-        title: "Annonsetekst",
-        text: "Utkast til boligannonsen på norsk, skrevet fra bildene og fakta du legger inn. Du redigerer og godkjenner.",
-        status: "soon",
-        media: {
-          kind: "ad",
-          image: { image: "pairEveningResult", alt: "Stue som kveldsbilde laget med AI" },
-          label: "Utkast, eksempel",
-          title: "Lys hjørnestue med utgang til vestvendt balkong",
-          excerpt: "Store vinduer mot to sider, plass til både sofagruppe og spisebord, og kveldssol på balkongen …",
-        },
-      },
-      {
-        id: "plantegning",
-        studio: "Tegnestudio",
-        title: "Plantegning",
-        text: "Ryddig plantegning fra en enkel skisse eller et bilde av den gamle tegningen.",
-        status: "soon",
-        media: {
-          kind: "plan",
-          label: "En håndtegnet skisse blir til en ryddig plantegning med stue, kjøkken, soverom, bad og gang",
-          sketch: { caption: "Skisse", rooms: ["stue", "sov", "kjøkken", "bad"] },
-          plan: { caption: "Plantegning", rooms: ["Stue", "Sov", "Kjøkken", "Bad", "Gang"] },
-        },
+        title: "Blå himmel",
+        text: "Grå himmel byttes med klar, blå himmel.",
+        orderLabel: "Bestill blå himmel",
+        size: "small",
       },
     ],
+    coming: {
+      title: "Kommer snart",
+      items: [
+        {
+          id: "rydd_opp",
+          studio: "Bildestudio",
+          title: "Rydd opp",
+          text: "Løse gjenstander på benker, bord og gulv fjernes. Faste ting og pynt blir stående, som kraner, lamper og planter.",
+        },
+        {
+          id: "video",
+          studio: "Filmstudio",
+          title: "Boligfilm",
+          text: "Korte filmer av boligen, laget fra bildene du allerede har. Klare for annonsen og sosiale medier.",
+        },
+        {
+          id: "copywriter",
+          studio: "Tekststudio",
+          title: "Annonsetekst",
+          text: "Utkast til boligannonsen på norsk, skrevet fra bildene og fakta du legger inn. Du redigerer og godkjenner.",
+        },
+        {
+          id: "plantegning",
+          studio: "Tegnestudio",
+          title: "Plantegning",
+          text: "Ryddig plantegning fra en enkel skisse eller et bilde av den gamle tegningen.",
+        },
+      ],
+    },
   },
 
   // F2: filmseksjonen (designet Main.dc.html linje 258-277). Petter 20.10:
@@ -311,17 +313,14 @@ export const home = {
       features: ["Alt i Kveldsbilde", "Én ny runde per bilde"],
       ctaLabel: "Prøv gratis først",
     },
-    // F6a (Petter 20.10, 2c): tjenestene uten pris, i rekkefoelgen fra
-    // designet. Blå himmel er med fordi den finnes i appen; prisen er ikke
-    // avklart (TG-227).
+    // F6a (Petter 20.10, 2c): tjenestene uten pris; prisen er ikke avklart
+    // (TG-227). Dag 58 (F2): bare de som kan bestilles, i rekkefoelgen fra
+    // tjenestekortene. Ingen ny pris, bare lappen [PRIS].
     otherFormat: "{name}:",
     others: [
+      { name: "Årstider", price: { pending: "price" } },
       { name: "Digital styling", price: { pending: "price" } },
-      { name: "Rydd opp", price: { pending: "price" } },
       { name: "Blå himmel", price: { pending: "price" } },
-      { name: "Boligfilm", price: { pending: "price" } },
-      { name: "Annonsetekst", price: { pending: "price" } },
-      { name: "Plantegning", price: { pending: "price" } },
     ],
   },
 

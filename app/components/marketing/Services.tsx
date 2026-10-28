@@ -1,34 +1,31 @@
 import Image from "next/image";
-import { ArrowRight, PenLine, Play } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { IMAGES } from "../../../content/marketing/images";
 import type { ServiceMedia, Services as ServicesContent, Site } from "../../../content/marketing/schema";
-import { VIDEOS } from "../../../content/marketing/videos";
-import { MarketingVideo } from "./MarketingVideo";
-import { PendingMark } from "./PendingMark";
-import { PlanIllustration } from "./PlanIllustration";
 import { CONTAINER, FOCUS, H2, LEAD, SECTION_Y } from "./classes";
 
 /**
- * Tjenestene som seks kort i studioer (F4, designet Main.dc.html linje
- * 104-256). Serverkomponent; bare videoloekka kjoerer i nettleseren. All
- * tekst kommer fra innholdet (home.services).
+ * Tjenestene som kort i studioer (F4, designet Main.dc.html linje 104-256).
+ * Serverkomponent. All tekst kommer fra innholdet (home.services).
  *
- * Alle tjenestene vises som om de er klare (Petter dag 48). En `available`
- * har bestillingslenken til site.cta, de andre «Få tidlig tilgang» til
- * kontaktsiden. Lenken peker paa kortets h3 (aria-describedby), saa de like
- * lenketekstene kan skilles i en skjermleser.
+ * Dag 58 (F2, Petter 28.10), som paa Tjenester: bare det som kan bestilles
+ * har kort med bestillingslenken til site.cta. De store kortene har bilde og
+ * staar tre i én rad fra 1024 px; de smaa har ikke bilde. «Kommer snart»
+ * staar under, uten bilde og uten lenke. Lenken peker paa kortets h3
+ * (aria-describedby), saa de like lenketekstene kan skilles i en skjermleser.
  *
  * Mediet er 230 px hoeyt, saa plassen er satt foer bildene kommer (CLS). I
  * de delte bildene ligger resultatet under og vises helt, og originalen
  * ligger over og klippes til hoeyre halvdel. Resultatet staar altsaa til
  * venstre, speilvendt fra designet, fordi det ekte AI-merket staar nede til
- * venstre i kveldsbildet og maa synes (auditen §3). Begge bildene har samme
+ * venstre i bildet og maa synes (auditen §3). Begge bildene har samme
  * utsnitt nede til venstre (object-left-bottom), saa halvdelene ligger likt.
  * AI-lappen oeverst til venstre er et tillegg og erstatter ikke merket i
- * bildet. Bildet i annonseteksten har ingen lapp, som i mosaikken.
+ * bildet. Et eksempel (Digital styling) er bare originalen, med «Eksempel»
+ * og uten AI-lapp.
  */
 
-const SIZES = "(min-width: 1320px) 400px, (min-width: 1024px) 31vw, (min-width: 768px) 47vw, 100vw";
+const SIZES = "(min-width: 1320px) 400px, (min-width: 1024px) 31vw, 100vw";
 
 /** Samme stil som hovedknappen i toppen (Hero.tsx). */
 const BIG_BUTTON = `flex h-[54px] items-center gap-2.5 self-start rounded-[12px] bg-primary px-6 text-[16.5px] font-semibold text-on-primary no-underline hover:opacity-90 ${FOCUS}`;
@@ -42,15 +39,9 @@ const TAG =
 const AI_DOT =
   "inline-flex size-[22px] shrink-0 items-center justify-center rounded-full bg-surface text-[12px] font-bold tracking-[-0.02em] text-ink";
 
-/** Om et medium viser et midlertidig bilde (lappen [BILDE] under kortene). */
-function isPending(media: ServiceMedia): boolean {
-  if (media.kind === "split") return Boolean(media.after.pending || media.before.pending);
-  if (media.kind === "video") return Boolean(media.video.pending);
-  if (media.kind === "ad") return Boolean(media.image.pending);
-  return false;
-}
+const LINK = `self-start rounded-button text-[15px] font-semibold text-ink underline underline-offset-[3px] ${FOCUS}`;
 
-function Media({ media, aiLabel, site }: { media: ServiceMedia; aiLabel: string; site: Site }) {
+function Media({ media, aiLabel }: { media: ServiceMedia; aiLabel: string }) {
   if (media.kind === "split") {
     return (
       <div className={`${MEDIA} bg-surface-2`}>
@@ -81,55 +72,23 @@ function Media({ media, aiLabel, site }: { media: ServiceMedia; aiLabel: string;
       </div>
     );
   }
-  if (media.kind === "video") {
-    return (
-      <div className={`${MEDIA} bg-night`}>
-        <MarketingVideo
-          src={VIDEOS.loop.src}
-          poster={IMAGES.loopPoster.src}
-          label={media.video.label}
-          mode="loop"
-          labels={site.video}
-        />
-        <span className={`${TAG} left-2.5`}>
-          <Play aria-hidden="true" className="size-3.5 fill-current" strokeWidth={0} />
-          {media.label}
-        </span>
-      </div>
-    );
-  }
-  if (media.kind === "ad") {
-    return (
-      <div className={`${MEDIA} box-border flex items-center gap-4 bg-ink p-[18px] text-paper`}>
-        <div className="relative h-[176px] w-[132px] shrink-0 overflow-hidden rounded-[10px]">
-          <Image
-            src={IMAGES[media.image.image]}
-            alt={media.image.alt}
-            fill
-            sizes="132px"
-            className="object-cover object-left-bottom"
-          />
-        </div>
-        <div className="flex min-w-0 flex-col gap-2">
-          <p className="m-0 inline-flex items-center gap-1.5 self-start rounded-pill bg-amber-bg px-2.5 py-1 text-[12px] font-semibold text-amber-fg">
-            <PenLine aria-hidden="true" className="size-3" strokeWidth={2} />
-            {media.label}
-          </p>
-          <p className="m-0 font-display text-[23px] leading-[26px]">{media.title}</p>
-          <p className="m-0 text-[13px] leading-[19px] text-paper/75">{media.excerpt}</p>
-        </div>
-      </div>
-    );
-  }
   return (
-    <div className={`${MEDIA} box-border flex items-center justify-center bg-paper p-3.5`}>
-      <PlanIllustration plan={media} />
+    <div className={`${MEDIA} bg-surface-2`}>
+      <Image
+        src={IMAGES[media.image.image]}
+        alt={media.image.alt}
+        fill
+        sizes={SIZES}
+        className="object-cover object-left-bottom"
+      />
+      <span className={`${TAG} left-2.5`}>{media.label}</span>
     </div>
   );
 }
 
 export function Services({ services, site }: { services: ServicesContent; site: Site }) {
-  const pending = services.items.some((s) => isPending(s.media));
+  const large = services.items.filter((s) => s.size === "large");
+  const small = services.items.filter((s) => s.size === "small");
   return (
     <section id={services.anchor} aria-labelledby={`${services.anchor}-tittel`} className={SECTION_Y}>
       <div className={`${CONTAINER} flex flex-col gap-10`}>
@@ -145,43 +104,63 @@ export function Services({ services, site }: { services: ServicesContent; site: 
             <ArrowRight aria-hidden="true" className="size-[18px]" strokeWidth={2} />
           </a>
         </div>
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {services.items.map((s) => {
-            const titleId = `${services.anchor}-${s.id}`;
-            const link = s.status === "available" ? { label: s.orderLabel, href: site.cta.href } : services.earlyAccess;
-            return (
-              <article
-                key={s.id}
-                className="flex flex-col overflow-hidden rounded-card border border-line bg-surface"
-              >
-                <Media media={s.media} aiLabel={services.aiLabel} site={site} />
-                <div className="flex grow flex-col gap-2 p-5">
-                  <p className="m-0 text-[12px] font-medium uppercase tracking-[0.05em] text-neutral-fg">{s.studio}</p>
-                  <h3 id={titleId} className="m-0 text-[21px] font-semibold leading-[27px] text-ink">
-                    {s.title}
-                  </h3>
-                  <p className="m-0 grow text-[15.5px] leading-[1.55] text-ink-2">{s.text}</p>
-                  <a
-                    href={link.href}
-                    aria-describedby={titleId}
-                    className={`self-start rounded-button text-[15px] font-semibold text-ink underline underline-offset-[3px] ${FOCUS}`}
-                  >
-                    {link.label}
-                  </a>
-                </div>
-              </article>
-            );
-          })}
+        <div className="flex flex-col gap-5">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            {large.map((s) => {
+              const titleId = `${services.anchor}-${s.id}`;
+              return (
+                <article
+                  key={s.id}
+                  className="flex flex-col overflow-hidden rounded-card border border-line bg-surface"
+                >
+                  {s.size === "large" && <Media media={s.media} aiLabel={services.aiLabel} />}
+                  <div className="flex grow flex-col gap-2 p-5">
+                    <p className="m-0 text-[12px] font-medium uppercase tracking-[0.05em] text-neutral-fg">{s.studio}</p>
+                    <h3 id={titleId} className="m-0 text-[21px] font-semibold leading-[27px] text-ink">
+                      {s.title}
+                    </h3>
+                    <p className="m-0 grow text-[15.5px] leading-[1.55] text-ink-2">{s.text}</p>
+                    <a href={site.cta.href} aria-describedby={titleId} className={LINK}>
+                      {s.orderLabel}
+                    </a>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          {small.length > 0 && (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {small.map((s) => {
+                const titleId = `${services.anchor}-${s.id}`;
+                return (
+                  <article key={s.id} className="flex flex-col gap-2 rounded-card border border-line bg-surface p-5">
+                    <p className="m-0 text-[12px] font-medium uppercase tracking-[0.05em] text-neutral-fg">{s.studio}</p>
+                    <h3 id={titleId} className="m-0 text-[19px] font-semibold leading-[25px] text-ink">
+                      {s.title}
+                    </h3>
+                    <p className="m-0 grow text-[15.5px] leading-[1.55] text-ink-2">{s.text}</p>
+                    <a href={site.cta.href} aria-describedby={titleId} className={LINK}>
+                      {s.orderLabel}
+                    </a>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
-        <p className="m-0 flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-[15px] text-ink-2">
-          <span className="font-semibold text-ink">{services.also.label}</span>
-          <span>{services.also.text}</span>
-        </p>
-        {/* F4: styling, rydd opp og loekka er midlertidige (pending "image") til de ekte eksemplene er laget. */}
-        {pending && (
-          <p className="m-0 -ml-2">
-            <PendingMark label={site.pendingLabels.image} />
-          </p>
+        {services.coming.items.length > 0 && (
+          <div className="flex flex-col gap-4">
+            <h3 className="m-0 text-[17px] font-semibold text-ink">{services.coming.title}</h3>
+            <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2 lg:grid-cols-4">
+              {services.coming.items.map((s) => (
+                <li key={s.id} className="flex flex-col gap-1.5 rounded-card border border-dashed border-line-strong bg-paper p-5">
+                  <p className="m-0 text-[12px] font-medium uppercase tracking-[0.05em] text-neutral-fg">{s.studio}</p>
+                  <p className="m-0 text-[16px] font-semibold text-ink-2">{s.title}</p>
+                  <p className="m-0 text-[14.5px] leading-[1.5] text-ink-2">{s.text}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
     </section>

@@ -9,6 +9,11 @@ import pairEveningOriginal from "./images/par-kveld-original.jpg";
 import pairEveningResult from "./images/par-kveld-resultat.jpg";
 import pairStylingOriginal from "./images/par-styling-original.jpg";
 import pairStylingResult from "./images/par-styling-resultat.jpg";
+import pairSeasonOriginal from "./images/par-aarstid-original.jpg";
+import pairSeasonResult from "./images/par-aarstid-resultat.jpg";
+import pairSkyOriginal from "./images/par-himmel-original.jpg";
+import pairSkyResult from "./images/par-himmel-resultat.jpg";
+import stylingExample from "./images/styling-eksempel.jpg";
 
 // Bildene importeres statisk, saa next/image faar bredde og hoeyde
 // (AUDIT_MARKEDSSIDE §7). Den eneste fila med bildeimport:
@@ -25,6 +30,12 @@ import pairStylingResult from "./images/par-styling-resultat.jpg";
 // - Midlertidige, med pending: "image" naar de tas i bruk: pairCleanup*
 //   (probe R0b, Petters hjem, uten AI-merke) og pairStyling* (probe M0,
 //   fotografens bilde, uten AI-merke).
+// - Dag 58 (F2, TG-NEW-271): byte-like kopier av bildene paa Tjenester
+//   (app/(app)/tjenester/bilder/, sha256 sjekket), 1600x1067 (3:2). Ekte, med
+//   AI-merket nede til venstre: pairSeason* (aarstid-for/-etter) og pairSky*
+//   (himmel-for/-etter). stylingExample er originalen til Digital styling
+//   (styling-for.jpg), vist med «Eksempel» til et godkjent resultat finnes.
+//   pairCleanup* og pairStyling* brukes ikke lenger paa forsiden.
 export const IMAGES: Record<ImageKey, StaticImageData> = {
   merkingEvening,
   pairEveningOriginal,
@@ -33,6 +44,11 @@ export const IMAGES: Record<ImageKey, StaticImageData> = {
   pairCleanupResult,
   pairStylingOriginal,
   pairStylingResult,
+  pairSeasonOriginal,
+  pairSeasonResult,
+  pairSkyOriginal,
+  pairSkyResult,
+  stylingExample,
   filmPoster,
   loopPoster,
 };

@@ -1,4 +1,4 @@
-import type { ServiceMedia } from "../../../content/marketing/schema";
+import type { PlanMedia } from "../../../content/marketing/schema";
 
 /**
  * Plantegningen i tjenestekortet (F4, designet Main.dc.html linje 198-240):
@@ -11,7 +11,7 @@ import type { ServiceMedia } from "../../../content/marketing/schema";
  * PLAN_ROOMS); et rom uten plass tegnes ikke.
  */
 
-type Plan = Extract<ServiceMedia, { kind: "plan" }>;
+type Plan = PlanMedia;
 
 const VIEW_BOX = "0 0 400 200";
 
