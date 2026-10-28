@@ -1,12 +1,10 @@
 "use client";
 
-import { useId } from "react";
-import type { LocalInstruction } from "../../lib/api";
+import { useId, useState } from "react";
+import { Info } from "lucide-react";
 import { t, type Locale, type UiKey } from "../../lib/i18n";
 import {
   draftFor,
-  LOCAL_INSTRUCTION_KEYS,
-  LOCAL_INSTRUCTIONS,
   LOCAL_TEXT_MAX,
   localBoxes,
   type EditDraft,
@@ -14,7 +12,7 @@ import {
 } from "../../lib/local";
 import { canRedo, canUndo, redo, removeMark, undo, type StudioState } from "../../lib/studio";
 import { buttonClass } from "../ui/Button";
-import { choiceClass, FOCUS } from "./classes";
+import { FOCUS } from "./classes";
 
 const BTN_PRIMARY = buttonClass("primary", "min-h-12 w-full sm:w-auto");
 const BTN_SECONDARY = buttonClass("secondary", "min-h-11");
@@ -22,9 +20,11 @@ const BTN_SECONDARY = buttonClass("secondary", "min-h-11");
 /**
  * «Marker og beskriv», studio v2 (Dag 58, designet brett 8 og 9). Lerretet
  * med boksene staar i bildeflaten paa siden (StudioCanvas); her er lista med
- * én rad per boks, med samme nummer (1–4) som i bildet: instruksen (Slukk,
- * Tenn, Fjern dette, Legg til med tekst) og «Fjern». Peker man paa en rad
- * (eller fokuserer i den), lyser boksen opp, og omvendt (`activeId`).
+ * én rad per boks, med samme nummer (1–4) som i bildet: tekstfeltet «Hva skal
+ * endres her?» med teller (fritekst, Petter 28.10) og «Fjern». Peker man paa
+ * en rad (eller fokuserer i den), lyser boksen opp, og omvendt (`activeId`).
+ * Infoknappen (i) ved overskriften viser hvordan man markerer
+ * (aria-expanded, ogsaa paa mobil).
  *
  * Angre og Gjoer om er knapper (WCAG 2.5.7). Én knapp «Utfør endringene (N)»
  * med linja «Runder igjen: X av 3 · bare de markerte områdene endres». Paa
@@ -81,40 +81,25 @@ function EditRow({
             {t(locale, "local.removeEdit")}
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          {LOCAL_INSTRUCTIONS.map((code: LocalInstruction) => (
-            <button
-              key={code}
-              type="button"
-              aria-pressed={draft.instruction === code}
-              onClick={() => onDraft({ ...draft, instruction: code })}
-              disabled={locked}
-              className={choiceClass(draft.instruction === code, "rounded-pill")}
-            >
-              {t(locale, LOCAL_INSTRUCTION_KEYS[code])}
-            </button>
-          ))}
+        <div>
+          <label htmlFor={textId} className="block text-xs font-bold text-ink mb-2">
+            {t(locale, "local.textLabel")}
+          </label>
+          <textarea
+            id={textId}
+            value={draft.text}
+            maxLength={LOCAL_TEXT_MAX}
+            rows={2}
+            placeholder={t(locale, "local.textPlaceholder")}
+            disabled={locked}
+            aria-describedby={countId}
+            onChange={(e) => onDraft({ ...draft, text: e.target.value })}
+            className={`w-full rounded-button border border-line-strong bg-surface p-3 text-sm text-ink placeholder:text-ink-2 ${FOCUS}`}
+          />
+          <p id={countId} className="text-xs text-ink-2 mt-1 text-right" aria-live="polite">
+            {t(locale, "local.textCount", { n: draft.text.length, max: LOCAL_TEXT_MAX })}
+          </p>
         </div>
-        {draft.instruction === "add" && (
-          <div>
-            <label htmlFor={textId} className="block text-xs font-bold text-ink mb-2">
-              {t(locale, "local.textLabel")}
-            </label>
-            <textarea
-              id={textId}
-              value={draft.text}
-              maxLength={LOCAL_TEXT_MAX}
-              rows={2}
-              disabled={locked}
-              aria-describedby={countId}
-              onChange={(e) => onDraft({ ...draft, text: e.target.value })}
-              className={`w-full rounded-button border border-line-strong bg-surface p-3 text-sm text-ink ${FOCUS}`}
-            />
-            <p id={countId} className="text-xs text-ink-2 mt-1 text-right" aria-live="polite">
-              {t(locale, "local.textCount", { n: draft.text.length, max: LOCAL_TEXT_MAX })}
-            </p>
-          </div>
-        )}
       </fieldset>
     </li>
   );
@@ -153,10 +138,27 @@ export function LocalEditPanel({
   locale: Locale;
 }) {
   const boxes = localBoxes(studio);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const infoId = useId();
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <p className="text-sm text-ink font-bold">{t(locale, "local.title")}</p>
+        <div className="flex items-center gap-1">
+          <p className="text-sm text-ink font-bold">{t(locale, "local.title")}</p>
+          <button
+            type="button"
+            onClick={() => setInfoOpen((open) => !open)}
+            aria-expanded={infoOpen}
+            aria-controls={infoId}
+            aria-label={t(locale, "local.infoLabel")}
+            className={`flex size-11 items-center justify-center rounded-pill text-ink-2 hover:text-ink ${FOCUS}`}
+          >
+            <Info aria-hidden className="size-5" strokeWidth={1.8} />
+          </button>
+        </div>
+        <p id={infoId} hidden={!infoOpen} className="text-sm text-ink bg-surface-2 rounded-button p-3">
+          {t(locale, "local.infoText")}
+        </p>
         {boxes.length === 0 && <p className="text-sm text-ink mt-1">{t(locale, "local.hint")}</p>}
       </div>
 

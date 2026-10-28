@@ -196,8 +196,9 @@ import { choiceClass, FOCUS } from "@/app/components/godkjenning/classes";
  * «Marker og beskriv» (FE-3, studio v2, Dag 58): naar `correction.local_accepted`
  * er sant, har «Korriger bildet» to valg. Med «Marker og beskriv» blir
  * bildeflaten lerretet (StudioCanvas, inntil 4 nummererte bokser), og kortet
- * faar lista med én rad per boks (LocalEditPanel). Etter runden staar lista
- * med ✓ eller feilmelding og «Prøv igjen» per endring (LocalEditResults), og
+ * faar lista med én rad per boks og tekstfeltet «Hva skal endres her?»
+ * (LocalEditPanel, fritekst). Etter runden staar lista med meglerens tekst,
+ * ✓ eller feilmelding og «Prøv igjen» per endring (LocalEditResults), og
  * glideren viser forrige versjon mot ny med boksene (av/på; «Mot original» er
  * et valg). Feiler hele runden, staar teksten for `correction.last_round_error`
  * i kortet (roundFailedMessage).
@@ -259,7 +260,7 @@ export default function GodkjenningPage({
   // «Endre valg» (TG-NEW-145): valgene i velgeren, forvalgt fra current_choices ved «Korriger bildet».
   const [choiceState, setChoiceState] = useState<ChoiceState>(NO_CHOICES);
   const [limitReached, setLimitReached] = useState(false);
-  // «Marker og beskriv» (studio v2): modusen i «Korriger bildet», boksene, instruks og tekst per boks,
+  // «Marker og beskriv» (studio v2): modusen i «Korriger bildet», boksene, teksten per boks,
   // boksen som lyser opp, bildets sideforhold (overlappsjekken) og hvorfor siste boks ble avvist.
   const [localMode, setLocalMode] = useState(false);
   const [localStudio, setLocalStudio] = useState<StudioState>(STUDIO_START);

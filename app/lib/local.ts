@@ -5,6 +5,7 @@ import type {
   LocalEditNumber,
   LocalEditRequest,
   LocalInstruction,
+  ReviewLocalInstruction,
 } from "./api";
 import { correctionResult, type CorrectionResult } from "./correction.ts";
 import type { CodeGroup, UiKey } from "./i18n";
@@ -21,16 +22,17 @@ import { addBox, serializeMark, type ImagePoint, type Mark, type StudioState } f
  * - Valget vises naar `correction.local_accepted` er sant (ingen eget
  *   frontend-flagg).
  * - Inntil 4 bokser, nummerert 1–4 i rekkefoelgen de ble tegnet. Hver boks
- *   har sin instruks og (ved Legg til) sin tekst.
+ *   har sin tekst: hva som skal endres der (fritekst, Dag 58, FRITEKST_BE:
+ *   `{shape, text}`, 1–500 tegn). Knappene Slukk, Tenn, Fjern dette og
+ *   Legg til er borte (Petter 28.10).
  * - Bokser som overlapper, avvises her foer de sendes. Margen er den backend
- *   bruker foer claim (AVVIK 3): 7 % av kortsiden rundt hver boks, 10 % for
- *   Tenn. Ny boks sjekkes med 7 %; foer innsending sjekkes med instruksen.
- * - Ett resultat (ingen kandidater). Etter runden har hver endring ✓ eller
- *   en feilmelding, og «Prøv igjen» sender `retry` (teller som runde).
+ *   bruker foer claim: 7 % av kortsiden rundt hver boks (`EDGE_MARGIN_PCT`).
+ * - Ett resultat (ingen kandidater). Etter runden har hver endring meglerens
+ *   tekst (`local.edits[].text`, bare til eieren), ✓ eller en feilmelding, og
+ *   «Prøv igjen» sender `retry` (teller som runde).
  */
 
-export const LOCAL_INSTRUCTIONS: readonly LocalInstruction[] = ["fire_out", "light", "remove", "add"];
-
+/** Navnene paa de gamle instruksene, for runder fra foer fritekst (review viser dem fortsatt). */
 export const LOCAL_INSTRUCTION_KEYS: Record<LocalInstruction, UiKey> = {
   fire_out: "local.fireOut",
   light: "local.light",
@@ -38,25 +40,23 @@ export const LOCAL_INSTRUCTION_KEYS: Record<LocalInstruction, UiKey> = {
   add: "local.add",
 };
 
-/** Hoeyst saa mange tegn i Legg til (backend `TEXT_MAX`). */
-export const LOCAL_TEXT_MAX = 200;
+/** Hoeyst saa mange tegn i teksten per boks (backend `TEXT_MAX_FREE`). */
+export const LOCAL_TEXT_MAX = 500;
 /** Hoeyst saa mange endringer per runde (backend `MAX_EDITS`). */
 export const MAX_LOCAL_EDITS = 4;
-/** Margen rundt boksen, i broek av kortsiden (backend: E utvides med 7 %, Tenn 10 %). */
+/** Margen rundt boksen, i broek av kortsiden (backend `EDGE_MARGIN_PCT`: E er boksen + 7 %). */
 export const EDIT_MARGIN = 0.07;
-export const EDIT_MARGIN_LIGHT = 0.1;
 
 export type LocalBox = Extract<Mark, { kind: "box" }>;
 
-/** Instruksen og teksten for én boks (noekkelen er boksens id). */
+/** Teksten for én boks: hva som skal endres der (noekkelen er boksens id). */
 export interface EditDraft {
-  instruction: LocalInstruction | null;
   text: string;
 }
 
 export type EditDrafts = Readonly<Record<number, EditDraft>>;
 
-export const EMPTY_DRAFT: EditDraft = { instruction: null, text: "" };
+export const EMPTY_DRAFT: EditDraft = { text: "" };
 
 /** Kan «Marker og beskriv» velges? Bare naar review-svaret sier det. */
 export function localShown(review: Pick<JobReviewDetail, "correction">): boolean {
@@ -82,10 +82,6 @@ function margins(margin: number, aspect: number): { mx: number; my: number } {
   const a = Number.isFinite(aspect) && aspect > 0 ? aspect : 3 / 2;
   // Kortsiden er hoeyden naar bildet er liggende (a >= 1), ellers bredden.
   return a >= 1 ? { mx: margin / a, my: margin } : { mx: margin, my: margin * a };
-}
-
-export function editMargin(instruction: LocalInstruction | null): number {
-  return instruction === "light" ? EDIT_MARGIN_LIGHT : EDIT_MARGIN;
 }
 
 /**
@@ -142,18 +138,15 @@ export function addLocalBox(
   return { studio: next, rejected: null };
 }
 
-/** Det foerste paret (nummer a < b) som overlapper med margen for instruksen, eller null. */
-export function overlappingPair(
-  studio: StudioState,
-  drafts: EditDrafts,
-  aspect: number
-): [number, number] | null {
+/**
+ * Det foerste paret (nummer a < b) som overlapper med margen, eller null.
+ * Angre og Gjoer om kan sette tilbake en boks ved siden av en ny.
+ */
+export function overlappingPair(studio: StudioState, aspect: number): [number, number] | null {
   const boxes = localBoxes(studio);
   for (let i = 0; i < boxes.length; i++) {
     for (let j = i + 1; j < boxes.length; j++) {
-      const mi = editMargin(draftFor(drafts, boxes[i].id).instruction);
-      const mj = editMargin(draftFor(drafts, boxes[j].id).instruction);
-      if (boxesOverlap(boxes[i], boxes[j], mi, mj, aspect)) return [i + 1, j + 1];
+      if (boxesOverlap(boxes[i], boxes[j], EDIT_MARGIN, EDIT_MARGIN, aspect)) return [i + 1, j + 1];
     }
   }
   return null;
@@ -167,7 +160,6 @@ export function cleanLocalText(text: string): string {
 /** Hva som mangler foer «Utfør endringene» kan trykkes; null naar alt er klart. `n` er boksens nummer. */
 export type LocalMissing =
   | { kind: "box" }
-  | { kind: "instruction"; n: number }
   | { kind: "text"; n: number }
   | { kind: "textTooLong"; n: number }
   | { kind: "overlap"; a: number; b: number }
@@ -175,20 +167,19 @@ export type LocalMissing =
 
 export const LOCAL_MISSING_KEYS: Record<Exclude<LocalMissing, null>["kind"], UiKey> = {
   box: "local.missingBox",
-  instruction: "local.missingInstruction",
   text: "local.missingText",
   textTooLong: "local.missingTextTooLong",
   overlap: "local.missingOverlap",
 };
 
-/** Hva som mangler for én endring (uten boksen), eller null. */
-export function draftMissing(draft: EditDraft): "instruction" | "text" | "textTooLong" | null {
-  if (draft.instruction === null) return "instruction";
-  if (draft.instruction === "add") {
-    const text = cleanLocalText(draft.text);
-    if (text === "") return "text";
-    if (text.length > LOCAL_TEXT_MAX) return "textTooLong";
-  }
+/**
+ * Hva som mangler for én endring (uten boksen), eller null. Som backend
+ * (`check_edit`): teksten renses, og bare punktum og utropstegn er ingen tekst.
+ */
+export function draftMissing(draft: EditDraft): "text" | "textTooLong" | null {
+  const text = cleanLocalText(draft.text);
+  if (text.replace(/[.!]+$/, "") === "") return "text";
+  if (text.length > LOCAL_TEXT_MAX) return "textTooLong";
   return null;
 }
 
@@ -199,7 +190,7 @@ export function localMissing(opts: { studio: StudioState; drafts: EditDrafts; as
     const kind = draftMissing(draftFor(opts.drafts, box.id));
     if (kind !== null) return { kind, n: i + 1 };
   }
-  const pair = overlappingPair(opts.studio, opts.drafts, opts.aspect);
+  const pair = overlappingPair(opts.studio, opts.aspect);
   if (pair !== null) return { kind: "overlap", a: pair[0], b: pair[1] };
   return null;
 }
@@ -218,8 +209,9 @@ export function missingText(missing: Exclude<LocalMissing, null>): { key: UiKey;
 
 /**
  * Body for «Utfør endringene»: `correct` med én endring per boks i
- * rekkefoelgen 1–4, teksten bare ved Legg til. Aldri overrides, choices eller
- * peissvar (backend gir 400 local_exclusive). null naar noe mangler.
+ * rekkefoelgen 1–4, `{shape, text}` med den rensede teksten, uten instruks.
+ * Aldri overrides, choices eller peissvar (backend gir 400 local_exclusive).
+ * null naar noe mangler.
  */
 export function buildLocalCorrection(
   review: Pick<JobReviewDetail, "version">,
@@ -232,10 +224,8 @@ export function buildLocalCorrection(
   for (const box of localBoxes(studio)) {
     const draft = draftFor(drafts, box.id);
     const shape = serializeMark(box);
-    if (shape.shape !== "box" || draft.instruction === null) return null;
-    const edit: LocalEditRequest = { shape: { shape: "box", points: shape.points }, instruction: draft.instruction };
-    if (draft.instruction === "add") edit.text = cleanLocalText(draft.text);
-    edits.push(edit);
+    if (shape.shape !== "box") return null;
+    edits.push({ shape: { shape: "box", points: shape.points }, text: cleanLocalText(draft.text) });
   }
   const body: DecisionRequest = { action: "correct", local: { edits } };
   if (review.version !== null) body.expected_version = review.version;
@@ -263,10 +253,15 @@ export function localInfo(review: Pick<JobReviewDetail, "correction">): {
     : { key: "local.infoNoMax", vars: { n: roundsLeft } };
 }
 
-/** Én rad i lista etter runden: nummer, instruks, ✓ eller koden, og om «Prøv igjen» kan trykkes. */
+/**
+ * Én rad i lista etter runden: nummer, instruks, meglerens tekst (null for
+ * andre enn eieren, etter sletting og for gamle runder uten tekst), ✓ eller
+ * koden, og om «Prøv igjen» kan trykkes.
+ */
 export interface EditResultRow {
   k: LocalEditNumber;
-  instruction: LocalInstruction | null;
+  instruction: ReviewLocalInstruction | null;
+  text: string | null;
   ok: boolean;
   /** Koden naar endringen ikke ble gjort; null naar den er ok. */
   code: string | null;
@@ -275,8 +270,9 @@ export interface EditResultRow {
 
 /**
  * Lista etter en lokal runde, eller null uten lokal runde. «Prøv igjen»
- * krever `correct` i allowed_actions og en runde igjen; Legg til uten tekst
- * (teksten er slettet, `text_len` 0 eller mangler) kan ikke proeves igjen.
+ * krever `correct` i allowed_actions og en runde igjen; fritekst og Legg til
+ * uten tekst (`text_len` 0 eller mangler) kan ikke proeves igjen. Er teksten
+ * toemt av slettejobben, staar lengden, og backend svarer 409 text_cleared.
  */
 export function editResults(
   review: Pick<JobReviewDetail, "local" | "allowedActions" | "status" | "correction">
@@ -286,15 +282,33 @@ export function editResults(
   const canCorrect = review.allowedActions.includes("correct") && review.correction.roundsLeft > 0;
   return local.edits.map((e) => {
     const ok = e.status === "ok";
-    const textGone = e.instruction === "add" && !(typeof e.textLen === "number" && e.textLen > 0);
+    const needsText = e.instruction === "text" || e.instruction === "add";
+    const textGone = needsText && !(typeof e.textLen === "number" && e.textLen > 0);
     return {
       k: e.k,
       instruction: e.instruction,
+      text: e.text,
       ok,
       code: ok ? null : e.status,
       canRetry: canCorrect && e.instruction !== null && !textGone,
     };
   });
+}
+
+/**
+ * Overskriften for en rad etter runden: meglerens tekst, ellers navnet paa
+ * den gamle instruksen (runder fra foer fritekst), ellers «Endring k».
+ */
+export function resultLabel(row: Pick<EditResultRow, "k" | "instruction" | "text">): {
+  text: string | null;
+  key: UiKey;
+  vars: Record<string, number>;
+} {
+  if (row.text !== null) return { text: row.text, key: "local.editTitle", vars: { n: row.k } };
+  if (row.instruction !== null && row.instruction !== "text") {
+    return { text: null, key: LOCAL_INSTRUCTION_KEYS[row.instruction], vars: {} };
+  }
+  return { text: null, key: "local.editTitle", vars: { n: row.k } };
 }
 
 /**
