@@ -606,7 +606,42 @@ async function submitOrder(
   if (res.status === 202) {
     return parseStylingOrder(await res.json().catch(() => null));
   }
+  return orderFailure(res, name);
+}
 
+/**
+ * «Lag i en annen aarstid» (Dag 58, TG-NEW-273, A1): POST
+ * /v1/jobs/{job_id}/aarstid med `{"seasons": [...]}`. Ny bestilling fra
+ * originalen til jobben, én kvote-enhet. Kilden og bildetypen tar backend fra
+ * jobben, saa de sendes ikke (de gir 400 invalid_order). Samme 202-svar og
+ * samme feilform som submitAarstidOrder.
+ */
+export async function submitSeasonFromJob(opts: {
+  jobId: string;
+  seasons: string[];
+  /** Én per bestilling, samme ved nytt forsoek av samme valg (aarstidBytte.ts). */
+  idempotencyKey?: string;
+  getToken: GetToken;
+}): Promise<StylingOrderResult> {
+  const { jobId, seasons, idempotencyKey, getToken } = opts;
+  const headers = new Headers(await authHeader(getToken));
+  headers.set("Content-Type", "application/json");
+  if (idempotencyKey !== undefined) headers.set("Idempotency-Key", idempotencyKey);
+
+  const res = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/aarstid`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ seasons }),
+  });
+
+  if (res.status === 202) {
+    return parseStylingOrder(await res.json().catch(() => null));
+  }
+  return orderFailure(res, "submitSeasonFromJob");
+}
+
+/** Feilen fra en bestilling: kode gir SubmitError, 400 uten kode ValidationError. */
+async function orderFailure(res: Response, name: string): Promise<never> {
   // Samme feilform som submitJob (KONTRAKT_KVOTE).
   const raw = await res.text().catch(() => "");
   const body = parseJsonOrNull(raw);
@@ -1536,6 +1571,7 @@ function toDisclosure(raw: unknown): ReviewDisclosure | null {
     edited:
       Array.isArray(edited) && edited.every((v): v is string => typeof v === "string") ? edited : null,
     source: stringOrNull(raw.source),
+    sourceSeason: stringOrNull(raw.source_season),
     status: stringOrNull(raw.status),
   };
 }
