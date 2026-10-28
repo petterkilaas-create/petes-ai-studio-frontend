@@ -445,7 +445,11 @@ test("getReview 200 normaliserer svaret og ignorerer ukjente handlinger", async 
     editable: false, state: null,
   });
   // Dag 57 (TG-NEW-145): uten feltene er valgene tomme.
-  assert.deepEqual(r.review.correction, { roundsLeft: 0, lastRoundFailed: false, choicesAccepted: [], currentChoices: null });
+  assert.deepEqual(r.review.correction, {
+    roundsLeft: 0, lastRoundFailed: false, choicesAccepted: [], currentChoices: null,
+    // FE-3 (Dag 58): uten LOCAL_EDIT i backend er «Marker og beskriv» av, og ingen feilkode.
+    localAccepted: false, maxRounds: null, lastRoundError: null,
+  });
   assert.equal(r.review.images.previous, null);
   assert.equal(r.review.lights.approved[0].reasonCode, null);
   assert.deepEqual(r.review.imageType.runValues, ["interior", "exterior_facade"]);
@@ -596,7 +600,10 @@ test("normalizeReview leser Rett-feltene (2d-2a)", () => {
   assert.equal(r.lights.approved[1].state, null, "ukjent state");
   assert.equal(r.lights.unstable[0].run, 2);
   assert.equal(r.lights.unstable[0].editable, false);
-  assert.deepEqual(r.correction, { roundsLeft: 0, lastRoundFailed: true, choicesAccepted: [], currentChoices: null });
+  assert.deepEqual(r.correction, {
+    roundsLeft: 0, lastRoundFailed: true, choicesAccepted: [], currentChoices: null,
+    localAccepted: false, maxRounds: 1, lastRoundError: null,
+  });
   assert.deepEqual(r.images.previous, { round: 0, previewUrl: null });
   // Negativt eller oedelagt rundetall blir 0.
   assert.equal(api.normalizeReview({ correction: { rounds_left: -1 } }, "j1").correction.roundsLeft, 0);

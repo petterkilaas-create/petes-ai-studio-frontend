@@ -1031,9 +1031,10 @@ export async function getCapabilities(opts: { getToken: GetToken }): Promise<Cap
 // Godkjenning (2d-1): GET /v1/jobs/{id}/review og POST /v1/jobs/{id}/decision
 // ---------------------------------------------------------------------------
 
-export type DecisionAction = "approve" | "reject" | "continue" | "correct";
+export type DecisionAction = "approve" | "reject" | "continue" | "correct" | "choose";
 
-const DECISION_ACTIONS: ReadonlySet<string> = new Set(["approve", "reject", "continue", "correct"]);
+/** `choose` (FE-3, Dag 58): velg kandidat i en lokal runde («Marker og beskriv»). */
+const DECISION_ACTIONS: ReadonlySet<string> = new Set(["approve", "reject", "continue", "correct", "choose"]);
 
 /** Maks lengde paa begrunnelsen (backend renser og sjekker igjen, 422 over). */
 export const REASON_MAX_LEN = 500;
@@ -1084,6 +1085,33 @@ export interface ReviewCorrection {
   choicesAccepted?: string[];
   /** Valgene gjeldende bilde ble laget med, som utgangspunkt for velgeren; null (eller mangler) uten. */
   currentChoices?: CurrentChoices | null;
+  /**
+   * «Marker og beskriv» (FE-3, Dag 58, BE-7b): `correction.local_accepted`. Bare med
+   * LOCAL_EDIT i backend; mangler feltet, er det false.
+   */
+  localAccepted?: boolean;
+  /** Rundetaket for brukeren (`correction.max_rounds`); null naar feltet mangler. */
+  maxRounds?: number | null;
+  /**
+   * Koden naar siste retterunde feilet (`correction.last_round_error`, Petter 28.10),
+   * f.eks. `mask_empty`. null naar feltet mangler eller er tomt.
+   */
+  lastRoundError?: string | null;
+}
+
+/** En kandidat i den lokale runden: k (1 eller 2) og den merkede forhaandsvisningen (null naar den mangler). */
+export interface LocalCandidate {
+  k: 1 | 2;
+  previewUrl: string | null;
+}
+
+/** `local` i review-svaret (BE-7b): den lokale runden bak gjeldende bilde. */
+export interface ReviewLocal {
+  instruction: string | null;
+  round: number | null;
+  /** Kandidaten som er i bruk (1 eller 2), eller null. */
+  chosen: 1 | 2 | null;
+  candidates: LocalCandidate[];
 }
 
 /**
@@ -1320,6 +1348,11 @@ export interface JobReviewDetail {
    * naar feltet mangler). Teksten er bare med for eieren og foer A1.
    */
   wishes: ReviewWishes | null;
+  /**
+   * «Marker og beskriv» (FE-3, Dag 58): den lokale runden bak gjeldende bilde og
+   * kandidatene. null uten lokal runde, uten LOCAL_EDIT og naar feltet mangler.
+   */
+  local?: ReviewLocal | null;
 }
 
 // ---- Oenskene (TG-NEW-263, backend #254) ---------------------------------------
@@ -1760,6 +1793,9 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
       lastRoundFailed: correction.last_round_failed === true,
       choicesAccepted: stringList(correction.choices_accepted),
       currentChoices: toCurrentChoices(correction.current_choices),
+      localAccepted: correction.local_accepted === true,
+      maxRounds: numberOrNull(correction.max_rounds),
+      lastRoundError: nonEmptyString(correction.last_round_error),
     },
     images: {
       originalUrl: stringOrNull(images.original_url),
@@ -1789,6 +1825,32 @@ export function normalizeReview(raw: unknown, jobId: string): JobReviewDetail {
     order: toReviewOrder(r.order),
     framing: toFraming(r.framing),
     wishes: toReviewWishes(r.wishes),
+    local: toReviewLocal(r.local),
+  };
+}
+
+function candidateNumber(value: unknown): 1 | 2 | null {
+  return value === 1 || value === 2 ? value : null;
+}
+
+/**
+ * `local` (BE-7b, `decisions.local_view`) strengt lest: bare kandidater med k 1
+ * eller 2, hver én gang. Uten kandidater: null (backend sender da null).
+ */
+export function toReviewLocal(raw: unknown): ReviewLocal | null {
+  if (!isRecord(raw)) return null;
+  const candidates: LocalCandidate[] = [];
+  for (const c of records(raw.candidates)) {
+    const k = candidateNumber(c.k);
+    if (k === null || candidates.some((x) => x.k === k)) continue;
+    candidates.push({ k, previewUrl: nonEmptyString(c.preview_url) });
+  }
+  if (candidates.length === 0) return null;
+  return {
+    instruction: stringOrNull(raw.instruction),
+    round: numberOrNull(raw.round),
+    chosen: candidateNumber(raw.chosen),
+    candidates,
   };
 }
 
@@ -1890,6 +1952,20 @@ export interface DecisionRequest {
   additions_acknowledged?: boolean;
   /** Bare ved correct, og bare de endrede valgene (TG-NEW-145). Utelatt: samme valg. */
   choices?: CorrectionChoices;
+  /** «Marker og beskriv» ved correct (FE-3, BE-7b); aldri sammen med overrides, choices eller peissvar. */
+  local?: LocalRequest;
+  /** Kandidaten ved choose (FE-3, BE-7b A1). */
+  candidate?: 1 | 2;
+}
+
+/** Instruksene i «Marker og beskriv»: Slukk, Tenn, Fjern dette og Legg til. */
+export type LocalInstruction = "fire_out" | "light" | "remove" | "add";
+
+/** `local` i body: én boks (B1) med hjoernene i 0–1 i resultatets ramme, og teksten bare ved add. */
+export interface LocalRequest {
+  shape: { shape: "box"; points: [number, number][] };
+  instruction: LocalInstruction;
+  text?: string;
 }
 
 /**
@@ -1928,6 +2004,20 @@ export const CHOICE_ERROR_CODES: ReadonlySet<string> = new Set([
   "choices_not_supported",
 ]);
 
+/** 400-kodene for «Marker og beskriv» og `choose` (BE-7b), foer claim og 0 kr. */
+export const LOCAL_ERROR_CODES: ReadonlySet<string> = new Set([
+  "local_not_accepted",
+  "local_exclusive",
+  "local_not_supported",
+  "shape_not_supported",
+  "shape_invalid",
+  "instruction_invalid",
+  "text_required",
+  "text_too_long",
+  "text_not_accepted",
+  "candidate_invalid",
+]);
+
 export function parseDecisionResponse(httpStatus: number, body: unknown): DecisionOutcome {
   const outer = isRecord(body) ? body : {};
   const inner = isRecord(outer.detail) ? outer.detail : outer;
@@ -1951,7 +2041,7 @@ export function parseDecisionResponse(httpStatus: number, body: unknown): Decisi
       overrideCode: stringOrNull(inner.override_code),
     };
   }
-  if (httpStatus === 400 && code !== null && CHOICE_ERROR_CODES.has(code)) {
+  if (httpStatus === 400 && code !== null && (CHOICE_ERROR_CODES.has(code) || LOCAL_ERROR_CODES.has(code))) {
     // «Endre valg» (KONTRAKT_ENDRE_VALG §2): 400 foer claim, 0 kr. `field` sier hvilket valg.
     const field = stringOrNull(inner.field);
     return { kind: "blocked", code, fields: field === null ? [] : [field], overrideCode: null };

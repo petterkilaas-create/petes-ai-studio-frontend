@@ -42,6 +42,8 @@ import {
   correctionKind,
   correctionResult,
   correctionSubmitKey,
+  correctionView,
+  type CorrectionResult,
   initialToggles,
   needsConfirmation,
   previousFireplaceAnswer,
@@ -57,6 +59,20 @@ import {
   type ChoiceState,
 } from "@/app/lib/correctionChoices";
 import { runDecision } from "@/app/lib/decide";
+import {
+  buildChoose,
+  buildLocalCorrection,
+  candidatesView,
+  chooseResult,
+  keepOneBox,
+  localInfo,
+  localMissing,
+  localResult,
+  localShown,
+  roundFailedMessage,
+} from "@/app/lib/local";
+import { STROKE_WIDTH_DEFAULT, STUDIO_START, type StudioState } from "@/app/lib/studio";
+import type { LocalInstruction } from "@/app/lib/api";
 import { canDownload } from "@/app/lib/download";
 import { formatDate } from "@/app/lib/dates";
 import {
@@ -99,6 +115,9 @@ import { Lightbox } from "@/app/components/godkjenning/Lightbox";
 import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
 import { OrderTabs } from "@/app/components/godkjenning/OrderTabs";
 import { CorrectionPanel } from "@/app/components/godkjenning/CorrectionPanel";
+import { LocalEditPanel } from "@/app/components/godkjenning/LocalEditPanel";
+import { LocalCandidates } from "@/app/components/godkjenning/LocalCandidates";
+import { StudioCanvas } from "@/app/components/studio/StudioCanvas";
 import { DuskChoicePicker } from "@/app/components/DuskChoicePicker";
 import { StylingCorrectionPicker } from "@/app/components/styling/StylingCorrectionPicker";
 import { DUSK_IMAGES } from "@/app/(app)/tjenester/duskImages";
@@ -166,6 +185,13 @@ import { choiceClass, FOCUS } from "@/app/components/godkjenning/classes";
  * Retting uten lys og peis (FE-1, Dag 57): overskriften og hintet kommer fra
  * correctionKind (review-svaret), ikke fra tjenesten.
  *
+ * «Marker og beskriv» (FE-3, Dag 58): naar `correction.local_accepted` er
+ * sant, har «Korriger bildet» to valg. Med «Marker og beskriv» blir
+ * bildeflaten lerretet (StudioCanvas, én boks), og kortet faar de fire
+ * instruksene (LocalEditPanel). Etter runden staar de to forslagene under
+ * bildet (LocalCandidates), og «Bruk denne» sender `choose`. Feiler runden,
+ * staar teksten for `correction.last_round_error` i kortet (roundFailedMessage).
+ *
  * «Lag i en annen årstid» (Dag 58, TG-NEW-273): for eieren av en
  * aarstidsjobb (seasonSwitch) staar knappen under kortet med handlingene,
  * med kostlinja fra GET /v1/quota. Etter 202 aapnes den nye bestillingen.
@@ -218,6 +244,11 @@ export default function GodkjenningPage({
   // «Endre valg» (TG-NEW-145): valgene i velgeren, forvalgt fra current_choices ved «Korriger bildet».
   const [choiceState, setChoiceState] = useState<ChoiceState>(NO_CHOICES);
   const [limitReached, setLimitReached] = useState(false);
+  // «Marker og beskriv» (FE-3): modusen i «Korriger bildet», boksen, instruksen og teksten.
+  const [localMode, setLocalMode] = useState(false);
+  const [localStudio, setLocalStudio] = useState<StudioState>(STUDIO_START);
+  const [localInstruction, setLocalInstruction] = useState<LocalInstruction | null>(null);
+  const [localText, setLocalText] = useState("");
   // «Jeg har sammenlignet bildet med originalen.» (D-5a). Ved advarsel setter
   // samme kryss ogsaa acknowledged (TG-NEW-199). Gjelder bare runden siden viser.
   const [compared, setCompared] = useState(false);
@@ -367,6 +398,10 @@ export default function GodkjenningPage({
     setConfirmed(false);
     setRejectOpen(false);
     setMessage(null);
+    setLocalMode(false);
+    setLocalStudio(STUDIO_START);
+    setLocalInstruction(null);
+    setLocalText("");
     setEditing(true);
   };
 
@@ -375,6 +410,40 @@ export default function GodkjenningPage({
     setToggles({});
     setChoiceState(NO_CHOICES);
     setConfirmed(false);
+    setLocalMode(false);
+    setLocalStudio(STUDIO_START);
+    setLocalInstruction(null);
+    setLocalText("");
+  };
+
+  // Svaret paa «Lag nytt bilde» og «Lag 2 forslag» (correctionResult og localResult).
+  const handleCorrection = (result: CorrectionResult) => {
+    switch (result.kind) {
+      case "poll":
+        cancelCorrection();
+        setPollJobId(jobId);
+        break;
+      case "reload":
+        cancelCorrection();
+        setMessage(result.message);
+        break;
+      case "limit":
+        cancelCorrection();
+        setLimitReached(true);
+        setMessage(result.message);
+        break;
+      case "blocked":
+        setMessage(result.message);
+        setBlocked(true);
+        break;
+      case "retry":
+        // 400, 422 og 503: valgene og markeringen staar, saa brukeren kan proeve igjen.
+        setMessage(result.message);
+        break;
+      case "not_found":
+        setLoad({ kind: "not_found" });
+        break;
+    }
   };
 
   const submitCorrection = () => {
@@ -408,34 +477,59 @@ export default function GodkjenningPage({
         setBusy(false);
         setPending(null);
       },
+      handle: (out) => handleCorrection(correctionResult(out)),
+    });
+  };
+
+  // «Lag 2 forslag» (FE-3): `correct` med én boks og instruksen; 202 og poll som «Lag nytt bilde».
+  const submitLocal = () => {
+    if (load.kind !== "ok" || locked) return;
+    const body = buildLocalCorrection(load.review, localStudio, localInstruction, localText);
+    if (body === null) return;
+    void runDecision({
+      inFlight,
+      send: () => postDecision({ jobId, decision: body, getToken }),
+      refetch: fetchReview,
+      onStart: () => {
+        setBusy(true);
+        setPending("correct");
+        setMessage(null);
+      },
+      onError: () => setMessage({ key: "decision.error" }),
+      onSettled: () => {
+        setBusy(false);
+        setPending(null);
+      },
+      handle: (out) => handleCorrection(localResult(out)),
+    });
+  };
+
+  // «Bruk denne» (FE-3, A1): `choose` svarer 200 med en gang; review hentes paa nytt (runDecision).
+  const chooseCandidate = (k: 1 | 2) => {
+    if (load.kind !== "ok" || locked) return;
+    const review = load.review;
+    void runDecision({
+      inFlight,
+      send: () => postDecision({ jobId, decision: buildChoose(review, k), getToken }),
+      refetch: fetchReview,
+      onStart: () => {
+        setBusy(true);
+        setPending("choose");
+        setMessage(null);
+      },
+      onError: () => setMessage({ key: "decision.error" }),
+      onSettled: () => {
+        setBusy(false);
+        setPending(null);
+      },
       handle: (out) => {
-        const result = correctionResult(out);
-        switch (result.kind) {
-          case "poll":
-            cancelCorrection();
-            setPollJobId(jobId);
-            break;
-          case "reload":
-            cancelCorrection();
-            setMessage(result.message);
-            break;
-          case "limit":
-            cancelCorrection();
-            setLimitReached(true);
-            setMessage(result.message);
-            break;
-          case "blocked":
-            setMessage(result.message);
-            setBlocked(true);
-            break;
-          case "retry":
-            // 422 og 503: valgene staar, saa brukeren kan proeve igjen.
-            setMessage(result.message);
-            break;
-          case "not_found":
-            setLoad({ kind: "not_found" });
-            break;
+        const result = chooseResult(out);
+        if (result.kind === "not_found") {
+          setLoad({ kind: "not_found" });
+          return;
         }
+        if (result.kind === "message" && result.refetch) void fetchReview();
+        setMessage(result.message);
       },
     });
   };
@@ -565,6 +659,16 @@ export default function GodkjenningPage({
               fireplaceShown,
               answer: correctAnswer,
             });
+            // «Marker og beskriv» (FE-3): bare naar review-svaret sier det og resultatet har en forhaandsvisning.
+            const localAvailable = localShown(review) && review.images.previewUrl !== null;
+            const isLocal = isEditing && localMode && localAvailable;
+            const candidates = candidatesView(review);
+            const failedMessage = roundFailedMessage(review);
+            const correctionTitleKey = correctionView(kind, {
+              lightsShown: panelShown(review, "lights"),
+              lightCount: 0,
+              choices: choiceKind !== null,
+            }).titleKey;
 
             const readOnly = isReadOnlyOther(review);
             const deleted = mediaDeleted(review);
@@ -616,35 +720,47 @@ export default function GodkjenningPage({
                         {/* FE-3: laget dekker visningen mens en ny versjon lages; den er inert så lenge. */}
                         <div className="relative">
                           <div inert={making !== null}>
-                            <CompareViewer
-                              originalUrl={review.images.originalUrl}
-                              result={shown === null ? null : { url: shownUrl, label: shownLabel }}
-                              placeholder={<PreviewPlaceholder />}
-                              onResultLoad={() => setResultLoaded(true)}
-                              lightsView={
-                                canShowMarkers(review, { litOnly: !admin }) && review.images.originalUrl !== null ? (
-                                  <LightMarkers
-                                    url={review.images.originalUrl}
-                                    lights={review.lights}
-                                    inputOrientation={review.inputOrientation}
-                                    litOnly={!admin}
-                                    locale={locale}
-                                  />
-                                ) : null
-                              }
-                              additionsView={
-                                canShowAdditions(review) && review.images.previewUrl !== null ? (
-                                  <AdditionMarkers
-                                    url={review.images.previewUrl}
-                                    items={review.additionsCheck.items}
-                                    admin={admin}
-                                    locale={locale}
-                                  />
-                                ) : null
-                              }
-                              onExpand={() => setLightbox(true)}
-                              locale={locale}
-                            />
+                            {isLocal && review.images.previewUrl !== null ? (
+                              <StudioCanvas
+                                src={review.images.previewUrl}
+                                alt={t(locale, "local.canvasAlt")}
+                                tool="box"
+                                width={STROKE_WIDTH_DEFAULT}
+                                studio={localStudio}
+                                onChange={(next) => setLocalStudio(keepOneBox(next))}
+                                locale={locale}
+                              />
+                            ) : (
+                              <CompareViewer
+                                originalUrl={review.images.originalUrl}
+                                result={shown === null ? null : { url: shownUrl, label: shownLabel }}
+                                placeholder={<PreviewPlaceholder />}
+                                onResultLoad={() => setResultLoaded(true)}
+                                lightsView={
+                                  canShowMarkers(review, { litOnly: !admin }) && review.images.originalUrl !== null ? (
+                                    <LightMarkers
+                                      url={review.images.originalUrl}
+                                      lights={review.lights}
+                                      inputOrientation={review.inputOrientation}
+                                      litOnly={!admin}
+                                      locale={locale}
+                                    />
+                                  ) : null
+                                }
+                                additionsView={
+                                  canShowAdditions(review) && review.images.previewUrl !== null ? (
+                                    <AdditionMarkers
+                                      url={review.images.previewUrl}
+                                      items={review.additionsCheck.items}
+                                      admin={admin}
+                                      locale={locale}
+                                    />
+                                  ) : null
+                                }
+                                onExpand={() => setLightbox(true)}
+                                locale={locale}
+                              />
+                            )}
                           </div>
                           {making !== null && <MakingOverlay version={making} locale={locale} />}
                         </div>
@@ -672,6 +788,9 @@ export default function GodkjenningPage({
                           />
                         )}
                         {brightness.kind === "approved" && <BrightnessApproved step={brightness.step} locale={locale} />}
+                        {candidates !== null && !isLocal && making === null && (
+                          <LocalCandidates view={candidates} onChoose={chooseCandidate} locked={locked} locale={locale} />
+                        )}
                         {lightbox && review.images.originalUrl !== null && (
                           <Lightbox
                             originalUrl={review.images.originalUrl}
@@ -746,6 +865,11 @@ export default function GodkjenningPage({
                         controls={controls}
                         canCorrect={canCorrect}
                         roundFailed={correction.roundFailed}
+                        roundFailedText={
+                          "key" in failedMessage
+                            ? t(locale, failedMessage.key)
+                            : codeText(locale, failedMessage.group, failedMessage.code)
+                        }
                         // Banneret sier det allerede: ingen «Ingen handlinger …» (C1).
                         readOnly={readOnly || deleted}
                         locked={locked}
@@ -762,51 +886,96 @@ export default function GodkjenningPage({
                         onStartCorrection={startCorrection}
                         correction={
                           isEditing ? (
-                            <CorrectionPanel
-                              lights={review.lights}
-                              toggles={toggles}
-                              onToggle={(light, uncertain, on) =>
-                                setToggles((prev) => setToggle(prev, light, uncertain, on))
-                              }
-                              fireplaceShown={fireplaceShown}
-                              lightsShown={panelShown(review, "lights")}
-                              kind={kind}
-                              answer={correctAnswer}
-                              onAnswer={setCorrectAnswer}
-                              confirmNeeded={confirmNeeded}
-                              confirmed={confirmed}
-                              onConfirmed={setConfirmed}
-                              roundsLeft={correction.roundsLeft}
-                              submitEnabled={submitEnabled}
-                              onSubmit={submitCorrection}
-                              onCancel={cancelCorrection}
-                              locked={locked}
-                              admin={admin}
-                              choices={
-                                choiceKind === "dusk" ? (
-                                  <DuskChoicePicker
-                                    value={choiceState.dusk}
-                                    onChange={(dusk) => setChoiceState((prev) => ({ ...prev, dusk }))}
+                            <div className="flex flex-col gap-4">
+                              {localAvailable && (
+                                <div role="group" aria-label={t(locale, "local.modes")} className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    aria-pressed={!localMode}
+                                    onClick={() => setLocalMode(false)}
                                     disabled={locked}
-                                    images={DUSK_IMAGES}
-                                    compact
-                                    locale={locale}
-                                  />
-                                ) : choiceKind === "styling" ? (
-                                  <StylingCorrectionPicker
-                                    styles={correctionStyles(review.order, jobId, choiceStart.style)}
-                                    style={choiceState.style}
-                                    decor={choiceState.decor}
-                                    onStyle={(style) => setChoiceState((prev) => ({ ...prev, style }))}
-                                    onDecor={(decor) => setChoiceState((prev) => ({ ...prev, decor }))}
+                                    className={choiceClass(!localMode, "rounded-pill")}
+                                  >
+                                    {t(locale, correctionTitleKey)}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-pressed={localMode}
+                                    onClick={() => setLocalMode(true)}
                                     disabled={locked}
-                                    locale={locale}
-                                  />
-                                ) : null
-                              }
-                              submitKey={correctionSubmitKey(choices)}
-                              locale={locale}
-                            />
+                                    className={choiceClass(localMode, "rounded-pill")}
+                                  >
+                                    {t(locale, "local.title")}
+                                  </button>
+                                </div>
+                              )}
+                              {isLocal ? (
+                                <LocalEditPanel
+                                  studio={localStudio}
+                                  onStudio={setLocalStudio}
+                                  instruction={localInstruction}
+                                  onInstruction={setLocalInstruction}
+                                  text={localText}
+                                  onText={setLocalText}
+                                  missing={localMissing({
+                                    studio: localStudio,
+                                    instruction: localInstruction,
+                                    text: localText,
+                                  })}
+                                  info={localInfo(review)}
+                                  onSubmit={submitLocal}
+                                  onCancel={cancelCorrection}
+                                  locked={locked}
+                                  locale={locale}
+                                />
+                              ) : (
+                                <CorrectionPanel
+                                  lights={review.lights}
+                                  toggles={toggles}
+                                  onToggle={(light, uncertain, on) =>
+                                    setToggles((prev) => setToggle(prev, light, uncertain, on))
+                                  }
+                                  fireplaceShown={fireplaceShown}
+                                  lightsShown={panelShown(review, "lights")}
+                                  kind={kind}
+                                  answer={correctAnswer}
+                                  onAnswer={setCorrectAnswer}
+                                  confirmNeeded={confirmNeeded}
+                                  confirmed={confirmed}
+                                  onConfirmed={setConfirmed}
+                                  roundsLeft={correction.roundsLeft}
+                                  submitEnabled={submitEnabled}
+                                  onSubmit={submitCorrection}
+                                  onCancel={cancelCorrection}
+                                  locked={locked}
+                                  admin={admin}
+                                  choices={
+                                    choiceKind === "dusk" ? (
+                                      <DuskChoicePicker
+                                        value={choiceState.dusk}
+                                        onChange={(dusk) => setChoiceState((prev) => ({ ...prev, dusk }))}
+                                        disabled={locked}
+                                        images={DUSK_IMAGES}
+                                        compact
+                                        locale={locale}
+                                      />
+                                    ) : choiceKind === "styling" ? (
+                                      <StylingCorrectionPicker
+                                        styles={correctionStyles(review.order, jobId, choiceStart.style)}
+                                        style={choiceState.style}
+                                        decor={choiceState.decor}
+                                        onStyle={(style) => setChoiceState((prev) => ({ ...prev, style }))}
+                                        onDecor={(decor) => setChoiceState((prev) => ({ ...prev, decor }))}
+                                        disabled={locked}
+                                        locale={locale}
+                                      />
+                                    ) : null
+                                  }
+                                  submitKey={correctionSubmitKey(choices)}
+                                  locale={locale}
+                                />
+                              )}
+                            </div>
                           ) : null
                         }
                         additions={review.additionsCheck}
