@@ -119,19 +119,20 @@ test("FE-3: siden bruker tilstanden som finnes (polling og pending), uten nye ka
   assert.match(page, /const locked = busy \|\| blocked \|\| polling;/);
   assert.match(page, /const making = makingImage\(polling, pending\) \? nextVersion\(variants\) : null;/);
   // «Lag nytt bilde»: pending er "correct" fra klikket til svaret, saa null igjen.
-  const submit = page.slice(page.indexOf("const submitCorrection"), page.indexOf("const messageText"));
+  const submit = page.slice(page.indexOf("const handleCorrection"), page.indexOf("const submitLocal"));
   assert.match(submit, /onStart: \(\) => \{\s*setBusy\(true\);\s*setPending\("correct"\);/);
   assert.match(submit, /onSettled: \(\) => \{\s*setBusy\(false\);\s*setPending\(null\);\s*\}/);
   assert.match(submit, /case "poll":\s*cancelCorrection\(\);\s*setPollJobId\(jobId\);/);
-  // Ingen nye kall: bare de to som fantes (getReview og postDecision, pluss /me).
-  assert.equal(page.match(/postDecision\(/g)?.length, 2);
+  // Ingen nye kall: getReview og postDecision (pluss /me). FE-3 (Dag 58): «Lag 2 forslag» og
+  // «Bruk denne» sender ogsaa gjennom postDecision, saa det er fire steder.
+  assert.equal(page.match(/postDecision\(/g)?.length, 4);
   assert.doesNotMatch(page, /fetch\(/);
 });
 
 test("FE-3: laget ligger over visningen, som er inert saa lenge, og stripa faar plassholderen", () => {
   assert.match(
     page,
-    /<div className="relative">\s*<div inert=\{making !== null\}>\s*<CompareViewer[\s\S]*?\/>\s*<\/div>\s*\{making !== null && <MakingOverlay version=\{making\} locale=\{locale\} \/>\}\s*<\/div>/
+    /<div className="relative">\s*<div inert=\{making !== null\}>\s*\{isLocal && review\.images\.previewUrl !== null \? \(\s*<StudioCanvas[\s\S]*?\/>\s*\) : \(\s*<CompareViewer[\s\S]*?\/>\s*\)\}\s*<\/div>\s*\{making !== null && <MakingOverlay version=\{making\} locale=\{locale\} \/>\}\s*<\/div>/
   );
   assert.equal(page.match(/making=\{making\}/g)?.length, 2);
   assert.match(page, /stripShown\(strip, making\)/);

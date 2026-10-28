@@ -135,10 +135,14 @@ export function disclosureText(
   if (new Set(disclosure.edited).size !== disclosure.edited.length) return missing;
   const editedTable = season ? codes.disclosureSeasonEdited : codes.disclosureEdited;
   const items: string[] = [];
+  // «Marker og beskriv» (FE-3, versjon 10): `objects_removed` og `objects_added` er hele setninger etter lista.
+  const sentences: string[] = [];
   for (const code of disclosure.edited) {
     const text = lookup(editedTable, code);
-    if (text === null) return missing;
-    items.push(text);
+    const sentence = season ? null : lookup(codes.disclosureLocal, code);
+    if (text !== null) items.push(text);
+    else if (sentence !== null) sentences.push(sentence);
+    else return missing;
   }
 
   const parts = [base];
@@ -150,5 +154,6 @@ export function disclosureText(
   if (detail !== "base" && items.length > 0) {
     parts.push(season ? clauseSentence(locale, items) : editedSentence(locale, items));
   }
+  if (detail !== "base") parts.push(...sentences);
   return { kind: "text", text: parts.join(" ") };
 }

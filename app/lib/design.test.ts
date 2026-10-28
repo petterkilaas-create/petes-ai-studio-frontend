@@ -982,7 +982,7 @@ test("TG147: siden skjuler «Rått», viser kontrollen under bildet og sender tr
   // Kontrollen rett under CompareViewer i bildekortet (FE-3: etter laget for venting og bryteren for råbildet).
   assert.match(
     page,
-    /<CompareViewer[\s\S]*?\/>\s*<\/div>\s*\{making !== null && <MakingOverlay version=\{making\} locale=\{locale\} \/>\}\s*<\/div>\s*\{raw !== null && \([\s\S]*?\)\}\s*\{brightness\.kind === "control" && step !== null && \(\s*<BrightnessControl/
+    /<CompareViewer[\s\S]*?\/>\s*\)\}\s*<\/div>\s*\{making !== null && <MakingOverlay version=\{making\} locale=\{locale\} \/>\}\s*<\/div>\s*\{raw !== null && \([\s\S]*?\)\}\s*\{brightness\.kind === "control" && step !== null && \(\s*<BrightnessControl/
   );
   assert.match(page, /\{brightness\.kind === "approved" && <BrightnessApproved step=\{brightness\.step\} locale=\{locale\} \/>\}/);
   assert.match(page, /locked=\{locked\}\s*preload=\{preloadUrls\(brightness\.steps, step\)\}/);

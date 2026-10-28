@@ -67,6 +67,7 @@ export function DecisionCard({
   controls,
   canCorrect,
   roundFailed,
+  roundFailedText,
   readOnly,
   locked,
   busy,
@@ -101,6 +102,8 @@ export function DecisionCard({
   controls: DecisionControls;
   canCorrect: boolean;
   roundFailed: boolean;
+  /** Teksten naar runden feilet (FE-3: koden i `last_round_error`); uten den som foer. */
+  roundFailedText?: string;
   readOnly: boolean;
   locked: boolean;
   busy: boolean;
@@ -142,7 +145,7 @@ export function DecisionCard({
     <section className={`${CARD} flex flex-col gap-4`}>
       {roundFailed && (
         <p className="text-sm text-amber-fg bg-amber-bg rounded-button p-3" role="status">
-          {t(locale, "correct.roundFailed")}
+          {roundFailedText ?? t(locale, "correct.roundFailed")}
         </p>
       )}
 
