@@ -40,6 +40,27 @@ export const SERVICE_CARD_TEXT: Record<string, ServiceCardText> = {
   },
 };
 
+/**
+ * Store kort med bilde bare for de tre demotjenestene (Petter 28.10, Dag 58,
+ * del 4). De andre bestillbare (Blå himmel, Skjul ansikter) er små kort uten
+ * bilde under de store, og bestilles som foer. Bare visningen endres.
+ */
+export const LARGE_CARD_IDS: readonly string[] = ["skumring", "digital_styling", "aarstider"];
+
+export type CardSize = "large" | "small";
+
+export function cardSize(id: string): CardSize {
+  return LARGE_CARD_IDS.includes(id) ? "large" : "small";
+}
+
+/** De bestillbare kortene delt i store og små, i samme rekkefoelge som foer. */
+export function splitBySize<T extends { id: string }>(tools: readonly T[]): { large: T[]; small: T[] } {
+  return {
+    large: tools.filter((tool) => cardSize(tool.id) === "large"),
+    small: tools.filter((tool) => cardSize(tool.id) === "small"),
+  };
+}
+
 /** Id-en til opplastingskortet, som rulles inn naar et kort velges. */
 export const UPLOAD_CARD_ID = "tjeneste-opplasting";
 

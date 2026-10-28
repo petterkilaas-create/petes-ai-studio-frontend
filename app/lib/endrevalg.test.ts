@@ -319,7 +319,7 @@ test("FE-a (V-a): stripa viser rundens stil, også for megleren", () => {
   assert.equal(variantLabel("nb", d1, { choices: false, presetId: "skumring" }), "Versjon 2 · nå (Sen kveld)");
   assert.equal(variantLabel("en", d1, { choices: false, presetId: "skumring" }), "Version 2 · now (Late evening)");
   // Admin: stilen foerst, saa valgene som foer.
-  assert.equal(variantLabel("nb", d1, { choices: true, presetId: "skumring" }), "Versjon 2 · nå (Sen kveld, sen, stjernehimmel)");
+  assert.equal(variantLabel("nb", d1, { choices: true, presetId: "skumring" }), "Versjon 2 · nå (Sen kveld, stjernehimmel)");
   // Uten stil i runden (flagget av, eldre runder): som foer.
   const [plain] = compareVariants(images([round(0, {}, true)]), { isAdmin: false });
   assert.equal(variantLabel("nb", plain, { choices: false, presetId: "skumring" }), "Versjon 1 · nå");
