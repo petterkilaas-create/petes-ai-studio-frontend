@@ -3,14 +3,15 @@
 import { Check } from "lucide-react";
 import type { LocalEditNumber } from "../../lib/api";
 import { codeText, t, type Locale } from "../../lib/i18n";
-import { LOCAL_INSTRUCTION_KEYS, type EditResultRow } from "../../lib/local";
+import { resultLabel, type EditResultRow } from "../../lib/local";
 import { buttonClass } from "../ui/Button";
 
 const BTN_SECONDARY = buttonClass("secondary", "min-h-11");
 
 /**
  * Lista etter en lokal runde (studio v2, Dag 58): én rad per endring med
- * samme nummer som boksen i bildet, ✓ eller feilmeldingen, og «Prøv igjen»
+ * samme nummer som boksen i bildet, meglerens egen tekst (fritekst; gamle
+ * runder viser instruksen), ✓ eller feilmeldingen, og «Prøv igjen»
  * (ny runde som bare gjoer den endringen paa nytt; teller som runde). Peker
  * man paa en rad, lyser boksen opp i sammenligningen (`activeK`).
  */
@@ -34,7 +35,8 @@ export function LocalEditResults({
       <p className="text-sm text-ink font-bold">{t(locale, "local.resultsTitle")}</p>
       <ol aria-label={t(locale, "local.resultsTitle")} className="flex flex-col gap-2">
         {rows.map((row) => {
-          const label = row.instruction === null ? t(locale, "local.editTitle", { n: row.k }) : t(locale, LOCAL_INSTRUCTION_KEYS[row.instruction]);
+          const head = resultLabel(row);
+          const label = head.text !== null ? `«${head.text}»` : t(locale, head.key, head.vars);
           const active = activeK === row.k;
           return (
             <li
@@ -56,7 +58,7 @@ export function LocalEditResults({
                   {row.k}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-ink">
+                  <p className="text-sm font-medium text-ink break-words">
                     <span className="sr-only">{t(locale, "local.editTitle", { n: row.k })}: </span>
                     {label}
                   </p>

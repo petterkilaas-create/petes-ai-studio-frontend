@@ -10,8 +10,11 @@ import type { ReviewDisclosure } from "./disclosure.ts";
 // «Marker og beskriv», studio v2 (Dag 58). Kontrakten er backend STUDIO_V2_BE
 // (RAPPORT_STUDIO_V2_BE.md, «Kontrakten (bekreftet)», valgene A1, B1, C1, D1):
 // `correct` med `local: {edits: [...]}` (1–4) eller `local: {retry: k}`,
-// `local: {round, retry_of, edits: [{k, instruction, box, text_len, status}]}`
+// `local: {round, retry_of, edits: [{k, instruction, box, text_len, text, status}]}`
 // i review, og `images.previous.preview_url` som forrige versjon (D1).
+// Fritekst (Dag 58, FRITEKST_BE, Petter 28.10: A1, B1, C1, D2): hver endring er
+// `{shape, text}` (1–500 tegn), instruksen i review er "text", og `text` er
+// eierens egen tekst (null for andre og etter sletting).
 // Merketeksten v10 og feilmeldingen for runden er fra FE-3.
 // Falske svar: fetch byttes ut, ingen nettverkskall og ingen betalte kall.
 process.env.NEXT_PUBLIC_API_BASE = "http://api.test";
@@ -39,7 +42,10 @@ function captureFetch(status: number, body: unknown) {
   return calls;
 }
 
-/** Review-svaret etter en lokal v2-runde med tre endringer, der nummer 2 feilet. */
+/**
+ * Review-svaret etter en lokal v2-runde med tre endringer, der nummer 2 feilet.
+ * 1 og 2 er fritekst; 3 er en gammel endring (Tenn) fra foer fritekst, uten tekst.
+ */
 const LOCAL_REVIEW = {
   job_id: "j1",
   status: "awaiting_approval",
@@ -61,9 +67,9 @@ const LOCAL_REVIEW = {
     round: 1,
     retry_of: null,
     edits: [
-      { k: 1, instruction: "remove", box: [[0.1, 0.2], [0.3, 0.4]], text_len: 0, status: "ok" },
-      { k: 2, instruction: "add", box: [[0.5, 0.5], [0.7, 0.7]], text_len: 12, status: "mask_empty" },
-      { k: 3, instruction: "light", box: [[0.8, 0.1], [0.95, 0.3]], text_len: 0, status: "ok" },
+      { k: 1, instruction: "text", box: [[0.1, 0.2], [0.3, 0.4]], text_len: 22, text: "fjern skålen på bordet", status: "ok" },
+      { k: 2, instruction: "text", box: [[0.5, 0.5], [0.7, 0.7]], text_len: 12, text: "slukk peisen", status: "mask_empty" },
+      { k: 3, instruction: "light", box: [[0.8, 0.1], [0.95, 0.3]], text_len: 0, text: null, status: "ok" },
     ],
   },
 };
@@ -80,7 +86,7 @@ const ASPECT = 3 / 2;
 
 // --- Review-svaret --------------------------------------------------------------
 
-test("Studio v2: review-svaret leses strengt: edits med k 1–4, boksen, status og retry_of", () => {
+test("Studio v2: review-svaret leses strengt: edits med k 1–4, boksen, teksten, status og retry_of", () => {
   const r = review();
   assert.equal(r.correction.localAccepted, true);
   assert.deepEqual(r.allowedActions, ["approve", "reject", "correct"]);
@@ -88,21 +94,22 @@ test("Studio v2: review-svaret leses strengt: edits med k 1–4, boksen, status 
     round: 1,
     retryOf: null,
     edits: [
-      { k: 1, instruction: "remove", box: { from: { x: 0.1, y: 0.2 }, to: { x: 0.3, y: 0.4 } }, textLen: 0, status: "ok" },
-      { k: 2, instruction: "add", box: { from: { x: 0.5, y: 0.5 }, to: { x: 0.7, y: 0.7 } }, textLen: 12, status: "mask_empty" },
-      { k: 3, instruction: "light", box: { from: { x: 0.8, y: 0.1 }, to: { x: 0.95, y: 0.3 } }, textLen: 0, status: "ok" },
+      { k: 1, instruction: "text", box: { from: { x: 0.1, y: 0.2 }, to: { x: 0.3, y: 0.4 } }, textLen: 22, text: "fjern skålen på bordet", status: "ok" },
+      { k: 2, instruction: "text", box: { from: { x: 0.5, y: 0.5 }, to: { x: 0.7, y: 0.7 } }, textLen: 12, text: "slukk peisen", status: "mask_empty" },
+      { k: 3, instruction: "light", box: { from: { x: 0.8, y: 0.1 }, to: { x: 0.95, y: 0.3 } }, textLen: 0, text: null, status: "ok" },
     ],
   });
   // Feil form: k utenfor 1–4 og dubletter forkastes, sortert etter k; ukjent instruks og boks blir null;
   // uten status aldri «ok». Boksen i formen fra forespoerselen godtas, og hjoernene sorteres.
+  // Teksten som ikke er tekst, eller bare mellomrom, blir null.
   const odd = review({
     ...LOCAL_REVIEW,
     local: {
       round: 2,
       retry_of: 3,
       edits: [
-        { k: 4, instruction: "paint", box: [[0.1, 0.1], [1.2, 0.2]], status: "ok" },
-        { k: 2, instruction: "light", box: { shape: "box", points: [[0.6, 0.6], [0.5, 0.5]] } },
+        { k: 4, instruction: "paint", box: [[0.1, 0.1], [1.2, 0.2]], text: 42, status: "ok" },
+        { k: 2, instruction: "light", box: { shape: "box", points: [[0.6, 0.6], [0.5, 0.5]] }, text: "  " },
         { k: 2, instruction: "remove", status: "ok" },
         { k: 5, status: "ok" },
         { k: "1", status: "ok" },
@@ -114,8 +121,8 @@ test("Studio v2: review-svaret leses strengt: edits med k 1–4, boksen, status 
     round: 2,
     retryOf: 3,
     edits: [
-      { k: 2, instruction: "light", box: { from: { x: 0.5, y: 0.5 }, to: { x: 0.6, y: 0.6 } }, textLen: null, status: "unknown" },
-      { k: 4, instruction: null, box: null, textLen: null, status: "ok" },
+      { k: 2, instruction: "light", box: { from: { x: 0.5, y: 0.5 }, to: { x: 0.6, y: 0.6 } }, textLen: null, text: null, status: "unknown" },
+      { k: 4, instruction: null, box: null, textLen: null, text: null, status: "ok" },
     ],
   });
   // Uten endringer, uten feltet (flagget av), null, og en gammel FE-3-runde med kandidater: ingen lokal runde.
@@ -158,13 +165,11 @@ test("Studio v2: inntil 4 bokser, nummerert 1–4 i rekkefoelgen de ble tegnet; 
   });
 });
 
-test("Studio v2: overlappende bokser avvises med forklaring; margen er 7 % av kortsiden, 10 % for Tenn", () => {
-  // Backend krever 7 % rundt hver boks (Dag 58), Tenn fortsatt 10 %.
+test("Studio v2: overlappende bokser avvises med forklaring; margen er 7 % av kortsiden for alle", () => {
+  // Backend: E er boksen + 7 % av kortsiden for fritekst (EDGE_MARGIN_PCT). Ingen egen margin for Tenn lenger.
   assert.equal(local.EDIT_MARGIN, 0.07);
-  assert.equal(local.EDIT_MARGIN_LIGHT, 0.1);
-  assert.equal(local.editMargin("remove"), 0.07);
-  assert.equal(local.editMargin(null), 0.07);
-  assert.equal(local.editMargin("light"), 0.1);
+  assert.ok(!("EDIT_MARGIN_LIGHT" in local));
+  assert.ok(!("editMargin" in local));
   // Rett inni og over kanten: avvist.
   assert.equal(local.addLocalBox(ONE_BOX, { x: 0.2, y: 0.3 }, { x: 0.6, y: 0.6 }, ASPECT).rejected, "overlap");
   // 1 % av bredden fra kanten: avvist.
@@ -188,18 +193,19 @@ test("Studio v2: overlappende bokser avvises med forklaring; margen er 7 % av ko
   assert.equal(local.boxesOverlap(top, below, 0.03, 0.03, 2 / 3), false);
   // Kanter som bare beroerer hverandre (uten margin): ikke overlapp.
   assert.equal(local.boxesOverlap(left, { from: { x: 0.3, y: 0.1 }, to: { x: 0.4, y: 0.3 } }, 0, 0, 1), false);
-  // Tenn har 10 %: to bokser som er greie med Fjern (9,33 % < 10 %), ligger for tett naar den
-  // ene er Tenn (6,67 % + 4,67 % = 11,33 % > 10 %).
+  // Teksten endrer ikke margen: «slukk peisen» ved siden av en annen boks er greit med 10 % mellom
+  // (tidligere 10 % for Tenn, som ga overlapp her).
   const near = local.addLocalBox(ONE_BOX, { x: 0.5, y: 0.2 }, { x: 0.6, y: 0.5 }, ASPECT).studio;
   assert.equal(near.marks.length, 2);
   const b2 = near.marks[1].id;
-  const drafts = (i1: "remove" | "light") => ({
-    [id1]: { instruction: i1, text: "" },
-    [b2]: { instruction: "remove" as const, text: "" },
-  });
-  assert.deepEqual(local.localMissing({ studio: near, drafts: drafts("remove"), aspect: ASPECT }), null);
-  assert.deepEqual(local.localMissing({ studio: near, drafts: drafts("light"), aspect: ASPECT }), { kind: "overlap", a: 1, b: 2 });
-  assert.equal(local.buildLocalCorrection({ version: 1 }, near, drafts("light"), ASPECT), null);
+  const both = { [id1]: { text: "slukk peisen" }, [b2]: { text: "tenn lampen" } };
+  assert.deepEqual(local.localMissing({ studio: near, drafts: both, aspect: ASPECT }), null);
+  // Bokser som overlapper likevel (Angre kan sette tilbake en boks ved siden av en ny): sjekkes foer innsending.
+  const tight = addBox(ONE_BOX, { x: 0.45, y: 0.2 }, { x: 0.6, y: 0.5 });
+  const t2 = tight.marks[1].id;
+  const tightDrafts = { [id1]: { text: "slukk peisen" }, [t2]: { text: "tenn lampen" } };
+  assert.deepEqual(local.localMissing({ studio: tight, drafts: tightDrafts, aspect: ASPECT }), { kind: "overlap", a: 1, b: 2 });
+  assert.equal(local.buildLocalCorrection({ version: 1 }, tight, tightDrafts, ASPECT), null);
   // Forklaringene staar i ordlista.
   assert.equal(t("nb", local.BOX_REJECTION_KEYS.overlap), "Boksene kan ikke overlappe. Dra den nye boksen et annet sted.");
   assert.equal(t("nb", local.BOX_REJECTION_KEYS.max), "Du kan markere opptil 4 ting. Fjern en boks for å lage en ny.");
@@ -209,18 +215,19 @@ test("Studio v2: overlappende bokser avvises med forklaring; margen er 7 % av ko
 
 // --- Utfør endringene ---------------------------------------------------------------
 
-test("Studio v2: «Utfør endringene» sender correct med edits i rekkefoelgen 1–N og expected_version; 202 gir poll", async () => {
+test("Fritekst: «Utfør endringene» sender correct med {shape, text} i rekkefoelgen 1–N og expected_version; 202 gir poll", async () => {
   const drafts = {
-    [id1]: { instruction: "remove" as const, text: "ignoreres" },
-    [id2]: { instruction: "add" as const, text: "  en  grønn\n plante " },
+    [id1]: { text: "fjern skålen på bordet" },
+    [id2]: { text: "  legg en  grønn\n plante i hjørnet. " },
   };
   const body = local.buildLocalCorrection(review(), TWO, drafts, ASPECT);
+  // Teksten renses som i backend (mellomrom og linjeskift), men ellers uendret; ingen instruks.
   assert.deepEqual(body, {
     action: "correct",
     local: {
       edits: [
-        { shape: { shape: "box", points: [[0.1, 0.2], [0.4, 0.5]] }, instruction: "remove" },
-        { shape: { shape: "box", points: [[0.6, 0.6], [0.9, 0.9]] }, instruction: "add", text: "en grønn plante" },
+        { shape: { shape: "box", points: [[0.1, 0.2], [0.4, 0.5]] }, text: "fjern skålen på bordet" },
+        { shape: { shape: "box", points: [[0.6, 0.6], [0.9, 0.9]] }, text: "legg en grønn plante i hjørnet." },
       ],
     },
     expected_version: 7,
@@ -231,9 +238,10 @@ test("Studio v2: «Utfør endringene» sender correct med edits i rekkefoelgen 1
   // Body er byte for byte det backend venter: aldri overrides, choices eller fireplace_fire (local_exclusive).
   assert.equal(
     calls[0].init?.body,
-    '{"action":"correct","local":{"edits":[{"shape":{"shape":"box","points":[[0.1,0.2],[0.4,0.5]]},"instruction":"remove"},' +
-      '{"shape":{"shape":"box","points":[[0.6,0.6],[0.9,0.9]]},"instruction":"add","text":"en grønn plante"}]},"expected_version":7}'
+    '{"action":"correct","local":{"edits":[{"shape":{"shape":"box","points":[[0.1,0.2],[0.4,0.5]]},"text":"fjern skålen på bordet"},' +
+      '{"shape":{"shape":"box","points":[[0.6,0.6],[0.9,0.9]]},"text":"legg en grønn plante i hjørnet."}]},"expected_version":7}'
   );
+  assert.doesNotMatch(String(calls[0].init?.body), /instruction/);
   assert.deepEqual(out, { kind: "poll", status: "running" });
   assert.deepEqual(local.localResult(out), { kind: "poll" });
   // Uten version: utelatt.
@@ -246,52 +254,63 @@ test("Studio v2: «Utfør endringene» sender correct med edits i rekkefoelgen 1
   assert.equal(t("nb", noMax.key, noMax.vars), "Runder igjen: 1 · bare de markerte områdene endres");
   assert.equal(
     t("nb", "local.hint"),
-    "Dra en boks rundt det som skal endres, og velg hva som skal skje. Du kan markere opptil 4 ting."
+    "Dra en boks rundt det som skal endres, og skriv hva som skal endres. Du kan markere opptil 4 ting."
   );
 });
 
-test("Studio v2: knappen er laast til hver boks har instruks, og Legg til har tekst (1–200 tegn)", () => {
-  const m = (drafts: Record<number, { instruction: "add" | "light" | null; text: string }>, studio = TWO) =>
-    local.localMissing({ studio, drafts, aspect: ASPECT });
-  const light = { instruction: "light" as const, text: "" };
+test("Fritekst: knappen er grå til hver boks har tekst (1–500 tegn etter rensing)", () => {
+  const m = (drafts: Record<number, { text: string }>, studio = TWO) => local.localMissing({ studio, drafts, aspect: ASPECT });
+  const ok = { text: "slukk peisen" };
   assert.deepEqual(m({}, STUDIO_START), { kind: "box" });
-  assert.deepEqual(m({}), { kind: "instruction", n: 1 });
-  assert.deepEqual(m({ [id1]: light }), { kind: "instruction", n: 2 });
-  assert.deepEqual(m({ [id1]: light, [id2]: light }), null);
-  assert.deepEqual(m({ [id1]: light, [id2]: { instruction: "add", text: "  \n " } }), { kind: "text", n: 2 });
-  assert.deepEqual(m({ [id1]: light, [id2]: { instruction: "add", text: "x".repeat(200) } }), null);
-  assert.deepEqual(m({ [id1]: light, [id2]: { instruction: "add", text: "x".repeat(201) } }), { kind: "textTooLong", n: 2 });
+  assert.deepEqual(m({}), { kind: "text", n: 1 });
+  assert.deepEqual(m({ [id1]: ok }), { kind: "text", n: 2 });
+  assert.deepEqual(m({ [id1]: ok, [id2]: ok }), null);
+  // Bare mellomrom, eller bare punktum og utropstegn (backend: free_text er tom): ingen tekst.
+  for (const text of ["", "  \n ", "...", " ! "]) assert.deepEqual(m({ [id1]: ok, [id2]: { text } }), { kind: "text", n: 2 }, text);
+  assert.deepEqual(m({ [id1]: ok, [id2]: { text: "x" } }), null);
+  assert.deepEqual(m({ [id1]: ok, [id2]: { text: "x".repeat(500) } }), null);
+  assert.deepEqual(m({ [id1]: ok, [id2]: { text: "x".repeat(501) } }), { kind: "textTooLong", n: 2 });
   // Mellomrom som renses bort, teller ikke.
-  assert.deepEqual(m({ [id1]: light, [id2]: { instruction: "add", text: ` ${"x".repeat(200)} ` } }), null);
-  assert.equal(local.buildLocalCorrection({ version: 1 }, TWO, { [id1]: light }, ASPECT), null);
+  assert.deepEqual(m({ [id1]: ok, [id2]: { text: ` ${"x".repeat(250)}\n\n${"x".repeat(249)} ` } }), null);
+  assert.equal(local.LOCAL_TEXT_MAX, 500);
+  assert.equal(local.buildLocalCorrection({ version: 1 }, TWO, { [id1]: ok }, ASPECT), null);
   assert.equal(local.buildLocalCorrection({ version: 1 }, STUDIO_START, {}, ASPECT), null);
-  // Uten tekst for de andre instruksene, og bare local i body.
-  for (const instruction of ["fire_out", "light", "remove"] as const) {
-    const body = local.buildLocalCorrection({ version: 1 }, ONE_BOX, { [id1]: { instruction, text: "tekst" } }, ASPECT);
-    assert.deepEqual(body, {
-      action: "correct",
-      local: { edits: [{ shape: { shape: "box", points: [[0.1, 0.2], [0.4, 0.5]] }, instruction }] },
-      expected_version: 1,
-    });
-  }
   const txt = local.missingText({ kind: "text", n: 2 });
-  assert.equal(t("nb", txt.key, txt.vars), "Skriv hva som skal legges til i boks 2.");
-  assert.deepEqual(local.LOCAL_INSTRUCTIONS.map((i) => t("nb", local.LOCAL_INSTRUCTION_KEYS[i])), [
-    "Slukk",
-    "Tenn",
-    "Fjern dette",
-    "Legg til",
-  ]);
+  assert.equal(t("nb", txt.key, txt.vars), "Skriv hva som skal endres i boks 2.");
+  const long = local.missingText({ kind: "textTooLong", n: 1 });
+  assert.equal(t("nb", long.key, long.vars), "Teksten i boks 1 kan ha høyst 500 tegn.");
+  // Feltet, eksempelet og infoteksten.
+  assert.equal(t("nb", "local.textLabel"), "Hva skal endres her?");
+  assert.equal(t("nb", "local.textPlaceholder"), "f.eks. fjern skålen på bordet");
+  assert.equal(
+    t("nb", "local.infoText"),
+    "Tegn boksen der endringen skal være, gjerne litt større enn tingen. Skal du henge opp gardiner, tegn helt ned " +
+      "dit de skal henge. Skal du tenne eller slukke lys, ta med lysskjæret rundt. Skriv kort og konkret, én ting per " +
+      'boks – for eksempel "fjern skålen på bordet" eller "slukk peisen". Alt utenfor boksene blir som før.'
+  );
+  // Teksten for instruksvalget er borte.
+  assert.ok(!Object.hasOwn(DICTIONARIES.nb.ui, "local.missingInstruction"));
+  assert.ok(!("LOCAL_INSTRUCTIONS" in local));
 });
 
 // --- Etter runden ---------------------------------------------------------------------
 
-test("Studio v2: lista etter runden: ✓ eller koden per endring, og «Prøv igjen» bare naar det gaar", () => {
-  assert.deepEqual(local.editResults(review()), [
-    { k: 1, instruction: "remove", ok: true, code: null, canRetry: true },
-    { k: 2, instruction: "add", ok: false, code: "mask_empty", canRetry: true },
-    { k: 3, instruction: "light", ok: true, code: null, canRetry: true },
+test("Fritekst: lista etter runden: meglerens tekst, ✓ eller koden per endring, og «Prøv igjen» bare naar det gaar", () => {
+  const rows = local.editResults(review())!;
+  assert.deepEqual(rows, [
+    { k: 1, instruction: "text", text: "fjern skålen på bordet", ok: true, code: null, canRetry: true },
+    { k: 2, instruction: "text", text: "slukk peisen", ok: false, code: "mask_empty", canRetry: true },
+    { k: 3, instruction: "light", text: null, ok: true, code: null, canRetry: true },
   ]);
+  // Overskriften: teksten, ellers den gamle instruksen (runder fra foer fritekst), ellers «Endring k».
+  assert.deepEqual(local.resultLabel(rows[0]), { text: "fjern skålen på bordet", key: "local.editTitle", vars: { n: 1 } });
+  const old = local.resultLabel(rows[2]);
+  assert.equal(old.text, null);
+  assert.equal(t("nb", old.key, old.vars), "Tenn");
+  // Fritekst uten tekst (andre enn eieren, eller etter slettejobben): «Endring k», aldri en gammel instruks.
+  const noText = local.resultLabel({ k: 2, instruction: "text", text: null });
+  assert.equal(t("nb", noText.key, noText.vars), "Endring 2");
+  assert.equal(t("nb", local.resultLabel({ k: 4, instruction: null, text: null }).key, { n: 4 }), "Endring 4");
   // Ingen runder igjen, eller uten correct (admin paa andres jobb): ingen «Prøv igjen».
   for (const r of [
     review({ ...LOCAL_REVIEW, correction: { ...LOCAL_REVIEW.correction, rounds_left: 0 } }),
@@ -299,12 +318,14 @@ test("Studio v2: lista etter runden: ✓ eller koden per endring, og «Prøv igj
   ]) {
     assert.ok(local.editResults(r)!.every((row) => !row.canRetry));
   }
-  // Legg til uten tekst (slettet, AVVIK 7): kan ikke proeves igjen.
-  const cleared = review({
-    ...LOCAL_REVIEW,
-    local: { round: 1, edits: [{ k: 1, instruction: "add", box: null, text_len: 0, status: "ok" }] },
-  });
-  assert.equal(local.editResults(cleared)![0].canRetry, false);
+  // Fritekst og Legg til uten tekstlengde: kan ikke proeves igjen.
+  for (const instruction of ["text", "add"]) {
+    const cleared = review({
+      ...LOCAL_REVIEW,
+      local: { round: 1, edits: [{ k: 1, instruction, box: null, text_len: 0, text: null, status: "ok" }] },
+    });
+    assert.equal(local.editResults(cleared)![0].canRetry, false, instruction);
+  }
   // Uten lokal runde, eller naar jobben ikke venter: ingen liste.
   assert.equal(local.editResults(review({ ...LOCAL_REVIEW, local: null })), null);
   assert.equal(local.editResults(review({ ...LOCAL_REVIEW, status: "succeeded" })), null);
@@ -391,6 +412,21 @@ test("Studio v2: 400 for boksene og teksten, og 409 ved «Prøv igjen», gir ret
     kind: "error",
     httpStatus: 400,
   });
+});
+
+test("Fritekst: text_required og text_too_long gjelder hver boks (500 tegn), og ingen tekst ber om knappene", () => {
+  assert.equal(codeText("nb", "localError", "text_required"), "Skriv hva som skal endres i hver boks.");
+  assert.equal(codeText("nb", "localError", "text_too_long"), "Teksten kan ha høyst 500 tegn per boks.");
+  assert.equal(codeText("en", "localError", "text_too_long"), "The text can have at most 500 characters per box.");
+  // Knappene finnes ikke lenger: ingen feilmelding eller veiledning ber megleren velge dem.
+  for (const locale of ["nb", "en"] as const) {
+    const texts = [
+      ...Object.values(DICTIONARIES[locale].codes.localError),
+      t(locale, "local.hint"),
+      t(locale, "local.missingText", { n: 1 }),
+    ];
+    for (const text of texts) assert.doesNotMatch(text, /Slukk, Tenn|Legg til|Put out, Light|with Add|200/, text);
+  }
 });
 
 test("FE-3: 409 raw_missing og raw_mismatch har egen tekst her (ikke lysstyrkens), correction_limit som foer", () => {
@@ -518,9 +554,14 @@ test("Studio v2: siden: lerretet med nummererte bokser, lista, én knapp, og ing
 test("Studio v2: panelet og lista: samme nummer som i bildet, hover begge veier, store trykkflater", () => {
   const panel = read("components/godkjenning/LocalEditPanel.tsx");
   assert.match(panel, /boxes\.map\(\(box, i\) => \(\s*<EditRow[\s\S]*?n=\{i \+ 1\}/);
-  assert.match(panel, /LOCAL_INSTRUCTIONS\.map\(/);
-  assert.match(panel, /\{draft\.instruction === "add" && \(/);
-  assert.match(panel, /maxLength=\{LOCAL_TEXT_MAX\}/);
+  // Fritekst: tekstfeltet med eksempel og teller i hver rad, og ingen instruksknapper.
+  assert.doesNotMatch(panel, /LOCAL_INSTRUCTIONS|aria-pressed|draft\.instruction/);
+  assert.match(panel, /<textarea[\s\S]*?maxLength=\{LOCAL_TEXT_MAX\}[\s\S]*?placeholder=\{t\(locale, "local\.textPlaceholder"\)\}/);
+  assert.match(panel, /t\(locale, "local\.textCount", \{ n: draft\.text\.length, max: LOCAL_TEXT_MAX \}\)/);
+  // Infoknappen (i) ved overskriften: aria-expanded, kontrollerer teksten, og minst 44 px.
+  assert.match(panel, /aria-expanded=\{infoOpen\}\s*aria-controls=\{infoId\}\s*aria-label=\{t\(locale, "local\.infoLabel"\)\}/);
+  assert.match(panel, /className=\{`flex size-11 /);
+  assert.match(panel, /<p id=\{infoId\} hidden=\{!infoOpen\}[^>]*>\s*\{t\(locale, "local\.infoText"\)\}/);
   assert.match(panel, /onPointerEnter=\{\(e\) => e\.pointerType === "mouse" && onActive\(id\)\}/);
   assert.match(panel, /onFocus=\{\(\) => onActive\(id\)\}/);
   assert.match(panel, /t\(locale, "local\.submit", \{ n: boxes\.length \}\)/);
@@ -539,6 +580,9 @@ test("Studio v2: panelet og lista: samme nummer som i bildet, hover begge veier,
   assert.match(results, /row\.canRetry && \(/);
   assert.match(results, /onClick=\{\(\) => onRetry\(row\.k\)\}/);
   assert.match(results, /codeText\(locale, "localEditError", row\.code\)/);
+  // Meglerens tekst som overskrift (resultLabel), ellers ordlista.
+  assert.match(results, /const head = resultLabel\(row\);/);
+  assert.match(results, /head\.text !== null \? `«\$\{head\.text\}»` : t\(locale, head\.key, head\.vars\)/);
   // Boksene i glideren tar ikke imot pekeren.
   assert.match(read("components/godkjenning/LocalEditBoxes.tsx"), /aria-hidden="true" className="pointer-events-none absolute inset-0"/);
   // Glideren: forrige versjon til venstre, men «Hold for original» viser originalen.

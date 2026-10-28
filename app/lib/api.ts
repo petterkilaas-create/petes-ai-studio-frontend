@@ -1105,13 +1105,16 @@ export type LocalEditNumber = 1 | 2 | 3 | 4;
 /**
  * En endring i den lokale runden (studio v2, `local.edits[]`): nummeret,
  * instruksen, boksen (hjoernene i 0–1, null naar den mangler), lengden paa
- * teksten og status: "ok" eller koden for hvorfor endringen ikke ble gjort.
+ * teksten, teksten og status: "ok" eller koden for hvorfor endringen ikke ble
+ * gjort. Teksten (fritekst, D2) faar bare eieren; null for andre og etter
+ * slettejobben.
  */
 export interface ReviewLocalEdit {
   k: LocalEditNumber;
-  instruction: LocalInstruction | null;
+  instruction: ReviewLocalInstruction | null;
   box: { from: { x: number; y: number }; to: { x: number; y: number } } | null;
   textLen: number | null;
+  text: string | null;
   status: string;
 }
 
@@ -1843,7 +1846,7 @@ function editNumber(value: unknown): LocalEditNumber | null {
   return value === 1 || value === 2 || value === 3 || value === 4 ? value : null;
 }
 
-const LOCAL_INSTRUCTION_SET: ReadonlySet<string> = new Set(["fire_out", "light", "remove", "add"]);
+const LOCAL_INSTRUCTION_SET: ReadonlySet<string> = new Set(["text", "fire_out", "light", "remove", "add"]);
 
 /**
  * Boksen som [[x0, y0], [x1, y1]] i 0–1, eller null ved feil form. Formen
@@ -1879,10 +1882,11 @@ export function toReviewLocal(raw: unknown): ReviewLocal | null {
     const k = editNumber(e.k);
     if (k === null || edits.some((x) => x.k === k)) continue;
     const instruction = typeof e.instruction === "string" && LOCAL_INSTRUCTION_SET.has(e.instruction)
-      ? (e.instruction as LocalInstruction)
+      ? (e.instruction as ReviewLocalInstruction)
       : null;
     const textLen = typeof e.text_len === "number" && Number.isInteger(e.text_len) && e.text_len >= 0 ? e.text_len : null;
-    edits.push({ k, instruction, box: toEditBox(e.box), textLen, status: nonEmptyString(e.status) ?? "unknown" });
+    const text = nonEmptyString(e.text);
+    edits.push({ k, instruction, box: toEditBox(e.box), textLen, text, status: nonEmptyString(e.status) ?? "unknown" });
   }
   if (edits.length === 0) return null;
   edits.sort((a, b) => a.k - b.k);
@@ -1991,14 +1995,23 @@ export interface DecisionRequest {
   local?: LocalRequest;
 }
 
-/** Instruksene i «Marker og beskriv»: Slukk, Tenn, Fjern dette og Legg til. */
+/**
+ * De gamle instruksene i «Marker og beskriv» (Slukk, Tenn, Fjern dette og
+ * Legg til). Frontend sender dem ikke lenger, men review viser dem for runder
+ * fra foer fritekst.
+ */
 export type LocalInstruction = "fire_out" | "light" | "remove" | "add";
 
-/** En endring i body: boksen med hjoernene i 0–1 i resultatets ramme, og teksten bare ved add. */
+/** Instruksen i review: "text" for fritekst (nye runder), ellers en av de gamle. */
+export type ReviewLocalInstruction = "text" | LocalInstruction;
+
+/**
+ * En endring i body (fritekst, Dag 58): boksen med hjoernene i 0–1 i
+ * resultatets ramme og hva som skal endres der (1–500 tegn). Ingen instruks.
+ */
 export interface LocalEditRequest {
   shape: { shape: "box"; points: [number, number][] };
-  instruction: LocalInstruction;
-  text?: string;
+  text: string;
 }
 
 /**
