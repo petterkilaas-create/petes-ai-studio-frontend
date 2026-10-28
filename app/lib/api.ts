@@ -1,8 +1,16 @@
-// Bare typer, pluss den rene quota.ts (.ts-endelse: testes med node --test).
+// Bare typer, pluss de rene quota.ts, retry.ts og feedback.ts (.ts-endelse: testes med node --test).
 import type { DuskSky, DuskStyle, DuskTime, ReviewDusk, ReviewStyle } from "./dusk";
 import type { ReviewDisclosure } from "./disclosure";
 import { parseQuota, type Quota } from "./quota.ts";
 import { getWithRetry, isNetworkError, isRetryableStatus, TransientError } from "./retry.ts";
+import {
+  parseFeedback,
+  ratingOrNull,
+  type FeedbackRating,
+  type FeedbackRequest,
+  type FeedbackResult,
+  type JobFeedback,
+} from "./feedback.ts";
 
 const apiBase = process.env.NEXT_PUBLIC_API_BASE;
 if (!apiBase) {
@@ -781,6 +789,8 @@ interface JobSummaryWire {
   quota_return?: unknown;
   /** TG-NEW-263: antall oensker tatt med (bare koder, aldri tekst), eller null. */
   wishes_summary?: unknown;
+  /** Dag 58 (valg 1A): stjernene fra siste tilbakemelding (1–5), eller null. */
+  feedback_rating?: unknown;
 }
 
 /**
@@ -886,6 +896,8 @@ export interface JobSummary {
   quotaReturn?: QuotaReturn;
   /** TG-NEW-263: oppsummeringen av oenskene (bare tall). null og undefined: ingen linje. */
   wishesSummary?: WishesSummary | null;
+  /** Dag 58: stjernene fra siste tilbakemelding (feedback.ts). null og undefined: ingen. */
+  feedbackRating?: FeedbackRating | null;
 }
 
 /** Statusene i filteret «Venter paa meg» (GET /v1/jobs?status=, 2d-1a). */
@@ -988,6 +1000,7 @@ export async function listJobs(opts: {
     reasonCodes: stringList(row.reason_codes),
     quotaReturn: parseQuotaReturn(row.quota_return),
     wishesSummary: toWishesSummary(row.wishes_summary),
+    feedbackRating: ratingOrNull(row.feedback_rating),
   }));
 }
 
@@ -2109,4 +2122,50 @@ export async function postDecision(opts: {
     getToken
   );
   return parseDecisionResponse(res.status, await readJson(res));
+}
+
+// ---------------------------------------------------------------------------
+// Tilbakemelding fra megleren (Dag 58): POST og GET /v1/jobs/{id}/feedback
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /v1/jobs/{id}/feedback (RAPPORT_FEEDBACK_BE §3): 201 er lagret, 400 er
+ * ugyldig vurdering, knapp, tekst eller runde (koden i `detail.code`, f.eks.
+ * `tag_invalid`). Alt annet (409 `action_not_allowed` og `feedback_not_allowed`,
+ * 503) er en feil; tilbakemeldingen stopper aldri noe, saa kortet viser bare en linje.
+ */
+export async function postFeedback(opts: {
+  jobId: string;
+  body: FeedbackRequest;
+  getToken: GetToken;
+}): Promise<FeedbackResult> {
+  const url = `${API_BASE}/v1/jobs/${encodeURIComponent(opts.jobId)}/feedback`;
+  const res = await authedFetch(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts.body),
+    },
+    opts.getToken
+  );
+  if (res.status === 201) return { kind: "ok" };
+  if (res.status === 400) return { kind: "invalid", code: errorCode(await readJson(res)) };
+  return { kind: "error" };
+}
+
+/**
+ * GET /v1/jobs/{id}/feedback: siste innsending fra `{feedback, tags_allowed}`
+ * (RAPPORT_FEEDBACK_BE §3), eller null naar det ikke finnes noen
+ * (`feedback: null` eller 404). Andre svar kaster, saa kalleren kan vise en
+ * feil i stedet for aa sende uten forrige innsending. Knappene staar i
+ * feedback.ts; `tags_allowed` brukes ikke.
+ */
+export async function getFeedback(opts: { jobId: string; getToken: GetToken }): Promise<JobFeedback | null> {
+  const url = `${API_BASE}/v1/jobs/${encodeURIComponent(opts.jobId)}/feedback`;
+  const res = await authedFetch(url, { method: "GET" }, opts.getToken);
+  if (res.status === 404 || res.status === 204) return null;
+  if (res.status !== 200) throw new Error(`getFeedback failed (${res.status})`);
+  const body = await readJson(res);
+  return parseFeedback(isRecord(body) ? body.feedback : null);
 }

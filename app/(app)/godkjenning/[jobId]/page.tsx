@@ -96,6 +96,7 @@ import { canShowMarkers } from "@/app/lib/lightsView";
 import { panelShown } from "@/app/lib/presets";
 import { canShowAdditions } from "@/app/lib/additions";
 import { checklistFor } from "@/app/lib/checklist";
+import { feedbackMode, feedbackRound } from "@/app/lib/feedback";
 import { framingWarning, orderTabs } from "@/app/lib/orderTabs";
 import { doneTitleKey, failedLines, stopDoneKey } from "@/app/lib/notCreated";
 import {
@@ -118,6 +119,7 @@ import { VersionStrip } from "@/app/components/godkjenning/VersionStrip";
 import { MakingOverlay } from "@/app/components/godkjenning/MakingOverlay";
 import { Lightbox } from "@/app/components/godkjenning/Lightbox";
 import { DecisionCard } from "@/app/components/godkjenning/DecisionCard";
+import { FeedbackCard } from "@/app/components/godkjenning/FeedbackCard";
 import { OrderTabs } from "@/app/components/godkjenning/OrderTabs";
 import { CorrectionPanel } from "@/app/components/godkjenning/CorrectionPanel";
 import { LocalEditPanel } from "@/app/components/godkjenning/LocalEditPanel";
@@ -203,6 +205,11 @@ import { choiceClass, FOCUS } from "@/app/components/godkjenning/classes";
  * «Lag i en annen årstid» (Dag 58, TG-NEW-273): for eieren av en
  * aarstidsjobb (seasonSwitch) staar knappen under kortet med handlingene,
  * med kostlinja fra GET /v1/quota. Etter 202 aapnes den nye bestillingen.
+ *
+ * Tilbakemeldingen (Dag 58): etter «Godkjenn» eller «Avvis» staar kortet
+ * «Hvor fornøyd er du med bildet?» (FeedbackCard) under resultatkortet, for
+ * eieren naar et bilde ble laget (feedbackMode). Admin paa en annen brukers
+ * jobb ser eierens tilbakemelding bare for lesing. Det stopper aldri noe.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -681,6 +688,7 @@ export default function GodkjenningPage({
             const deleted = mediaDeleted(review);
             const tabs = orderTabs(review.order, jobId, locale);
             const sw = seasonSwitch(review);
+            const feedback = feedbackMode(review);
 
             return (
               <>
@@ -879,33 +887,45 @@ export default function GodkjenningPage({
 
                   <div className="flex flex-col gap-6 min-w-0">
                     {done !== null ? (
-                      // Nedlasting og tekst til annonsen der resultatet vises (etter godkjenning).
-                      <section className={CARD}>
-                        <p className="text-ink font-bold">{t(locale, doneTitleKey(done.key, stopDone))}</p>
-                        {done.reason && (
-                          <p className="text-sm text-ink mt-2 break-words">
-                            {t(locale, "review.reasonLabel")}: {done.reason}
-                          </p>
+                      <>
+                        {/* Nedlasting og tekst til annonsen der resultatet vises (etter godkjenning). */}
+                        <section className={CARD}>
+                          <p className="text-ink font-bold">{t(locale, doneTitleKey(done.key, stopDone))}</p>
+                          {done.reason && (
+                            <p className="text-sm text-ink mt-2 break-words">
+                              {t(locale, "review.reasonLabel")}: {done.reason}
+                            </p>
+                          )}
+                          {doneLines.map((key) => (
+                            <p key={key} className="text-sm text-ink mt-2">
+                              {t(locale, key)}
+                            </p>
+                          ))}
+                          {typeLine !== null && <p className="text-sm text-ink mt-2">{noteText(locale, typeLine)}</p>}
+                          {canDownload(review) && <DownloadButton jobId={review.jobId} presetId={review.presetId} locale={locale} />}
+                          {review.status === "succeeded" && (
+                            <DisclosureBlock disclosure={review.disclosure} locale={locale} />
+                          )}
+                          {messageText !== null && (
+                            <p
+                              className="mt-6 text-sm text-amber-fg bg-amber-bg rounded-button p-3"
+                              role="status"
+                            >
+                              {messageText}
+                            </p>
+                          )}
+                        </section>
+                        {/* Dag 58: tilbakemeldingen etter «Godkjenn» eller «Avvis»; admin leser andres. */}
+                        {feedback !== null && (
+                          <FeedbackCard
+                            jobId={review.jobId}
+                            readOnly={feedback === "read"}
+                            presetId={review.presetId}
+                            round={feedbackRound(review)}
+                            locale={locale}
+                          />
                         )}
-                        {doneLines.map((key) => (
-                          <p key={key} className="text-sm text-ink mt-2">
-                            {t(locale, key)}
-                          </p>
-                        ))}
-                        {typeLine !== null && <p className="text-sm text-ink mt-2">{noteText(locale, typeLine)}</p>}
-                        {canDownload(review) && <DownloadButton jobId={review.jobId} presetId={review.presetId} locale={locale} />}
-                        {review.status === "succeeded" && (
-                          <DisclosureBlock disclosure={review.disclosure} locale={locale} />
-                        )}
-                        {messageText !== null && (
-                          <p
-                            className="mt-6 text-sm text-amber-fg bg-amber-bg rounded-button p-3"
-                            role="status"
-                          >
-                            {messageText}
-                          </p>
-                        )}
-                      </section>
+                      </>
                     ) : (
                       <>
                         {results !== null && !isEditing && making === null && (

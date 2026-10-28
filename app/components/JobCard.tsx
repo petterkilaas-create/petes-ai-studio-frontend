@@ -12,6 +12,7 @@ import { OpenReviewLink } from "./OpenReviewLink";
 import { PrivacyDownloadButton } from "./PrivacyDownloadButton";
 import { canDownloadPrivacy } from "../lib/download";
 import { JobMedia } from "./JobMedia";
+import { HistoryStars } from "./HistoryStars";
 import { cardNote, mediaView } from "../lib/jobMedia";
 import { formatDate } from "../lib/dates";
 import { cardClass } from "./ui/Card";
@@ -111,6 +112,8 @@ export function JobCard({ job, thumb }: { job: JobSummary; thumb: string | null 
           {formatDate(job.createdAt, locale)}
         </span>
         {wishes !== null && <span className="text-ink-2 text-[13px]">{t(locale, wishes.key, wishes.vars)}</span>}
+        {/* Dag 58: stjernene fra tilbakemeldingen; eieren kan endre dem. */}
+        <HistoryStars job={job} locale={locale} />
         {note !== null && (
           // TG-NEW-117: miniatyren finnes, men bildene i full stoerrelse er slettet.
           <span className="text-ink-2 text-[13px]">{t(locale, note)}</span>

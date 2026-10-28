@@ -4,6 +4,7 @@ import type { JobSummary } from "../lib/api";
 import { StatusPill } from "./JobCard";
 import { OpenReviewLink } from "./OpenReviewLink";
 import { JobMedia } from "./JobMedia";
+import { HistoryStars } from "./HistoryStars";
 import { mediaView } from "../lib/jobMedia";
 import {
   orderDate,
@@ -101,6 +102,8 @@ export function OrderCard({ jobs, thumbs }: { jobs: JobSummary[]; thumbs: (strin
                   {t(locale, key)}
                 </p>
               ))}
+              {/* Dag 58: stjernene per stil; eieren kan endre dem. */}
+              <HistoryStars job={line.job} locale={locale} />
             </li>
           ))}
         </ul>
