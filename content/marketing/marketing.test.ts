@@ -177,7 +177,9 @@ test("MS2: bildene har alt-tekst og finnes i images.ts, og bare images.ts import
     assert.ok(existsSync(join(CONTENT_DIR, m[1])), m[1]);
   }
   // F7: de to gamle toppbildene er slettet (11 -> 9). Dag 58 (F2): to par og eksempelet fra Tjenester (9 -> 14).
-  assert.equal([...images.matchAll(/^import \w+ from "\.\/images\//gm)].length, 14);
+  // Dag 58 (stylingkort): eksempelet er byttet med Japandi-paret (14 -> 15).
+  assert.equal([...images.matchAll(/^import \w+ from "\.\/images\//gm)].length, 15);
+  assert.ok(!existsSync(join(CONTENT_DIR, "images/styling-eksempel.jpg")));
   for (const f of filesIn("content").filter((f) => f !== "content/marketing/images.ts")) {
     assert.doesNotMatch(read(f), /\.(jpe?g|png|webp|avif)"/, f);
   }
@@ -192,6 +194,9 @@ test("MS2: bildene har alt-tekst og finnes i images.ts, og bare images.ts import
     ["par-rydd-resultat.jpg", [1536, 1024]],
     ["par-styling-original.jpg", [1536, 1024]],
     ["par-styling-resultat.jpg", [1536, 1024]],
+    // Dag 58 (stylingkort): Japandi-paret i 1600x1067, som Tjenester.
+    ["par-japandi-original.jpg", [1600, 1067]],
+    ["par-japandi-resultat.jpg", [1600, 1067]],
     ["film-plakat.jpg", [1280, 720]],
     ["lokke-plakat.jpg", [720, 480]],
   ] as const) {
@@ -1370,18 +1375,19 @@ test("F3: mosaikken, kveldsbildet foerst; Dag 58: fire ruter med de bestillbare 
     image: { image: "pairEveningResult", alt: "Stue som kveldsbilde laget med AI, med AI-merket nede til venstre" },
   });
   // Dag 58 (F2): bildene er ekte, med AI-merket i bildet, uten pending. Digital
-  // styling er originalen med «Eksempel», som paa Tjenester.
+  // styling er Japandi-resultatet (stylingkort, Dag 58), som paa Tjenester.
   assert.deepEqual(tiles.map((t) => t.image.image), [
     "pairEveningResult",
     "pairSeasonResult",
     "pairSkyResult",
-    "stylingExample",
+    "pairJapandiResult",
   ]);
   for (const t of tiles) assert.ok(!("pending" in t.image), t.label);
-  assert.deepEqual(tiles.map((t) => t.example ?? null), [null, null, null, "Eksempel"]);
-  // Resultatene sier i alt-teksten at de er laget med AI og har merket; originalen sier at den er originalen.
+  // Ingen rute er et eksempel lenger.
+  assert.deepEqual(tiles.map((t) => t.example ?? null), [null, null, null, null]);
+  // Resultatene sier i alt-teksten at de er laget med AI og har merket.
   for (const t of tiles.slice(0, 3)) assert.match(t.image.alt, /laget med AI, med AI-merket nede til venstre$/);
-  assert.ok(!/AI/.test(tiles[3].image.alt) && /originalbildet/.test(tiles[3].image.alt));
+  assert.match(tiles[3].image.alt, /med AI, med AI-merket nede til venstre$/);
   // Filmen er ute av mosaikken (Petter 28.10); den staar i filmseksjonen.
   for (const t of tiles) assert.ok(!("video" in t), t.label);
 });
@@ -1473,7 +1479,7 @@ test("F4: tjenestene har tekstene Petter bestemte, og Skjul ansikter og skilt er
     [
       ["scene_transform", "Bestill kveldsbilde", "split"],
       ["aarstider", "Bestill årstider", "split"],
-      ["virtual_stage", "Bestill digital styling", "example"],
+      ["virtual_stage", "Bestill digital styling", "split"],
       ["klart_vaer", "Bestill blå himmel", null],
     ]
   );
@@ -1555,14 +1561,15 @@ test("F4: det ekte AI-merket synes: resultatet til venstre, nede til venstre i u
     assert.ok(!("pending" in season.media.after) && !("pending" in season.media.before));
     assert.deepEqual(season.media.labels, { after: "Vinter", before: "Sommer" });
   }
-  // Digital styling: bare originalen, med «Eksempel» og uten AI-lapp.
+  // Digital styling (Dag 58, stylingkort): Japandi-paret, som paa Tjenester.
   const styling = home.services.items[2];
   assert.ok(styling.size === "large");
   if (styling.size === "large") {
     assert.deepEqual(styling.media, {
-      kind: "example",
-      image: { image: "stylingExample", alt: "Tom stue med hvite panelvegger, originalbildet uten møbler" },
-      label: "Eksempel",
+      kind: "split",
+      after: { image: "pairJapandiResult", alt: "Soverom møblert digitalt med AI, med AI-merket nede til venstre" },
+      before: { image: "pairJapandiOriginal", alt: "Samme soverom uten møbler" },
+      labels: { after: "Møblert", before: "Tomt" },
     });
   }
   const src = withoutComments(read("app/components/marketing/Services.tsx"));
@@ -1603,7 +1610,8 @@ test("Dag 58 (F2): bildene fra Tjenester er byte-like kopier, og forsiden viser 
     ["par-aarstid-resultat.jpg", "aarstid-etter.jpg"],
     ["par-himmel-original.jpg", "himmel-for.jpg"],
     ["par-himmel-resultat.jpg", "himmel-etter.jpg"],
-    ["styling-eksempel.jpg", "styling-for.jpg"],
+    ["par-japandi-original.jpg", "styling-for.jpg"],
+    ["par-japandi-resultat.jpg", "styling-etter.jpg"],
   ];
   for (const [copy, source] of COPIES) {
     const a = readFileSync(join(CONTENT_DIR, "images", copy));
@@ -1611,10 +1619,17 @@ test("Dag 58 (F2): bildene fra Tjenester er byte-like kopier, og forsiden viser 
     assert.ok(a.equals(b), `${copy} er ikke lik ${source}`);
   }
   assert.doesNotMatch(withoutComments(read("content/marketing/images.ts")), /tjenester\/bilder/);
-  // Tjenester viser Digital styling som original med «Eksempel» (cardImages.ts); forsiden det samme.
-  assert.match(withoutComments(read("app/(app)/tjenester/cardImages.ts")), /digital_styling: \{ before: stylingBefore \}/);
+  // Tjenester viser Digital styling som foer/etter-par (cardImages.ts); forsiden det samme.
+  assert.match(
+    withoutComments(read("app/(app)/tjenester/cardImages.ts")),
+    /digital_styling: \{ before: stylingBefore, after: stylingAfter \}/
+  );
   const styling = home.services.items.find((s) => s.id === "virtual_stage");
-  assert.ok(styling && styling.size === "large" && styling.media.kind === "example");
+  assert.ok(styling && styling.size === "large" && styling.media.kind === "split");
+  if (styling && styling.size === "large" && styling.media.kind === "split") {
+    assert.equal(styling.media.after.image, "pairJapandiResult");
+    assert.equal(styling.media.before.image, "pairJapandiOriginal");
+  }
 });
 
 test("F4: F1-vakta: tjenestene har ingen midlertidige bilder lenger (Dag 58)", () => {

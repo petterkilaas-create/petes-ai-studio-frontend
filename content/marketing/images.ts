@@ -13,7 +13,8 @@ import pairSeasonOriginal from "./images/par-aarstid-original.jpg";
 import pairSeasonResult from "./images/par-aarstid-resultat.jpg";
 import pairSkyOriginal from "./images/par-himmel-original.jpg";
 import pairSkyResult from "./images/par-himmel-resultat.jpg";
-import stylingExample from "./images/styling-eksempel.jpg";
+import pairJapandiOriginal from "./images/par-japandi-original.jpg";
+import pairJapandiResult from "./images/par-japandi-resultat.jpg";
 
 // Bildene importeres statisk, saa next/image faar bredde og hoeyde
 // (AUDIT_MARKEDSSIDE §7). Den eneste fila med bildeimport:
@@ -33,8 +34,8 @@ import stylingExample from "./images/styling-eksempel.jpg";
 // - Dag 58 (F2, TG-NEW-271): byte-like kopier av bildene paa Tjenester
 //   (app/(app)/tjenester/bilder/, sha256 sjekket), 1600x1067 (3:2). Ekte, med
 //   AI-merket nede til venstre: pairSeason* (aarstid-for/-etter) og pairSky*
-//   (himmel-for/-etter). stylingExample er originalen til Digital styling
-//   (styling-for.jpg), vist med «Eksempel» til et godkjent resultat finnes.
+//   (himmel-for/-etter) og pairJapandi* (styling-for/-etter, Digital
+//   styling, rom 13849265_2 i Japandi; erstattet originalen med «Eksempel»).
 //   pairCleanup* og pairStyling* brukes ikke lenger paa forsiden.
 export const IMAGES: Record<ImageKey, StaticImageData> = {
   merkingEvening,
@@ -48,7 +49,8 @@ export const IMAGES: Record<ImageKey, StaticImageData> = {
   pairSeasonResult,
   pairSkyOriginal,
   pairSkyResult,
-  stylingExample,
+  pairJapandiOriginal,
+  pairJapandiResult,
   filmPoster,
   loopPoster,
 };

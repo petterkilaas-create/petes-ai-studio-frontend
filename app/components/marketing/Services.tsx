@@ -21,8 +21,8 @@ import { CONTAINER, FOCUS, H2, LEAD, SECTION_Y } from "./classes";
  * venstre i bildet og maa synes (auditen §3). Begge bildene har samme
  * utsnitt nede til venstre (object-left-bottom), saa halvdelene ligger likt.
  * AI-lappen oeverst til venstre er et tillegg og erstatter ikke merket i
- * bildet. Et eksempel (Digital styling) er bare originalen, med «Eksempel»
- * og uten AI-lapp.
+ * bildet. Et eksempel er bare originalen, med «Eksempel» og uten AI-lapp
+ * (ingen kort bruker det etter Dag 58; Digital styling har et ekte par).
  */
 
 const SIZES = "(min-width: 1320px) 400px, (min-width: 1024px) 31vw, 100vw";

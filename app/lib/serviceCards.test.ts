@@ -116,11 +116,11 @@ test("D-1: bildene: kveldsparet fra forsiden, himmelen fra repoet, bare original
   assert.match(src, /skumring: \{ before: IMAGES\.pairEveningOriginal, after: IMAGES\.pairEveningResult \}/);
   assert.match(src, /klart_vaer: \{ before: skyBefore, after: skyAfter \}/);
   assert.match(src, /privacy_blur: \{ before: IMAGES\.pairEveningOriginal \}/);
-  // Digital styling: bare originalen (Petter 25.10, valg b). Probe-resultatet
-  // fjernet panelovnene og stikkontaktene og brukes ikke.
-  assert.match(src, /digital_styling: \{ before: stylingBefore \}/);
+  // Digital styling (Dag 58): Japandi-paret fra STYLINGKORT A (rom 13849265_2),
+  // med AI-merket fra backend i etter-bildet.
+  assert.match(src, /digital_styling: \{ before: stylingBefore, after: stylingAfter \}/);
   assert.match(src, /^import stylingBefore from "\.\/bilder\/styling-for\.jpg";$/m);
-  assert.doesNotMatch(src, /styling-etter/);
+  assert.match(src, /^import stylingAfter from "\.\/bilder\/styling-etter\.jpg";$/m);
   // Illustrasjonen (uskarpe plakater) og fotografens styling-bilder brukes ikke.
   assert.doesNotMatch(src, /skjul|pairStyling/i);
   for (const m of src.matchAll(/from "\.\/(bilder\/[\w-]+\.jpg)";/g)) {

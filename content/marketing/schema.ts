@@ -22,7 +22,8 @@ export type ImageKey =
   | "pairSeasonResult"
   | "pairSkyOriginal"
   | "pairSkyResult"
-  | "stylingExample"
+  | "pairJapandiOriginal"
+  | "pairJapandiResult"
   | "filmPoster"
   | "loopPoster";
 
