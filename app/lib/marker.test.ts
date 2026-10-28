@@ -448,6 +448,28 @@ test("FE-3: merketeksten versjon 10: objects_removed og objects_added er egne se
   );
 });
 
+test("Fritekst: merketeksten versjon 11: areas_edited er en egen setning, ogsaa sammen med de gamle kodene", () => {
+  assert.equal(
+    txt(disclosureText("nb", d(["areas_edited"]), "edited")),
+    `${BASE_NB} Markerte områder er redigert digitalt.`
+  );
+  // En ny markering paa et bilde med gamle runder bak seg (local_chain): begge kodene.
+  assert.equal(
+    txt(disclosureText("nb", d(["window_lights", "objects_removed", "areas_edited"]), "edited")),
+    `${BASE_NB} Lys i vinduer er redigert. Gjenstander er fjernet digitalt. Markerte områder er redigert digitalt.`
+  );
+  assert.equal(txt(disclosureText("nb", d(["areas_edited"]), "base")), BASE_NB);
+  assert.equal(
+    txt(disclosureText("en", d(["areas_edited"]), "edited")),
+    "Evening image created with AI from a daytime photo. Marked areas have been edited digitally."
+  );
+  // Aarstidsbasene tar ikke de lokale kodene.
+  assert.deepEqual(
+    disclosureText("nb", d(["areas_edited"], { base: "season_winter", time: null }), "edited"),
+    { kind: "missing" }
+  );
+});
+
 // --- Siden og komponentene ------------------------------------------------------------
 
 test("Studio v2: siden: lerretet med nummererte bokser, lista, én knapp, og ingen kandidater", () => {
