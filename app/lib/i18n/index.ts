@@ -50,6 +50,7 @@ export type CodeGroup =
   | "localError"
   | "localRoundError"
   | "localEditError"
+  | "localOriginalError"
   | "disclosureLocal";
 
 const nbUi = {
@@ -251,6 +252,8 @@ const nbUi = {
   "additions.warning": "Kontrollen fant mulige endringer: {list}. Se markeringene i bildet.",
   "additions.note": "Kontrollen fant noe du bør se på: {list}.",
   "additions.unchecked": "Ikke kontrollert automatisk.",
+  // Etter en lokal runde staar kontrollen fra basen (ORIGINAL_BYGG, Petter 28.10).
+  "additions.checkedVersion": "Kontrollen gjelder versjon {n}. Sjekk selv at rettingene ser riktige ut.",
   "additions.and": "og",
   "additions.show": "Vis mulige endringer",
   "additions.listLabel": "Mulige endringer i bildet",
@@ -313,6 +316,13 @@ const nbUi = {
   "local.showBoxes": "Vis boksene",
   "local.previous": "Forrige versjon",
   "local.previousAlt": "Forrige versjon av bildet",
+  // «Som i originalen» (ORIGINAL_BYGG, Dag 58).
+  "local.original": "Som i originalen",
+  "local.originalInfoLabel": "Om «Som i originalen»",
+  "local.originalInfoText":
+    "Henter det som var i originalbildet her, også lys og ild. Bruk det når noe er lagt til som ikke skal være der.",
+  "local.originalComes": "Dette kommer tilbake",
+  "local.originalCropAlt": "Utsnitt av originalbildet i boks {n}",
   "decision.statusChanged": "Jobben ble endret i mellomtiden. Siden er oppdatert. Se over den før du velger på nytt.",
   "decision.error": "Noe gikk galt. Prøv igjen senere.",
   "express.openReview": "Åpne godkjenning",
@@ -1117,6 +1127,9 @@ const nb: Dictionary = {
       answer_invalid: "Svaret fra bildemodellen kunne ikke leses. Du har fortsatt forrige bilde, og runden er ikke brukt. Prøv igjen.",
       edits_overlap: "Områdene ble for store og overlappet hverandre. Dra boksene lenger fra hverandre. Du har fortsatt forrige bilde, og runden er ikke brukt.",
       no_edit: "Ingen av endringene kunne gjøres. Du har fortsatt forrige bilde, og runden er ikke brukt.",
+      original_missing: "Originalbildet finnes ikke lenger, så området kunne ikke hentes tilbake. Du har fortsatt forrige bilde, og runden er ikke brukt.",
+      original_invalid: "Originalbildet kunne ikke leses, så området kunne ikke hentes tilbake. Du har fortsatt forrige bilde, og runden er ikke brukt.",
+      original_ring_empty: "Området rundt boksen er for lite til å tilpasse originalen. Dra en mindre boks. Du har fortsatt forrige bilde, og runden er ikke brukt.",
     },
     // Status per endring i lista etter runden (studio v2, `local.edits[].status`).
     localEditError: {
@@ -1131,6 +1144,16 @@ const nb: Dictionary = {
       answer_invalid: "Svaret fra bildemodellen kunne ikke leses. Prøv igjen.",
       edits_overlap: "Området overlappet en annen endring. Flytt boksen og prøv igjen.",
       retry_source_missing: "Endringen kunne ikke prøves igjen. Marker området på nytt.",
+      original_missing: "Originalbildet finnes ikke lenger, så området kunne ikke hentes tilbake.",
+      original_invalid: "Originalbildet kunne ikke leses, så området kunne ikke hentes tilbake.",
+      original_ring_empty: "Området rundt boksen er for lite til å tilpasse originalen. Dra en mindre boks.",
+    },
+    // «Som i originalen» i lista etter runden: uten «Prøv igjen», som ikke tilbys (A1).
+    localOriginalError: {
+      align_inliers: "Originalen kunne ikke passes inn i bildet her. Beskriv endringen med tekst i stedet.",
+      original_missing: "Originalbildet finnes ikke lenger, så området kunne ikke hentes tilbake.",
+      original_invalid: "Originalbildet kunne ikke leses, så området kunne ikke hentes tilbake.",
+      original_ring_empty: "Området rundt boksen er for lite til å tilpasse originalen. Dra en mindre boks, eller beskriv endringen med tekst.",
     },
     // Merketeksten versjon 10: hele setninger etter lista «… er redigert.» (disclosure.ts).
     disclosureLocal: {
@@ -1174,6 +1197,7 @@ const nb: Dictionary = {
     localError: "Noe gikk galt. Prøv igjen senere.",
     localRoundError: "Det nye bildet kunne ikke lages. Du har fortsatt forrige bilde, og runden er ikke brukt.",
     localEditError: "Endringen ble ikke gjort.",
+    localOriginalError: "Området kunne ikke hentes fra originalen.",
     disclosureLocal: "Merketeksten kunne ikke lages.",
   },
 };
@@ -1370,6 +1394,7 @@ const en: Dictionary = {
     "additions.warning": "The check found possible changes: {list}. See the markings in the image.",
     "additions.note": "The check found something you should look at: {list}.",
     "additions.unchecked": "Not checked automatically.",
+    "additions.checkedVersion": "The check applies to version {n}. Check for yourself that the corrections look right.",
     "additions.and": "and",
     "additions.show": "Show possible changes",
     "additions.listLabel": "Possible changes in the image",
@@ -1430,6 +1455,12 @@ const en: Dictionary = {
     "local.showBoxes": "Show the boxes",
     "local.previous": "Previous version",
     "local.previousAlt": "Previous version of the image",
+    "local.original": "As in the original",
+    "local.originalInfoLabel": "About “As in the original”",
+    "local.originalInfoText":
+      "Brings back what was in the original photo here, including lights and fire. Use it when something has been added that should not be there.",
+    "local.originalComes": "This comes back",
+    "local.originalCropAlt": "Detail of the original photo in box {n}",
     "decision.statusChanged": "The job changed in the meantime. The page has been updated. Review it before choosing again.",
     "decision.error": "Something went wrong. Please try again later.",
     "express.openReview": "Open approval",
@@ -2160,6 +2191,9 @@ const en: Dictionary = {
       answer_invalid: "The answer from the image model could not be read. You still have the previous image, and the round has not been used. Please try again.",
       edits_overlap: "The areas became too large and overlapped. Drag the boxes further apart. You still have the previous image, and the round has not been used.",
       no_edit: "None of the changes could be made. You still have the previous image, and the round has not been used.",
+      original_missing: "The original photo no longer exists, so the area could not be brought back. You still have the previous image, and the round has not been used.",
+      original_invalid: "The original photo could not be read, so the area could not be brought back. You still have the previous image, and the round has not been used.",
+      original_ring_empty: "The area around the box is too small to match the original. Drag a smaller box. You still have the previous image, and the round has not been used.",
     },
     localEditError: {
       mask_empty: "No object was found in the box. Drag the box closer around it.",
@@ -2173,6 +2207,15 @@ const en: Dictionary = {
       answer_invalid: "The answer from the image model could not be read. Please try again.",
       edits_overlap: "The area overlapped another change. Move the box and try again.",
       retry_source_missing: "The change could not be tried again. Mark the area again.",
+      original_missing: "The original photo no longer exists, so the area could not be brought back.",
+      original_invalid: "The original photo could not be read, so the area could not be brought back.",
+      original_ring_empty: "The area around the box is too small to match the original. Drag a smaller box.",
+    },
+    localOriginalError: {
+      align_inliers: "The original could not be fitted into the image here. Describe the change with text instead.",
+      original_missing: "The original photo no longer exists, so the area could not be brought back.",
+      original_invalid: "The original photo could not be read, so the area could not be brought back.",
+      original_ring_empty: "The area around the box is too small to match the original. Drag a smaller box, or describe the change with text.",
     },
     disclosureLocal: {
       objects_removed: "Objects have been removed digitally.",
@@ -2214,6 +2257,7 @@ const en: Dictionary = {
     localError: "Something went wrong. Please try again later.",
     localRoundError: "The new image could not be created. You still have the previous image, and the round has not been used.",
     localEditError: "The change was not made.",
+    localOriginalError: "The area could not be brought back from the original.",
     disclosureLocal: "The disclosure text could not be created.",
   },
 };

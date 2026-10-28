@@ -818,8 +818,17 @@ test("normalizeReview: images.rounds (D2a, KONTRAKT_RUNDER)", () => {
         style: null,
         decorLevel: null,
       },
+      // Uten additions_check: ikke kontrollert (som toppfeltet).
+      additionsCheck: { status: null, level: "unchecked", items: [] },
     },
-    { round: 0, current: false, previewUrl: null, rawPreviewUrl: null, choices: null },
+    {
+      round: 0,
+      current: false,
+      previewUrl: null,
+      rawPreviewUrl: null,
+      choices: null,
+      additionsCheck: { status: null, level: "unchecked", items: [] },
+    },
   ]);
 });
 

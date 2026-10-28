@@ -90,6 +90,7 @@ export function DecisionCard({
   acknowledged,
   onAcknowledged,
   framingPct,
+  checkedVersion,
   message,
   locale,
 }: {
@@ -134,6 +135,12 @@ export function DecisionCard({
   onAcknowledged: (on: boolean) => void;
   /** Prosenten utenfor originalfotoet naar den er over grensen (framingWarning), ellers null. */
   framingPct: number | null;
+  /**
+   * Versjonen kontrollen gjelder naar gjeldende versjon er laget med lokale
+   * endringer (checkedVersion); da staar den linja i stedet for varselet og
+   * merknaden. null: som foer.
+   */
+  checkedVersion: number | null;
   message: string | null;
   locale: Locale;
 }) {
@@ -171,13 +178,18 @@ export function DecisionCard({
           {/* TG-NEW-199, D-5a og D-5c: kontrollen, rammen, sjekklista og krysset. Bare naar «Godkjenn» vises. */}
           {controls.approve && (
             <div className="flex flex-col gap-3">
-              {view.notice === "warning" && (
+              {checkedVersion !== null && (view.notice === "warning" || view.notice === "note") && (
+                <p className="text-sm text-amber-fg bg-amber-bg rounded-button p-3 break-words" role="status">
+                  {t(locale, "additions.checkedVersion", { n: checkedVersion })}
+                </p>
+              )}
+              {checkedVersion === null && view.notice === "warning" && (
                 <div className="flex flex-col gap-2 text-sm text-red-fg bg-red-bg rounded-button p-3 break-words" role="alert">
                   <p>{sentences.warning}</p>
                   {sentences.note !== null && <p>{sentences.note}</p>}
                 </div>
               )}
-              {view.notice === "note" && (
+              {checkedVersion === null && view.notice === "note" && (
                 <p className="text-sm text-amber-fg bg-amber-bg rounded-button p-3 break-words" role="status">
                   {sentences.note}
                 </p>

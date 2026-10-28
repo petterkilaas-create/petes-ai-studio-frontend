@@ -1198,6 +1198,12 @@ export interface ReviewRound {
   /** Bare admin; alle andre: alltid null. */
   rawPreviewUrl: string | null;
   choices: RoundChoices | null;
+  /**
+   * Kontrollen av tillegg for runden (`images.rounds[].additions_check`). En
+   * lokal runde har kontrollen fra basen (backend C2), saa den er lik. Mangler
+   * i eldre testdata.
+   */
+  additionsCheck?: AdditionsCheck;
 }
 
 /** Trinnene for lysstyrke (TG-NEW-147): -2 til 2. Navnet lages fra trinnet i brightness.ts. */
@@ -1681,6 +1687,7 @@ function toRounds(raw: unknown): ReviewRound[] | null {
             previewUrl: nonEmptyString(r.preview_url),
             rawPreviewUrl: nonEmptyString(r.raw_preview_url),
             choices: toRoundChoices(r.choices),
+            additionsCheck: toAdditionsCheck(r.additions_check),
           },
         ]
       : []
@@ -1859,7 +1866,7 @@ function editNumber(value: unknown): LocalEditNumber | null {
   return value === 1 || value === 2 || value === 3 || value === 4 ? value : null;
 }
 
-const LOCAL_INSTRUCTION_SET: ReadonlySet<string> = new Set(["text", "fire_out", "light", "remove", "add"]);
+const LOCAL_INSTRUCTION_SET: ReadonlySet<string> = new Set(["text", "original", "fire_out", "light", "remove", "add"]);
 
 /**
  * Boksen som [[x0, y0], [x1, y1]] i 0–1, eller null ved feil form. Formen
@@ -2015,17 +2022,21 @@ export interface DecisionRequest {
  */
 export type LocalInstruction = "fire_out" | "light" | "remove" | "add";
 
-/** Instruksen i review: "text" for fritekst (nye runder), ellers en av de gamle. */
-export type ReviewLocalInstruction = "text" | LocalInstruction;
+/**
+ * Instruksen i review: "text" for fritekst og "original" for «Som i
+ * originalen» (nye runder), ellers en av de gamle.
+ */
+export type ReviewLocalInstruction = "text" | "original" | LocalInstruction;
 
 /**
- * En endring i body (fritekst, Dag 58): boksen med hjoernene i 0–1 i
- * resultatets ramme og hva som skal endres der (1–500 tegn). Ingen instruks.
+ * En endring i body (Dag 58): boksen med hjoernene i 0–1 i resultatets ramme
+ * og hva som skal endres der (fritekst, 1–500 tegn), eller `mode: "original"`
+ * uten tekst («Som i originalen», ORIGINAL_BYGG: pikslene hentes fra
+ * originalen, uten modellkall). Ingen instruks.
  */
-export interface LocalEditRequest {
-  shape: { shape: "box"; points: [number, number][] };
-  text: string;
-}
+export type LocalEditRequest =
+  | { shape: { shape: "box"; points: [number, number][] }; text: string }
+  | { shape: { shape: "box"; points: [number, number][] }; mode: "original" };
 
 /**
  * `local` i body (studio v2): 1–4 endringer, eller «Prøv igjen» paa endring k

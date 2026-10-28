@@ -65,6 +65,7 @@ import {
   BOX_REJECTION_KEYS,
   buildLocalCorrection,
   buildRetry,
+  checkedVersion,
   editResults,
   localCompare,
   localInfo,
@@ -202,6 +203,11 @@ import { choiceClass, FOCUS } from "@/app/components/godkjenning/classes";
  * glideren viser forrige versjon mot ny med boksene (av/på; «Mot original» er
  * et valg). Feiler hele runden, staar teksten for `correction.last_round_error`
  * i kortet (roundFailedMessage).
+ *
+ * «Som i originalen» (ORIGINAL_BYGG, Dag 58): per boks i stedet for teksten,
+ * med et utsnitt av originalen (LocalEditPanel). Er gjeldende versjon laget
+ * med lokale endringer, staar «Kontrollen gjelder versjon N …» i stedet for
+ * varselet fra kontrollen (checkedVersion), fordi kontrollen er fra basen.
  *
  * «Lag i en annen årstid» (Dag 58, TG-NEW-273): for eieren av en
  * aarstidsjobb (seasonSwitch) staar knappen under kortet med handlingene,
@@ -1015,6 +1021,8 @@ export default function GodkjenningPage({
                                     info={localInfo(review)}
                                     onSubmit={submitLocal}
                                     onCancel={cancelCorrection}
+                                    originalUrl={review.images.originalUrl}
+                                    aspect={localAspect}
                                     locked={locked}
                                     locale={locale}
                                   />
@@ -1076,6 +1084,7 @@ export default function GodkjenningPage({
                           onAcknowledged={setAcknowledged}
                           approveLock={approveLock}
                           framingPct={framingWarning(review.framing)}
+                          checkedVersion={checkedVersion(review)}
                           message={messageText}
                           locale={locale}
                         />
