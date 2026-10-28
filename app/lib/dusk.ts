@@ -149,6 +149,39 @@ export function displayStyle(code: string, time: string | null): string {
   return code === STYLE_V1 && time === "late" ? STYLE_LATE : code;
 }
 
+/**
+ * Himmelkoder backend viser for en runde laget med stilen, uten at megleren
+ * valgte himmel (Varm skumring og Lys sommerkveld, ogsaa v2).
+ */
+const STYLE_SKY: Readonly<Record<string, string>> = {
+  [STYLE_V2]: "warm_dusk",
+  warm_dusk_v3: "warm_dusk",
+  [STYLE_SUMMER]: "summer_night",
+};
+
+/** Tidspunktet stilen gir (kortet; de gamle stilene er tidlige, v1 + `late` er Sen kveld). */
+const STYLE_TIMES: Readonly<Record<string, readonly string[]>> = {
+  ...Object.fromEntries(DUSK_STYLES.map((s) => [s, [DUSK_CARDS[s].time]])),
+  [STYLE_SUMMER]: [DUSK_CARDS[STYLE_SUMMER].time, "summer_night"],
+  [STYLE_V1]: ["early"],
+  [STYLE_V2]: ["early"],
+};
+
+/**
+ * Hva stilen allerede sier (stripa, Dag 58): tidspunktet den krever, og
+ * himmelen naar stilen bare har én (eller backend viser stilens egen
+ * himmelkode). Da staar de ikke i etiketten; et himmelvalg (Blå time, Sen
+ * kveld) skiller versjonene og blir staaende. `style` er rundens kode.
+ */
+export function givenByStyle(style: string, time: string | null): { time: boolean; sky: (sky: string | null) => boolean } {
+  const name = displayStyle(style, time);
+  const card = isDuskStyle(name) ? DUSK_CARDS[name] : null;
+  return {
+    time: time !== null && (STYLE_TIMES[name] ?? []).includes(time),
+    sky: (sky) => sky !== null && (sky === STYLE_SKY[name] || (card !== null && card.skies.length === 1 && card.skies[0] === sky)),
+  };
+}
+
 /** Blå time: himmelen staar alltid i meglerlinja, ogsaa standarden. */
 const BLUE_HOUR: ReadonlySet<string> = new Set([STYLE_V1, STYLE_BLUE]);
 

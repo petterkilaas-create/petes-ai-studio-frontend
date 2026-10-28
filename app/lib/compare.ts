@@ -2,7 +2,7 @@ import type { DecisionAction, ReviewRound, RoundChoices } from "./api";
 import { codeText, t, type Locale, type UiKey } from "./i18n/index.ts";
 import { resultImageUrl, variantOptions, type ImageVariant, type ReviewPreviews } from "./review.ts";
 import { isStylingPreset, styleText } from "./styling.ts";
-import { displayStyle } from "./dusk.ts";
+import { displayStyle, givenByStyle } from "./dusk.ts";
 
 /**
  * Variantene i «Sammenlign originalen med» (D2a). Rene funksjoner, saa de
@@ -101,12 +101,17 @@ export function selectedVariant(variants: CompareVariant[], id: string | null): 
   return variants.find((v) => v.id === id) ?? defaultVariant(variants);
 }
 
-/** Valgene i parentes: tidspunkt, himmel (eller «uten himmel»), peis og lys. */
+/**
+ * Valgene i parentes: tidspunkt, himmel (eller «uten himmel»), peis og lys.
+ * Har runden en skumringsstil, utelates tidspunkt og himmel som stilen gir
+ * (givenByStyle, Dag 58).
+ */
 function choiceParts(locale: Locale, choices: RoundChoices): string[] {
   const parts: string[] = [];
-  if (choices.time !== null) parts.push(codeText(locale, "roundTime", choices.time));
+  const given = choices.style == null ? null : givenByStyle(choices.style, choices.time);
+  if (choices.time !== null && !given?.time) parts.push(codeText(locale, "roundTime", choices.time));
   if (choices.skyApplied === false) parts.push(t(locale, "compare.noSky"));
-  else if (choices.sky !== null) parts.push(codeText(locale, "roundSky", choices.sky));
+  else if (choices.sky !== null && !given?.sky(choices.sky)) parts.push(codeText(locale, "roundSky", choices.sky));
   if (choices.fireplaceFire === "yes") parts.push(t(locale, "compare.fireLit"));
   if (choices.fireplaceFire === "no") parts.push(t(locale, "compare.fireNotLit"));
   if (choices.lightsChanged) parts.push(t(locale, "compare.lightsChanged"));
@@ -149,7 +154,9 @@ function labelParts(locale: Locale, variant: CompareVariant, presetId: string | 
  * `styling_…`) staar stilen i parentes: «Versjon 1 · nå (Fargerik eklektisk)».
  * Ordet er «Versjon», ikke «Runde» (FE-c, Dag 57, F2). Har runden sin egen
  * stil («Endre valg», TG-NEW-145, V-a), ser ogsaa megleren den: «Versjon 2 ·
- * nå (Funkis)» eller «Versjon 1 (Sen kveld)».
+ * nå (Funkis)» eller «Versjon 1 (Sen kveld)». Admin ser bare det som
+ * skiller versjonene: «Versjon 2 · nå (Varm skumring, lys justert)», ikke
+ * tidspunkt og himmel som stilen gir (Dag 58).
  */
 export function variantLabel(
   locale: Locale,
