@@ -12,6 +12,7 @@ import {
   addBox,
   addPin,
   addStroke,
+  BOX_MIN,
   boxFrom,
   extendStroke,
   imageToPane,
@@ -24,7 +25,9 @@ import {
   studioKey,
   svgFrame,
   undo,
+  MARK,
   type ImagePoint,
+  type Mark,
   type StudioState,
   type StrokeDraft,
 } from "../../lib/studio";
@@ -62,13 +65,26 @@ import { FOCUS } from "../godkjenning/classes";
  * Tastene paa lerretet: Esc avbryter det som tegnes, Ctrl- eller Cmd-Z
  * angrer (med Shift gjoer om), «+», «−» og 0 zoomer, og piltastene flytter
  * utsnittet.
+ *
+ * Studio v2 (Dag 58): med `onBox` bestemmer forelderen om en ny boks legges
+ * til (inntil 4, ingen overlapp). `numbered` setter nummeret (1–4) paa hver
+ * boks. `activeId` lyser opp én boks, og `onActive` sier hvilken boks musa
+ * peker paa (eller fingeren trykker paa), saa lista kan lyse opp samme rad.
+ * `onAspect` gir bildets sideforhold (til overlappsjekken).
  */
 
 export type StudioTool = "pin" | "brush" | "box";
 
-/** Fargen paa markeringene, fra designet (brett 8). Det finnes ingen blaa token. */
-const MARK = "#2F5BD3";
 const TAP_PX = 10;
+
+/** Den oeverste boksen under punktet (den sist tegnede), eller null. */
+function boxAt(marks: readonly Mark[], p: ImagePoint): number | null {
+  for (let i = marks.length - 1; i >= 0; i--) {
+    const m = marks[i];
+    if (m.kind === "box" && p.x >= m.from.x && p.x <= m.to.x && p.y >= m.from.y && p.y <= m.to.y) return m.id;
+  }
+  return null;
+}
 
 type Gesture =
   | { kind: "pin"; x: number; y: number }
@@ -87,6 +103,11 @@ export function StudioCanvas({
   width,
   studio,
   onChange,
+  onBox,
+  numbered = false,
+  activeId = null,
+  onActive,
+  onAspect,
   locale,
 }: {
   /** Resultatets forhaandsvisning (aldri originalen eller miniatyren). */
@@ -97,6 +118,16 @@ export function StudioCanvas({
   width: number;
   studio: StudioState;
   onChange: (next: StudioState) => void;
+  /** Ny boks fra a til b; uten den legges boksen til med addBox. */
+  onBox?: (a: ImagePoint, b: ImagePoint) => void;
+  /** Nummeret (1, 2, …) paa hver boks, i rekkefoelgen de ble tegnet. */
+  numbered?: boolean;
+  /** Boksen som lyser opp (fra lista), eller null. */
+  activeId?: number | null;
+  /** Boksen pekeren er over (mus) eller fingeren trykket paa, eller null. */
+  onActive?: (id: number | null) => void;
+  /** Bildets sideforhold (bredde / hoeyde) naar bildet er lastet. */
+  onAspect?: (aspect: number) => void;
   locale: Locale;
 }) {
   const paneRef = useRef<HTMLDivElement>(null);
@@ -221,7 +252,15 @@ export function StudioCanvas({
   };
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!pointers.current.has(e.pointerId)) return;
+    if (!pointers.current.has(e.pointerId)) {
+      // Musa over lerretet uten aa tegne: boksen under pekeren lyser opp.
+      if (onActive !== undefined && e.pointerType === "mouse" && gesture.current === null) {
+        const at = imagePoint(e.clientX, e.clientY, e.currentTarget.getBoundingClientRect());
+        const hit = at === null ? null : boxAt(studio.marks, at);
+        if (hit !== activeId) onActive(hit);
+      }
+      return;
+    }
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const g = gesture.current;
     if (g === null) return;
@@ -270,12 +309,22 @@ export function StudioCanvas({
     }
     const d = draftRef.current;
     if (finished && d?.kind === "stroke") onChange(addStroke(studio, d.stroke));
-    if (finished && d?.kind === "box") onChange(addBox(studio, d.from, d.to));
+    if (finished && d?.kind === "box") {
+      const b = boxFrom(d.from, d.to);
+      if (onActive !== undefined && Math.hypot(b.to.x - b.from.x, b.to.y - b.from.y) < BOX_MIN) {
+        // Et trykk uten aa dra: boksen under lyser opp (paa mobil uten mus).
+        onActive(boxAt(studio.marks, d.from));
+      } else if (onBox !== undefined) {
+        onBox(d.from, d.to);
+      } else {
+        onChange(addBox(studio, d.from, d.to));
+      }
+    }
     setDraft(null);
   };
 
   const frame = svgFrame(aspect);
-  const box = (from: ImagePoint, to: ImagePoint, key: string | number) => {
+  const box = (from: ImagePoint, to: ImagePoint, key: string | number, active = false) => {
     const b = boxFrom(from, to);
     return (
       <rect
@@ -285,10 +334,10 @@ export function StudioCanvas({
         width={(b.to.x - b.from.x) * frame.width}
         height={(b.to.y - b.from.y) * frame.height}
         fill={MARK}
-        fillOpacity={0.26}
+        fillOpacity={active ? 0.45 : 0.26}
         stroke={MARK}
-        strokeWidth={2}
-        strokeDasharray="6 4"
+        strokeWidth={active ? 4 : 2}
+        strokeDasharray={active ? undefined : "6 4"}
         vectorEffect="non-scaling-stroke"
       />
     );
@@ -312,6 +361,16 @@ export function StudioCanvas({
     return inPane(at) ? [{ id: m.id, n: pinNumber(studio.marks, m.id), at }] : [];
   });
 
+  // Nummeret staar inne i boksens oeverste venstre hjoerne (bare den delen som er i utsnittet).
+  const boxLabels = numbered
+    ? studio.marks
+        .filter((m): m is Extract<Mark, { kind: "box" }> => m.kind === "box")
+        .flatMap((m, i) => {
+          const at = imageToPane(view, m.from);
+          return inPane(at) ? [{ id: m.id, n: i + 1, at }] : [];
+        })
+    : [];
+
   return (
     <div
       ref={paneRef}
@@ -329,6 +388,9 @@ export function StudioCanvas({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}
       onPointerCancel={onPointerEnd}
+      onPointerLeave={(e) => {
+        if (onActive !== undefined && e.pointerType === "mouse" && activeId !== null) onActive(null);
+      }}
     >
       <div className="absolute inset-0 origin-top-left" style={{ transform: viewTransform(view) }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- forhaandsvisningen fra backend, som ellers paa siden */}
@@ -339,7 +401,10 @@ export function StudioCanvas({
           className="absolute inset-0 h-full w-full object-cover"
           onLoad={(e) => {
             const img = e.currentTarget;
-            if (img.naturalWidth > 0 && img.naturalHeight > 0) setAspect(img.naturalWidth / img.naturalHeight);
+            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+              setAspect(img.naturalWidth / img.naturalHeight);
+              onAspect?.(img.naturalWidth / img.naturalHeight);
+            }
           }}
         />
         <svg
@@ -349,7 +414,7 @@ export function StudioCanvas({
           preserveAspectRatio="none"
         >
           {studio.marks.map((m) =>
-            m.kind === "stroke" ? stroke(m, m.id) : m.kind === "box" ? box(m.from, m.to, m.id) : null
+            m.kind === "stroke" ? stroke(m, m.id) : m.kind === "box" ? box(m.from, m.to, m.id, m.id === activeId) : null
           )}
           {draft?.kind === "stroke" ? stroke(draft.stroke, "draft") : null}
           {draft?.kind === "box" ? box(draft.from, draft.to, "draft") : null}
@@ -363,6 +428,18 @@ export function StudioCanvas({
           style={{ left: `${p.at.x * 100}%`, top: `${p.at.y * 100}%` }}
         >
           {p.n}
+        </span>
+      ))}
+      {boxLabels.map((b) => (
+        <span
+          key={b.id}
+          aria-hidden="true"
+          className={`pointer-events-none absolute ml-1 mt-1 flex h-7 w-7 items-center justify-center rounded-pill border-2 border-surface text-sm font-semibold text-surface shadow-md ${
+            b.id === activeId ? "bg-primary" : "bg-ink"
+          }`}
+          style={{ left: `${b.at.x * 100}%`, top: `${b.at.y * 100}%` }}
+        >
+          {b.n}
         </span>
       ))}
     </div>

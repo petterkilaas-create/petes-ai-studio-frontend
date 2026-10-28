@@ -36,6 +36,12 @@ export interface StudioState {
 
 export const STUDIO_START: StudioState = { marks: [], past: [], future: [], nextId: 1 };
 
+/**
+ * Fargen paa markeringene, fra designet (brett 8), paa lerretet og over
+ * glideren etter runden (LocalEditBoxes). Det finnes ingen blaa token.
+ */
+export const MARK = "#2F5BD3";
+
 export const MAX_PINS = 3;
 /** Saa mange steg kan angres. */
 export const HISTORY_MAX = 50;

@@ -123,9 +123,9 @@ test("FE-3: siden bruker tilstanden som finnes (polling og pending), uten nye ka
   assert.match(submit, /onStart: \(\) => \{\s*setBusy\(true\);\s*setPending\("correct"\);/);
   assert.match(submit, /onSettled: \(\) => \{\s*setBusy\(false\);\s*setPending\(null\);\s*\}/);
   assert.match(submit, /case "poll":\s*cancelCorrection\(\);\s*setPollJobId\(jobId\);/);
-  // Ingen nye kall: getReview og postDecision (pluss /me). FE-3 (Dag 58): «Lag 2 forslag» og
-  // «Bruk denne» sender ogsaa gjennom postDecision, saa det er fire steder.
-  assert.equal(page.match(/postDecision\(/g)?.length, 4);
+  // Ingen nye kall: getReview og postDecision (pluss /me). Studio v2 (Dag 58): «Utfør endringene»
+  // og «Prøv igjen» sender gjennom sendLocal, og «Bruk denne» er borte, saa det er tre steder.
+  assert.equal(page.match(/postDecision\(/g)?.length, 3);
   assert.doesNotMatch(page, /fetch\(/);
 });
 

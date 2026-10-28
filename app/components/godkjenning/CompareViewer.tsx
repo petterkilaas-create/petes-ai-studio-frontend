@@ -30,6 +30,11 @@ import { choiceClass, FOCUS, LABEL } from "./classes";
  * slideren og i «Kun resultat». Slipp, og AI-bildet er tilbake; skillet
  * staar der det sto. «Forstørr» aapner lysboksen (`onExpand`, siden har den).
  * Begge krever begge bildene.
+ *
+ * Studio v2 (Dag 58): `base` bytter originalen i glideren og «Side ved side»
+ * med et annet bilde (forrige versjon, D1), med egen merkelapp. «Hold for
+ * original» viser fortsatt originalen. `marks` (boksene fra endringene)
+ * tegnes over hele bildet i glideren og over resultatet ellers.
  */
 
 type Mode = "slider" | "side" | "result";
@@ -73,22 +78,34 @@ function ResultImage({
   return <img src={url} alt={alt} className={FRAME} onLoad={onLoad} />;
 }
 
+/** Bildet til venstre i glideren og «Side ved side»: originalen, eller `base` (forrige versjon). */
+export type CompareBase = { url: string; label: string; alt: string };
+
 function Slider({
   originalUrl,
+  base,
   aiUrl,
   resultAlt,
   onResultLoad,
   full,
+  marks,
   locale,
 }: {
   originalUrl: string;
+  base: CompareBase | null;
   aiUrl: string;
   resultAlt: string;
   onResultLoad?: () => void;
   /** «Hold for original»: hele originalen, uten skillet. Verdien beholdes. */
   full: boolean;
+  marks: ReactNode;
   locale: Locale;
 }) {
+  // «Hold for original» viser alltid originalen, ogsaa naar glideren sammenligner med forrige versjon.
+  const left =
+    base === null || full
+      ? { url: originalUrl, label: t(locale, "review.original"), alt: t(locale, "compare.altOriginal") }
+      : base;
   const [value, setValue] = useState(SLIDER_START);
   const trackRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLDivElement>(null);
@@ -136,13 +153,14 @@ function Slider({
       <div className="absolute inset-0" style={{ clipPath: `inset(0 ${full ? 0 : 100 - value}% 0 0)` }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={originalUrl}
-          alt={t(locale, "compare.altOriginal")}
+          src={left.url}
+          alt={left.alt}
           draggable={false}
           className="absolute inset-0 h-full w-full object-cover"
         />
-        <span className={`${CHIP} left-3`}>{t(locale, "review.original")}</span>
+        <span className={`${CHIP} left-3`}>{left.label}</span>
       </div>
+      {marks}
       {!full && (
         <div
           aria-hidden="true"
@@ -216,6 +234,8 @@ export function CompareViewer({
   lightsView = null,
   additionsView = null,
   onExpand,
+  base = null,
+  marks = null,
   locale,
 }: {
   originalUrl: string | null;
@@ -231,6 +251,10 @@ export function CompareViewer({
   additionsView?: ReactNode;
   /** Aapner lysboksen (D-5b1); uten den vises ikke «Forstørr». */
   onExpand?: () => void;
+  /** Studio v2: forrige versjon i stedet for originalen til venstre; null gir originalen. */
+  base?: CompareBase | null;
+  /** Studio v2: boksene over bildet (pointer-events-none, 0–1 i resultatets ramme). */
+  marks?: ReactNode;
   locale: Locale;
 }) {
   const [mode, setMode] = useState<Mode>("slider");
@@ -316,10 +340,12 @@ export function CompareViewer({
       {!showLights && !showAdditions && shown === "slider" && originalUrl !== null && result.url !== null && (
         <Slider
           originalUrl={originalUrl}
+          base={base}
           aiUrl={result.url}
           resultAlt={resultAlt}
           onResultLoad={onResultLoad}
           full={held}
+          marks={held ? null : marks}
           locale={locale}
         />
       )}
@@ -327,12 +353,20 @@ export function CompareViewer({
       {!showLights && !showAdditions && shown === "side" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className={`${LABEL} mb-2`}>{t(locale, "review.original")}</p>
-            <OriginalImage url={originalUrl} locale={locale} />
+            <p className={`${LABEL} mb-2`}>{base === null ? t(locale, "review.original") : base.label}</p>
+            {base === null ? (
+              <OriginalImage url={originalUrl} locale={locale} />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={base.url} alt={base.alt} className={FRAME} />
+            )}
           </div>
           <div>
             <p className={`${LABEL} mb-2`}>{t(locale, "review.result")}</p>
-            <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} onLoad={onResultLoad} />
+            <div className="relative">
+              <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} onLoad={onResultLoad} />
+              {result.url !== null && marks}
+            </div>
           </div>
         </div>
       )}
@@ -340,6 +374,7 @@ export function CompareViewer({
       {!showLights && !showAdditions && shown === "result" && (
         <div className="relative">
           <ResultImage url={result.url} alt={resultAlt} placeholder={placeholder} onLoad={onResultLoad} />
+          {!held && result.url !== null && marks}
           {held && originalUrl !== null && (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
