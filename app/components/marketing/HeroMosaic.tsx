@@ -16,8 +16,8 @@ import type { Hero } from "../../../content/marketing/schema";
  * prioritet; de andre lastes lat. Dag 58 (F2): alle bildene er ekte og har
  * AI-merket nede til venstre i selve bildet, saa utsnittet holdes nede til
  * venstre (object-left-bottom) og merket kuttes aldri (auditen §3 punkt 2).
- * Ingen bilder faar egen «AI»-lapp. En original uten resultat (Digital
- * styling) har teksten fra `example` («Eksempel») nede til venstre.
+ * Ingen bilder faar egen «AI»-lapp. En original uten resultat har teksten
+ * fra `example` («Eksempel») nede til venstre (ingen rute etter Dag 58).
  * Dag 58 (Petter 28.10): fire ruter, uten videoloekka. Digital styling
  * staar i full bredde under, saa rutenettet er fylt.
  */

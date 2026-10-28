@@ -33,8 +33,8 @@ export const home = {
     secondary: { label: "Se filmen", href: "#film" },
     freeNote: "{n} gratis bilder når du registrerer deg. Uten kort.",
     // Dag 58 (F2): de bestillbare tjenestene, uten filmen (Petter 28.10).
-    // Bildene er ekte og har AI-merket i bildet; Digital styling er
-    // originalen med «Eksempel», som paa Tjenester.
+    // Bildene er ekte og har AI-merket i bildet (Digital styling fra Dag 58,
+    // Japandi, som paa Tjenester).
     mosaic: {
       label: "Eksempler på bilder",
       tiles: [
@@ -52,8 +52,7 @@ export const home = {
         },
         {
           label: "Digital styling",
-          image: { image: "stylingExample", alt: "Tom stue med hvite panelvegger, originalbildet uten møbler" },
-          example: "Eksempel",
+          image: { image: "pairJapandiResult", alt: "Soverom møblert digitalt med AI, med AI-merket nede til venstre" },
         },
       ],
     },
@@ -74,7 +73,7 @@ export const home = {
 
   // Linje 85-121 og 472-480. F5: tre faner med slideren. Dag 58 (F2): de
   // bestillbare tjenestene med ekte par (AI-merket i bildet): kveldsbilde,
-  // aarstider og blaa himmel. Digital styling har ikke noe godkjent resultat.
+  // aarstider og blaa himmel. Digital styling har ingen fane (bare kortene).
   examples: {
     _type: "examples",
     anchor: "eksempler",
@@ -176,9 +175,10 @@ export const home = {
         orderLabel: "Bestill digital styling",
         size: "large",
         media: {
-          kind: "example",
-          image: { image: "stylingExample", alt: "Tom stue med hvite panelvegger, originalbildet uten møbler" },
-          label: "Eksempel",
+          kind: "split",
+          after: { image: "pairJapandiResult", alt: "Soverom møblert digitalt med AI, med AI-merket nede til venstre" },
+          before: { image: "pairJapandiOriginal", alt: "Samme soverom uten møbler" },
+          labels: { after: "Møblert", before: "Tomt" },
         },
       },
       {
