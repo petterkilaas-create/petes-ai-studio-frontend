@@ -709,22 +709,23 @@ test("B2: «Detaljer» viser stilen for styling og skumringsanalysen ellers", ()
   assert.ok(details.indexOf('"reasonCode"') < start && details.indexOf('"flagCode"') < start);
 });
 
+// Dag 58: Aarstider med, de tre store foerst og de smaa til slutt.
 test("B2: ingressen nevner digital styling, ordrett paa nb og en", () => {
   assert.equal(
     DICTIONARIES.nb.ui["express.subtitle"],
-    "Kveldsbilde, blå himmel og digital styling laget med AI, og skjuling av ansikter."
+    "Kveldsbilde, årstider, digital styling og blå himmel laget med AI, og skjuling av ansikter."
   );
   assert.equal(
     DICTIONARIES.en.ui["express.subtitle"],
-    "Dusk image, blue sky and digital styling made with AI, and blurring of faces."
+    "Dusk image, seasons, digital styling and blue sky made with AI, and blurring of faces."
   );
   assert.equal(
     DICTIONARIES.nb.ui["home.intro"],
-    "Redigering av boligfoto: kveldsbilde, blå himmel og digital styling laget med AI, og skjuling av ansikter."
+    "Redigering av boligfoto: kveldsbilde, årstider, digital styling og blå himmel laget med AI, og skjuling av ansikter."
   );
   assert.equal(
     DICTIONARIES.en.ui["home.intro"],
-    "Real estate photo editing: dusk image, blue sky and digital styling made with AI, and blurring of faces."
+    "Real estate photo editing: dusk image, seasons, digital styling and blue sky made with AI, and blurring of faces."
   );
 });
 

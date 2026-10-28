@@ -22,13 +22,15 @@ import { cardClass } from "./ui/Card";
  * en del av navnet.
  *
  * Lite kort (`size="small"`, Dag 58 del 4): samme knapp og tekster, uten
- * bilde og med mindre tittel.
+ * bilde og med mindre tittel. De store staar tre i én rad fra 1024 px, saa
+ * tittelen er 38 px foerst fra 1280 px.
  */
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-paper";
 
-const SIZES = "(min-width: 1024px) 540px, 100vw";
+// Tre kort i én rad fra 1024 px (Dag 58): hoeyst ca. 350 px bredt.
+const SIZES = "(min-width: 1024px) 360px, 100vw";
 
 const IMAGE = "object-cover object-left-bottom";
 
@@ -101,7 +103,7 @@ export function ServiceCard({
       <span className={`flex flex-1 flex-col ${small ? "gap-3 p-5" : "gap-3.5 p-6 lg:p-7"}`}>
         <h3
           id={titleId}
-          className={`font-display font-normal leading-[1.05] text-ink ${small ? "text-[24px]" : "text-[30px] lg:text-[38px]"}`}
+          className={`font-display font-normal leading-[1.05] text-ink ${small ? "text-[24px]" : "text-[30px] xl:text-[38px]"}`}
         >
           {t(locale, tool.titleKey)}
         </h3>

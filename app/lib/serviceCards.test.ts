@@ -87,7 +87,7 @@ test("D-1: hele kortet er én knapp med aria-pressed, uten knapp eller lenke inn
   // Tittelen med Instrument Serif fra 28 px, knappeflaten minst 44 px, ingen skygge.
   // Dag 58: det lille kortet har 24 px.
   assert.match(card, /font-display font-normal/);
-  assert.match(card, /"text-\[30px\] lg:text-\[38px\]"/);
+  assert.match(card, /"text-\[30px\] xl:text-\[38px\]"/);
   assert.match(card, /min-h-12/);
   assert.doesNotMatch(card, /shadow|#[0-9a-f]{3,8}\b|-\[(#|rgb)/i);
   // Siden sender valget videre til selectTool, som foer.
@@ -138,7 +138,7 @@ test("D-1: rekkefoelgen er kortene, saa opplastingen, saa «Kommer», og kortene
   const upload = page.indexOf("<Card id={UPLOAD_CARD_ID}");
   const coming = page.indexOf("{COMING_TOOLS.map(");
   assert.ok(cards > 0 && cards < upload && upload < coming, `${cards} ${upload} ${coming}`);
-  assert.match(page, /<div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">\s*\{LARGE_TOOLS\.map/);
+  assert.match(page, /<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">\s*\{LARGE_TOOLS\.map/);
   // «Kommer» har en overskrift, og alle kortene som ikke kan bestilles staar der.
   assert.match(page, /t\(locale, "express\.comingTitle"\)/);
   const coming_ = visibleCategories().flatMap((c) => c.items).filter((t) => !t.orderable).map((t) => t.id);
@@ -203,4 +203,39 @@ test("Dag 58: siden viser de små kortene uten bilde, med samme valg og bestilli
   assert.doesNotMatch(page, /ORDERABLE_TOOLS\.map/);
   const card = withoutComments(read(CARD));
   assert.match(card, /\{!small && \(/);
+});
+
+// ---------------------------------------------------------------------------
+// Dag 58 (live-sjekken 28.10): tre store i én rad, og ingressen med Årstider.
+// ---------------------------------------------------------------------------
+
+test("Dag 58: de store kortene er Kveldsbilde, Årstider og Digital styling i den rekkefoelgen, saa Blå himmel og Skjul ansikter", () => {
+  const { large, small } = splitBySize(orderableTools());
+  assert.deepEqual(large.map((t) => t.id), ["skumring", "aarstider", "digital_styling"]);
+  assert.deepEqual(small.map((t) => t.id), ["klart_vaer", "privacy_blur"]);
+});
+
+test("Dag 58: de tre store staar i én rad fra 1024 px, ikke 2 + 1", () => {
+  const page = withoutComments(read(PAGE));
+  const grid = page.match(/<div className="([^"]*)">\s*\{LARGE_TOOLS\.map/);
+  assert.ok(grid);
+  assert.match(grid[1], /\bgrid-cols-1\b/);
+  assert.match(grid[1], /\blg:grid-cols-3\b/);
+  assert.doesNotMatch(grid[1], /grid-cols-2/);
+  // Bildet er hoeyst ca. 350 px bredt i raden, og sizes sier det.
+  assert.match(withoutComments(read(CARD)), /const SIZES = "\(min-width: 1024px\) 360px, 100vw";/);
+});
+
+test("Dag 58: ingressen nevner tjenestene i samme rekkefoelge som kortene, og alle med AI foer «laget med AI»", () => {
+  const nb = DICTIONARIES.nb.ui["express.subtitle"].toLowerCase();
+  const names = ["kveldsbilde", "årstider", "digital styling", "blå himmel", "skjuling av ansikter"];
+  const at = names.map((n) => nb.indexOf(n));
+  for (const [i, pos] of at.entries()) assert.ok(pos >= 0, names[i]);
+  assert.deepEqual([...at].sort((a, b) => a - b), at);
+  // Blå himmel er laget med AI og skal ikke staa etter merket (Forbrukertilsynet).
+  const ai = nb.indexOf("laget med ai");
+  for (const n of names.slice(0, 4)) assert.ok(nb.indexOf(n) < ai, n);
+  assert.ok(nb.indexOf("skjuling av ansikter") > ai);
+  const en = DICTIONARIES.en.ui["express.subtitle"].toLowerCase();
+  for (const n of ["dusk image", "seasons", "digital styling", "blue sky", "blurring of faces"]) assert.ok(en.includes(n), n);
 });

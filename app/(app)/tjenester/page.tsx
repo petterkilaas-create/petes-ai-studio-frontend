@@ -287,7 +287,8 @@ function ExpressContent() {
       <section className="space-y-4">
         <h2 className="text-sm font-medium text-ink">{t(locale, "express.chooseService")}</h2>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+        {/* Dag 58: de tre store i én rad fra 1024 px (ikke 2 + 1), én kolonne under. */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {LARGE_TOOLS.map((tool) => (
             <ServiceCard
               key={tool.id}

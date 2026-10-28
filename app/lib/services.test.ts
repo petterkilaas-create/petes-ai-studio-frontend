@@ -232,8 +232,9 @@ const HOME_KEYS = [
   "express.subtitle",
 ] as const satisfies readonly UiKey[];
 
-test("forsiden og Tjenester: teksten lover ikke video, Veo, HDR eller aarstider", () => {
-  const forbidden = /video|veo|hdr|season|årstid|film|reel|klart vær|staging|copywrit/i;
+// Dag 58: Aarstider kan bestilles (TG-NEW-271), saa season og årstid er tatt ut.
+test("forsiden og Tjenester: teksten lover ikke video, Veo eller HDR", () => {
+  const forbidden = /video|veo|hdr|film|reel|klart vær|staging|copywrit/i;
   for (const locale of ["nb", "en"] as const) {
     for (const key of HOME_KEYS) {
       const text = DICTIONARIES[locale].ui[key];
