@@ -555,7 +555,9 @@ test("Studio v2: panelet og lista: samme nummer som i bildet, hover begge veier,
   const panel = read("components/godkjenning/LocalEditPanel.tsx");
   assert.match(panel, /boxes\.map\(\(box, i\) => \(\s*<EditRow[\s\S]*?n=\{i \+ 1\}/);
   // Fritekst: tekstfeltet med eksempel og teller i hver rad, og ingen instruksknapper.
-  assert.doesNotMatch(panel, /LOCAL_INSTRUCTIONS|aria-pressed|draft\.instruction/);
+  // Den eneste aria-pressed er «Som i originalen» (ORIGINAL_BYGG).
+  assert.doesNotMatch(panel, /LOCAL_INSTRUCTIONS|draft\.instruction/);
+  assert.equal(panel.match(/aria-pressed/g)?.length, 1);
   assert.match(panel, /<textarea[\s\S]*?maxLength=\{LOCAL_TEXT_MAX\}[\s\S]*?placeholder=\{t\(locale, "local\.textPlaceholder"\)\}/);
   assert.match(panel, /t\(locale, "local\.textCount", \{ n: draft\.text\.length, max: LOCAL_TEXT_MAX \}\)/);
   // Infoknappen (i) ved overskriften: aria-expanded, kontrollerer teksten, og minst 44 px.
@@ -579,7 +581,7 @@ test("Studio v2: panelet og lista: samme nummer som i bildet, hover begge veier,
   const results = read("components/godkjenning/LocalEditResults.tsx");
   assert.match(results, /row\.canRetry && \(/);
   assert.match(results, /onClick=\{\(\) => onRetry\(row\.k\)\}/);
-  assert.match(results, /codeText\(locale, "localEditError", row\.code\)/);
+  assert.match(results, /codeText\(locale, editErrorGroup\(row\), row\.code\)/);
   // Meglerens tekst som overskrift (resultLabel), ellers ordlista.
   assert.match(results, /const head = resultLabel\(row\);/);
   assert.match(results, /head\.text !== null \? `«\$\{head\.text\}»` : t\(locale, head\.key, head\.vars\)/);

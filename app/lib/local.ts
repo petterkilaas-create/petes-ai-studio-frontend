@@ -1,4 +1,5 @@
 import type {
+  AdditionsCheck,
   DecisionOutcome,
   DecisionRequest,
   JobReviewDetail,
@@ -25,8 +26,16 @@ import { addBox, serializeMark, type ImagePoint, type Mark, type StudioState } f
  *   har sin tekst: hva som skal endres der (fritekst, Dag 58, FRITEKST_BE:
  *   `{shape, text}`, 1–500 tegn). Knappene Slukk, Tenn, Fjern dette og
  *   Legg til er borte (Petter 28.10).
+ * - «Som i originalen» (ORIGINAL_BYGG, Dag 58): i stedet for teksten kan en
+ *   boks hente tilbake det som var i originalbildet der (`{shape, mode:
+ *   "original"}`, uten tekst). Backend limer det inn uten modellkall, foer
+ *   fritekst-endringene i samme runde. Raden viser et utsnitt av originalen
+ *   («Dette kommer tilbake»), og «Prøv igjen» tilbys ikke (A1).
  * - Bokser som overlapper, avvises her foer de sendes. Margen er den backend
- *   bruker foer claim: 7 % av kortsiden rundt hver boks (`EDGE_MARGIN_PCT`).
+ *   bruker foer claim for fritekst: 7 % av kortsiden rundt hver boks
+ *   (`EDGE_MARGIN_PCT`). «Som i originalen» har 3 % i backend, men valget
+ *   gjoeres etter at boksen er tegnet, saa 7 % gjelder for alle (strengere,
+ *   aldri en avvisning backend ikke ville gitt).
  * - Ett resultat (ingen kandidater). Etter runden har hver endring meglerens
  *   tekst (`local.edits[].text`, bare til eieren), ✓ eller en feilmelding, og
  *   «Prøv igjen» sender `retry` (teller som runde).
@@ -49,9 +58,15 @@ export const EDIT_MARGIN = 0.07;
 
 export type LocalBox = Extract<Mark, { kind: "box" }>;
 
-/** Teksten for én boks: hva som skal endres der (noekkelen er boksens id). */
+/**
+ * Hva som skal skje i én boks (noekkelen er boksens id): teksten (fritekst),
+ * eller «Som i originalen» (`mode` "original"; mangler `mode`, er det
+ * fritekst). Teksten staar naar megleren bytter, saa den er der igjen om
+ * valget tas av.
+ */
 export interface EditDraft {
   text: string;
+  mode?: "text" | "original";
 }
 
 export type EditDrafts = Readonly<Record<number, EditDraft>>;
@@ -175,8 +190,10 @@ export const LOCAL_MISSING_KEYS: Record<Exclude<LocalMissing, null>["kind"], UiK
 /**
  * Hva som mangler for én endring (uten boksen), eller null. Som backend
  * (`check_edit`): teksten renses, og bare punktum og utropstegn er ingen tekst.
+ * «Som i originalen» trenger ingen tekst.
  */
 export function draftMissing(draft: EditDraft): "text" | "textTooLong" | null {
+  if (draft.mode === "original") return null;
   const text = cleanLocalText(draft.text);
   if (text.replace(/[.!]+$/, "") === "") return "text";
   if (text.length > LOCAL_TEXT_MAX) return "textTooLong";
@@ -209,7 +226,8 @@ export function missingText(missing: Exclude<LocalMissing, null>): { key: UiKey;
 
 /**
  * Body for «Utfør endringene»: `correct` med én endring per boks i
- * rekkefoelgen 1–4, `{shape, text}` med den rensede teksten, uten instruks.
+ * rekkefoelgen 1–4, `{shape, text}` med den rensede teksten, eller
+ * `{shape, mode: "original"}` uten tekst. Ingen instruks.
  * Aldri overrides, choices eller peissvar (backend gir 400 local_exclusive).
  * null naar noe mangler.
  */
@@ -225,7 +243,12 @@ export function buildLocalCorrection(
     const draft = draftFor(drafts, box.id);
     const shape = serializeMark(box);
     if (shape.shape !== "box") return null;
-    edits.push({ shape: { shape: "box", points: shape.points }, text: cleanLocalText(draft.text) });
+    const points = { shape: "box" as const, points: shape.points };
+    edits.push(
+      draft.mode === "original"
+        ? { shape: points, mode: "original" }
+        : { shape: points, text: cleanLocalText(draft.text) }
+    );
   }
   const body: DecisionRequest = { action: "correct", local: { edits } };
   if (review.version !== null) body.expected_version = review.version;
@@ -273,6 +296,8 @@ export interface EditResultRow {
  * krever `correct` i allowed_actions og en runde igjen; fritekst og Legg til
  * uten tekst (`text_len` 0 eller mangler) kan ikke proeves igjen. Er teksten
  * toemt av slettejobben, staar lengden, og backend svarer 409 text_cleared.
+ * «Som i originalen» kan ikke proeves igjen (A1: samme bilde hver gang;
+ * backend gir 400 retry_invalid).
  */
 export function editResults(
   review: Pick<JobReviewDetail, "local" | "allowedActions" | "status" | "correction">
@@ -290,14 +315,15 @@ export function editResults(
       text: e.text,
       ok,
       code: ok ? null : e.status,
-      canRetry: canCorrect && e.instruction !== null && !textGone,
+      canRetry: canCorrect && e.instruction !== null && e.instruction !== "original" && !textGone,
     };
   });
 }
 
 /**
- * Overskriften for en rad etter runden: meglerens tekst, ellers navnet paa
- * den gamle instruksen (runder fra foer fritekst), ellers «Endring k».
+ * Overskriften for en rad etter runden: meglerens tekst, «Som i originalen»,
+ * ellers navnet paa den gamle instruksen (runder fra foer fritekst), ellers
+ * «Endring k».
  */
 export function resultLabel(row: Pick<EditResultRow, "k" | "instruction" | "text">): {
   text: string | null;
@@ -305,6 +331,7 @@ export function resultLabel(row: Pick<EditResultRow, "k" | "instruction" | "text
   vars: Record<string, number>;
 } {
   if (row.text !== null) return { text: row.text, key: "local.editTitle", vars: { n: row.k } };
+  if (row.instruction === "original") return { text: null, key: "local.original", vars: {} };
   if (row.instruction !== null && row.instruction !== "text") {
     return { text: null, key: LOCAL_INSTRUCTION_KEYS[row.instruction], vars: {} };
   }
@@ -414,7 +441,32 @@ export const LOCAL_EDIT_ERRORS: readonly string[] = [
   "answer_invalid",
   "edits_overlap",
   "retry_source_missing",
+  // «Som i originalen» (ORIGINAL_BYGG): originalen mangler, kan ikke leses, eller ringen rundt boksen er tom.
+  "original_missing",
+  "original_invalid",
+  "original_ring_empty",
 ];
+
+/**
+ * Kodene for «Som i originalen» som har egen tekst i lista (gruppen
+ * `localOriginalError`): uten «Prøv igjen», som ikke tilbys (A1). Andre
+ * koder faar teksten i `localEditError`.
+ */
+export const LOCAL_ORIGINAL_ERRORS: readonly string[] = [
+  "align_inliers",
+  "original_missing",
+  "original_invalid",
+  "original_ring_empty",
+];
+
+/** Teksten for koden paa en rad: egen tekst for «Som i originalen» naar den finnes. */
+export function editErrorGroup(
+  row: Pick<EditResultRow, "instruction" | "code">
+): "localOriginalError" | "localEditError" {
+  return row.instruction === "original" && row.code !== null && LOCAL_ORIGINAL_ERRORS.includes(row.code)
+    ? "localOriginalError"
+    : "localEditError";
+}
 
 /**
  * Meldingen naar siste retterunde feilet (alle endringene feilet): den
@@ -435,6 +487,9 @@ export const LOCAL_ROUND_ERRORS: readonly string[] = [
   "edits_overlap",
   "no_edit",
   "no_candidate",
+  "original_missing",
+  "original_invalid",
+  "original_ring_empty",
 ];
 
 export function roundFailedMessage(
@@ -443,4 +498,78 @@ export function roundFailedMessage(
   const code = review.correction.lastRoundError ?? null;
   if (code !== null && LOCAL_ROUND_ERRORS.includes(code)) return { group: "localRoundError", code };
   return { key: "correct.roundFailed" };
+}
+
+/** Hoeyst saa stort er utsnittet av originalen i raden, i px. */
+export const ORIGINAL_CROP_MAX = { width: 160, height: 96 } as const;
+
+/**
+ * Utsnittet av originalen i raden for «Som i originalen» («Dette kommer
+ * tilbake»): stoerrelsen i px (innenfor ORIGINAL_CROP_MAX, med boksens
+ * sideforhold) og hvor originalen ligger, i prosent av utsnittet. Boksen er i
+ * resultatets ramme; backend justerer originalen til den rammen, saa
+ * utsnittet viser omtrent det som kommer tilbake. null for en boks uten flate.
+ */
+export function originalCrop(
+  box: { from: ImagePoint; to: ImagePoint },
+  aspect: number
+): { width: number; height: number; img: { width: number; height: number; left: number; top: number } } | null {
+  const a = Number.isFinite(aspect) && aspect > 0 ? aspect : 3 / 2;
+  const bw = box.to.x - box.from.x;
+  const bh = box.to.y - box.from.y;
+  if (!(bw > 0 && bh > 0)) return null;
+  // Utsnittet i enheter av bildehoeyden: bredden bw * a, hoeyden bh.
+  const scale = Math.min(ORIGINAL_CROP_MAX.width / (bw * a), ORIGINAL_CROP_MAX.height / bh);
+  return {
+    width: Math.round(bw * a * scale),
+    height: Math.round(bh * scale),
+    img: {
+      width: 100 / bw,
+      height: 100 / bh,
+      left: (-box.from.x / bw) * 100,
+      top: (-box.from.y / bh) * 100,
+    },
+  };
+}
+
+function sameCheck(a: AdditionsCheck, b: AdditionsCheck): boolean {
+  return a.level === b.level && JSON.stringify(a.items) === JSON.stringify(b.items);
+}
+
+/**
+ * Versjonen kontrollen av tillegg gjelder, naar gjeldende versjon er laget med
+ * lokale endringer og kontrollen fant noe (advarsel eller merknad); ellers
+ * null. Siden viser da «Kontrollen gjelder versjon N. Sjekk selv at
+ * rettingene ser riktige ut.» i stedet for varselet (Petter 28.10, 14.32).
+ *
+ * En lokal runde har kontrollen fra basen (backend C2), og kontrollen kjoeres
+ * ikke paa nytt. Kontrollen er derfor fra den eldste runden i rekken bakover
+ * fra gjeldende som har akkurat samme kontroll (flere lokale runder etter
+ * hverandre). Uten `images.rounds`: forrige versjon. «Versjon n» er runde n − 1.
+ */
+export function checkedVersion(
+  review: Pick<JobReviewDetail, "local" | "additionsCheck" | "status"> & {
+    images: Pick<JobReviewDetail["images"], "rounds" | "previous">;
+  }
+): number | null {
+  const local = review.local ?? null;
+  const level = review.additionsCheck.level;
+  if (local === null || review.status !== "awaiting_approval" || (level !== "warning" && level !== "note")) {
+    return null;
+  }
+  const rounds = review.images.rounds ?? null;
+  if (rounds !== null && rounds.length > 0) {
+    const sorted = [...rounds].sort((a, b) => a.round - b.round);
+    const found = sorted.findIndex((r) => r.current);
+    const current = found >= 0 ? found : sorted.length - 1;
+    let source = current;
+    for (let i = current - 1; i >= 0; i--) {
+      const check = sorted[i].additionsCheck;
+      if (check === undefined || !sameCheck(check, review.additionsCheck)) break;
+      source = i;
+    }
+    if (source < current) return sorted[source].round + 1;
+  }
+  const previous = review.images.previous?.round ?? null;
+  return previous === null ? null : previous + 1;
 }

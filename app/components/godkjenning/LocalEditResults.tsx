@@ -3,7 +3,7 @@
 import { Check } from "lucide-react";
 import type { LocalEditNumber } from "../../lib/api";
 import { codeText, t, type Locale } from "../../lib/i18n";
-import { resultLabel, type EditResultRow } from "../../lib/local";
+import { editErrorGroup, resultLabel, type EditResultRow } from "../../lib/local";
 import { buttonClass } from "../ui/Button";
 
 const BTN_SECONDARY = buttonClass("secondary", "min-h-11");
@@ -12,7 +12,8 @@ const BTN_SECONDARY = buttonClass("secondary", "min-h-11");
  * Lista etter en lokal runde (studio v2, Dag 58): én rad per endring med
  * samme nummer som boksen i bildet, meglerens egen tekst (fritekst; gamle
  * runder viser instruksen), ✓ eller feilmeldingen, og «Prøv igjen»
- * (ny runde som bare gjoer den endringen paa nytt; teller som runde). Peker
+ * (ny runde som bare gjoer den endringen paa nytt; teller som runde).
+ * «Som i originalen» har ingen «Prøv igjen» (A1) og egne feiltekster. Peker
  * man paa en rad, lyser boksen opp i sammenligningen (`activeK`).
  */
 export function LocalEditResults({
@@ -68,7 +69,7 @@ export function LocalEditResults({
                       {t(locale, "local.editDone")}
                     </p>
                   ) : (
-                    <p className="text-xs text-amber-fg">{codeText(locale, "localEditError", row.code)}</p>
+                    <p className="text-xs text-amber-fg">{codeText(locale, editErrorGroup(row), row.code)}</p>
                   )}
                 </div>
               </div>
