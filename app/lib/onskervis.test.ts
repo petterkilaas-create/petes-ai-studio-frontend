@@ -315,7 +315,7 @@ test("ingen ønsketekst paa kortene: bare tallene fra wishesSummaryText", () => 
 // --- Siden og panelet -------------------------------------------------------------
 
 test("siden: panelet bare naar wishes ikke er null, for alle roller, under kortet med knappene", () => {
-  const page = code("(app)/godkjenning/[jobId]/page.tsx");
+  const page = code("components/godkjenning/ResultReview.tsx");
   assert.match(page, /\{review\.wishes !== null && \(\s*<WishesPanel\s+wishes=\{review\.wishes\}\s+status=\{review\.status\}\s+isOwner=\{review\.isOwner\}/);
   assert.equal(page.match(/<WishesPanel\b/g)?.length, 1);
   // Ikke bak admin, og etter DecisionCard og resultatkortet, foer MoodPanel.

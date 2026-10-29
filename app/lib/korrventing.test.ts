@@ -24,7 +24,7 @@ const APP = join(dirname(fileURLToPath(import.meta.url)), "..");
 const code = (rel: string) =>
   readFileSync(join(APP, rel), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
-const page = code("(app)/godkjenning/[jobId]/page.tsx");
+const page = code("components/godkjenning/ResultReview.tsx");
 const card = code("components/godkjenning/DecisionCard.tsx");
 const panel = code("components/godkjenning/CorrectionPanel.tsx");
 const strip = code("components/godkjenning/VersionStrip.tsx");

@@ -555,7 +555,7 @@ test("S3-f: hooken har aatte faste useJobStatus-kall med minDelayMs, og useJobSt
   assert.match(jobStatus, /\}, \[jobId, getToken\]\);/);
   // De andre kallene er uendret.
   assert.match(read("hooks/useProcessJob.ts"), /useJobStatus\(jobId\);/);
-  assert.match(read("(app)/godkjenning/[jobId]/page.tsx"), /useJobStatus\(activePollId\);/);
+  assert.match(read("components/godkjenning/ResultReview.tsx"), /useJobStatus\(activePollId\);/);
 });
 
 test("S3-f: et svar med aatte jobber der 5–8 er not_started, gir aatte kort, og 5–8 polles ikke", () => {

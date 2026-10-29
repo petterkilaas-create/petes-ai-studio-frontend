@@ -103,7 +103,7 @@ test("FE-a: velgeren bare når kontrakten sier det: Kveldsbilde, styling, ellers
   // Uten current_choices vises ingen velger, selv om feltene er godtatt.
   assert.equal(choicesKind(review(DUSK, null)), null);
   // Siden: velgerne bare med choicesKind, og ingen regel paa tjenestenavnet.
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /const choiceKind = choicesKind\(review\);/);
   assert.match(page, /choiceKind === "dusk" \? \(\s*<DuskChoicePicker[\s\S]*?compact[\s\S]*?\/>\s*\) : choiceKind === "styling" \? \(\s*<StylingCorrectionPicker/);
   assert.match(page, /\) : null\s*\}\s*submitKey=\{correctionSubmitKey\(choices\)\}/);
@@ -141,7 +141,7 @@ test("FE-a: dagens valg er forvalgt; en gammel stil gir intet valgt kort", () =>
   assert.deepEqual(changeStyle(null, "late_evening_v1"), { style: "late_evening_v1", sky: "dark" });
   assert.deepEqual(changeStyle(DEFAULT_DUSK, "nordic_blue_hour_v2"), DEFAULT_DUSK);
   // Siden forvelger ved «Korriger bildet» og nullstiller ved Avbryt.
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /setChoiceState\(initialChoices\(load\.review\)\);/);
   assert.match(page, /const cancelCorrection = \(\) => \{[\s\S]*?setChoiceState\(NO_CHOICES\);/);
 });
@@ -170,7 +170,7 @@ test("FE-a (V-b): stiler som er andre jobber i bestillingen skjules; jobbens ege
   const picker = read("components/styling/StylingCorrectionPicker.tsx");
   assert.match(picker, /shown=\{styles\}/);
   assert.match(picker, /const hidden = styles\.length < STYLING_STYLES\.length;/);
-  assert.match(read("(app)/godkjenning/[jobId]/page.tsx"), /styles=\{correctionStyles\(review\.order, jobId, choiceStart\.style\)\}/);
+  assert.match(read("components/godkjenning/ResultReview.tsx"), /styles=\{correctionStyles\(review\.order, jobId, choiceStart\.style\)\}/);
 });
 
 // --- Body ------------------------------------------------------------------------
@@ -239,7 +239,7 @@ test("FE-a: lys og peis sendes fortsatt, også sammen med ny stil", async () => 
   assert.equal(out.kind, "poll");
   assert.deepEqual(sent[0], body);
   // Siden sender de endrede valgene ved «Lag nytt bilde».
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /choicesBody\(choicesKind\(review\), initialChoices\(review\), choiceState\)/);
 });
 

@@ -286,7 +286,7 @@ test("Tilbakemelding: stjernene er knapper paa minst 44 px med navn fra ordlista
 });
 
 test("Tilbakemelding: kortet er koblet inn etter avgjoerelsen, og bare eieren sender", () => {
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /const feedback = feedbackMode\(review\);/);
   assert.match(page, /readOnly=\{feedback === "read"\}/);
   const card = read("components/godkjenning/FeedbackCard.tsx");

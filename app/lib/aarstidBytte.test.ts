@@ -328,7 +328,7 @@ test("Dag 58: normalizeReview leser disclosure.source_season", () => {
 // --- Siden og komponenten (kildekoden som tekst) ---------------------------------------------
 
 test("Dag 58: siden viser panelet bare med seasonSwitch, og panelet sender, trekker kvoten og går videre", () => {
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /const sw = seasonSwitch\(review\);/);
   assert.match(page, /\{sw !== null && \(\s*<SeasonSwitchPanel/);
   assert.match(page, /const quota = useQuota\(\);/);

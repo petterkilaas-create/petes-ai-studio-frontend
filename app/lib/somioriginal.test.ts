@@ -265,7 +265,7 @@ test("Som i originalen: siden, panelet og kortet", () => {
     "Henter det som var i originalbildet her, også lys og ild. Bruk det når noe er lagt til som ikke skal være der."
   );
   assert.equal(t("nb", "local.originalComes"), "Dette kommer tilbake");
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /originalUrl=\{review\.images\.originalUrl\}\s*aspect=\{localAspect\}/);
   assert.match(page, /checkedVersion=\{checkedVersion\(review\)\}/);
   // Kortet: linja i stedet for varselet og merknaden, aldri begge.

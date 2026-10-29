@@ -521,7 +521,7 @@ test("Fritekst: merketeksten versjon 11: areas_edited er en egen setning, ogsaa 
 // --- Siden og komponentene ------------------------------------------------------------
 
 test("Studio v2: siden: lerretet med nummererte bokser, lista, én knapp, og ingen kandidater", () => {
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /const localAvailable = localShown\(review\) && review\.images\.previewUrl !== null;/);
   assert.match(page, /const isLocal = isEditing && localMode && localAvailable;/);
   assert.match(page, /\{isLocal \? \(\s*<LocalEditPanel[\s\S]*?onSubmit=\{submitLocal\}[\s\S]*?\) : \(\s*<CorrectionPanel/);

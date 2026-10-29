@@ -218,7 +218,7 @@ test("slettet: alle nye noekler finnes paa nb og en, uten antall dager", () => {
 });
 
 test("slettet: godkjenningssiden viser banneret og laaser knappene, slideren og nedlastingen", () => {
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /const deleted = mediaDeleted\(review\);/);
   // Banneret med datoen fra samme funksjon som kortene.
   // Datoen paa brukerens spraak (TG-NEW-129).

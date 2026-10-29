@@ -250,13 +250,13 @@ test("P3b: overskriften rett etter «Ja, avbryt» er «Avbrutt av deg»; etter n
   assert.equal(nb(doneTitleKey("review.statusRejected", null)), "Avvist av deg");
   assert.equal(doneTitleKey("notCreated.title", null), "notCreated.title");
   assert.match(
-    code("(app)/godkjenning/[jobId]/page.tsx"),
+    code("components/godkjenning/ResultReview.tsx"),
     /<p className="text-ink font-bold">\{t\(locale, doneTitleKey\(done\.key, stopDone\)\)\}<\/p>/
   );
 });
 
 test("P3b: siden viser bekreftelsen bare etter «Avbryt» i et stopp, fra svaret, og glemmer den ved ny lasting", () => {
-  const page = code("(app)/godkjenning/[jobId]/page.tsx");
+  const page = code("components/godkjenning/ResultReview.tsx");
   assert.match(page, /const fromStop = action === "reject" && isStopped\(review\);/);
   assert.match(page, /if \(fromStop\) setStopDone\(stopDoneKey\(out\.quotaReturn\)\);/);
   assert.equal(page.match(/setStopDone\(stopDoneKey/g)?.length, 1);
