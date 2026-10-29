@@ -331,7 +331,7 @@ test("P3a: merknadsboksen over sjekklista, i samme stil som merknaden fra kontro
 });
 
 test("P3a: siden gir stoppboksen og merknadene til alle roller; «Detaljer» er fortsatt bare admin", () => {
-  const page = code("(app)/godkjenning/[jobId]/page.tsx");
+  const page = code("components/godkjenning/ResultReview.tsx");
   assert.match(
     page,
     /stop=\{\s*isStopped\(review\)\s*\? \{ reasons: stopReasons\(review\), fireplace: isFireplaceStop\(review\) \}\s*: null\s*\}/

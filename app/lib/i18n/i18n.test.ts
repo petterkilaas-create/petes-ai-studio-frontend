@@ -215,8 +215,10 @@ test("«Rett» heter «Korriger bildet» (Lekkasjen L4)", () => {
   }
   // D2b: knappen ligger i handlingskortet; siden og kortet har ingen «Rett» skrevet rett inn.
   const app = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  // FE-1: siden er et skall rundt ResultReview; begge sjekkes.
   const page = readFileSync(join(app, "(app)", "godkjenning", "[jobId]", "page.tsx"), "utf8");
+  const review = readFileSync(join(app, "components", "godkjenning", "ResultReview.tsx"), "utf8");
   const card = readFileSync(join(app, "components", "godkjenning", "DecisionCard.tsx"), "utf8");
-  for (const src of [page, card]) assert.doesNotMatch(src, />\s*Rett\s*</);
+  for (const src of [page, review, card]) assert.doesNotMatch(src, />\s*Rett\s*</);
   assert.match(card, /t\(locale, "action\.correct"\)/);
 });

@@ -263,7 +263,7 @@ test("linja «Bildetype: … (valgt ved bestilling)» bare naar megleren valgte 
 });
 
 test("siden og kortet: merknadene og linja for alle roller, linja over merknadene og i resultatkortet", () => {
-  const page = code("(app)/godkjenning/[jobId]/page.tsx");
+  const page = code("components/godkjenning/ResultReview.tsx");
   assert.match(page, /const typeLine = imageTypeLine\(review\);/);
   assert.match(page, /notes=\{reviewNotes\(review\)\}\s+imageTypeLine=\{typeLine\}/);
   assert.match(page, /\{typeLine !== null && <p className="text-sm text-ink mt-2">\{noteText\(locale, typeLine\)\}<\/p>\}/);

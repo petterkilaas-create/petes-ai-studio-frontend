@@ -193,6 +193,7 @@ test("D1: listen over aktive filer har skallet, sidene og komponentene", () => {
     "components/ServiceUnavailable.tsx",
     "components/ui/Button.tsx",
     "(app)/godkjenning/[jobId]/page.tsx",
+    "components/godkjenning/ResultReview.tsx",
     "components/PreviewPlaceholder.tsx",
   ]) {
     assert.ok(files.includes(f), f);
@@ -264,7 +265,7 @@ test("D1b: godkjenningssiden og PreviewPlaceholder bruker bare tokenene", () => 
     assert.doesNotMatch(src, /\b(text|bg|border)-(white|black)\b/, f);
     assert.doesNotMatch(src, /\b(red|amber)-\d/, f);
   }
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   // Knappene og kortene er de felles komponentene (primary, ikke turkis).
   // D2b: handlingsknappene ligger i handlingskortet.
   assert.match(page, /const BTN_PRIMARY = buttonClass\("primary"\);/);
@@ -351,9 +352,10 @@ test("D1: testene for annonseteksten og lekkasjevernet er uendret", () => {
   // TG-NEW-153 (dag 38): to stier fra (app)/express til (app)/tjenester, ellers uendret (Petter 05.10).
   // G2 (dag 47): tre nye tester for Klart vaer nederst i disclosure.test.ts, de gamle uendret (Petter 19.10).
   // GS (dag 49): tre nye tester for Digital styling nederst i disclosure.test.ts, de gamle uendret.
+  // FE-1 (dag 59): to stier i previews.test.ts fra godkjenningssiden til ResultReview, ellers uendret.
   const expected: Record<string, string> = {
     "lib/disclosure.test.ts": "cd27bce3c31c3e3748040ada64b87c048e5b219066379cd41dbc09060ea9328f",
-    "lib/previews.test.ts": "e78901bf96250efc8fca3f5eea49d985abc6bf7213870dac66c528182a65b4d4",
+    "lib/previews.test.ts": "efc8a9510221f5a0002fbf9deba8e7e6fc4d92004692fb2d587e9f742fec4d32",
     "lib/jobState.test.ts": "cac4d79a9ed60e6307f4cdd0118fcba43c22b8aa8ba7a783ba4c0e1522a818c5",
   };
   for (const [rel, hash] of Object.entries(expected)) {
@@ -552,7 +554,7 @@ test("D2a: komponentene har ingen synlig tekst skrevet rett inn", () => {
 });
 
 test("D2a: siden bygger variantene fra rundene, med admin fra /me", () => {
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /compareVariants\(review\.images, \{ isAdmin: caps\.viewAll \}\)/);
   assert.match(page, /getCapabilities\(\{ getToken \}\)/);
   assert.match(page, /useState<Capabilities>\(NO_CAPABILITIES\)/);
@@ -593,7 +595,7 @@ test("D2b: komponentene finnes og er med i D1-sjekkene", () => {
 });
 
 test("D2b: «Detaljer» vises bare naar showDetails(caps) er sann", () => {
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /\{showDetails\(caps\) && <DetailsPanel /);
   assert.equal(page.match(/<DetailsPanel /g)?.length, 1);
 });
@@ -606,7 +608,7 @@ const ANALYSIS = /review\.lightsUnstable|review\.lightsRejected|review\.lightsAp
 // kodene fra analysen. Derfor ingen unntak her lenger (TG-NEW-219-linja er borte).
 
 test("D2b: analysen staar bare i DetailsPanel (megleren ser den ikke)", () => {
-  const files = ["(app)/godkjenning/[jobId]/page.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("DetailsPanel.tsx") && !f.endsWith("LightLabel.tsx"))];
+  const files = ["components/godkjenning/ResultReview.tsx", ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("DetailsPanel.tsx") && !f.endsWith("LightLabel.tsx"))];
   for (const f of files) {
     const src = withoutComments(read(f));
     assert.doesNotMatch(src, ANALYSIS, f);
@@ -627,7 +629,7 @@ test("D2b: rettingen er én flat liste med «Usikker», uten grunner, tidspunkt 
   assert.doesNotMatch(panel, /\breason\b|lightReason/);
   assert.doesNotMatch(panel, /dusk|DuskChoice|roundTime|roundSky|"time"|"sky"/i);
   // Siden sender kandidat-flagget videre til setToggle, og body bygges som foer.
-  const page = read("(app)/godkjenning/[jobId]/page.tsx");
+  const page = read("components/godkjenning/ResultReview.tsx");
   assert.match(page, /setToggles\(\(prev\) => setToggle\(prev, light, uncertain, on\)\)/);
   // Dag 57 (TG-NEW-145): de endrede valgene som femte argument; lys og peis som foer.
   assert.match(page, /buildCorrection\(\s*review,\s*toggles,\s*correctionFireplaceShown\(review\.fireplace\),\s*correctAnswer,(\s*\/\/[^\n]*)?\s*choicesBody\(choicesKind\(review\), initialChoices\(review\), choiceState\)\s*\)/);
@@ -703,7 +705,7 @@ test("TG-NEW-148: bare «Detaljer» (admin) viser analysens plassering; alle vis
   // Ingen andre steder leser plasseringen direkte. AdditionMarkers viser
   // kontrollens plassering bare for admin (TG-NEW-199 PR 4, testet i tg199pr4.test.ts).
   for (const f of [
-    "(app)/godkjenning/[jobId]/page.tsx",
+    "components/godkjenning/ResultReview.tsx",
     ...GODKJENNING_COMPONENTS.filter((f) => !f.endsWith("LightLabel.tsx") && !f.endsWith("AdditionMarkers.tsx")),
   ]) {
     assert.doesNotMatch(withoutComments(read(f)), /\.location\b/, f);
@@ -719,7 +721,7 @@ test("TG-NEW-148: bare «Detaljer» (admin) viser analysens plassering; alle vis
 // ---------------------------------------------------------------------------
 
 test("TG-NEW-166: markoerene brukes bare av godkjenningssiden, aldri av glideren, nedlastingen eller merkingen", () => {
-  const page = "(app)/godkjenning/[jobId]/page.tsx";
+  const page = "components/godkjenning/ResultReview.tsx";
   const markers = "components/godkjenning/LightMarkers.tsx";
   assert.ok(GODKJENNING_COMPONENTS.includes(markers), "med i D1-sjekkene");
   for (const f of activeFiles().filter((f) => /\.tsx?$/.test(f) && f !== page && f !== markers)) {
@@ -934,13 +936,13 @@ const CSS_BRIGHTNESS = /brightness\(|\bfilter\s*:|filter:\s*`|(^|[\s"'`])(filter
 
 test("TG147: ingen CSS-filter paa resultatbildet; bildet er trinnets lenke fra backend", () => {
   for (const f of [
-    "(app)/godkjenning/[jobId]/page.tsx",
+    "components/godkjenning/ResultReview.tsx",
     "components/godkjenning/CompareViewer.tsx",
     "components/godkjenning/BrightnessControl.tsx",
   ]) {
     assert.doesNotMatch(withoutComments(read(f)), CSS_BRIGHTNESS, f);
   }
-  const page = withoutComments(read("(app)/godkjenning/[jobId]/page.tsx"));
+  const page = withoutComments(read("components/godkjenning/ResultReview.tsx"));
   assert.match(page, /const stepShown = brightness\.kind === "control" && !brightness\.locked \? step : null;/);
   assert.match(page, /const shownUrl = stepShown !== null \? brightnessResultUrl\(review\.brightness, stepShown\) : roundUrl;/);
   assert.match(page, /result=\{shown === null \? null : \{ url: shownUrl, label: shownLabel \}\}/);
@@ -974,7 +976,7 @@ test("TG147: kontrollen er en innebygd range med fem trinn, navn fra ordlista og
 });
 
 test("TG147: siden skjuler «Rått», viser kontrollen under bildet og sender trinnet ved godkjenning", () => {
-  const page = withoutComments(read("(app)/godkjenning/[jobId]/page.tsx"));
+  const page = withoutComments(read("components/godkjenning/ResultReview.tsx"));
   assert.match(
     page,
     /const variants = visibleVariants\(\s*compareVariants\(review\.images, \{ isAdmin: caps\.viewAll \}\),\s*review\.brightness\s*\);/

@@ -17,7 +17,7 @@ const read = (rel: string) => readFileSync(join(APP, rel), "utf8");
 /** Uten kommentarer, saa en kommentar ikke kan oppfylle eller bryte en sjekk. */
 const code = (rel: string) => read(rel).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
-const page = code("(app)/godkjenning/[jobId]/page.tsx");
+const page = code("components/godkjenning/ResultReview.tsx");
 const mood = code("components/godkjenning/MoodPanel.tsx");
 const correction = code("components/godkjenning/CorrectionPanel.tsx");
 const markers = code("components/godkjenning/LightMarkers.tsx");

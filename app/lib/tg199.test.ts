@@ -20,7 +20,7 @@ const read = (rel: string) => readFileSync(join(APP, rel), "utf8");
 const code = (rel: string) => read(rel).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 const card = code("components/godkjenning/DecisionCard.tsx");
-const page = code("(app)/godkjenning/[jobId]/page.tsx");
+const page = code("components/godkjenning/ResultReview.tsx");
 
 test("TG199 og D-5a: «action.checkAdded» er borte fra ordlista og koden", () => {
   assert.ok(!Object.hasOwn(DICTIONARIES.nb.ui, "action.checkAdded"));

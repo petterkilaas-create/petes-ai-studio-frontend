@@ -15,7 +15,7 @@ const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
 const REPO_DIR = fileURLToPath(new URL("../..", import.meta.url));
 const code = (rel: string) => withoutComments(readFileSync(join(APP_DIR, rel), "utf8"));
 
-const page = code("(app)/godkjenning/[jobId]/page.tsx");
+const page = code("components/godkjenning/ResultReview.tsx");
 const layout = code("(app)/layout.tsx");
 const viewer = code("components/godkjenning/CompareViewer.tsx");
 const lightbox = code("components/godkjenning/Lightbox.tsx");

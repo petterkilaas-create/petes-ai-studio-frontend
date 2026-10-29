@@ -23,7 +23,7 @@ import { literalTexts, withoutComments } from "./testing/jsxText.ts";
 const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
 const code = (rel: string) => withoutComments(readFileSync(join(APP_DIR, rel), "utf8"));
 
-const page = code("(app)/godkjenning/[jobId]/page.tsx");
+const page = code("components/godkjenning/ResultReview.tsx");
 const card = code("components/godkjenning/DecisionCard.tsx");
 const tabsSrc = code("components/godkjenning/OrderTabs.tsx");
 

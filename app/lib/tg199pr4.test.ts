@@ -312,7 +312,7 @@ test("TG199 PR4: 409 additions_not_acknowledged henter på nytt og låser ikke",
 const card = code("components/godkjenning/DecisionCard.tsx");
 const markersSrc = code("components/godkjenning/AdditionMarkers.tsx");
 const viewer = code("components/godkjenning/CompareViewer.tsx");
-const page = code("(app)/godkjenning/[jobId]/page.tsx");
+const page = code("components/godkjenning/ResultReview.tsx");
 
 test("TG199 PR4: i kortet står linja, sjekklista og krysset over knappene, bare med «Godkjenn» og ikke i rettingen", () => {
   const block = card.indexOf("{controls.approve && (\n            <div");

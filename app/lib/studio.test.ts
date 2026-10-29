@@ -352,8 +352,8 @@ test("StudioCanvas: bare godkjenningssiden bruker den, med nummererte bokser (st
   const users = [...sources("(app)"), ...sources("(marketing)"), ...sources("components")].filter(
     (f) => f !== "components/studio/StudioCanvas.tsx" && /StudioCanvas/.test(code(f))
   );
-  assert.deepEqual(users, ["(app)/godkjenning/[jobId]/page.tsx"]);
-  const page = code("(app)/godkjenning/[jobId]/page.tsx");
+  assert.deepEqual(users, ["components/godkjenning/ResultReview.tsx"]);
+  const page = code("components/godkjenning/ResultReview.tsx");
   assert.match(page, /<StudioCanvas[\s\S]*?tool="box"[\s\S]*?onBox=\{addBoxFromCanvas\}\s*numbered\s*activeId=\{localActive\}\s*onActive=\{setLocalActive\}/);
 });
 
