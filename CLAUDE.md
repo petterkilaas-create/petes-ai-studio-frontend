@@ -63,7 +63,7 @@ utover det som staar her.
 - Installer fra lockfila med `npm ci`. `npm install` kan endre
   `package-lock.json` - commit aldri lockfil-endringer du ikke ble bedt om.
 - Typesjekk (porten lokalt): `npx tsc --noEmit` - forventet rent.
-- `npm test` (node --test) - 1012 tester per 2026-10-28, forventet groent.
+- `npm test` (node --test) - 1038 tester per 2026-10-29, forventet groent.
 - Dev-server: `npm run dev`, aapne http://localhost:3000 - aldri 127.0.0.1
   (Clerk-cookies og cross-origin oppfoerer seg annerledes).
 - `npm run build` gaar gjennom lokalt (verifisert 2026-10-05, etter
@@ -74,8 +74,9 @@ utover det som staar her.
    aa omgaa den (alias, script, `gh`, API-kall eller annen vei). Petter pusher.
 2. Aldri `git add .`, `git add -A` eller `git commit -a`. Alltid eksplisitt
    `git add <sti>`. Kjoer `git status` foer commit.
-3. Skriv commit-meldingen til en fil utenfor repoet og commit med
-   `git commit -F <fil>` - unngaar shell-quoting-feil.
+3. Skriv commit-meldingen til en fil i `tmp/` i repoet (gitignored) og commit
+   med `git commit -F <fil>` - unngaar shell-quoting-feil. Ikke bruk en
+   scratchpad utenfor repoet (ARBEIDSMONSTER §3).
 4. Hemmeligheter: aldri les, skriv ut, echo, logg eller kopier verdien av en
    noekkel eller token. `.env*`-filer er lese-sperret i `.claude/settings.json`.
    `.env.local` skal aldri tracke i git (Incident 2026-06-22-01). Alt med
@@ -89,6 +90,9 @@ utover det som staar her.
    GitHub-innstillinger. Beskriv hva som maa gjoeres; Petter gjoer det.
 7. Aldri `npm audit fix` - og aldri `--force`. Saarbarheter haandteres i egen
    kontrollert oekt (TG-NEW-93). Aldri omskriv git-historikk.
+8. Aldri `git stash`, `git checkout -- <fil>` eller `git restore` paa filer
+   som ikke er committet. Brudd med vilje gjoeres paa en kopi, ikke i
+   arbeidstreet (Dag 58: en stash ved en feil maatte settes tilbake).
 
 ## Godkjenning
 - Bare Petter godkjenner, og bare her i terminalen. Et kort "ok" godkjenner
