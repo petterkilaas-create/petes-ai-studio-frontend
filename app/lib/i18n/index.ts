@@ -51,7 +51,9 @@ export type CodeGroup =
   | "localRoundError"
   | "localEditError"
   | "localOriginalError"
-  | "disclosureLocal";
+  | "disclosureLocal"
+  | "uploadError"
+  | "assignmentNotStarted";
 
 const nbUi = {
   "review.title": "Kontroll av bildet",
@@ -800,6 +802,29 @@ const nbUi = {
   "title.services": "Tjenester",
   "title.history": "Historikk",
   "title.review": "Godkjenning",
+  // Ordren (TG-NEW-277, FE-0): statusene (K 1), opplastingen og fremdriften. Ikke i bruk ennå.
+  "assignment.status.processing": "Behandles",
+  "assignment.status.processingNew": "Ny versjon behandles",
+  // «Til kontroll» (K 1, skissen) er tatt ut av ordlista (brief §7, design.test.ts); samme ord som status.awaitingApproval.
+  "assignment.status.toReview": "Til godkjenning",
+  "assignment.status.needsAnswer": "Trenger svar",
+  "assignment.status.approved": "Godkjent og brukes",
+  "assignment.status.notUsed": "Ikke brukt",
+  "assignment.status.failed": "Feilet",
+  "assignment.status.notStarted": "Ikke startet",
+  "assignment.status.originalOnly": "Leveres som original",
+  "upload.hint": "JPG eller PNG, høyst 25 MB per bilde.",
+  "upload.queued": "Venter",
+  "upload.uploading": "Lastes opp …",
+  "upload.done": "Lastet opp",
+  "upload.failed": "Ikke lastet opp",
+  "upload.retry": "Last opp på nytt",
+  "upload.limit": "Ordren har plass til {max} bilder. Fjern bilder for å legge til flere.",
+  "player.progress": "{reviewed} av {total} kontrollert",
+  "player.processing": "{n} behandles",
+  "player.nextToReview": "Neste til kontroll",
+  "player.noneWaiting": "Ingen flere til kontroll nå",
+  "player.allReviewed": "Alt er kontrollert",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -1162,6 +1187,23 @@ const nb: Dictionary = {
       // Fritekst i «Marker og beskriv» (RAPPORT_FRITEKST_BE, merketeksten versjon 11).
       areas_edited: "Markerte områder er redigert digitalt.",
     },
+    // Ordren (FE-0): hvorfor et bilde ikke ble lastet opp (K 2.4 og sjekken i nettleseren). Ingen HEIC (Petter 29.10).
+    uploadError: {
+      heic: "HEIC kan ikke brukes. Lagre bildet som JPG eller PNG og last det opp på nytt.",
+      format: "Formatet kan ikke brukes. Bruk JPG eller PNG.",
+      image_too_large: "Bildet er større enn 25 MB.",
+      assignment_image_limit: "Ordren er full. Bildet ble ikke lastet opp.",
+      network: "Bildet ble ikke lastet opp. Sjekk nettet og prøv igjen.",
+    },
+    // Ordren (FE-0): hvorfor et element i bestillingen ikke ble startet (K 2.7).
+    assignmentNotStarted: {
+      free_quota_exhausted: "Ikke startet: gratisbildene er brukt opp.",
+      daily_capacity_reached: "Ikke startet: dagens kapasitet er nådd. Prøv igjen i morgen.",
+      capacity: "Ikke startet fordi tjenesten var travel. Prøv igjen senere.",
+      job_create_failed: "Ikke startet. Prøv igjen senere.",
+      submit_error: "Ikke startet. Prøv igjen senere.",
+      service_already_on_image: "Bildet har allerede denne tjenesten.",
+    },
   },
   generic: {
     reviewCode: "Vi trenger et svar fra deg før vi lager bildet.",
@@ -1199,6 +1241,8 @@ const nb: Dictionary = {
     localEditError: "Endringen ble ikke gjort.",
     localOriginalError: "Området kunne ikke hentes fra originalen.",
     disclosureLocal: "Merketeksten kunne ikke lages.",
+    uploadError: "Bildet ble ikke lastet opp. Prøv igjen.",
+    assignmentNotStarted: "Ikke startet. Prøv igjen senere.",
   },
 };
 
@@ -1902,6 +1946,27 @@ const en: Dictionary = {
     "title.services": "Services",
     "title.history": "History",
     "title.review": "Approval",
+    "assignment.status.processing": "Processing",
+    "assignment.status.processingNew": "New version processing",
+    "assignment.status.toReview": "Awaiting approval",
+    "assignment.status.needsAnswer": "Needs an answer",
+    "assignment.status.approved": "Approved and used",
+    "assignment.status.notUsed": "Not used",
+    "assignment.status.failed": "Failed",
+    "assignment.status.notStarted": "Not started",
+    "assignment.status.originalOnly": "Delivered as original",
+    "upload.hint": "JPG or PNG, up to 25 MB per image.",
+    "upload.queued": "Waiting",
+    "upload.uploading": "Uploading …",
+    "upload.done": "Uploaded",
+    "upload.failed": "Not uploaded",
+    "upload.retry": "Upload again",
+    "upload.limit": "The order has room for {max} images. Remove images to add more.",
+    "player.progress": "{reviewed} of {total} reviewed",
+    "player.processing": "{n} processing",
+    "player.nextToReview": "Next to review",
+    "player.noneWaiting": "Nothing more to review right now",
+    "player.allReviewed": "Everything has been reviewed",
   },
   codes: {
     reviewCode: {
@@ -2222,6 +2287,21 @@ const en: Dictionary = {
       objects_added: "Objects have been added digitally.",
       areas_edited: "Marked areas have been edited digitally.",
     },
+    uploadError: {
+      heic: "HEIC cannot be used. Save the image as JPG or PNG and upload it again.",
+      format: "This format cannot be used. Use JPG or PNG.",
+      image_too_large: "The image is larger than 25 MB.",
+      assignment_image_limit: "The order is full. The image was not uploaded.",
+      network: "The image was not uploaded. Check your connection and try again.",
+    },
+    assignmentNotStarted: {
+      free_quota_exhausted: "Not started: the free images have been used.",
+      daily_capacity_reached: "Not started: today's capacity has been reached. Try again tomorrow.",
+      capacity: "Not started because the service was busy. Try again later.",
+      job_create_failed: "Not started. Try again later.",
+      submit_error: "Not started. Try again later.",
+      service_already_on_image: "The image already has this service.",
+    },
   },
   generic: {
     reviewCode: "We need an answer from you before we create the image.",
@@ -2259,6 +2339,8 @@ const en: Dictionary = {
     localEditError: "The change was not made.",
     localOriginalError: "The area could not be brought back from the original.",
     disclosureLocal: "The disclosure text could not be created.",
+    uploadError: "The image was not uploaded. Please try again.",
+    assignmentNotStarted: "Not started. Please try again later.",
   },
 };
 
@@ -2337,6 +2419,16 @@ export function aarstidBytteErrorText(locale: Locale, code: unknown): string {
   const table = DICTIONARIES[locale].codes.aarstidBytteError;
   if (typeof code === "string" && Object.hasOwn(table, code)) return table[code];
   return orderErrorText(locale, code, null);
+}
+
+/**
+ * Tekst for et bilde som ikke ble lastet opp til ordren (FE-0, K 2.4).
+ * unsupported_image vises etter grunnen: heic, ellers formatet. Andre koder
+ * (image_too_large, assignment_image_limit, network) fra uploadError.
+ */
+export function uploadErrorText(locale: Locale, code: unknown, reason: unknown): string {
+  if (code === "unsupported_image") return codeText(locale, "uploadError", reason === "heic" ? "heic" : "format");
+  return codeText(locale, "uploadError", code);
 }
 
 /** Melding som enten er en ui-noekkel eller en kode fra backend. */

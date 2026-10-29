@@ -1,0 +1,82 @@
+{
+  "id": "asg_1",
+  "address": "Storgata 12",
+  "assignment_no": "2026-1234",
+  "slug": "storgata-12",
+  "created_at": "2026-10-29T08:00:00Z",
+  "updated_at": "2026-10-29T09:00:00Z",
+  "counts": { "images": 8, "results": 9, "processing": 1, "to_review": 3, "needs_answer": 1, "approved": 3, "not_used": 1, "failed": 0 },
+  "images": [
+    {
+      "id": "img_2", "position": 2, "room": "Kjøkken", "file_name": "IMG_4811.jpg", "width": 4500, "height": 3000,
+      "thumb_url": "https://x/t2", "original_url": "https://x/o2", "display_status": "approved",
+      "results": [
+        { "result_id": "job_2a", "service": "virtual_stage", "preset_id": "styling_japandi", "service_label": "Digital styling", "option_label": "Japandi",
+          "status": "succeeded", "display_status": "approved", "version": 1, "previous_version": null, "versions": [1],
+          "approved_version": 1, "rounds_left": 3, "preview_url": "https://x/p2a", "created_at": "2026-10-29T08:10:00Z", "updated_at": "2026-10-29T08:20:00Z" }
+      ]
+    },
+    {
+      "id": "img_1", "position": 1, "room": "Stue", "file_name": "IMG_4810.jpg", "width": 4500, "height": 3000,
+      "thumb_url": "https://x/t1", "original_url": "https://x/o1", "display_status": "to_review",
+      "results": [
+        { "result_id": "job_1a", "service": "scene_transform", "preset_id": "skumring", "service_label": "Kveldsbilde", "option_label": null,
+          "status": "awaiting_approval", "display_status": "to_review", "version": 1, "previous_version": null, "versions": [1],
+          "approved_version": null, "rounds_left": 3, "preview_url": "https://x/p1a", "created_at": "2026-10-29T08:10:00Z", "updated_at": "2026-10-29T08:20:00Z" },
+        { "result_id": "job_1b", "service": "virtual_stage", "preset_id": "styling_japandi", "service_label": "Digital styling", "option_label": "Japandi",
+          "status": "succeeded", "display_status": "approved", "version": 2, "previous_version": 1, "versions": [2, 1, 2],
+          "approved_version": 2, "rounds_left": 2, "preview_url": "https://x/p1b", "created_at": "2026-10-29T08:11:00Z", "updated_at": "2026-10-29T08:40:00Z" }
+      ]
+    },
+    {
+      "id": "img_3", "position": 3, "room": "Soverom", "file_name": "IMG_4812.jpg", "width": 4500, "height": 3000,
+      "thumb_url": "https://x/t3", "original_url": "https://x/o3", "display_status": "original_only", "results": []
+    },
+    {
+      "id": "img_4", "position": 4, "room": "Bad", "file_name": "IMG_4813.jpg", "width": 3000, "height": 4500,
+      "thumb_url": "https://x/t4", "original_url": "https://x/o4", "display_status": "needs_answer",
+      "results": [
+        { "result_id": "job_4a", "service": "scene_transform", "preset_id": "skumring", "service_label": "Kveldsbilde", "option_label": null,
+          "status": "needs_review", "display_status": "needs_answer", "version": 1, "previous_version": null, "versions": [1],
+          "approved_version": null, "rounds_left": 3, "preview_url": null, "created_at": "2026-10-29T08:12:00Z", "updated_at": "2026-10-29T08:12:00Z" }
+      ]
+    },
+    {
+      "id": "img_5", "position": 5, "room": "Fasade", "file_name": "IMG_4814.jpg", "width": 4500, "height": 3000,
+      "thumb_url": "https://x/t5", "original_url": "https://x/o5", "display_status": "to_review",
+      "results": [
+        { "result_id": "job_5a", "service": "scene_transform", "preset_id": "skumring", "service_label": "Kveldsbilde", "option_label": null,
+          "status": "awaiting_approval", "display_status": "to_review", "version": 1, "previous_version": null, "versions": [1],
+          "approved_version": null, "rounds_left": 3, "preview_url": "https://x/p5a", "created_at": "2026-10-29T08:13:00Z", "updated_at": "2026-10-29T08:30:00Z" },
+        { "result_id": "job_5b", "service": "scene_transform", "preset_id": "klart_vaer", "service_label": "Blå himmel", "option_label": null,
+          "status": "running", "display_status": "processing", "version": 2, "previous_version": 1, "versions": [1],
+          "approved_version": null, "rounds_left": 2, "preview_url": "https://x/p5b", "created_at": "2026-10-29T08:13:00Z", "updated_at": "2026-10-29T08:50:00Z" }
+      ]
+    },
+    {
+      "id": "img_6", "position": 6, "room": null, "file_name": "IMG_4815.jpg", "width": 4500, "height": 3000,
+      "thumb_url": "https://x/t6", "original_url": "https://x/o6", "display_status": "approved",
+      "results": [
+        { "result_id": "job_6a", "service": "privacy_blur", "preset_id": null, "service_label": "Skjul ansikter", "option_label": null,
+          "status": "succeeded", "display_status": "approved", "version": 1, "previous_version": null, "versions": [1],
+          "approved_version": 1, "rounds_left": null, "preview_url": "https://x/p6a", "created_at": "2026-10-29T08:14:00Z", "updated_at": "2026-10-29T08:14:00Z" }
+      ]
+    },
+    {
+      "id": "img_7", "position": 7, "room": "Gang", "file_name": "IMG_4816.jpg", "width": 4500, "height": 3000,
+      "thumb_url": "https://x/t7", "original_url": "https://x/o7", "display_status": "to_review",
+      "results": [
+        { "result_id": "job_7a", "service": "virtual_stage", "preset_id": "styling_moderne", "service_label": "Digital styling", "option_label": "Moderne",
+          "status": "failed", "display_status": "not_used", "version": 1, "previous_version": null, "versions": [1],
+          "approved_version": null, "rounds_left": 3, "preview_url": "https://x/p7a", "created_at": "2026-10-29T08:15:00Z", "updated_at": "2026-10-29T08:35:00Z" },
+        { "result_id": "job_7b", "service": "virtual_stage", "preset_id": "styling_japandi", "service_label": "Digital styling", "option_label": "Japandi",
+          "status": "awaiting_approval", "display_status": "to_review", "version": 1, "previous_version": null, "versions": [1],
+          "approved_version": null, "rounds_left": 3, "preview_url": "https://x/p7b", "created_at": "2026-10-29T08:16:00Z", "updated_at": "2026-10-29T08:36:00Z" }
+      ]
+    },
+    {
+      "id": "img_8", "position": 8, "room": "Hage", "file_name": "IMG_4817.jpg", "width": 4500, "height": 3000,
+      "thumb_url": "https://x/t8", "original_url": "https://x/o8", "display_status": "original_only", "results": []
+    }
+  ]
+}
