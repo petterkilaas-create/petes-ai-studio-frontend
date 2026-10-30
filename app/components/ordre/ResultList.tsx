@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { AssignmentResult } from "../../lib/assignments";
 import { resultStatusKey } from "../../lib/assignments";
 import { resultLabel } from "../../lib/brett";
-import { resultReviewHref, resultTone } from "../../lib/ordrer";
+import { resultOpenHref, resultTone } from "../../lib/ordrer";
 import { buttonClass } from "../ui/Button";
 import { Pill } from "../ui/Pill";
 import { t } from "../../lib/i18n";
@@ -19,15 +19,20 @@ import { useLocale } from "../../lib/i18n/useLocale";
  * FE-3c: navnet staar paa egen linje i full bredde og brytes som vanlig tekst;
  * under staar statusen, versjonen og «Åpne» i én rad som brytes ved behov.
  * «Åpne» har ordren med som `?fra=`, saa godkjenningssiden lenker tilbake hit.
+ *
+ * FE-4: «Åpne» gaar til ordresiden med bildet og resultatet valgt
+ * (`?bilde=&resultat=`), for alle resultater som ble startet.
  */
 export function ResultList({
   results,
   number,
   assignmentId,
+  imageId,
 }: {
   results: readonly AssignmentResult[];
   number: number;
   assignmentId: string;
+  imageId: string;
 }) {
   const locale = useLocale();
   if (results.length === 0) return null;
@@ -35,7 +40,7 @@ export function ResultList({
     <ul className="flex flex-col gap-3 border-t border-line pt-3" aria-label={t(locale, "orders.results.title")}>
       {results.map((result) => {
         const label = resultLabel(locale, result);
-        const href = resultReviewHref(result, assignmentId);
+        const href = resultOpenHref(assignmentId, imageId, result);
         return (
           <li key={result.resultId} className="flex min-w-0 flex-col gap-1.5 text-sm">
             <p className="break-words text-ink">{label}</p>

@@ -230,8 +230,9 @@ test("merknadene: egen tekst for hver kode paa nb og en, og lenke dit megleren k
   assert.equal(t("nb", noteKey("result_processing"), { label: "Kveldsbilde" }), "Kveldsbilde behandles og kommer med når den er godkjent.");
 
   const at = (code: string, resultId: string | null = "r9") => noteLink("a1", { imageId: "i", code, resultId });
-  assert.deepEqual(at("result_to_review"), { href: "/godkjenning/r9", key: "delivery.note.openReview" });
-  assert.deepEqual(at("result_needs_answer"), { href: "/godkjenning/r9", key: "delivery.note.openReview" });
+  // FE-4: til ordresiden med bildet og resultatet valgt (playerHref), ikke til godkjenningssiden.
+  assert.deepEqual(at("result_to_review"), { href: "/ordrer/a1?bilde=i&resultat=r9", key: "delivery.note.openReview" });
+  assert.deepEqual(at("result_needs_answer"), { href: "/ordrer/a1?bilde=i&resultat=r9", key: "delivery.note.openReview" });
   for (const code of ["result_processing", "result_not_used", "result_failed"]) {
     assert.deepEqual(at(code), { href: "/ordrer/a1/bilder", key: "delivery.note.openImages" }, code);
   }

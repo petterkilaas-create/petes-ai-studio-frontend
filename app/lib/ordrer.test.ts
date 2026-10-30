@@ -140,12 +140,12 @@ test("lista: «Vis flere» legger neste side bak, uten dubletter", () => {
   assert.deepEqual(merged.map((o) => o.id), ["a", "b", "c"]);
 });
 
-test("lista: siden bruker listAssignments med cursor, nyeste foerst fra backend, og lenker til bildene", () => {
+test("lista: siden bruker listAssignments med cursor, nyeste foerst fra backend, og lenker til ordren (FE-4: orderHref)", () => {
   const src = withoutComments(read("(app)/ordrer/page.tsx"));
   assert.match(src, /listAssignments\(request, \{ limit: ORDERS_PAGE_SIZE \}\)/);
   assert.match(src, /listAssignments\(request, \{ limit: ORDERS_PAGE_SIZE, cursor \}\)/);
   assert.match(src, /\{cursor !== null && \(/);
-  assert.match(src, /href=\{orderImagesHref\(order\.id\)\}/);
+  assert.match(src, /href=\{orderHref\(order\)\}/);
   assert.match(src, /<ButtonLink href=\{NEW_ORDER_PATH\}>\{t\(locale, "orders\.new"\)\}<\/ButtonLink>/);
   assert.match(src, /t\(locale, "orders\.emptyTitle"\)/);
   assert.match(src, /t\(locale, "orders\.emptyBody"\)/);

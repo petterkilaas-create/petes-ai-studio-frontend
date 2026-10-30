@@ -5,8 +5,8 @@ import type { GuidePage } from "../schema.ts";
 // «» er knapper og overskrifter derfra (testen sjekker det), og statusnavnene
 // hentes fra ordlista (assignment.status.*). Nedlastingen er fra FE-5
 // (RAPPORT_FE5.md). Grensene ({maxImages}, {maxMb}, {maxBoxes}) fylles fra
-// konstantene i appen (GuidePage.tsx). «Angre godkjenning» finnes i backend,
-// men ikke i appen ennaa, og er derfor ikke med.
+// konstantene i appen (GuidePage.tsx). Ordresiden og «Angre godkjenning» er
+// fra FE-4 (del 5 og 6).
 export const guidePage = {
   _type: "guidePage",
   seo: {
@@ -84,7 +84,8 @@ export const guidePage = {
       title: "Følg resultatene på bildesiden",
       steps: [
         "Resultatene kommer under bildene etter hvert som de blir klare. Trykk «Oppdater» for å se de nyeste.",
-        "Trykk «Åpne» på et resultat for å se det mot originalen.",
+        "Trykk «Åpne» på et resultat. Da åpnes ordresiden med bildet og resultatet valgt.",
+        "På ordresiden velger du bilde i stripa øverst og tjeneste i fanene under. Piltastene blar mellom bildene. Fremdriften øverst viser hvor mange som er kontrollert.",
       ],
       statuses: [
         { status: "processing", text: "Bildet lages. Når du har rettet et bilde, står det Ny versjon behandles." },
@@ -94,7 +95,10 @@ export const guidePage = {
         { status: "notUsed", text: "Du har avvist resultatet, og det kommer ikke med." },
         { status: "failed", text: "Resultatet kunne ikke lages. Du kan bestille tjenesten på nytt fra bildebrettet." },
       ],
-      notes: ["Vil du bestille mer til ordren, trykker du «Bestill flere tjenester»."],
+      notes: [
+        "Har ordren resultater, kommer du rett til ordresiden fra ordrelista. «Bilder og rom» tar deg til bildesiden.",
+        "Vil du bestille mer til ordren, trykker du «Bestill flere tjenester» på bildesiden eller «Bestill mer for boligen» på ordresiden.",
+      ],
     },
     {
       id: "godkjenn",
@@ -104,8 +108,11 @@ export const guidePage = {
         "Gå gjennom sjekklista, kryss av for «Jeg har sammenlignet bildet med originalen.» og trykk «Godkjenn».",
         "Er noe feil, trykker du «Korriger bildet» og velger hvordan.",
         "Vil du ikke bruke resultatet, trykker du «Avvis».",
+        "Etter «Godkjenn» eller «Avvis» går ordresiden videre til neste resultat som venter. Nederst står «Neste til kontroll» så lenge noe venter.",
       ],
       notes: [
+        "Har du godkjent noe ved en feil, trykker du «Angre godkjenning» på resultatet. Etter «Avvis» heter knappen «Angre», og du kan angre i en uke. Resultatet står da som Til godkjenning igjen, og du kan godkjenne, rette eller avvise det på nytt.",
+        "Rett etter at siden har gått videre, står en melding med «Angre godkjenning» eller «Angre» øverst i noen sekunder.",
         "«Endre valgene», «Korriger lyskildene» eller «Lag et nytt forsøk» lager bildet på nytt fra originalen. Hvilket av dem du ser, kommer an på tjenesten.",
         "«Marker og beskriv» endrer bare det du markerer. Dra en boks rundt det som skal endres, og skriv hva som skal endres. Du kan markere opptil {maxBoxes} ting. Alt utenfor boksene blir som før.",
         "«Som i originalen» henter tilbake det som var i originalen i boksen, også lys og ild. Bruk det når noe er lagt til som ikke skal være der. Det er gratis.",
@@ -117,7 +124,7 @@ export const guidePage = {
       id: "last-ned",
       title: "Last ned",
       steps: [
-        "Trykk «Last ned» på ordren i ordrelista eller øverst på bildesiden.",
+        "Trykk «Last ned» på ordren i ordrelista, eller øverst på bildesiden eller ordresiden.",
         "Se over fillista. Slå av «Med» for et resultat du ikke vil ha med. Originalene er alltid med.",
         "Trykk «Last ned ZIP».",
       ],
@@ -134,7 +141,7 @@ export const guidePage = {
       id: "merking",
       title: "Merking og tekst til annonsen",
       steps: [
-        "Når du har godkjent et bilde, står «Tekst til annonsen» på godkjenningssiden.",
+        "Når du har godkjent et bilde, står «Tekst til annonsen» ved resultatet på ordresiden og på godkjenningssiden.",
         "Trykk «Kopier» og lim teksten inn i annonsen sammen med bildet.",
       ],
       notes: [

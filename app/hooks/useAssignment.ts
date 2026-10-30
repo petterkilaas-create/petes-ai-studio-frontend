@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { assignmentRequest } from "../lib/api";
 import { assignmentErrorCode, getAssignment, type Assignment, type AssignmentRequest } from "../lib/assignments";
+import { isProcessing } from "../lib/ordrer";
+import type { RefreshResult } from "../lib/autoRefresh";
 
 export type AssignmentLoad =
   | { kind: "loading" }
@@ -16,11 +18,15 @@ export type AssignmentLoad =
  * start, og `reload` for «Prøv igjen». `onLoaded` kalles med ordren etter
  * hentingen (utkastet leses der, ikke i en effekt). `request` er kallet mot
  * backend med token (assignmentRequest), til bestillingen.
+ *
+ * FE-4: `reload` gir svaret til useAutoRefresh (ordresiden henter paa nytt
+ * mens noe behandles). En henting som feiler etter at ordren er vist,
+ * beholder siden som den er (som bildesiden).
  */
 export function useAssignment(
   assignmentId: string,
   onLoaded?: (assignment: Assignment) => void
-): { load: AssignmentLoad; reload: () => Promise<void>; request: AssignmentRequest } {
+): { load: AssignmentLoad; reload: () => Promise<RefreshResult>; request: AssignmentRequest } {
   const { getToken } = useAuth();
   const request = useMemo(() => assignmentRequest(getToken), [getToken]);
   const [load, setLoad] = useState<AssignmentLoad>({ kind: "loading" });
@@ -33,14 +39,18 @@ export function useAssignment(
     requestRef.current = request;
   }, [request]);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (): Promise<RefreshResult> => {
     try {
       const assignment = await getAssignment(requestRef.current, assignmentId);
       onLoadedRef.current?.(assignment);
       setLoad({ kind: "ok", assignment });
+      return { ok: true, working: isProcessing(assignment) };
     } catch (err) {
       const code = assignmentErrorCode(err);
-      setLoad(code === "not_found" ? { kind: "not_found" } : { kind: "error", code });
+      setLoad((prev) =>
+        prev.kind === "ok" ? prev : code === "not_found" ? { kind: "not_found" } : { kind: "error", code }
+      );
+      return { ok: false, working: true };
     }
   }, [assignmentId]);
 

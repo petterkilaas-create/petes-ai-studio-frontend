@@ -1,4 +1,7 @@
 import type { AssignmentImage, AssignmentResult } from "./assignments.ts";
+import { resultLabel } from "./brett.ts";
+import { t, type Locale, type UiKey } from "./i18n/index.ts";
+import { ORDERS_PATH } from "./services.ts";
 
 /**
  * Spilleren paa ordresiden (TG-NEW-277, FE-0; audit punkt 5 og 6): rekkefoelgen
@@ -134,3 +137,163 @@ export function stripKey(key: string, index: number, count: number): number | nu
       return null;
   }
 }
+
+// --- ordresiden (FE-4) ------------------------------------------------------------
+
+/** Parameterne i adressen: valgt bilde og resultat (`?bilde=&resultat=`). */
+export const IMAGE_PARAM = "bilde";
+export const RESULT_PARAM = "resultat";
+
+/** Id-ene fra backend (`img_…`, uuid): bokstaver, tall, `_` og `-`. */
+const ID = /^[A-Za-z0-9_-]{1,100}$/;
+
+/** Id-en fra adressen, eller null naar den mangler eller ser feil ut. */
+export function parsePlayerParam(value: string | string[] | undefined | null): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return typeof raw === "string" && ID.test(raw) ? raw : null;
+}
+
+/** Ordresiden, med bildet og resultatet naar de er valgt. */
+export function playerHref(assignmentId: string, pos: PlayerPos | null = null): string {
+  const path = `${ORDERS_PATH}/${encodeURIComponent(assignmentId)}`;
+  if (pos === null) return path;
+  const q = new URLSearchParams({ [IMAGE_PARAM]: pos.imageId });
+  if (pos.resultId !== null) q.set(RESULT_PARAM, pos.resultId);
+  return `${path}?${q.toString()}`;
+}
+
+/** Foerste plass paa et bilde: det som venter paa megleren, ellers det foerste resultatet, ellers bildet alene. */
+export function imagePos(image: AssignmentImage): PlayerPos {
+  const r = image.results.find(needsReviewer) ?? image.results[0];
+  return { imageId: image.id, resultId: r?.resultId ?? null };
+}
+
+/**
+ * Plassen fra adressen: bildet og resultatet naar begge finnes, bildet
+ * alene naar resultatet mangler (eller ikke hoerer til bildet), resultatet
+ * alene naar bildet mangler. Ukjente id-er gir startPos (lenken er gammel,
+ * eller bildet er fjernet). null uten bilder.
+ */
+export function resolvePos(
+  images: readonly AssignmentImage[],
+  imageId: string | null,
+  resultId: string | null
+): PlayerPos | null {
+  const image = imageId === null ? undefined : images.find((i) => i.id === imageId);
+  if (image !== undefined) {
+    const r = image.results.find((x) => x.resultId === resultId);
+    return r !== undefined ? { imageId: image.id, resultId: r.resultId } : imagePos(image);
+  }
+  if (resultId !== null) {
+    const owner = images.find((i) => i.results.some((r) => r.resultId === resultId));
+    if (owner !== undefined) return { imageId: owner.id, resultId };
+  }
+  return startPos(images);
+}
+
+/** Bildet ved siden av (←/→ paa siden): foerste plass paa forrige eller neste bilde, uten aa gaa rundt. */
+export function imageStep(images: readonly AssignmentImage[], cur: PlayerPos, delta: -1 | 1): PlayerPos | null {
+  const i = images.findIndex((img) => img.id === cur.imageId);
+  const next = i < 0 ? undefined : images[i + delta];
+  return next === undefined ? null : imagePos(next);
+}
+
+/**
+ * Det som staar under resultatet naar ingenting mer venter, eller neste
+ * plass: «Neste til kontroll», «Ingen flere nå, N behandles» eller «Alt er
+ * kontrollert. Gå til nedlasting». Feilede resultater telles ikke (som i
+ * fremdriften). `none` naar bare gjeldende venter, eller naar ordren ikke har
+ * noe aa kontrollere (ingenting aa si).
+ */
+export type NextState =
+  | { kind: "next"; pos: PlayerPos }
+  | { kind: "waiting"; processing: number }
+  | { kind: "all_reviewed" }
+  | { kind: "none" };
+
+export function nextState(images: readonly AssignmentImage[], cur: PlayerPos | null): NextState {
+  const pos = nextToReview(images, cur);
+  if (pos !== null && (cur === null || !samePos(pos, cur))) return { kind: "next", pos };
+  if (pos !== null) return { kind: "none" };
+  const p = assignmentProgress(images);
+  if (p.processing > 0) return { kind: "waiting", processing: p.processing };
+  return allReviewed(p) ? { kind: "all_reviewed" } : { kind: "none" };
+}
+
+/** Siden hopper videre etter «Godkjenn» og «Avvis» (skissen), ikke etter retting eller angring. */
+export function jumpsAfter(action: string): action is "approve" | "reject" {
+  return action === "approve" || action === "reject";
+}
+
+/** Hvor lenge meldingen «Godkjent: …» med «Angre» staar etter hoppet (Petter 30.10). */
+export const UNDO_NOTICE_MS = 10_000;
+
+/** Meldingen etter hoppet: «Godkjent: Stue · Kveldsbilde» eller «Avvist: …». */
+export function undoNoticeKey(action: "approve" | "reject"): UiKey {
+  return action === "approve" ? "player.undo.approved" : "player.undo.rejected";
+}
+
+/** Angreknappen og spoersmaalet i meldingen, som i ResultReview: «Angre godkjenning» eller «Angre». */
+export function undoKeys(action: "approve" | "reject"): { button: UiKey; confirm: UiKey } {
+  return action === "approve"
+    ? { button: "reopen.approved", confirm: "reopen.confirmApproved" }
+    : { button: "reopen.rejected", confirm: "reopen.confirmRejected" };
+}
+
+/** Rommet (eller «Bilde N») og tjenesten: «Stue · Kveldsbilde». */
+export function posLabel(locale: Locale, images: readonly AssignmentImage[], pos: PlayerPos): string {
+  const i = images.findIndex((img) => img.id === pos.imageId);
+  if (i < 0) return "";
+  const image = images[i];
+  const room = image.room ?? t(locale, "player.imageN", { n: i + 1 });
+  const r = image.results.find((x) => x.resultId === pos.resultId);
+  return r === undefined ? room : `${room} · ${resultLabel(locale, r)}`;
+}
+
+/** Linja under miniatyren i stripa: «2 av 3 kontrollert», eller «Original» uten resultater. */
+export function stripStatus(locale: Locale, image: AssignmentImage): string {
+  if (image.results.length === 0) return t(locale, "player.original");
+  const p = progress(image.results);
+  return t(locale, "player.progress", { reviewed: p.reviewed, total: p.total });
+}
+
+/** Fremdriften oeverst: «6 av 9 kontrollert · 1 behandles» (delen med behandles bare naar noe behandles). */
+export function progressText(locale: Locale, p: Progress): string {
+  const parts = [t(locale, "player.progress", { reviewed: p.reviewed, total: p.total })];
+  if (p.processing > 0) parts.push(t(locale, "player.processing", { n: p.processing }));
+  return parts.join(" · ");
+}
+
+/**
+ * ←/→ paa hele siden blar mellom bildene, men ikke naar fokus staar i et
+ * tekstfelt, en meny, en glider eller paa lerretet (der flytter piltastene
+ * bildet), i lysboksen (`modal`), og ikke med Ctrl, Alt eller Cmd. Stripa og
+ * fanene har egne piltaster. Gir -1, 1 eller null.
+ */
+export function pageArrow(
+  key: string,
+  target: { tag: string; role: string | null; editable: boolean; modal: boolean },
+  modifiers: { alt: boolean; ctrl: boolean; meta: boolean }
+): -1 | 1 | null {
+  if (key !== "ArrowLeft" && key !== "ArrowRight") return null;
+  if (modifiers.alt || modifiers.ctrl || modifiers.meta || target.modal) return null;
+  const tag = target.tag.toUpperCase();
+  if (target.editable || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return null;
+  if (target.role !== null && SKIP_ROLES.has(target.role)) return null;
+  return key === "ArrowLeft" ? -1 : 1;
+}
+
+const SKIP_ROLES: ReadonlySet<string> = new Set([
+  "application",
+  "slider",
+  "tab",
+  "tablist",
+  "menu",
+  "menuitem",
+  "listbox",
+  "option",
+  "radio",
+  "spinbutton",
+  "textbox",
+  "combobox",
+]);

@@ -1045,10 +1045,13 @@ export async function getCapabilities(opts: { getToken: GetToken }): Promise<Cap
 // Godkjenning (2d-1): GET /v1/jobs/{id}/review og POST /v1/jobs/{id}/decision
 // ---------------------------------------------------------------------------
 
-export type DecisionAction = "approve" | "reject" | "continue" | "correct";
+export type DecisionAction = "approve" | "reject" | "continue" | "correct" | "reopen";
 
-/** `choose` (FE-3) er tatt ut i studio v2 (Dag 58): én runde gir ett resultat, uten kandidater. */
-const DECISION_ACTIONS: ReadonlySet<string> = new Set(["approve", "reject", "continue", "correct"]);
+/**
+ * `choose` (FE-3) er tatt ut i studio v2 (Dag 58): én runde gir ett resultat, uten kandidater.
+ * `reopen` (FE-4, K 2.10): «Angre godkjenning» etter Godkjenn, eller etter Avvis innen 7 dager.
+ */
+const DECISION_ACTIONS: ReadonlySet<string> = new Set(["approve", "reject", "continue", "correct", "reopen"]);
 
 /** Maks lengde paa begrunnelsen (backend renser og sjekker igjen, 422 over). */
 export const REASON_MAX_LEN = 500;

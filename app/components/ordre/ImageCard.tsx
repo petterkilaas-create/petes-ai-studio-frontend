@@ -302,7 +302,7 @@ export function ImageCard({
         </div>
       </div>
 
-      <ResultList results={image.results} number={number} assignmentId={assignmentId} />
+      <ResultList results={image.results} number={number} assignmentId={assignmentId} imageId={image.id} />
     </li>
   );
 }
