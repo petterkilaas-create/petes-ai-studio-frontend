@@ -1,0 +1,632 @@
+{
+  "to_review": {
+    "assignment_id": "asg_1",
+    "display_status": "to_review",
+    "version": 3,
+    "versions": [
+      {
+        "version": 1,
+        "source": "generated",
+        "created_at": "2026-10-30T09:10:00Z"
+      },
+      {
+        "version": 2,
+        "source": "generated",
+        "created_at": "2026-10-30T09:20:00Z"
+      },
+      {
+        "version": 3,
+        "source": "edited",
+        "created_at": "2026-10-30T09:30:00Z"
+      }
+    ],
+    "content_sha256": "cd34a1f0e9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2",
+    "basis_sha256": "ef56b2a1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f3",
+    "approved": null,
+    "approved_history": [
+      {
+        "version": 1,
+        "content_sha256": "ab12c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+        "at": "2026-10-30T09:15:00Z",
+        "by_role": "owner"
+      }
+    ],
+    "last_run": {
+      "id": "run_2",
+      "kind": "regenerate",
+      "status": "succeeded",
+      "step": null,
+      "error_code": null,
+      "created_at": "2026-10-30T09:16:00Z",
+      "updated_at": "2026-10-30T09:20:00Z"
+    },
+    "documents": [
+      {
+        "id": "doc_1",
+        "file_name": "Salgsoppgave.pdf",
+        "bytes": 41234567,
+        "kind": "sales_prospectus",
+        "pages": 64,
+        "status": "ready",
+        "used_in_version": true,
+        "created_at": "2026-10-30T09:00:00Z"
+      },
+      {
+        "id": "doc_2",
+        "file_name": "Tilstandsrapport.pdf",
+        "bytes": 8123456,
+        "kind": "condition_report",
+        "pages": 22,
+        "status": "ready",
+        "used_in_version": true,
+        "created_at": "2026-10-30T09:01:00Z"
+      }
+    ],
+    "images_used": [
+      {
+        "image_id": "img_1",
+        "position": 1
+      },
+      {
+        "image_id": "img_2",
+        "position": 2
+      },
+      {
+        "image_id": "img_3",
+        "position": 3
+      },
+      {
+        "image_id": "img_4",
+        "position": 4
+      },
+      {
+        "image_id": "img_5",
+        "position": 5
+      },
+      {
+        "image_id": "img_6",
+        "position": 6
+      },
+      {
+        "image_id": "img_7",
+        "position": 7
+      },
+      {
+        "image_id": "img_8",
+        "position": 8
+      }
+    ],
+    "note": "Ny kjøkkeninnredning 2024",
+    "key_facts": [
+      {
+        "key": "total_price",
+        "status": "found",
+        "value_text": "kr 5 760 000",
+        "fact_ids": [
+          "c_total_price"
+        ]
+      },
+      {
+        "key": "location",
+        "status": "found",
+        "value_text": "Grünerløkka, Oslo",
+        "fact_ids": [
+          "f1"
+        ]
+      },
+      {
+        "key": "property_type",
+        "status": "found",
+        "value_text": "Leilighet (borettslag)",
+        "fact_ids": [
+          "f2"
+        ]
+      },
+      {
+        "key": "bra_i",
+        "status": "conflict",
+        "value_text": "74 m² / 71 m²",
+        "fact_ids": [
+          "f7",
+          "f8"
+        ]
+      },
+      {
+        "key": "bedrooms",
+        "status": "found",
+        "value_text": "2",
+        "fact_ids": [
+          "f9"
+        ]
+      },
+      {
+        "key": "energy_label",
+        "status": "missing",
+        "value_text": null,
+        "fact_ids": []
+      }
+    ],
+    "issues": [
+      {
+        "id": "i1",
+        "code": "conflicting_bra_i",
+        "severity": "material",
+        "message": "BRA-i er oppgitt med ulike verdier: 74 m² (salgsoppgaven s. 4) og 71 m² (tilstandsrapporten s. 3).",
+        "suggestion": "Sjekk hvilken verdi som stemmer, og rett teksten eller dokumentet.",
+        "fact_ids": [
+          "f7",
+          "f8"
+        ],
+        "fields": []
+      },
+      {
+        "id": "i2",
+        "code": "length_outside_target",
+        "severity": "info",
+        "message": "30 ord; målet er 40–90 ord.",
+        "suggestion": "Utvid litt hvis det finnes mer å si.",
+        "fact_ids": [],
+        "fields": [
+          "social.post"
+        ]
+      }
+    ],
+    "channels": {
+      "finn": {
+        "headline": {
+          "text": "Lys leilighet med vestvendt balkong og nytt kjøkken på Grünerløkka",
+          "fact_ids": [
+            "f1",
+            "f12",
+            "f30"
+          ]
+        },
+        "intro": {
+          "text": "Leiligheten ligger i et rolig bakgårdsbygg på Grünerløkka, med kort vei til Birkelunden, Akerselva og trikken. Den har to soverom, en åpen stue med store vindusflater og en vestvendt balkong på 8 m² der ettermiddagssolen kommer inn. Kjøkkenet fikk ny innredning i 2024. Boligen er en del av et borettslag, og totalprisen inkluderer andel fellesgjeld. Energimerket er ikke oppgitt i dokumentene vi har fått. Les salgsoppgaven og tilstandsrapporten før visning, og spør megleren om det du lurer på. Visningen avtales direkte med megleren.",
+          "fact_ids": [
+            "f1",
+            "f9",
+            "f12",
+            "f20",
+            "f30",
+            "c_total_price"
+          ]
+        },
+        "body": [
+          {
+            "id": "p1",
+            "text": "Stuen har store vindusflater mot vest og gir godt dagslys store deler av dagen. Rommet har plass til både sofagruppe og spisebord, og døren ut til balkongen står midt på veggen. Balkongen er vestvendt og har plass til et lite bord og to stoler. Fra stuen går det en kort gang videre til soverommene og badet. Gulvene og overflatene er beskrevet i tilstandsrapporten, som du bør lese før visning. Der står også alder og tilstand for vinduer og balkongdør.",
+            "fact_ids": [
+              "f12",
+              "f20"
+            ],
+            "check": "supported"
+          },
+          {
+            "id": "p2",
+            "text": "Kjøkkenet fikk ny innredning i 2024, ifølge megleren. Det er åpent mot stuen og har benkeplass langs to vegger. Hvitevarene som følger med, står i salgsoppgaven. Spør megleren om garanti og dokumentasjon for innredningen hvis det er viktig for deg.",
+            "fact_ids": [
+              "f30"
+            ],
+            "check": "partial"
+          },
+          {
+            "id": "p3",
+            "text": "Leiligheten har to soverom. Det største har plass til dobbeltseng og garderobeskap, og det minste passer som gjesterom eller kontor. Badet er beskrevet i tilstandsrapporten, som også gir tilstandsgraden for de enkelte bygningsdelene. Arealet er oppgitt ulikt i salgsoppgaven og tilstandsrapporten. Sjekk tallene i dokumentene før du legger inn bud. Borettslaget har felles vaskeri og sykkelbod i kjelleren, og vedtektene og budsjettet finnes hos megleren. Felleskostnadene og andelen fellesgjeld står i salgsoppgaven.",
+            "fact_ids": [
+              "f7",
+              "f8",
+              "f9"
+            ],
+            "check": "supported"
+          }
+        ],
+        "highlights": [
+          {
+            "id": "h1",
+            "text": "Vestvendt balkong på 8 m²",
+            "fact_ids": [
+              "f12"
+            ],
+            "check": "supported"
+          },
+          {
+            "id": "h2",
+            "text": "Ny kjøkkeninnredning i 2024",
+            "fact_ids": [
+              "f30"
+            ],
+            "check": "supported"
+          },
+          {
+            "id": "h3",
+            "text": "To soverom",
+            "fact_ids": [
+              "f9"
+            ],
+            "check": "supported"
+          },
+          {
+            "id": "h4",
+            "text": "Store vindusflater i stuen",
+            "fact_ids": [
+              "f20"
+            ],
+            "check": "supported"
+          }
+        ],
+        "neighbourhood": {
+          "text": "Grünerløkka har kafeer, butikker og parker innen få minutters gange. Birkelunden og Olaf Ryes plass ligger like ved, og turveien langs Akerselva går nedover mot sentrum og oppover mot Nydalen. Trikken stopper i nærheten og går til sentrum på kort tid. Dagligvarebutikker, apotek og treningssenter ligger i nabolaget. Nabolagsprofilen fra megleren har mer om skoler, barnehager og avstander. Området er livlig på kveldstid, særlig i helgene, men bakgården ligger skjermet fra gaten. Bysykkelstativ og flere bussholdeplasser ligger også i gangavstand fra bygget.",
+          "fact_ids": [
+            "f1"
+          ]
+        },
+        "copy_text": {
+          "headline": "Lys leilighet med vestvendt balkong og nytt kjøkken på Grünerløkka",
+          "intro": "Leiligheten ligger i et rolig bakgårdsbygg på Grünerløkka, med kort vei til Birkelunden, Akerselva og trikken. Den har to soverom, en åpen stue med store vindusflater og en vestvendt balkong på 8 m² der ettermiddagssolen kommer inn. Kjøkkenet fikk ny innredning i 2024. Boligen er en del av et borettslag, og totalprisen inkluderer andel fellesgjeld. Energimerket er ikke oppgitt i dokumentene vi har fått. Les salgsoppgaven og tilstandsrapporten før visning, og spør megleren om det du lurer på. Visningen avtales direkte med megleren.",
+          "body": "Stuen har store vindusflater mot vest og gir godt dagslys store deler av dagen. Rommet har plass til både sofagruppe og spisebord, og døren ut til balkongen står midt på veggen. Balkongen er vestvendt og har plass til et lite bord og to stoler. Fra stuen går det en kort gang videre til soverommene og badet. Gulvene og overflatene er beskrevet i tilstandsrapporten, som du bør lese før visning. Der står også alder og tilstand for vinduer og balkongdør.\n\nKjøkkenet fikk ny innredning i 2024, ifølge megleren. Det er åpent mot stuen og har benkeplass langs to vegger. Hvitevarene som følger med, står i salgsoppgaven. Spør megleren om garanti og dokumentasjon for innredningen hvis det er viktig for deg.\n\nLeiligheten har to soverom. Det største har plass til dobbeltseng og garderobeskap, og det minste passer som gjesterom eller kontor. Badet er beskrevet i tilstandsrapporten, som også gir tilstandsgraden for de enkelte bygningsdelene. Arealet er oppgitt ulikt i salgsoppgaven og tilstandsrapporten. Sjekk tallene i dokumentene før du legger inn bud. Borettslaget har felles vaskeri og sykkelbod i kjelleren, og vedtektene og budsjettet finnes hos megleren. Felleskostnadene og andelen fellesgjeld står i salgsoppgaven.",
+          "highlights": "• Vestvendt balkong på 8 m²\n• Ny kjøkkeninnredning i 2024\n• To soverom\n• Store vindusflater i stuen",
+          "neighbourhood": "Grünerløkka har kafeer, butikker og parker innen få minutters gange. Birkelunden og Olaf Ryes plass ligger like ved, og turveien langs Akerselva går nedover mot sentrum og oppover mot Nydalen. Trikken stopper i nærheten og går til sentrum på kort tid. Dagligvarebutikker, apotek og treningssenter ligger i nabolaget. Nabolagsprofilen fra megleren har mer om skoler, barnehager og avstander. Området er livlig på kveldstid, særlig i helgene, men bakgården ligger skjermet fra gaten. Bysykkelstativ og flere bussholdeplasser ligger også i gangavstand fra bygget."
+        }
+      },
+      "social": {
+        "post": {
+          "text": "Ny på markedet: lys leilighet på Grünerløkka med vestvendt balkong på 8 m² og ny kjøkkeninnredning fra 2024. To soverom og kort vei til Akerselva. Visning etter avtale med megleren.",
+          "fact_ids": [
+            "f1",
+            "f9",
+            "f12",
+            "f30"
+          ]
+        },
+        "fact_line": {
+          "text": "kr 5 760 000 · Grünerløkka, Oslo · Leilighet (borettslag) · BRA-i uavklart · 2 soverom · Energimerke mangler",
+          "fact_ids": [
+            "c_total_price",
+            "f1",
+            "f2",
+            "f9"
+          ]
+        },
+        "hashtags": [
+          "#grünerløkka",
+          "#oslo"
+        ],
+        "copy_text": {
+          "post": "Ny på markedet: lys leilighet på Grünerløkka med vestvendt balkong på 8 m² og ny kjøkkeninnredning fra 2024. To soverom og kort vei til Akerselva. Visning etter avtale med megleren.\n\n#grünerløkka #oslo",
+          "fact_line": "kr 5 760 000 · Grünerløkka, Oslo · Leilighet (borettslag) · BRA-i uavklart · 2 soverom · Energimerke mangler",
+          "hashtags": "#grünerløkka #oslo"
+        }
+      },
+      "email": {
+        "subject": {
+          "text": "Ny leilighet på Grünerløkka med vestvendt balkong",
+          "fact_ids": [
+            "f1",
+            "f12"
+          ]
+        },
+        "preheader": {
+          "text": "To soverom, nytt kjøkken fra 2024 og kort vei til Akerselva. Meld deg på visning.",
+          "fact_ids": [
+            "f9",
+            "f30"
+          ]
+        },
+        "body": {
+          "text": "Hei!\n\nVi har fått en ny leilighet for salg på Grünerløkka. Den har to soverom, en lys stue med store vindusflater og en vestvendt balkong på 8 m². Kjøkkenet fikk ny innredning i 2024. Leiligheten ligger i et rolig bakgårdsbygg, med kort vei til Birkelunden, Akerselva og trikken.\n\nTotalprisen er kr 5 760 000, med andel fellesgjeld. Salgsoppgaven og tilstandsrapporten får du ved å svare på denne e-posten. Meld deg på visning, så sender vi deg tidspunktet når det er klart.",
+          "fact_ids": [
+            "f1",
+            "f9",
+            "f12",
+            "f20",
+            "f30",
+            "c_total_price"
+          ]
+        },
+        "signature": "Kari Megler\nEiendomsmegler MNEF",
+        "copy_text": {
+          "subject": "Ny leilighet på Grünerløkka med vestvendt balkong",
+          "preheader": "To soverom, nytt kjøkken fra 2024 og kort vei til Akerselva. Meld deg på visning.",
+          "body": "Hei!\n\nVi har fått en ny leilighet for salg på Grünerløkka. Den har to soverom, en lys stue med store vindusflater og en vestvendt balkong på 8 m². Kjøkkenet fikk ny innredning i 2024. Leiligheten ligger i et rolig bakgårdsbygg, med kort vei til Birkelunden, Akerselva og trikken.\n\nTotalprisen er kr 5 760 000, med andel fellesgjeld. Salgsoppgaven og tilstandsrapporten får du ved å svare på denne e-posten. Meld deg på visning, så sender vi deg tidspunktet når det er klart.",
+          "signature": "Kari Megler\nEiendomsmegler MNEF"
+        }
+      }
+    },
+    "basis": {
+      "schema_version": 1,
+      "facts": [
+        {
+          "id": "f1",
+          "field": "location",
+          "label": "Sted",
+          "value_text": "Grünerløkka, Oslo",
+          "kind": "document",
+          "source": {
+            "document_id": "doc_1",
+            "document_kind": "sales_prospectus",
+            "page": 1,
+            "excerpt": "Beliggenhet: Grünerløkka, Oslo"
+          },
+          "material": false
+        },
+        {
+          "id": "f2",
+          "field": "property_type",
+          "label": "Boligtype",
+          "value_text": "Leilighet (borettslag)",
+          "kind": "document",
+          "source": {
+            "document_id": "doc_1",
+            "document_kind": "sales_prospectus",
+            "page": 1,
+            "excerpt": "Boligtype: Leilighet. Eierform: Andel i borettslag"
+          },
+          "material": false
+        },
+        {
+          "id": "f3",
+          "field": "asking_price",
+          "label": "Prisantydning",
+          "value_text": "kr 4 900 000",
+          "value": 4900000,
+          "unit": "nok",
+          "kind": "document",
+          "source": {
+            "document_id": "doc_1",
+            "document_kind": "sales_prospectus",
+            "page": 2,
+            "excerpt": "Prisantydning: kr 4 900 000"
+          },
+          "material": false
+        },
+        {
+          "id": "f4",
+          "field": "purchase_costs",
+          "label": "Omkostninger",
+          "value_text": "kr 6 500",
+          "value": 6500,
+          "unit": "nok",
+          "kind": "document",
+          "source": {
+            "document_id": "doc_1",
+            "document_kind": "sales_prospectus",
+            "page": 2,
+            "excerpt": "Omkostninger: kr 6 500"
+          },
+          "material": false
+        },
+        {
+          "id": "f5",
+          "field": "shared_debt",
+          "label": "Fellesgjeld",
+          "value_text": "kr 853 500",
+          "value": 853500,
+          "unit": "nok",
+          "kind": "document",
+          "source": {
+            "document_id": "doc_1",
+            "document_kind": "sales_prospectus",
+            "page": 2,
+            "excerpt": "Andel fellesgjeld: kr 853 500"
+          },
+          "material": false
+        },
+        {
+          "id": "f7",
+          "field": "bra_i",
+          "label": "BRA-i",
+          "value_text": "74 m²",
+          "value": 74,
+          "unit": "m2",
+          "kind": "document",
+          "source": {
+            "document_id": "doc_1",
+            "document_kind": "sales_prospectus",
+            "page": 4,
+            "excerpt": "Bruksareal (BRA-i): 74 m²"
+          },
+          "material": false
+        },
+        {
+          "id": "f8",
+          "field": "bra_i",
+          "label": "BRA-i",
+          "value_text": "71 m²",
+          "value": 71,
+          "unit": "m2",
+          "kind": "document",
+          "source": {
+            "document_id": "doc_2",
+            "document_kind": "condition_report",
+            "page": 3,
+            "excerpt": "BRA-i 71 m²"
+          },
+          "material": false
+        },
+        {
+          "id": "f9",
+          "field": "bedrooms",
+          "label": "Soverom",
+          "value_text": "2",
+          "value": 2,
+          "unit": "count",
+          "kind": "document",
+          "source": {
+            "document_id": "doc_1",
+            "document_kind": "sales_prospectus",
+            "page": 4,
+            "excerpt": "Antall soverom: 2"
+          },
+          "material": false
+        },
+        {
+          "id": "f12",
+          "field": "balcony",
+          "label": "Balkong",
+          "value_text": "Vestvendt, 8 m²",
+          "kind": "document",
+          "source": {
+            "document_id": "doc_1",
+            "document_kind": "sales_prospectus",
+            "page": 6,
+            "excerpt": "Vestvendt balkong på ca. 8 m²"
+          },
+          "material": false
+        },
+        {
+          "id": "f20",
+          "field": "observation",
+          "label": "Synlig i bilde",
+          "value_text": "Store vindusflater i stua",
+          "kind": "visual",
+          "source": {
+            "image_id": "img_3",
+            "position": 3
+          },
+          "material": false
+        },
+        {
+          "id": "f30",
+          "field": "kitchen_year",
+          "label": "Kjøkken",
+          "value_text": "Ny innredning 2024",
+          "value": 2024,
+          "unit": "year",
+          "kind": "broker",
+          "source": {
+            "note": true
+          },
+          "material": false
+        },
+        {
+          "id": "c_total_price",
+          "field": "total_price",
+          "label": "Totalpris (utregnet)",
+          "value_text": "kr 5 760 000",
+          "value": 5760000,
+          "unit": "nok",
+          "kind": "computed",
+          "inputs": [
+            "f3",
+            "f4",
+            "f5"
+          ],
+          "material": false
+        }
+      ],
+      "plan": {
+        "angle": "outdoor_living",
+        "qualities": [
+          {
+            "text": "Vestvendt balkong på 8 m²",
+            "fact_ids": [
+              "f12"
+            ]
+          }
+        ],
+        "must_include": [
+          "c_total_price"
+        ],
+        "unknowns": [
+          "energy_label"
+        ]
+      },
+      "issues": [
+        {
+          "id": "i1",
+          "code": "conflicting_bra_i",
+          "severity": "material",
+          "message": "BRA-i er oppgitt med ulike verdier: 74 m² (salgsoppgaven s. 4) og 71 m² (tilstandsrapporten s. 3).",
+          "suggestion": "Sjekk hvilken verdi som stemmer, og rett teksten eller dokumentet.",
+          "fact_ids": [
+            "f7",
+            "f8"
+          ],
+          "fields": []
+        }
+      ]
+    },
+    "limits": {
+      "daily_runs": 10,
+      "runs_left_today": 7
+    },
+    "media_deleted_at": null,
+    "created_at": "2026-10-30T09:00:00Z",
+    "updated_at": "2026-10-30T09:12:00Z"
+  },
+  "processing": {
+    "assignment_id": "asg_1",
+    "display_status": "processing",
+    "version": null,
+    "versions": [],
+    "content_sha256": null,
+    "basis_sha256": null,
+    "approved": null,
+    "approved_history": [],
+    "last_run": {
+      "id": "run_1",
+      "kind": "order",
+      "status": "running",
+      "step": "writing",
+      "error_code": null,
+      "created_at": "2026-10-30T09:05:00Z",
+      "updated_at": "2026-10-30T09:07:00Z"
+    },
+    "documents": [
+      {
+        "id": "doc_1",
+        "file_name": "Salgsoppgave.pdf",
+        "bytes": 41234567,
+        "kind": "sales_prospectus",
+        "pages": 64,
+        "status": "ready",
+        "used_in_version": false,
+        "created_at": "2026-10-30T09:00:00Z"
+      },
+      {
+        "id": "doc_2",
+        "file_name": "Tilstandsrapport.pdf",
+        "bytes": 8123456,
+        "kind": "condition_report",
+        "pages": 22,
+        "status": "ready",
+        "used_in_version": false,
+        "created_at": "2026-10-30T09:01:00Z"
+      }
+    ],
+    "images_used": [],
+    "note": "Ny kjøkkeninnredning 2024",
+    "key_facts": [],
+    "issues": [],
+    "channels": null,
+    "basis": null,
+    "limits": {
+      "daily_runs": 10,
+      "runs_left_today": 9
+    },
+    "media_deleted_at": null,
+    "created_at": "2026-10-30T09:00:00Z",
+    "updated_at": "2026-10-30T09:07:00Z"
+  },
+  "not_ordered": {
+    "assignment_id": "asg_1",
+    "display_status": "not_ordered",
+    "documents": [
+      {
+        "id": "doc_1",
+        "file_name": "Salgsoppgave.pdf",
+        "bytes": 41234567,
+        "kind": null,
+        "pages": null,
+        "status": "ready",
+        "used_in_version": false,
+        "created_at": "2026-10-30T09:00:00Z"
+      }
+    ],
+    "limits": {
+      "daily_runs": 10,
+      "runs_left_today": 10
+    }
+  }
+}

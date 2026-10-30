@@ -57,7 +57,12 @@ export type CodeGroup =
   | "assignmentError"
   | "assignmentItemError"
   | "assignmentItemField"
-  | "deliveryError";
+  | "deliveryError"
+  | "listingTextError"
+  | "listingTextRunError"
+  | "listingTextDocumentKind"
+  | "listingTextDocumentReject"
+  | "listingTextKeyFact";
 
 const nbUi = {
   "review.title": "Kontroll av bildet",
@@ -1061,6 +1066,21 @@ const nbUi = {
   "delivery.linkOne": "Last ned (1 fil)",
   "delivery.linkLabel": "Last ned {address}",
   "delivery.listLink": "Last ned",
+  // Annonsetekst (TG-NEW-281, T0): statusene, trinnene og alvoret (K §0, §9.2). Ikke i bruk ennå.
+  // «Behandles», «Til godkjenning» og «Feilet» er assignment.status.* (samme ord som ordren).
+  "listingText.status.notOrdered": "Ikke bestilt",
+  "listingText.status.approved": "Godkjent",
+  "listingText.step.readingDocuments": "Leser dokumentene",
+  "listingText.step.viewingImages": "Ser på bildene",
+  "listingText.step.planning": "Velger vinkel",
+  "listingText.step.writing": "Skriver",
+  "listingText.step.checking": "Kontrollerer",
+  "listingText.step.done": "Klar",
+  "listingText.severity.material": "Vesentlig",
+  "listingText.severity.info": "Til orientering",
+  "listingText.keyStatus.found": "funnet",
+  "listingText.keyStatus.missing": "mangler",
+  "listingText.keyStatus.conflict": "uavklart",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -1510,6 +1530,66 @@ const nb: Dictionary = {
       assignments_unavailable: "Nedlastingen er ikke tilgjengelig akkurat nå. Prøv igjen om litt.",
       save_failed: "ZIP-en kunne ikke lagres. Prøv igjen.",
     },
+    // Annonsetekst (T0): feilkodene i K §7 og §9.1, og 404/503/nett/svar (listingTextErrorCode).
+    listingTextError: {
+      invalid_listing_text: "Teksten ble ikke lagret. Sjekk feltene og prøv igjen.",
+      idempotency_key_required: "Bestillingen kunne ikke sendes. Last siden på nytt og prøv igjen.",
+      no_material: "Legg til dokumenter, bilder eller noen stikkord før du bestiller.",
+      invalid_document: "Bare PDF-filer kan lastes opp.",
+      document_too_large: "Filen er over 100 MB. Del den opp eller komprimer den.",
+      document_limit: "Ordren kan ha høyst 10 dokumenter.",
+      document_not_uploaded: "Filen er ikke ferdig lastet opp ennå. Prøv igjen om litt.",
+      document_not_ready: "Et av dokumentene er ikke klart ennå. Vent litt, eller fjern det.",
+      listing_text_busy: "Teksten lages akkurat nå. Vent til den er ferdig.",
+      listing_text_exists: "Tekstpakken finnes allerede. Bruk «Lag på nytt».",
+      listing_text_not_ordered: "Det finnes ingen tekstpakke ennå. Bestill den først.",
+      version_conflict: "Dette er endret et annet sted. Last siden på nytt og prøv igjen.",
+      not_current_version: "Teksten er endret et annet sted. Last siden på nytt og prøv igjen.",
+      hash_mismatch: "Teksten er endret et annet sted. Last siden på nytt og prøv igjen.",
+      media_deleted: "Teksten og dokumentene er slettet etter lagringstiden.",
+      listing_text_daily_limit: "Du har brukt alle tekstpakkene for i dag. Prøv igjen senere.",
+      listing_text_daily_cap: "Tjenesten har nådd grensen for i dag. Prøv igjen senere.",
+      listing_text_unavailable: "Annonseteksten er ikke tilgjengelig akkurat nå. Prøv igjen om litt.",
+      invalid_office_profile: "Kontorprofilen ble ikke lagret. Sjekk feltene og prøv igjen.",
+      not_found: "Fant ikke ordren eller teksten. Last siden på nytt.",
+      network: "Fikk ikke kontakt med serveren. Sjekk nettet og prøv igjen.",
+      invalid_response: "Svaret fra serveren kunne ikke leses. Last siden på nytt.",
+    },
+    // `last_run.error_code` (K §7), og `not_available` fra stubben i backend 1b.
+    listingTextRunError: {
+      document_unreadable: "Et av dokumentene kunne ikke leses. Sjekk at PDF-en ikke er skadet eller låst.",
+      too_many_pages: "Et av dokumentene har for mange sider. Last opp bare delene som trengs.",
+      model_unavailable: "Teksten kunne ikke lages akkurat nå. Prøv igjen om litt.",
+      invalid_model_output: "Teksten kunne ikke lages. Prøv igjen.",
+      timeout: "Det tok for lang tid. Prøv igjen.",
+      interrupted: "Arbeidet ble avbrutt. Prøv igjen.",
+      stale: "Arbeidet stoppet opp. Prøv igjen.",
+      not_available: "Tekstpakker kan ikke lages ennå.",
+    },
+    // Dokumenttypene etter listing_text_schema.py (`DocumentKind`, K §9.3 punkt 3).
+    listingTextDocumentKind: {
+      sales_prospectus: "Salgsoppgave",
+      condition_report: "Tilstandsrapport",
+      energy_certificate: "Energiattest",
+      association_info: "Opplysninger om borettslag eller sameie",
+      area_report: "Arealmåling",
+      other: "Annet dokument",
+    },
+    // `reject_code` etter `complete` (K §2).
+    listingTextDocumentReject: {
+      not_pdf: "Ikke en PDF.",
+      size_mismatch: "Størrelsen stemmer ikke. Last opp filen på nytt.",
+      too_large: "Filen er over 100 MB.",
+    },
+    // De seks nøkkelopplysningene (K §5, Forbrukertilsynet).
+    listingTextKeyFact: {
+      total_price: "Totalpris",
+      location: "Sted",
+      property_type: "Boligtype",
+      bra_i: "BRA-i",
+      bedrooms: "Soverom",
+      energy_label: "Energimerke",
+    },
   },
   generic: {
     reviewCode: "Vi trenger et svar fra deg før vi lager bildet.",
@@ -1553,6 +1633,11 @@ const nb: Dictionary = {
     assignmentItemError: "Valget kan ikke brukes.",
     assignmentItemField: "Valget",
     deliveryError: "Nedlastingen kunne ikke gjøres. Prøv igjen.",
+    listingTextError: "Noe gikk galt. Prøv igjen.",
+    listingTextRunError: "Teksten kunne ikke lages. Prøv igjen.",
+    listingTextDocumentKind: "Dokument",
+    listingTextDocumentReject: "Filen kan ikke brukes.",
+    listingTextKeyFact: "Nøkkelopplysning",
   },
 };
 
@@ -2503,6 +2588,19 @@ const en: Dictionary = {
     "delivery.linkOne": "Download (1 file)",
     "delivery.linkLabel": "Download {address}",
     "delivery.listLink": "Download",
+    "listingText.status.notOrdered": "Not ordered",
+    "listingText.status.approved": "Approved",
+    "listingText.step.readingDocuments": "Reading the documents",
+    "listingText.step.viewingImages": "Looking at the images",
+    "listingText.step.planning": "Choosing the angle",
+    "listingText.step.writing": "Writing",
+    "listingText.step.checking": "Checking",
+    "listingText.step.done": "Ready",
+    "listingText.severity.material": "Material",
+    "listingText.severity.info": "For information",
+    "listingText.keyStatus.found": "found",
+    "listingText.keyStatus.missing": "missing",
+    "listingText.keyStatus.conflict": "unresolved",
   },
   codes: {
     reviewCode: {
@@ -2900,6 +2998,61 @@ const en: Dictionary = {
       assignments_unavailable: "Downloading is not available right now. Please try again shortly.",
       save_failed: "The ZIP could not be saved. Please try again.",
     },
+    listingTextError: {
+      invalid_listing_text: "The text was not saved. Check the fields and try again.",
+      idempotency_key_required: "The order could not be sent. Reload the page and try again.",
+      no_material: "Add documents, images or a few notes before you order.",
+      invalid_document: "Only PDF files can be uploaded.",
+      document_too_large: "The file is larger than 100 MB. Split it or compress it.",
+      document_limit: "An order can have up to 10 documents.",
+      document_not_uploaded: "The file has not finished uploading yet. Please try again shortly.",
+      document_not_ready: "One of the documents is not ready yet. Wait a moment, or remove it.",
+      listing_text_busy: "The text is being written right now. Wait until it is finished.",
+      listing_text_exists: "The text package already exists. Use “Write again”.",
+      listing_text_not_ordered: "There is no text package yet. Order it first.",
+      version_conflict: "This was changed somewhere else. Reload the page and try again.",
+      not_current_version: "The text was changed somewhere else. Reload the page and try again.",
+      hash_mismatch: "The text was changed somewhere else. Reload the page and try again.",
+      media_deleted: "The text and the documents were deleted after the retention period.",
+      listing_text_daily_limit: "You have used all text packages for today. Try again later.",
+      listing_text_daily_cap: "The service has reached its limit for today. Try again later.",
+      listing_text_unavailable: "Listing text is not available right now. Please try again shortly.",
+      invalid_office_profile: "The office profile was not saved. Check the fields and try again.",
+      not_found: "The order or the text was not found. Reload the page.",
+      network: "Could not reach the server. Check your connection and try again.",
+      invalid_response: "The response from the server could not be read. Reload the page.",
+    },
+    listingTextRunError: {
+      document_unreadable: "One of the documents could not be read. Check that the PDF is not damaged or locked.",
+      too_many_pages: "One of the documents has too many pages. Upload only the parts that are needed.",
+      model_unavailable: "The text could not be written right now. Please try again shortly.",
+      invalid_model_output: "The text could not be written. Please try again.",
+      timeout: "It took too long. Please try again.",
+      interrupted: "The work was interrupted. Please try again.",
+      stale: "The work stopped. Please try again.",
+      not_available: "Text packages cannot be made yet.",
+    },
+    listingTextDocumentKind: {
+      sales_prospectus: "Sales prospectus",
+      condition_report: "Condition report",
+      energy_certificate: "Energy certificate",
+      association_info: "Housing association information",
+      area_report: "Area measurement",
+      other: "Other document",
+    },
+    listingTextDocumentReject: {
+      not_pdf: "Not a PDF.",
+      size_mismatch: "The size does not match. Upload the file again.",
+      too_large: "The file is larger than 100 MB.",
+    },
+    listingTextKeyFact: {
+      total_price: "Total price",
+      location: "Location",
+      property_type: "Property type",
+      bra_i: "BRA-i",
+      bedrooms: "Bedrooms",
+      energy_label: "Energy label",
+    },
   },
   generic: {
     reviewCode: "We need an answer from you before we create the image.",
@@ -2943,6 +3096,11 @@ const en: Dictionary = {
     assignmentItemError: "The choice cannot be used.",
     assignmentItemField: "The choice",
     deliveryError: "The download could not be completed. Please try again.",
+    listingTextError: "Something went wrong. Please try again.",
+    listingTextRunError: "The text could not be written. Please try again.",
+    listingTextDocumentKind: "Document",
+    listingTextDocumentReject: "The file cannot be used.",
+    listingTextKeyFact: "Key fact",
   },
 };
 
