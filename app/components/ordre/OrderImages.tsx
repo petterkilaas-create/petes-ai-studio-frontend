@@ -55,6 +55,8 @@ import { deliveryFileCount, deliveryLinkText } from "../../lib/delivery";
 import { ORDER_REFRESH_MAX_MS, type RefreshResult } from "../../lib/autoRefresh";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { ORDERS_PATH } from "../../lib/services";
+import { listingTextHref } from "../../lib/listingText";
+import { useListingTextAccess } from "../../hooks/useListingTextAccess";
 import { ImageCard, menuButtonId, type ImageAction } from "./ImageCard";
 import { UploadPanel } from "./UploadPanel";
 import { Button, ButtonLink } from "../ui/Button";
@@ -110,6 +112,8 @@ export function OrderImages({ assignmentId, started = null }: { assignmentId: st
   const { getToken } = useAuth();
   const locale = useLocale();
   const router = useRouter();
+  // Annonsetekst (T1): lenken i toppen bare naar flagget slipper brukeren inn.
+  const listingText = useListingTextAccess() === "yes";
 
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [images, setImages] = useState<readonly AssignmentImage[]>([]);
@@ -352,10 +356,19 @@ export function OrderImages({ assignmentId, started = null }: { assignmentId: st
           title={<span className="break-words">{assignment.address}</span>}
           subtitle={assignment.assignmentNo ? t(locale, "orders.assignmentNo", { no: assignment.assignmentNo }) : undefined}
           actions={
-            images.length > 0 ? (
-              <ButtonLink variant="secondary" href={orderDeliveryHref(assignmentId)}>
-                {deliveryLinkText(locale, deliveryFileCount({ images: images.length, approved: assignment.counts.approved }))}
-              </ButtonLink>
+            listingText || images.length > 0 ? (
+              <>
+                {listingText && (
+                  <ButtonLink variant="secondary" href={listingTextHref(assignmentId)}>
+                    {t(locale, "listingText.page.fromOrder")}
+                  </ButtonLink>
+                )}
+                {images.length > 0 && (
+                  <ButtonLink variant="secondary" href={orderDeliveryHref(assignmentId)}>
+                    {deliveryLinkText(locale, deliveryFileCount({ images: images.length, approved: assignment.counts.approved }))}
+                  </ButtonLink>
+                )}
+              </>
             ) : undefined
           }
         />

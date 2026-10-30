@@ -423,7 +423,7 @@ test("D1c: services.ts har bare noekler til ordlista, ingen tekst eller emoji", 
   assert.doesNotMatch(code, /^\s*(title|desc|icon):/m);
   assert.doesNotMatch(code, EMOJI);
   const count = (re: RegExp) => code.match(re)?.length ?? 0;
-  const tools = count(/^\s*kind: "(simple|scene|styling|aarstid)",/gm);
+  const tools = count(/^\s*kind: "(simple|scene|styling|aarstid|page)",/gm);
   assert.ok(tools >= 4);
   // Fem kategorier etter APP1: Lys og himmel, Rydd, Innredning, Mer og Personvern.
   assert.equal(count(/^\s*titleKey: "/gm), tools + 5, "hvert verktoey og de fem kategoriene");
@@ -465,8 +465,8 @@ test("D1c: ordlista har ordene til Tjenester paa nb og en", () => {
     "express.tool.same_furniture_angles.desc",
     "express.tool.video.title",
     "express.tool.video.desc",
-    "express.tool.copywriter.title",
-    "express.tool.copywriter.desc",
+    "express.tool.annonsetekst.title",
+    "express.tool.annonsetekst.desc",
   ];
   for (const locale of ["nb", "en"] as const) {
     const ui = DICTIONARIES[locale].ui as Record<string, string>;

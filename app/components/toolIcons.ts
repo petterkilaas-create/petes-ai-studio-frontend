@@ -28,7 +28,7 @@ export const TOOL_ICONS: Record<string, LucideIcon> = {
   digital_styling: Sofa,
   same_furniture_angles: Images,
   video: Video,
-  copywriter: FileText,
+  annonsetekst: FileText,
 };
 
 /** Ikonet for hver kategori paa Tjenester (flyttet fra tjenester/page.tsx). Ukjent id: ingen ikon. */

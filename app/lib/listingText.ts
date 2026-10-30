@@ -1,5 +1,6 @@
 import type { UiKey } from "./i18n/index.ts";
-import type { AssignmentRequest } from "./assignments.ts";
+import type { AssignmentRequest, AssignmentSummary } from "./assignments.ts";
+import { LISTING_TEXT_PATH } from "./services.ts";
 
 /**
  * Annonsetekst per ordre (TG-NEW-281, T0). Typer, parsing, feltstier, teller
@@ -11,7 +12,8 @@ import type { AssignmentRequest } from "./assignments.ts";
  *
  * Ren modul uten runtime-importer fra api.ts, som assignments.ts: kallene tar
  * en `request` som kobles til authedFetch der modulen tas i bruk (T1-T4), og
- * testes med en falsk. Ikke i bruk ennaa.
+ * testes med en falsk. T1 bruker stiene og adressen nederst (sidene); kallene
+ * tas i bruk i T2-T4.
  *
  * Teksten i pakken er alltid norsk (K §5), ogsaa naar appen er paa engelsk.
  */
@@ -1252,4 +1254,33 @@ export function listingTextExportPath(id: string, opts: { version: number; chann
   const channels = CHANNELS.filter((c) => wanted.includes(c));
   const query = new URLSearchParams({ version: String(opts.version), format: "txt", channels: channels.join(",") });
   return `${textPath(id)}/export?${query.toString().replace(/%2C/g, ",")}`;
+}
+
+// --- sidene (T1) -------------------------------------------------------------
+
+/** Tekstsiden for en ordre (T1 er en plassholder; T2-T4 fyller den). */
+export function listingTextHref(id: string): string {
+  return `${LISTING_TEXT_PATH}/${encodeURIComponent(id)}`;
+}
+
+/**
+ * Sider av ordrelista som gaas gjennom foer en ny ordre lages (20 per side,
+ * altsaa de 100 nyeste). Backend har ikke soek paa adresse ennaa (K §9.3
+ * punkt 9); et adressesoek blir en egen TG etter 6.11.
+ */
+export const SAME_ADDRESS_PAGES = 5;
+
+/** Adressen slik den sammenlignes: smaa bokstaver og uten ekstra mellomrom (K §9.3 punkt 9). */
+export function normalizeAddress(address: string): string {
+  return address.trim().replace(/\s+/g, " ").toLocaleLowerCase("nb");
+}
+
+/** Ordrene med samme adresse som den megleren skrev, i samme rekkefoelge. Tom adresse gir ingen. */
+export function sameAddressOrders<T extends Pick<AssignmentSummary, "address">>(
+  orders: readonly T[],
+  address: string
+): T[] {
+  const wanted = normalizeAddress(address);
+  if (wanted.length === 0) return [];
+  return orders.filter((o) => normalizeAddress(o.address) === wanted);
 }

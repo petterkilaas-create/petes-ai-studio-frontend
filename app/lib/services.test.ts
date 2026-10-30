@@ -351,7 +351,7 @@ test("dag 45 / S4 / Dag 57: visibleCategories gir alle kortene i rekkefoelge, fi
       ["timetraveler", ["skumring", "klart_vaer", "aarstider"]],
       ["fixit", ["magic_cleanup"]],
       ["furnishing", ["digital_styling", "same_furniture_angles"]],
-      ["more", ["video", "copywriter"]],
+      ["more", ["video", "annonsetekst"]],
       ["privacy", ["privacy_blur"]],
     ]
   );
@@ -362,7 +362,7 @@ test("dag 45 / S4 / Dag 57: visibleCategories gir alle kortene i rekkefoelge, fi
   );
   assert.deepEqual(
     tools.filter((t) => !t.orderable).map((t) => t.id),
-    ["magic_cleanup", "same_furniture_angles", "video", "copywriter"]
+    ["magic_cleanup", "same_furniture_angles", "video", "annonsetekst"]
   );
   // Ingen tom kategori, og orderable er det samme som ENABLED.
   for (const c of cats) assert.ok(c.items.length > 0, c.id);
@@ -376,11 +376,11 @@ test("dag 45 / S4: det som kan bestilles og ?tjeneste= (Klart vaer aapnet i K3, 
   assert.deepEqual(toolFromParam("digital_styling"), { categoryId: "furnishing", toolId: "digital_styling" });
   // Dag 57: Aarstider etter Blaa himmel, i Lys og himmel.
   assert.deepEqual(toolFromParam("aarstider"), { categoryId: "timetraveler", toolId: "aarstider" });
-  for (const id of ["magic_cleanup", "virtual_stage", "video", "copywriter"]) {
+  for (const id of ["magic_cleanup", "virtual_stage", "video", "copywriter", "annonsetekst"]) {
     assert.equal(toolFromParam(id), null, id);
   }
-  // Video og Annonsetekst er ikke lagt inn i ENABLED, heller ikke som false.
-  for (const id of ["video", "copywriter"]) {
+  // Video og Annonsetekst er ikke lagt inn i ENABLED, heller ikke som false (Annonsetekst har LISTING_TEXT_UI, T1).
+  for (const id of ["video", "copywriter", "annonsetekst"]) {
     assert.ok(!Object.keys(ENABLED).includes(id), id);
   }
   // Digital styling har egen noekkel fra S2-f, og den er paa fra S4.
@@ -430,13 +430,14 @@ test("dag 45: «Kommer»-kortet er ikke en knapp, og bare bestillbare kort kan v
   // D-1 (dag 54, D1_SVAR punkt 4 A): «Kommer» er en egen seksjon nederst,
   // uten kategorier, og de store kortene viser bare de bestillbare.
   assert.match(page, /const ORDERABLE_TOOLS = ALL_TOOLS\.filter\(\(t\) => t\.orderable\);/);
-  assert.match(page, /const COMING_TOOLS = ALL_TOOLS\.filter\(\(t\) => !t\.orderable\);/);
+  // T1: «Kommer» er det som ikke kan bestilles, uten lenkekortet naar Annonsetekst er aapen (comingCards).
+  assert.match(page, /const comingTools = comingCards\(listingText\);/);
   // Dag 58 del 4: delt i store og små kort, begge bare de bestillbare.
   assert.match(page, /splitBySize\(ORDERABLE_TOOLS\)/);
   assert.match(page, /\{LARGE_TOOLS\.map\(\(tool\) => \(\s*<ServiceCard/);
   assert.match(page, /\{SMALL_TOOLS\.map\(\(tool\) => \(\s*<ServiceCard/);
   // Seksjonen for «Kommer» har ingen onClick eller knapp.
-  const start = page.indexOf("{COMING_TOOLS.map((tool) => {");
+  const start = page.indexOf("{comingTools.map((tool) => {");
   assert.ok(start > 0);
   const branch = page.slice(start, page.indexOf("</section>", start));
   assert.match(branch, /role="group"/);
@@ -579,7 +580,7 @@ test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENA
       ["timetraveler", ["skumring", "klart_vaer", "aarstider"]],
       ["fixit", ["magic_cleanup"]],
       ["furnishing", ["digital_styling", "same_furniture_angles"]],
-      ["more", ["video", "copywriter"]],
+      ["more", ["video", "annonsetekst"]],
     ]
   );
   assert.deepEqual(orderableTools().map((t) => t.id), ["skumring", "klart_vaer", "aarstider", "digital_styling", "privacy_blur"]);

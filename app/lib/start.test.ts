@@ -173,13 +173,14 @@ test("TG-153: /start bruker bare kallene som finnes, egne jobber, og nye forsoek
   assert.match(page, /mergeRefresh\(prev\.recent, recent, RECENT_FETCH\)/);
 });
 
-test("TG-153: /start viser det merkede bildet, og tjenestene kommer fra orderableTools", () => {
+test("TG-153: /start viser det merkede bildet, og tjenestene kommer fra serviceShortcuts (orderableTools og T1)", () => {
   const page = withoutComments(read("(app)/start/page.tsx"));
   // Dag 55: begge delene bruker entryCard (JobCard eller OrderCard), med thumbSrc fra siden.
   assert.equal((page.match(/\.map\(entryCard\)/g) ?? []).length, 2);
   assert.match(page, /<JobCard key=\{entry\.job\.jobId\} job=\{entry\.job\} thumb=\{thumbSrc\(entry\.job\)\} \/>/);
-  assert.match(page, /orderableTools\(\)\.map/);
-  assert.match(page, /href=\{serviceHref\(tool\.id\)\}/);
+  // T1: serviceShortcuts gir orderableTools med serviceHref, og Annonsetekst naar flagget slipper brukeren inn.
+  assert.match(page, /serviceShortcuts\(listingText\)\.map\(\(\{ tool, href \}\) =>/);
+  assert.match(page, /href=\{href\}/);
   assert.match(page, /<ButtonLink href=\{SERVICES_PATH\}>/);
   assert.match(page, /href=\{WAITING_HISTORY_HREF\}/);
   // Ingen tjeneste eller side skrevet rett inn: alt gaar via ENABLED.
