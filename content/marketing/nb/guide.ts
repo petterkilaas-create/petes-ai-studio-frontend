@@ -69,7 +69,7 @@ export const guidePage = {
       id: "start",
       title: "Kontroller og start",
       steps: [
-        "Se over bestillingen per tjeneste eller per bilde. Trykk «Til tjenestene» for å endre noe.",
+        "Se over bestillingen per tjeneste eller per bilde. Trykk «Tilbake» for å endre noe.",
         "Se hvor mange av gratisbildene bestillingen bruker.",
         "Trykk «Start behandling».",
       ],
@@ -85,7 +85,7 @@ export const guidePage = {
       steps: [
         "Resultatene kommer under bildene etter hvert som de blir klare. Trykk «Oppdater» for å se de nyeste.",
         "Trykk «Åpne» på et resultat. Da åpnes ordresiden med bildet og resultatet valgt.",
-        "På ordresiden velger du bilde i stripa øverst og tjeneste i fanene under. Piltastene blar mellom bildene. Fremdriften øverst viser hvor mange som er kontrollert.",
+        "På ordresiden velger du bilde i stripa øverst og tjeneste i fanene under. Piltastene blar mellom bildene. Fremdriften øverst viser hvor mange som er gjennomgått.",
       ],
       statuses: [
         { status: "processing", text: "Bildet lages. Når du har rettet et bilde, står det Ny versjon behandles." },
@@ -108,7 +108,7 @@ export const guidePage = {
         "Gå gjennom sjekklista, kryss av for «Jeg har sammenlignet bildet med originalen.» og trykk «Godkjenn».",
         "Er noe feil, trykker du «Korriger bildet» og velger hvordan.",
         "Vil du ikke bruke resultatet, trykker du «Avvis».",
-        "Etter «Godkjenn» eller «Avvis» går ordresiden videre til neste resultat som venter. Nederst står «Neste til kontroll» så lenge noe venter.",
+        "Etter «Godkjenn» eller «Avvis» går ordresiden videre til neste resultat som venter. Nederst står «Neste til godkjenning» så lenge noe venter.",
       ],
       notes: [
         "Har du godkjent noe ved en feil, trykker du «Angre godkjenning» på resultatet. Etter «Avvis» heter knappen «Angre», og du kan angre i en uke. Resultatet står da som Til godkjenning igjen, og du kan godkjenne, rette eller avvise det på nytt.",

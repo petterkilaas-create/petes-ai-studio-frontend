@@ -42,11 +42,13 @@ import {
   type SheetTarget,
 } from "../../lib/brett";
 import type { DuskStyle } from "../../lib/dusk";
-import { orderCheckHref, orderImagesHref } from "../../lib/ordrer";
+import { orderCheckHref } from "../../lib/ordrer";
 import { stripKey } from "../../lib/player";
+import { ORDERS_PATH } from "../../lib/services";
 import type { StylingStyle } from "../../lib/styling";
 import { BoardPanel } from "./BoardPanel";
 import { LoadState } from "./LoadState";
+import { OrderProgress } from "./OrderProgress";
 import { ServiceBadge } from "./ServiceBadge";
 import { ServiceSheet } from "./ServiceSheet";
 import { Button, ButtonLink } from "../ui/Button";
@@ -68,6 +70,10 @@ import { useLocale } from "../../lib/i18n/useLocale";
  * ble valgt sist (stilene, stemningen), huskes til neste gang (`memory`).
  * Utkastet lagres i localStorage ved hver endring (board.ts) og leses naar
  * ordren er hentet. Samme brett brukes for etterbestilling.
+ *
+ * Fremdriftslinja (Dag 59) er steg 2: den erstatter brettets egen faste
+ * bunnlinje, med «Neste: kontroller» som hovedknapp og totalsText som
+ * undertekst. Lenken oeverst gaar til ordrene (valg 2A).
  */
 
 interface OpenSheet {
@@ -202,13 +208,13 @@ export function ServiceBoard({
   const indoor = sheet?.target.service === "aarstid" ? indoorImages(images, items, sheetIds) : [];
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 pb-32 md:px-8 md:py-12">
+    <main className="mx-auto w-full max-w-7xl px-4 py-8 md:px-8 md:py-12">
       <Link
-        href={orderImagesHref(assignmentId)}
+        href={ORDERS_PATH}
         className={`mb-6 inline-flex min-h-11 items-center gap-2 rounded-button text-sm text-ink-2 hover:text-ink ${FOCUS}`}
       >
         <ArrowLeft aria-hidden className="size-4" strokeWidth={1.75} />
-        {t(locale, "board.back")}
+        {t(locale, "orders.back")}
       </Link>
 
       <div className="mb-8">
@@ -351,18 +357,19 @@ export function ServiceBoard({
         />
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-3 md:px-8">
-          <p className="mr-auto min-w-0 text-[13px] text-ink-2">
-            {totalsText(locale, totals)}
-          </p>
-          {items.length === 0 ? (
+      <OrderProgress
+        page="services"
+        assignment={assignment}
+        draftCount={items.length}
+        servicesNow={totalsText(locale, totals)}
+        primary={
+          items.length === 0 ? (
             <Button disabled>{t(locale, "board.next")}</Button>
           ) : (
             <ButtonLink href={orderCheckHref(assignmentId)}>{t(locale, "board.next")}</ButtonLink>
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
     </main>
   );
 }

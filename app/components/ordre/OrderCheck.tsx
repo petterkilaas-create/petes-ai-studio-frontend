@@ -34,8 +34,11 @@ import {
   type StartStop,
 } from "../../lib/orderStart";
 import { orderImagesHref, orderServicesHref, orderStartedHref } from "../../lib/ordrer";
+import { OneAtATime } from "../../lib/orderProgress";
 import { quotaView } from "../../lib/quota";
+import { ORDERS_PATH } from "../../lib/services";
 import { LoadState } from "./LoadState";
+import { OrderProgress } from "./OrderProgress";
 import { QuotaNotice } from "../QuotaNotice";
 import { Button, ButtonLink } from "../ui/Button";
 import { Card, cardClass } from "../ui/Card";
@@ -57,6 +60,13 @@ import { useLocale } from "../../lib/i18n/useLocale";
  * hvert kall som gikk, staar bare resten igjen i utkastet. Naar alt er sendt,
  * toemmes utkastet; er alt startet, gaar megleren til bildesiden, ellers vises
  * svaret per element her.
+ *
+ * Fremdriftslinja (Dag 59) er steg 3: «Start behandling» staar i linja, med
+ * samme handling og samme graa/aktiv-logikk. Fremdriften og svarene blir
+ * staaende paa siden. `once` (OneAtATime) stopper et dobbeltklikk foer React
+ * har tegnet knappen graa. Uten utkast og etter svaret staar knappene i
+ * kortet som foer, og linja har ingen hovedknapp. Lenken oeverst gaar til
+ * ordrene (valg 2A).
  */
 export function OrderCheck({ assignmentId }: { assignmentId: string }) {
   const locale = useLocale();
@@ -67,6 +77,7 @@ export function OrderCheck({ assignmentId }: { assignmentId: string }) {
   const [stop, setStop] = useState<StartStop | null>(null);
   const [running, setRunning] = useState(false);
   const keys = useRef(new CallKeys());
+  const once = useRef(new OneAtATime());
 
   const onLoaded = useCallback(
     (assignment: Assignment) => {
@@ -129,11 +140,11 @@ export function OrderCheck({ assignmentId }: { assignmentId: string }) {
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8 md:px-8 md:py-12">
       <Link
-        href={orderServicesHref(assignmentId)}
+        href={ORDERS_PATH}
         className={`mb-6 inline-flex min-h-11 items-center gap-2 rounded-button text-sm text-ink-2 hover:text-ink ${FOCUS}`}
       >
         <ArrowLeft aria-hidden className="size-4" strokeWidth={1.75} />
-        {t(locale, "check.back")}
+        {t(locale, "orders.back")}
       </Link>
 
       <div className="mb-8">
@@ -242,21 +253,25 @@ export function OrderCheck({ assignmentId }: { assignmentId: string }) {
               </div>
             )}
           </div>
+        </div>
+      )}
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-6">
-            <ButtonLink variant="secondary" href={orderServicesHref(assignmentId)}>
-              {t(locale, "check.back")}
-            </ButtonLink>
-            <Button onClick={() => void start()} disabled={running || stop?.kind === "error"}>
+      <OrderProgress
+        page="check"
+        assignment={assignment}
+        draftCount={items.length}
+        primary={
+          !done && items.length > 0 ? (
+            <Button onClick={() => void once.current.run(start)} disabled={running || stop?.kind === "error"}>
               {stop?.kind === "network"
                 ? t(locale, "check.retry")
                 : total === 1
                   ? t(locale, "check.startOne")
                   : t(locale, "check.startMany", { n: total })}
             </Button>
-          </div>
-        </div>
-      )}
+          ) : null
+        }
+      />
     </main>
   );
 }

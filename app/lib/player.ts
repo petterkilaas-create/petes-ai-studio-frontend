@@ -5,7 +5,7 @@ import { ORDERS_PATH } from "./services.ts";
 
 /**
  * Spilleren paa ordresiden (TG-NEW-277, FE-0; audit punkt 5 og 6): rekkefoelgen
- * paa resultatene, «Neste til kontroll», fremdriften og piltastene i
+ * paa resultatene, «Neste til godkjenning», fremdriften og piltastene i
  * bildestripa. Rene funksjoner uten React.
  */
 
@@ -67,7 +67,7 @@ export function startPos(images: readonly AssignmentImage[]): PlayerPos | null {
 }
 
 /**
- * Fremdriften: «6 av 9 kontrollert · 1 behandles». Kontrollert = godkjent
+ * Fremdriften: «6 av 9 gjennomgått · 1 behandles». Gjennomgått = godkjent
  * eller ikke brukt. Feilede og ikke startede resultater telles ikke med
  * (det er ingenting aa kontrollere).
  */
@@ -111,7 +111,7 @@ export function assignmentProgress(images: readonly AssignmentImage[]): Progress
   return progress(images.flatMap((i) => i.results));
 }
 
-/** Alt er kontrollert, og ingenting behandles: «Gå til nedlasting». */
+/** Alt er gjennomgått, og ingenting behandles: «Gå til nedlasting». */
 export function allReviewed(p: Progress): boolean {
   return p.total > 0 && p.reviewed === p.total;
 }
@@ -199,11 +199,11 @@ export function imageStep(images: readonly AssignmentImage[], cur: PlayerPos, de
 }
 
 /**
- * Det som staar under resultatet naar ingenting mer venter, eller neste
- * plass: «Neste til kontroll», «Ingen flere nå, N behandles» eller «Alt er
- * kontrollert. Gå til nedlasting». Feilede resultater telles ikke (som i
- * fremdriften). `none` naar bare gjeldende venter, eller naar ordren ikke har
- * noe aa kontrollere (ingenting aa si).
+ * Hovedknappen paa Godkjenning (fremdriftslinja, Dag 59): neste plass
+ * («Neste til godkjenning»), «Ingen flere nå, N behandles» eller «Gå til
+ * nedlasting». Feilede resultater telles ikke (som i fremdriften). `none`
+ * naar bare gjeldende venter, eller naar ordren ikke har noe aa godkjenne
+ * («Ingen flere til godkjenning nå»).
  */
 export type NextState =
   | { kind: "next"; pos: PlayerPos }
@@ -250,14 +250,14 @@ export function posLabel(locale: Locale, images: readonly AssignmentImage[], pos
   return r === undefined ? room : `${room} · ${resultLabel(locale, r)}`;
 }
 
-/** Linja under miniatyren i stripa: «2 av 3 kontrollert», eller «Original» uten resultater. */
+/** Linja under miniatyren i stripa: «2 av 3 gjennomgått», eller «Original» uten resultater. */
 export function stripStatus(locale: Locale, image: AssignmentImage): string {
   if (image.results.length === 0) return t(locale, "player.original");
   const p = progress(image.results);
   return t(locale, "player.progress", { reviewed: p.reviewed, total: p.total });
 }
 
-/** Fremdriften oeverst: «6 av 9 kontrollert · 1 behandles» (delen med behandles bare naar noe behandles). */
+/** Fremdriften oeverst: «6 av 9 gjennomgått · 1 behandles» (delen med behandles bare naar noe behandles). */
 export function progressText(locale: Locale, p: Progress): string {
   const parts = [t(locale, "player.progress", { reviewed: p.reviewed, total: p.total })];
   if (p.processing > 0) parts.push(t(locale, "player.processing", { n: p.processing }));

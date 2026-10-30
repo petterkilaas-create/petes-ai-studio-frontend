@@ -18,6 +18,8 @@ import {
   URL_REFRESH_MS,
 } from "../../lib/ordrer";
 import { deliveryFileCount, deliveryLinkText } from "../../lib/delivery";
+import { browserStorage } from "../../lib/board";
+import { draftCount } from "../../lib/orderProgress";
 import {
   assignmentProgress,
   imagePos,
@@ -42,6 +44,7 @@ import { Card } from "../ui/Card";
 import { PageHeader } from "../ui/PageHeader";
 import { LoadState } from "./LoadState";
 import { ImageStrip } from "./ImageStrip";
+import { ApprovalNextButton, OrderProgress } from "./OrderProgress";
 import { PANEL_ID, ResultTabs, tabId } from "./ResultTabs";
 import { UndoNotice, type Undo } from "./UndoNotice";
 import { t } from "../../lib/i18n";
@@ -52,12 +55,16 @@ import { useLocale } from "../../lib/i18n/useLocale";
  * originalen og alle resultatene i ordren, for godkjenning, retting og
  * nedlasting.
  *
- * - Toppen: adressen, fremdriften («6 av 9 kontrollert · 1 behandles»),
+ * - Toppen: adressen, fremdriften («6 av 9 gjennomgått · 1 behandles»),
  *   «Last ned (N filer)», «Bestill mer for boligen» (brettet) og «Bilder og rom».
  * - Bildestripa (ImageStrip) og fanene per tjeneste (ResultTabs).
  * - ResultReview er innebygd for valgt resultat, med `key={resultId}`, saa
  *   tilstanden er ny for hvert resultat. Et bilde uten resultater: «Leveres
  *   som original».
+ *
+ * Fremdriftslinja (Dag 59) er steg 4. Hovedknappen der (ApprovalNextButton)
+ * er den som stod under resultatet: «Neste til godkjenning», graa «Ingen
+ * flere nå, N behandles» eller «Gå til nedlasting».
  *
  * Valgt bilde og resultat holdes i tilstanden og skrives til adressen
  * (`?bilde=&resultat=`) med router.replace. Adressen leses bare ved start
@@ -66,8 +73,8 @@ import { useLocale } from "../../lib/i18n/useLocale";
  * Etter «Godkjenn» og «Avvis» hentes ordren, og siden hopper til neste som
  * venter (nextState), med meldingen «Godkjent: …» / «Avvist: …» og «Angre»
  * i ca. 10 sekunder (UndoNotice, Petter 30.10). Er ingen igjen, blir siden
- * staaende, og under resultatet staar «Ingen flere nå, N behandles» eller
- * «Alt er kontrollert. Gå til nedlasting».
+ * staaende, og knappen i linja viser «Ingen flere nå, N behandles» eller
+ * «Gå til nedlasting».
  *
  * Piltastene ←/→ blar mellom bildene naar fokus ikke er i et felt, paa
  * lerretet eller i lysboksen (pageArrow). Mens noe behandles, hentes ordren
@@ -340,26 +347,24 @@ export function AssignmentPlayer({
               )}
             </div>
           </section>
-
-          <div className="flex flex-col gap-2 border-t border-line pt-6">
-            {next.kind === "next" && (
-              <Button variant="secondary" className="self-start" onClick={() => select(next.pos, { focus: true })}>
-                {t(locale, "player.next", { label: posLabel(locale, images, next.pos) })}
-              </Button>
-            )}
-            {next.kind === "waiting" && (
-              <p className="rounded-button bg-neutral-bg p-3 text-sm text-neutral-fg" role="status">
-                {t(locale, "player.waiting", { n: next.processing })}
-              </p>
-            )}
-            {next.kind === "all_reviewed" && (
-              <ButtonLink href={orderDeliveryHref(assignmentId)} className="self-start">
-                {t(locale, "player.allReviewedLink")}
-              </ButtonLink>
-            )}
-          </div>
         </div>
       )}
+
+      <OrderProgress
+        page="player"
+        assignment={assignment}
+        draftCount={draftCount(browserStorage(), assignmentId, images.map((img) => img.id))}
+        primary={
+          pos !== null && image !== undefined ? (
+            <ApprovalNextButton
+              state={next}
+              nextLabel={next.kind === "next" ? posLabel(locale, images, next.pos) : ""}
+              onNext={next.kind === "next" ? () => select(next.pos, { focus: true }) : undefined}
+              deliveryHref={orderDeliveryHref(assignmentId)}
+            />
+          ) : null
+        }
+      />
     </main>
   );
 }
