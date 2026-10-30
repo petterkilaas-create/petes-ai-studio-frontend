@@ -33,6 +33,11 @@ export const ENABLED = {
    * bruker tjenestene ennaa). Backend aapnes i dag57-aarstid-paa, som merges foerst.
    */
   aarstider: true,
+  /**
+   * Ordre per boligoppdrag (TG-NEW-277, FE-2): /ordrer og undersidene. Paa fra
+   * FE-2 (Petter 29.10: «slaa alt paa»). Backend-flagget ASSIGNMENTS er paa (#270).
+   */
+  ordrer: true,
 } as const;
 
 /** Ukjent id gir av: en ny tjeneste maa legges inn over foer den vises. */
@@ -50,10 +55,13 @@ export function isServiceEnabled(id: string): boolean {
 export const SERVICES_PATH = "/tjenester";
 export const STAGING_PATH = "/staging";
 export const EXPRESS_V2_PATH = "/express-v2";
+/** Ordrene (FE-2). Undersidene sjekker denne stien, fordi isPageEnabled slaar opp eksakt sti. */
+export const ORDERS_PATH = "/ordrer";
 
 const PAGE_SERVICE: Record<string, string> = {
   [STAGING_PATH]: "virtual_stage",
   [EXPRESS_V2_PATH]: "express_v2",
+  [ORDERS_PATH]: "ordrer",
 };
 
 /**
@@ -70,7 +78,7 @@ export function isPageEnabled(path: string): boolean {
 // ---------------------------------------------------------------------------
 
 /** Id-en gir teksten (`nav.<id>` i ordlista) og ikonet (AppNav). */
-export type NavId = "start" | "services" | "staging" | "history";
+export type NavId = "start" | "services" | "staging" | "orders" | "history";
 
 export interface NavLink {
   id: NavId;
@@ -84,6 +92,8 @@ const ALL_NAV_LINKS: NavLink[] = [
   { id: "start", href: START_PATH },
   { id: "services", href: SERVICES_PATH },
   { id: "staging", href: STAGING_PATH },
+  // FE-2: ved siden av Historikk, som blir staaende til det er besluttet om Ordrer erstatter den.
+  { id: "orders", href: ORDERS_PATH },
   { id: "history", href: "/history" },
 ];
 

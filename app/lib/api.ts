@@ -1,6 +1,7 @@
 // Bare typer, pluss de rene quota.ts, retry.ts og feedback.ts (.ts-endelse: testes med node --test).
 import type { DuskSky, DuskStyle, DuskTime, ReviewDusk, ReviewStyle } from "./dusk";
 import type { ReviewDisclosure } from "./disclosure";
+import type { AssignmentRequest } from "./assignments.ts";
 import { parseQuota, type Quota } from "./quota.ts";
 import { getWithRetry, isNetworkError, isRetryableStatus, TransientError } from "./retry.ts";
 import {
@@ -2192,4 +2193,15 @@ export async function getFeedback(opts: { jobId: string; getToken: GetToken }): 
   if (res.status !== 200) throw new Error(`getFeedback failed (${res.status})`);
   const body = await readJson(res);
   return parseFeedback(isRecord(body) ? body.feedback : null);
+}
+
+/**
+ * Kallet til ordre-modulene (FE-2, TG-NEW-277): `path` er relativ til
+ * API_BASE, og kallet gaar gjennom authedFetch (token, 401-retry, og nye
+ * forsoek ved kaldstart bare for GET). Kallene og parsingen ligger i
+ * assignments.ts; opplastingen proeves aldri paa nytt her (koeen har
+ * Idempotency-Key og «Last opp paa nytt»).
+ */
+export function assignmentRequest(getToken: GetToken, onRetry?: () => void): AssignmentRequest {
+  return (path, init) => authedFetch(`${API_BASE}${path}`, init, getToken, onRetry);
 }
