@@ -18,15 +18,19 @@ const review = code("components/godkjenning/ResultReview.tsx");
 test("FE-1: siden er et skall som leser jobId og rendrer ResultReview med key", () => {
   assert.match(shell, /^"use client";/);
   assert.match(shell, /const \{ jobId \} = use\(params\);/);
-  assert.match(shell, /return <ResultReview key=\{jobId\} jobId=\{jobId\} \/>;/);
+  // FE-3c: `?fra=` leses med parseFrom og sendes videre som from.
+  assert.match(shell, /return <ResultReview key=\{jobId\} jobId=\{jobId\} from=\{from\} \/>;/);
   assert.match(shell, /import \{ ResultReview \} from "@\/app\/components\/godkjenning\/ResultReview";/);
   // Ingen tilstand, kall eller tekst i skallet.
   assert.doesNotMatch(shell, /useState|useEffect|useAuth|getReview|postDecision|\bt\(locale/);
 });
 
-test("FE-1: ResultReview tar jobId og valgfri onChanged, og leser ikke params", () => {
+test("FE-1: ResultReview tar jobId, valgfri from (FE-3c) og valgfri onChanged, og leser ikke params", () => {
   assert.match(review, /^"use client";/);
-  assert.match(review, /export function ResultReview\(\{\s*jobId,\s*onChanged,\s*\}: \{\s*jobId: string;\s*onChanged\?: \(\) => void;\s*\}\)/);
+  assert.match(
+    review,
+    /export function ResultReview\(\{\s*jobId,\s*from = null,\s*onChanged,\s*\}: \{\s*jobId: string;\s*from\?: string \| null;\s*onChanged\?: \(\) => void;\s*\}\)/
+  );
   assert.doesNotMatch(review, /export default/);
   assert.doesNotMatch(review, /\bparams\b|\buse\(/);
 });

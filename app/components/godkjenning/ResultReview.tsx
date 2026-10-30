@@ -99,6 +99,7 @@ import { canShowAdditions } from "@/app/lib/additions";
 import { checklistFor } from "@/app/lib/checklist";
 import { feedbackMode, feedbackRound } from "@/app/lib/feedback";
 import { framingWarning, orderTabs } from "@/app/lib/orderTabs";
+import { reviewBackLink } from "@/app/lib/ordrer";
 import { doneTitleKey, failedLines, stopDoneKey } from "@/app/lib/notCreated";
 import {
   blockedResult,
@@ -224,6 +225,11 @@ import { choiceClass, FOCUS } from "@/app/components/godkjenning/classes";
  * «Hvor fornøyd er du med bildet?» (FeedbackCard) under resultatkortet, for
  * eieren naar et bilde ble laget (feedbackMode). Admin paa en annen brukers
  * jobb ser eierens tilbakemelding bare for lesing. Det stopper aldri noe.
+ *
+ * Veien tilbake (FE-3c, Dag 59): `from` er ordre-id-en fra `?fra=` (uuid,
+ * parseFrom). Da gaar tilbake-lenken til bildesiden («← Til ordren») i stedet
+ * for til Historikk, og fanene tar `fra` med seg. Avgjoerelser og retting
+ * blir paa siden, saa lenken staar etterpaa ogsaa.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -236,9 +242,12 @@ const BTN_PRIMARY = buttonClass("primary");
 
 export function ResultReview({
   jobId,
+  from = null,
   onChanged,
 }: {
   jobId: string;
+  /** Ordre-id-en fra `?fra=` (uuid), eller null. */
+  from?: string | null;
   onChanged?: () => void;
 }) {
   const { getToken } = useAuth();
@@ -572,6 +581,8 @@ export function ResultReview({
     setLocalRejected(rejected === null ? null : BOX_REJECTION_KEYS[rejected]);
   };
 
+  const back = reviewBackLink(from);
+
   const messageText =
     message === null
       ? null
@@ -584,10 +595,10 @@ export function ResultReview({
       <main className="max-w-[1360px] mx-auto w-full p-4 sm:p-8 flex-1 flex flex-col gap-6">
         <div>
           <Link
-            href="/history"
+            href={back.href}
             className={`inline-flex min-h-11 items-center rounded-button text-sm text-ink-2 hover:text-ink ${FOCUS}`}
           >
-            ← {t(locale, "review.back")}
+            ← {t(locale, back.key)}
           </Link>
           <h1 className="font-display text-[32px] md:text-[40px] leading-tight text-ink mt-2 mb-1">
             {t(locale, "review.title")}
@@ -714,7 +725,7 @@ export function ResultReview({
 
             const readOnly = isReadOnlyOther(review);
             const deleted = mediaDeleted(review);
-            const tabs = orderTabs(review.order, jobId, locale);
+            const tabs = orderTabs(review.order, jobId, locale, from);
             const sw = seasonSwitch(review);
             const feedback = feedbackMode(review);
 

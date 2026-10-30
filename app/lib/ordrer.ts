@@ -5,7 +5,7 @@ import {
   type AssignmentResult,
   type AssignmentSummary,
 } from "./assignments.ts";
-import { reviewHref } from "./orderTabs.ts";
+import { parseFrom, reviewHref } from "./orderTabs.ts";
 import { t, type Locale, type UiKey } from "./i18n/index.ts";
 import { ORDERS_PATH } from "./services.ts";
 import { retryable, type UploadRow } from "./uploadQueue.ts";
@@ -246,10 +246,34 @@ export function applyRoom(images: readonly AssignmentImage[], id: string, room: 
 
 // --- resultatene paa bildesiden (FE-3) ----------------------------------------------
 
-/** Lenken til godkjenningssiden for det som kan aapnes der (til godkjenning, trenger svar, godkjent), ellers null. */
-export function resultReviewHref(result: AssignmentResult): string | null {
+/**
+ * Lenken til godkjenningssiden for det som kan aapnes der (til godkjenning,
+ * trenger svar, godkjent), ellers null. Med ordren som `?fra=` (FE-3c), saa
+ * megleren kommer tilbake til bildesiden.
+ */
+export function resultReviewHref(result: AssignmentResult, assignmentId: string | null = null): string | null {
   const s = result.displayStatus;
-  return s === "to_review" || s === "needs_answer" || s === "approved" ? reviewHref(result.resultId) : null;
+  return s === "to_review" || s === "needs_answer" || s === "approved" ? reviewHref(result.resultId, assignmentId) : null;
+}
+
+/**
+ * Tilbake-lenken paa godkjenningssiden (FE-3c): «← Til ordren» med en gyldig
+ * `fra` (stien bygges her, aldri fra adressen), ellers Historikk som foer.
+ */
+export function reviewBackLink(from: string | null): { href: string; key: UiKey } {
+  const order = parseFrom(from);
+  return order === null
+    ? { href: "/history", key: "review.back" }
+    : { href: orderImagesHref(order), key: "review.backToOrder" };
+}
+
+/**
+ * Banneret «N bearbeidinger er startet» (FE-3c): bare rett etter starten
+ * (`?startet=` ved foerste visning), til det lukkes eller ingenting lenger
+ * behandles.
+ */
+export function showStartedBanner(started: number | null, closed: boolean, processing: boolean): boolean {
+  return started !== null && started > 0 && !closed && processing;
 }
 
 /** Noe i ordren behandles: siden henter ordren paa nytt (én henting for hele ordren). */
