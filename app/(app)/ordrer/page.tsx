@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
-import { ImageOff } from "lucide-react";
+import { Download, ImageOff } from "lucide-react";
 import { assignmentRequest } from "@/app/lib/api";
 import { assignmentErrorCode, listAssignments, type AssignmentSummary } from "@/app/lib/assignments";
-import { appendOrders, NEW_ORDER_PATH, orderImagesHref, orderMeta, ORDERS_PAGE_SIZE } from "@/app/lib/ordrer";
+import { appendOrders, NEW_ORDER_PATH, orderDeliveryHref, orderImagesHref, orderMeta, ORDERS_PAGE_SIZE } from "@/app/lib/ordrer";
 import { formatDay } from "@/app/lib/dates";
 import { ORDERS_PATH, isPageEnabled } from "@/app/lib/services";
 import { ServiceUnavailable } from "@/app/components/ServiceUnavailable";
-import { Button, ButtonLink } from "@/app/components/ui/Button";
+import { Button, ButtonLink, buttonClass } from "@/app/components/ui/Button";
 import { Card, cardClass } from "@/app/components/ui/Card";
 import { PageHeader } from "@/app/components/ui/PageHeader";
 import { FOCUS } from "@/app/components/godkjenning/classes";
@@ -21,7 +21,7 @@ import { useLocale } from "@/app/lib/i18n/useLocale";
  * Ordrelista (TG-NEW-277, FE-2): adresse, oppdragsnummer, antall bilder og
  * dato, nyeste foerst (K 2.2), med «Vis flere» etter `next_cursor`. Filtrene i
  * skissen er kuttet for lanseringen (audit punkt 9). Hver rad gaar til bildene
- * til ordresiden finnes (FE-4).
+ * til ordresiden finnes (FE-4), og «Last ned» til nedlastingen (FE-5).
  */
 export default function OrdersPage() {
   if (!isPageEnabled(ORDERS_PATH)) return <ServiceUnavailable />;
@@ -123,10 +123,10 @@ function OrdersContent() {
         <>
           <ul className="flex flex-col gap-3 mb-10">
             {orders.map((order) => (
-              <li key={order.id}>
+              <li key={order.id} className={cardClass("none", "flex flex-col sm:flex-row sm:items-center")}>
                 <Link
                   href={orderImagesHref(order.id)}
-                  className={cardClass("none", `flex items-center gap-4 p-3 transition-colors hover:bg-surface-2 ${FOCUS}`)}
+                  className={`flex min-w-0 flex-1 items-center gap-4 rounded-card p-3 transition-colors hover:bg-surface-2 ${FOCUS}`}
                 >
                   <span className="flex aspect-[4/3] w-20 shrink-0 items-center justify-center overflow-hidden rounded-button bg-surface-2 sm:w-28">
                     {order.coverThumbUrl ? (
@@ -142,6 +142,16 @@ function OrdersContent() {
                   </span>
                   <span className="shrink-0 text-sm text-ink-2">{formatDay(order.createdAt, locale)}</span>
                 </Link>
+                {order.counts.images > 0 && (
+                  <Link
+                    href={orderDeliveryHref(order.id)}
+                    aria-label={t(locale, "delivery.linkLabel", { address: order.address })}
+                    className={buttonClass("secondary", "mx-3 mb-3 sm:my-3 sm:ml-0 px-4")}
+                  >
+                    <Download aria-hidden className="size-4" strokeWidth={1.75} />
+                    {t(locale, "delivery.listLink")}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>

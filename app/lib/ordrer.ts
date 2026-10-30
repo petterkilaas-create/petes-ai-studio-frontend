@@ -35,6 +35,11 @@ export function orderCheckHref(id: string): string {
   return `${ORDERS_PATH}/${encodeURIComponent(id)}/kontroll`;
 }
 
+/** Nedlastingen (FE-5): fillista og ZIP-en. */
+export function orderDeliveryHref(id: string): string {
+  return `${ORDERS_PATH}/${encodeURIComponent(id)}/last-ned`;
+}
+
 /** Parameteren paa bildesiden etter start: antall resultater som ble startet. */
 export const STARTED_PARAM = "startet";
 
