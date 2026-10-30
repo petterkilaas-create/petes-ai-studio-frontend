@@ -17,6 +17,7 @@ import {
   ITEM_FIELDS,
   itemKey,
   loadDraft,
+  removeItem,
   replaceItem,
   saveDraft,
   toWire,
@@ -25,19 +26,32 @@ import {
 } from "./board.ts";
 import {
   addChoices,
+  applySheet,
+  badgeLabel,
   boardServices,
   boardTotals,
   EMPTY_PANEL,
+  indoorImages,
   itemLabel,
+  looksIndoor,
+  mixedText,
   panelChoices,
   panelForNewSelection,
   panelFromItem,
   quotaPlan,
   resultLabel,
   selectRange,
+  serviceRow,
+  removeSheet,
+  removeText,
+  sheetButtons,
+  sheetStart,
   toggleSelected,
   type PanelState,
+  type SheetTarget,
 } from "./brett.ts";
+import { BOARD_SERVICES } from "./board.ts";
+import { EMPTY_STYLING } from "./styling.ts";
 import { codeText, DICTIONARIES, t } from "./i18n/index.ts";
 import {
   CallKeys,
@@ -76,6 +90,8 @@ const PAGES = ["(app)/ordrer/[id]/tjenester/page.tsx", "(app)/ordrer/[id]/kontro
 const COMPONENTS = [
   "components/ordre/ServiceBoard.tsx",
   "components/ordre/BoardPanel.tsx",
+  "components/ordre/ServiceSheet.tsx",
+  "components/ordre/ServiceBadge.tsx",
   "components/ordre/OrderCheck.tsx",
   "components/ordre/ResultList.tsx",
   "components/ordre/LoadState.tsx",
@@ -633,12 +649,21 @@ test("de nye sidene sjekker flagget paa /ordrer og har ingen synlig tekst skreve
   for (const rel of [...PAGES, ...COMPONENTS]) assert.deepEqual(literalTextsInFile(read(rel)), [], rel);
 });
 
-test("brettet: dagens velgere, utkastet i localStorage, og videre til oppsummeringen", () => {
-  const panel = withoutComments(read("components/ordre/BoardPanel.tsx"));
+test("brettet: dagens velgere i vinduet, utkastet i localStorage, og videre til oppsummeringen", () => {
+  // FE-3b: velgerne staar i vinduet (ServiceSheet) i full bredde, ikke i panelet.
+  const sheet = withoutComments(read("components/ordre/ServiceSheet.tsx"));
   for (const picker of ["<DuskChoicePicker", "<StylingChoicePicker", "<AarstidChoicePicker", "<ImageTypeChoice"]) {
-    assert.ok(panel.includes(picker), picker);
+    assert.ok(sheet.includes(picker), picker);
   }
-  assert.match(panel, /aria-expanded=\{isOpen\}/);
+  assert.equal(sheet.match(/\binDialog\b/g)?.length, 2);
+  assert.match(sheet, /dialog\.showModal\(\);/);
+  assert.match(sheet, /dialog\.addEventListener\("close", close\);/);
+  assert.match(sheet, /aria-labelledby=\{titleId\}/);
+  assert.match(sheet, /w-\[min\(720px,100vw\)\]/);
+  assert.match(sheet, /h-dvh/);
+  const panel = withoutComments(read("components/ordre/BoardPanel.tsx"));
+  assert.doesNotMatch(panel, /ChoicePicker|ImageTypeChoice/);
+  assert.equal(panel.match(/<Button\b/g)?.length, 1);
   const board = withoutComments(read("components/ordre/ServiceBoard.tsx"));
   assert.match(board, /saveDraft\(browserStorage\(\), assignmentId, next\);/);
   assert.match(board, /loadDraft\(browserStorage\(\), assignmentId, assignment\.images\.map\(\(img\) => img\.id\)\)/);
@@ -662,5 +687,239 @@ test("knappene paa de nye sidene er minst 44 px (Button, ButtonLink og ikonknapp
   assert.match(card, /const ICON_BUTTON = `inline-flex size-11 /);
   assert.match(card, /const MENU_ITEM = `flex min-h-11 /);
   const board = withoutComments(read("components/ordre/ServiceBoard.tsx"));
-  assert.match(board, /className=\{`flex min-h-11 w-full items-center gap-3/);
+  assert.match(board, /className=\{`flex w-full flex-col gap-2 rounded-button text-left/);
+  // Merkelappene er 32 px, med trykkflate paa 44 px (after:).
+  const badge = withoutComments(read("components/ordre/ServiceBadge.tsx"));
+  assert.match(badge, /min-h-8 [^`]*after:absolute after:inset-x-0 after:-inset-y-1\.5/);
+  assert.match(badge, /size-8 [^`]*after:absolute after:-inset-1\.5/);
+  const sheet = withoutComments(read("components/ordre/ServiceSheet.tsx"));
+  assert.match(sheet, /inline-flex size-11 shrink-0/);
+});
+
+// --- FE-3b: merkelappene, panelet og vinduet ------------------------------------------
+
+const AB = ["a", "b"];
+const stylingAB: SheetTarget = { kind: "images", service: "styling", imageIds: AB };
+const target = (service: SheetTarget["service"], imageIds: readonly string[] = AB): SheetTarget => ({
+  kind: "images",
+  service,
+  imageIds,
+});
+const style = (s: PanelState["styling"]["styles"]): PanelState => ({ ...PANEL, styling: { ...PANEL.styling, styles: s } });
+
+test("merkelappene: kort navn og valget, nb og en", () => {
+  const [dusk] = addChoices([], ["a"], panelChoices("skumring", PANEL)!);
+  assert.equal(badgeLabel("nb", dusk), `Kveldsbilde · ${codeText("nb", "duskStyle", "warm_dusk_v3")}`);
+  const [japandi] = addChoices([], ["a"], panelChoices("styling", PANEL)!);
+  assert.equal(badgeLabel("nb", japandi), "Styling · Japandi");
+  assert.equal(badgeLabel("en", japandi), "Styling · Japandi");
+  const [hoest] = addChoices([], ["a"], panelChoices("aarstid", PANEL)!);
+  assert.equal(badgeLabel("nb", hoest), "Årstid · Høst");
+  assert.equal(badgeLabel("en", hoest), "Season · Autumn");
+  const [sky] = addChoices([], ["a"], panelChoices("klart_vaer", PANEL)!);
+  assert.equal(badgeLabel("nb", sky), "Blå himmel");
+  const [faces] = addChoices([], ["a"], panelChoices("skjul_ansikter", PANEL)!);
+  assert.equal(badgeLabel("nb", faces), "Skjul ansikter");
+  assert.equal(badgeLabel("en", faces), "Hide faces");
+});
+
+test("merkelappen: × fjerner bare det ene elementet (samme stil paa et annet bilde og en annen stil staar)", () => {
+  const items = addChoices([], AB, panelChoices("styling", PANEL)!);
+  assert.equal(items.length, 4);
+  const japandiA = items.find((i) => i.imageId === "a" && i.option === "styling_japandi")!;
+  const next = removeItem(items, itemKey(japandiA));
+  assert.equal(next.length, 3);
+  assert.deepEqual(
+    next.map((i) => `${i.imageId}:${i.option}`),
+    ["b:styling_japandi", "a:styling_funkis", "b:styling_funkis"]
+  );
+});
+
+test("panelet: status per tjeneste («Ikke lagt til», «På 1 av 2», «På alle 2», «Lagt til») og knappen", () => {
+  const none = serviceRow("nb", [], [], "skumring");
+  assert.equal(none.status, null);
+  assert.equal(none.action, "add");
+  const empty = serviceRow("nb", [], AB, "skumring");
+  assert.equal(empty.status, "Ikke lagt til");
+  assert.equal(empty.action, "add");
+  const one = addChoices([], ["a"], panelChoices("skumring", PANEL)!);
+  const some = serviceRow("nb", one, AB, "skumring");
+  assert.equal(some.status, "På 1 av 2");
+  assert.equal(some.coverage, "some");
+  assert.equal(some.action, "edit");
+  assert.equal(serviceRow("en", one, AB, "skumring").status, "On 1 of 2");
+  const both = addChoices([], AB, panelChoices("skumring", PANEL)!);
+  assert.equal(serviceRow("nb", both, AB, "skumring").status, "På alle 2");
+  assert.equal(serviceRow("nb", both, ["a"], "skumring").status, "Lagt til");
+  assert.equal(serviceRow("nb", both, AB, "styling").status, "Ikke lagt til");
+  assert.equal(t("nb", "board.rowAdd"), "Legg til …");
+  assert.equal(t("nb", "board.rowEdit"), "Endre …");
+  assert.equal(t("nb", "board.selectedMany", { n: 2 }), "2 bilder valgt");
+  assert.equal(t("nb", "board.selectFirst"), "Kryss av ett eller flere bilder.");
+});
+
+test("«Ulike … nå»: ulike valg paa bildene vises i raden, og vinduet forhaandsvelger ingenting", () => {
+  let items = addChoices([], ["a"], panelChoices("styling", style(["styling_japandi"]))!);
+  items = addChoices(items, ["b"], panelChoices("styling", style(["styling_sekelskifte"]))!);
+  assert.equal(serviceRow("nb", items, AB, "styling").mixed, "Ulike stiler nå: Japandi, Sekelskifte");
+  assert.equal(mixedText("en", items, AB, "styling"), "Different styles now: Japandi, Turn of the century");
+  const start = sheetStart(items, stylingAB, PANEL);
+  assert.equal(start.mode, "edit");
+  assert.equal(start.mixed, true);
+  assert.deepEqual(start.panel.styling, EMPTY_STYLING);
+  assert.equal(panelChoices("styling", start.panel), null);
+  // Bare ett av bildene avkrysset: ingen forskjell.
+  assert.equal(serviceRow("nb", items, ["a"], "styling").mixed, null);
+  // Samme stiler, ulik romtype: «Ulike valg».
+  let rooms = addChoices([], ["a"], panelChoices("styling", PANEL)!);
+  rooms = addChoices(rooms, ["b"], panelChoices("styling", { ...PANEL, styling: { ...PANEL.styling, furnishAs: "bedroom" } })!);
+  assert.equal(mixedText("nb", rooms, AB, "styling"), "Ulike valg på bildene nå");
+  // Kveldsbilde med ulik stemning: ingen stemning valgt, «Oppdater» er av til megleren velger.
+  let dusk = addChoices([], ["a"], panelChoices("skumring", PANEL)!);
+  dusk = addChoices(dusk, ["b"], panelChoices("skumring", { ...PANEL, dusk: { style: "nordic_blue_hour_v2", sky: "clear" } })!);
+  const duskStart = sheetStart(dusk, target("skumring"), PANEL);
+  assert.equal(duskStart.mixed, true);
+  assert.equal(duskStart.panel.dusk, null);
+  assert.equal(panelChoices("skumring", duskStart.panel), null);
+  assert.equal(t("nb", "board.missingDusk"), "Velg en stemning.");
+  assert.match(mixedText("nb", dusk, AB, "skumring")!, /^Ulike stemninger nå: /);
+  // Aarstider.
+  let seasons = addChoices([], ["a"], panelChoices("aarstid", PANEL)!);
+  seasons = addChoices(seasons, ["b"], panelChoices("aarstid", { ...PANEL, aarstid: { source: "sommer", seasons: ["vaar"] } })!);
+  assert.equal(mixedText("nb", seasons, AB, "aarstid"), "Ulike årstider nå: Høst, Vinter, Vår");
+});
+
+test("vinduet: like valg paa bildene forhaandsvelges; ingen har tjenesten gir «Legg til» med det som ble valgt sist", () => {
+  const items = addChoices([], AB, panelChoices("styling", PANEL)!);
+  const start = sheetStart(items, stylingAB, EMPTY_PANEL);
+  assert.equal(start.mode, "edit");
+  assert.equal(start.mixed, false);
+  assert.deepEqual(start.panel.styling, { ...PANEL.styling, wishes: "Et stort teppe", styles: ["styling_japandi", "styling_funkis"] });
+  const add = sheetStart([], stylingAB, PANEL);
+  assert.equal(add.mode, "add");
+  assert.deepEqual(add.panel, panelForNewSelection(PANEL));
+  const season = sheetStart(addChoices([], AB, panelChoices("aarstid", PANEL)!), target("aarstid"), EMPTY_PANEL);
+  assert.deepEqual(season.panel.aarstid, { source: "sommer", seasons: ["hoest", "vinter"] });
+  // Merkelappen: valgene fra det ene elementet.
+  const japandi = items.find((i) => i.imageId === "b" && i.option === "styling_japandi")!;
+  const one = sheetStart(items, { kind: "item", service: "styling", imageId: "b", key: itemKey(japandi) }, EMPTY_PANEL);
+  assert.equal(one.mode, "edit");
+  assert.deepEqual(one.panel.styling.styles, ["styling_japandi"]);
+  const texts = (mode: "add" | "edit", total: number, has: number) =>
+    sheetButtons("nb", mode, total, has).map((b) => `${b.action}:${b.text}`);
+  assert.deepEqual(texts("add", 2, 0), ["add:Legg til på 2 bilder"]);
+  assert.deepEqual(texts("add", 1, 0), ["add:Legg til på bildet"]);
+  assert.deepEqual(texts("edit", 2, 2), ["update:Oppdater 2 bilder"]);
+  assert.deepEqual(texts("edit", 1, 1), ["update:Oppdater bildet"]);
+  // Delvis (Petter 30.10): to knapper, Oppdater roerer bare de som har den.
+  assert.deepEqual(texts("edit", 3, 2), ["update:Oppdater de 2 som har den", "add:Legg til på alle 3"]);
+  assert.deepEqual(texts("edit", 2, 1), ["update:Oppdater bildet som har den", "add:Legg til på alle 2"]);
+  assert.deepEqual(
+    sheetButtons("en", "edit", 3, 2).map((b) => b.text),
+    ["Update the 2 that have it", "Add to all 3"]
+  );
+  // Den dempede «Fjern»: bare naar noen har tjenesten.
+  assert.equal(removeText("nb", 2, 0), null);
+  assert.equal(removeText("nb", 2, 2), "Fjern fra de 2 bildene");
+  assert.equal(removeText("nb", 3, 2), "Fjern fra de 2 bildene");
+  assert.equal(removeText("nb", 1, 1), "Fjern fra bildet");
+  assert.equal(removeText("nb", 2, 1), "Fjern fra bildet som har den");
+});
+
+test("vinduet gir de samme items som panelet i FE-3, for alle fem tjenestene", () => {
+  const before = addChoices([], ["c"], panelChoices("skjul_ansikter", PANEL)!);
+  for (const service of BOARD_SERVICES) {
+    const tgt = target(service);
+    const start = sheetStart(before, tgt, PANEL);
+    assert.equal(start.mode, "add", service);
+    const viaSheet = applySheet(before, tgt, "add", PANEL);
+    assert.deepEqual(viaSheet, addChoices(before, AB, panelChoices(service, PANEL)!), service);
+    assert.deepEqual(viaSheet!.map(toWire), [...before, ...addChoices([], AB, panelChoices(service, PANEL)!)].map(toWire), service);
+  }
+});
+
+test("vinduet: «Oppdater» bytter tjenesten paa alle bildene i maalet; merkelappen bytter bare sitt element", () => {
+  let items = addChoices([], ["a"], panelChoices("styling", style(["styling_japandi"]))!);
+  items = addChoices(items, ["b"], panelChoices("styling", style(["styling_sekelskifte"]))!);
+  items = addChoices(items, AB, panelChoices("skumring", PANEL)!);
+  const next = applySheet(items, stylingAB, "update", style(["styling_funkis"]))!;
+  assert.deepEqual(
+    next.filter((i) => i.service === "styling").map((i) => `${i.imageId}:${i.option}`),
+    ["a:styling_funkis", "b:styling_funkis"]
+  );
+  assert.equal(next.filter((i) => i.service === "skumring").length, 2);
+  // Ufullstendig valg: ingen endring.
+  assert.equal(applySheet(items, stylingAB, "update", { ...PANEL, styling: EMPTY_STYLING }), null);
+  // Merkelappen: som «Endre» i FE-3 (replaceItem).
+  const sek = items.find((i) => i.option === "styling_sekelskifte")!;
+  const tgt: SheetTarget = { kind: "item", service: "styling", imageId: "b", key: itemKey(sek) };
+  const panel = style(["styling_funkis"]);
+  assert.deepEqual(applySheet(items, tgt, "update", panel), replaceItem(items, itemKey(sek), panelChoices("styling", panel)!));
+});
+
+test("vinduet, delvis: «Oppdater» roerer bare bildene som har tjenesten; «Legg til på alle» som FE-3", () => {
+  const abc = ["a", "b", "c"];
+  const tgt = target("styling", abc);
+  const items = addChoices([], AB, panelChoices("styling", style(["styling_japandi"]))!);
+  const start = sheetStart(items, tgt, EMPTY_PANEL);
+  assert.equal(start.mode, "edit");
+  assert.deepEqual(start.panel.styling.styles, ["styling_japandi"]);
+  const funkis = style(["styling_funkis"]);
+  const updated = applySheet(items, tgt, "update", funkis)!;
+  assert.deepEqual(
+    updated.map((i) => `${i.imageId}:${i.option}`),
+    ["a:styling_funkis", "b:styling_funkis"]
+  );
+  const added = applySheet(items, tgt, "add", funkis)!;
+  assert.deepEqual(added, addChoices(items, abc, panelChoices("styling", funkis)!));
+  assert.deepEqual(
+    added.map((i) => `${i.imageId}:${i.option}`),
+    ["a:styling_japandi", "b:styling_japandi", "a:styling_funkis", "b:styling_funkis", "c:styling_funkis"]
+  );
+  // Samme valg som de har: «Legg til på alle» gir bare det tredje bildet, ingen dubletter.
+  const same = applySheet(items, tgt, "add", start.panel)!;
+  assert.equal(same.length, 3);
+  assert.equal(same[2].imageId, "c");
+});
+
+test("vinduet: «Fjern» tar tjenesten av bildene i maalet, eller bare elementet for merkelappen", () => {
+  let items = addChoices([], AB, panelChoices("styling", PANEL)!);
+  items = addChoices(items, ["c"], panelChoices("styling", PANEL)!);
+  items = addChoices(items, AB, panelChoices("skjul_ansikter", PANEL)!);
+  const left = removeSheet(items, target("styling"));
+  assert.deepEqual(
+    left.map((i) => `${i.imageId}:${i.service}`),
+    ["c:styling", "c:styling", "a:skjul_ansikter", "b:skjul_ansikter"]
+  );
+  const japandiA = items.find((i) => i.imageId === "a" && i.option === "styling_japandi")!;
+  const one = removeSheet(items, { kind: "item", service: "styling", imageId: "a", key: itemKey(japandiA) });
+  assert.deepEqual(one, removeItem(items, itemKey(japandiA)));
+  const sheet = withoutComments(read("components/ordre/ServiceSheet.tsx"));
+  // Dempet, men 44 px hoey, og bare naar noen har tjenesten.
+  assert.match(sheet, /\{remove !== null && \(\s*<button\s+type="button"\s+onClick=\{onRemove\}\s+className=\{`ml-auto inline-flex min-h-11 [^`]*text-ink-2 underline/);
+  assert.match(sheet, /variant=\{i === 0 \? "primary" : "secondary"\}/);
+});
+
+test("aarstider er for utebilder: rom-navn som tyder paa inne, og bilder merket «Innendørs», faar advarsel", () => {
+  for (const room of ["Stue", "Hovedsoverom", "Gang", "Bad 2", "Kjøkken/stue", "TV-stue", "Tomt rom", "Innerom", "Living room"]) {
+    assert.equal(looksIndoor(room), true, room);
+  }
+  for (const room of ["Fasade", "Hage", "Terrasse", "Uterom", "Uteplass", "Inngangsparti", "Balkong", "Utsikt", null]) {
+    assert.equal(looksIndoor(room), false, String(room));
+  }
+  const imgs = [image("a", 1, { room: "Fasade" }), image("b", 2, { room: "Stue" }), image("c", 3, { room: "Hage" })];
+  const marked = addChoices([], ["c"], panelChoices("skumring", { ...PANEL, duskImageType: "interior" })!);
+  assert.deepEqual(
+    indoorImages(imgs, marked, ["a", "b", "c"]).map((i) => i.id),
+    ["b", "c"]
+  );
+  assert.deepEqual(indoorImages(imgs, marked, ["a"]), []);
+  assert.equal(
+    t("nb", "board.sheet.indoor", { names: "2. Stue" }),
+    "Ser ut til å være tatt innendørs: 2. Stue. Årstider virker bare på bilder tatt utendørs."
+  );
+  assert.equal(t("nb", "board.sheet.aarstidNote"), "Årstider er for bilder tatt utendørs: fasade, hage og balkong.");
+  const sheet = withoutComments(read("components/ordre/ServiceSheet.tsx"));
+  assert.match(sheet, /\{service === "aarstid" && <p [^>]*>\{t\(locale, "board\.sheet\.aarstidNote"\)\}<\/p>\}/);
+  assert.match(sheet, /t\(locale, "board\.sheet\.indoor", \{ names: indoor \}\)/);
 });

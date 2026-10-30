@@ -263,6 +263,7 @@ test("S2-f/S3-f/D-3: rommet staar foerst med krysset i samme rad, saa stilene og
     't(locale, "styling.styles")',
     't(locale, "styling.stylesHelp")',
     't(locale, "styling.styles")',
+    't(locale, "styling.focusHide")',
     't(locale, "styling.decor")',
     't(locale, "styling.decorHelp")',
     't(locale, "styling.decor")',
