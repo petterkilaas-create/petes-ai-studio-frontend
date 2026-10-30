@@ -57,9 +57,9 @@ function withStatus(images: readonly AssignmentImage[], status: (id: string) => 
   }));
 }
 
-// --- neste til kontroll ------------------------------------------------------------------
+// --- neste til godkjenning ------------------------------------------------------------------
 
-test("neste til kontroll: etter godkjenning hopper siden til neste som venter, og rundt til starten", () => {
+test("neste til godkjenning: etter godkjenning hopper siden til neste som venter, og rundt til starten", () => {
   // job_1a er godkjent: neste er job_4a.
   const after1 = withStatus(IMAGES, (id) => (id === "job_1a" ? "approved" : null));
   assert.deepEqual(nextState(after1, { imageId: "img_1", resultId: "job_1a" }), {
@@ -77,7 +77,7 @@ test("neste til kontroll: etter godkjenning hopper siden til neste som venter, o
   for (const a of ["reopen", "correct", "continue"]) assert.equal(jumpsAfter(a), false, a);
 });
 
-test("neste til kontroll: ingen igjen gir «Ingen flere nå, N behandles» eller «Alt er kontrollert»", () => {
+test("neste til godkjenning: ingen igjen gir «Ingen flere nå, N behandles» eller «Alt er gjennomgått»", () => {
   const waiting = new Set(["job_1a", "job_4a", "job_5a", "job_7b"]);
   // Alt avgjort, men job_5b behandles fortsatt.
   const busy = withStatus(IMAGES, (id) => (waiting.has(id) ? "approved" : null));
@@ -86,7 +86,7 @@ test("neste til kontroll: ingen igjen gir «Ingen flere nå, N behandles» eller
   // Ingenting behandles heller.
   const done = withStatus(IMAGES, (id) => (waiting.has(id) || id === "job_5b" ? "approved" : null));
   assert.deepEqual(nextState(done, { imageId: "img_7", resultId: "job_7b" }), { kind: "all_reviewed" });
-  assert.equal(t("nb", "player.allReviewedLink"), "Alt er kontrollert. Gå til nedlasting");
+  assert.equal(t("nb", "player.allReviewedLink"), "Alt er gjennomgått. Gå til nedlasting");
   // Bare gjeldende venter: ingen knapp (den peker ikke paa seg selv).
   const only = withStatus(IMAGES, (id) => (waiting.has(id) && id !== "job_5a" ? "approved" : id === "job_5b" ? "failed" : null));
   assert.deepEqual(nextState(only, { imageId: "img_5", resultId: "job_5a" }), { kind: "none" });
@@ -171,17 +171,17 @@ test("teksten: rom og tjeneste, stripa og fremdriften", () => {
   assert.deepEqual(
     IMAGES.map((img) => stripStatus("nb", img)),
     [
-      "1 av 2 kontrollert",
-      "1 av 1 kontrollert",
+      "1 av 2 gjennomgått",
+      "1 av 1 gjennomgått",
       "Original",
-      "0 av 1 kontrollert",
-      "0 av 2 kontrollert",
-      "1 av 1 kontrollert",
-      "1 av 2 kontrollert",
+      "0 av 1 gjennomgått",
+      "0 av 2 gjennomgått",
+      "1 av 1 gjennomgått",
+      "1 av 2 gjennomgått",
       "Original",
     ]
   );
-  assert.equal(progressText("nb", assignmentProgress(IMAGES)), "4 av 9 kontrollert · 1 behandles");
+  assert.equal(progressText("nb", assignmentProgress(IMAGES)), "4 av 9 gjennomgått · 1 behandles");
   const idle = withStatus(IMAGES, (id) => (id === "job_5b" ? "approved" : null));
   assert.equal(progressText("en", assignmentProgress(idle)), "5 of 9 reviewed");
 });
@@ -353,7 +353,7 @@ test("ordlista: nb og en for spilleren, meldingen og «Angre godkjenning»", () 
   assert.equal(t("nb", "player.undo.approved", { label: "Stue · Kveldsbilde" }), "Godkjent: Stue · Kveldsbilde");
   assert.equal(t("nb", "player.undo.rejected", { label: "Bad" }), "Avvist: Bad");
   assert.equal(t("en", "player.undo.approved", { label: "Bad" }), "Approved: Bad");
-  assert.equal(t("nb", "player.next", { label: "Bad" }), "Neste til kontroll: Bad");
+  assert.equal(t("nb", "player.next", { label: "Bad" }), "Neste til godkjenning: Bad");
   assert.equal(nb["player.orderMore"], "Bestill mer for boligen");
   // Alle de nye noeklene har tekst paa begge spraak, og de engelske er ikke norske.
   const keys = Object.keys(nb).filter((k) => k.startsWith("reopen.") || /^player\.(undo|next$|waiting|allReviewedLink|orderMore|images|noImages|keysHint|imageN|original|position|stripLabel|tabsLabel)/.test(k));
@@ -374,7 +374,7 @@ test("veiledningen: del 6 har «Angre godkjenning», og del 5 sier at «Åpne» 
     return s === undefined ? "" : [...s.steps, ...(s.notes ?? [])].join("\n");
   };
   assert.match(text("godkjenn"), /«Angre godkjenning»/);
-  assert.match(text("godkjenn"), /«Neste til kontroll»/);
+  assert.match(text("godkjenn"), /«Neste til godkjenning»/);
   assert.match(text("resultater"), /«Åpne» på et resultat\. Da åpnes ordresiden/);
   assert.match(text("resultater"), /«Bestill mer for boligen»/);
   // «Angre godkjenning» staar ikke lenger som noe som mangler.

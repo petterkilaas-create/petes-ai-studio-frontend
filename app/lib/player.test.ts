@@ -14,7 +14,7 @@ import {
 } from "./player.ts";
 
 /**
- * Spilleren (FE-0, audit punkt 5 og 6): rekkefoelgen, «Neste til kontroll»,
+ * Spilleren (FE-0, audit punkt 5 og 6): rekkefoelgen, «Neste til godkjenning»,
  * fremdriften og piltastene. Eksempelet er ordren med 8 bilder.
  */
 const SAMPLE = parseAssignment(
@@ -57,10 +57,10 @@ test("nextToReview: bare gjeldende venter gir gjeldende; ingenting venter gir nu
   assert.equal(nextToReview([], null), null);
 });
 
-test("fremdriften: «4 av 9 kontrollert · 1 behandles» for eksempelet", () => {
+test("fremdriften: «4 av 9 gjennomgått · 1 behandles» for eksempelet", () => {
   const p = assignmentProgress(IMAGES);
   assert.deepEqual(p, { reviewed: 4, total: 9, processing: 1, waiting: 4 });
-  assert.equal(t("nb", "player.progress", { reviewed: p.reviewed, total: p.total }), "4 av 9 kontrollert");
+  assert.equal(t("nb", "player.progress", { reviewed: p.reviewed, total: p.total }), "4 av 9 gjennomgått");
   assert.equal(t("nb", "player.processing", { n: p.processing }), "1 behandles");
   assert.equal(allReviewed(p), false);
 });

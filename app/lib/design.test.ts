@@ -331,7 +331,11 @@ test("D1: ordlista har de nye ordene paa nb og en", () => {
   assert.equal(nb["history.openReview"], "Åpne godkjenning");
   // Ordene som forsvinner (brief §7), og ingen gamle nøkler for tittelen.
   const allNb = Object.values(nb).join("\n");
-  assert.doesNotMatch(allNb, /Scene-transformasjon|Til kontroll|Til gjennomgang/);
+  assert.doesNotMatch(allNb, /Scene-transformasjon|[Tt]il kontroll|Til gjennomgang/);
+  // Dag 59 (FREMDRIFT, beslutning 4): spilleren sier «gjennomgått», ikke «kontrollert».
+  for (const [key, text] of Object.entries(nb)) {
+    if (key.startsWith("player.")) assert.doesNotMatch(text, /kontrollert/, key);
+  }
   assert.ok(!Object.hasOwn(nb, "home.titlePrefix") && !Object.hasOwn(nb, "home.titleHighlight"));
 });
 
