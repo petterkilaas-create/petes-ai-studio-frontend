@@ -11,7 +11,8 @@ import type { RefreshResult } from "@/app/lib/autoRefresh";
 import { useAutoRefresh } from "@/app/hooks/useAutoRefresh";
 import { useQuota } from "@/app/hooks/useQuota";
 import { quotaView } from "@/app/lib/quota";
-import { orderableTools, serviceHref, SERVICES_PATH } from "@/app/lib/services";
+import { serviceShortcuts, SERVICES_PATH } from "@/app/lib/services";
+import { useListingTextAccess } from "@/app/hooks/useListingTextAccess";
 import {
   anyWorking,
   HISTORY_PATH,
@@ -56,6 +57,8 @@ export default function Home() {
   const { getToken } = useAuth();
   const locale = useLocale();
   const quota = useQuota();
+  // Annonsetekst (T1): snarveien bare naar flagget slipper brukeren inn.
+  const listingText = useListingTextAccess() === "yes";
 
   const [jobs, setJobs] = useState<StartJobs>({ kind: "loading" });
   const [waking, setWaking] = useState(false);
@@ -142,7 +145,7 @@ export default function Home() {
         <QuotaNotice view={quotaView(quota.quota)} locale={locale} />
       </div>
 
-      {view.kind === "new" && <ServiceShortcuts locale={locale} lead />}
+      {view.kind === "new" && <ServiceShortcuts locale={locale} listingText={listingText} lead />}
 
       {view.kind === "loading" && (
         <div className="flex flex-col items-center justify-center gap-4 py-12" role="status">
@@ -193,7 +196,7 @@ export default function Home() {
         </>
       )}
 
-      {view.kind !== "new" && <ServiceShortcuts locale={locale} />}
+      {view.kind !== "new" && <ServiceShortcuts locale={locale} listingText={listingText} />}
     </main>
   );
 }
@@ -208,10 +211,19 @@ function entryCard(entry: HistoryEntry) {
 }
 
 /**
- * Tjenestene som snarveier: bare de som kan bestilles (orderableTools, fra
- * ENABLED). Hver gaar til Tjenester med tjenesten valgt.
+ * Tjenestene som snarveier: de som kan bestilles (fra ENABLED), hver til
+ * Tjenester med tjenesten valgt, og Annonsetekst til sin egen side naar
+ * flagget slipper brukeren inn (serviceShortcuts, T1).
  */
-function ServiceShortcuts({ locale, lead = false }: { locale: Locale; lead?: boolean }) {
+function ServiceShortcuts({
+  locale,
+  listingText,
+  lead = false,
+}: {
+  locale: Locale;
+  listingText: boolean;
+  lead?: boolean;
+}) {
   return (
     <section className="flex flex-col gap-4">
       <div>
@@ -219,12 +231,12 @@ function ServiceShortcuts({ locale, lead = false }: { locale: Locale; lead?: boo
         {lead && <p className="mt-1 text-sm text-ink-2">{t(locale, "start.services.lead")}</p>}
       </div>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {orderableTools().map((tool) => {
+        {serviceShortcuts(listingText).map(({ tool, href }) => {
           const Icon = TOOL_ICONS[tool.id];
           return (
             <Link
               key={tool.id}
-              href={serviceHref(tool.id)}
+              href={href}
               className={cardClass(
                 "lg",
                 `group flex h-full flex-col transition-colors hover:border-line-strong ${FOCUS}`

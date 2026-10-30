@@ -6,11 +6,23 @@ import { ORDERS_PATH } from "../../lib/services";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { FOCUS } from "../godkjenning/classes";
-import { codeText, t } from "../../lib/i18n";
+import { codeText, t, type UiKey } from "../../lib/i18n";
 import { useLocale } from "../../lib/i18n/useLocale";
 
-/** Henter, fant ikke ordren eller feil (brettet og oppsummeringen, FE-3; som bildesiden). */
-export function LoadState({ load, onRetry }: { load: Exclude<AssignmentLoad, { kind: "ok" }>; onRetry: () => void }) {
+/**
+ * Henter, fant ikke ordren eller feil (brettet og oppsummeringen, FE-3; som
+ * bildesiden). `back` er lenken nederst; standard er ordrelista (Annonsetekst
+ * gaar tilbake til sin egen side, T1).
+ */
+export function LoadState({
+  load,
+  onRetry,
+  back = { href: ORDERS_PATH, key: "orders.back" },
+}: {
+  load: Exclude<AssignmentLoad, { kind: "ok" }>;
+  onRetry: () => void;
+  back?: { href: string; key: UiKey };
+}) {
   const locale = useLocale();
   if (load.kind === "loading") {
     return (
@@ -38,8 +50,8 @@ export function LoadState({ load, onRetry }: { load: Exclude<AssignmentLoad, { k
           </>
         )}
         <p className="mt-6">
-          <Link href={ORDERS_PATH} className={`text-sm text-ink underline ${FOCUS}`}>
-            {t(locale, "orders.back")}
+          <Link href={back.href} className={`text-sm text-ink underline ${FOCUS}`}>
+            {t(locale, back.key)}
           </Link>
         </p>
       </Card>

@@ -42,7 +42,8 @@ import { aarstidParams, aarstidSummary, EMPTY_AARSTID, type AarstidChoice } from
 import { privacyDownload, saveBlob } from "@/app/lib/download";
 import { aarstidOrderErrorText, orderErrorText, t } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
-import { SERVICE_PARAM, toolFromParam, visibleCategories } from "@/app/lib/services";
+import { comingCards, pageCards, SERVICE_PARAM, toolFromParam, visibleCategories } from "@/app/lib/services";
+import { useListingTextAccess } from "@/app/hooks/useListingTextAccess";
 import { Button } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { Pill } from "@/app/components/ui/Pill";
@@ -56,7 +57,6 @@ import { PageHeader } from "@/app/components/ui/PageHeader";
 const CATEGORIES = visibleCategories();
 const ALL_TOOLS = CATEGORIES.flatMap((c) => c.items);
 const ORDERABLE_TOOLS = ALL_TOOLS.filter((t) => t.orderable);
-const COMING_TOOLS = ALL_TOOLS.filter((t) => !t.orderable);
 // Dag 58 del 4: store kort med bilde for de tre demotjenestene, små kort uten bilde under.
 const { large: LARGE_TOOLS, small: SMALL_TOOLS } = splitBySize(ORDERABLE_TOOLS);
 
@@ -97,6 +97,10 @@ function ExpressContent() {
   const [aarstid, setAarstid] = useState<AarstidChoice>(EMPTY_AARSTID);
 
   const locale = useLocale();
+  // Annonsetekst (T1): en lenke blant de små kortene naar flagget slipper brukeren inn, ellers «Kommer».
+  const listingText = useListingTextAccess() === "yes";
+  const linkTools = pageCards(listingText);
+  const comingTools = comingCards(listingText);
   const preview = useImagePreview();
   // Kvoten for gratisbilder (TG-NEW-149): fra GET /v1/quota, oppdatert fra bestillingen.
   const quota = useQuota();
@@ -302,7 +306,7 @@ function ExpressContent() {
             />
           ))}
         </div>
-        {SMALL_TOOLS.length > 0 && (
+        {SMALL_TOOLS.length + linkTools.length > 0 && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:gap-6">
             {SMALL_TOOLS.map((tool) => (
               <ServiceCard
@@ -313,6 +317,17 @@ function ExpressContent() {
                 selected={tool.id === selectedToolId}
                 disabled={isProcessing}
                 onSelect={() => selectTool(tool.id)}
+                locale={locale}
+                size="small"
+              />
+            ))}
+            {linkTools.map((tool) => (
+              <ServiceCard
+                key={tool.id}
+                tool={tool}
+                text={SERVICE_CARD_TEXT[tool.id]}
+                images={undefined}
+                href={tool.href}
                 locale={locale}
                 size="small"
               />
@@ -593,13 +608,13 @@ function ExpressContent() {
       )}
 
       {/* --- KOMMER (dag 45): kortene som ikke kan bestilles, uten kategorier (D-1) --- */}
-      {COMING_TOOLS.length > 0 && (
+      {comingTools.length > 0 && (
         <section aria-labelledby="kommer-tittel" className="space-y-4">
           <h2 id="kommer-tittel" className="text-sm font-medium text-ink">
             {t(locale, "express.comingTitle")}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {COMING_TOOLS.map((tool) => {
+            {comingTools.map((tool) => {
               const Icon = TOOL_ICONS[tool.id];
               // Ingen knapp og ingen onClick, ikke i tab-rekkefoelgen. Ingen
               // opacity, saa teksten holder kontrasten.

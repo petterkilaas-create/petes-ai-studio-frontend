@@ -13,7 +13,7 @@
  * importer), saa modulen kan testes med node --test.
  */
 
-import type { ImageTypeHint } from "./api";
+import type { Capabilities, ImageTypeHint } from "./api";
 import type { UiKey } from "./i18n";
 import { START_PATH } from "./marketingAccess.ts";
 
@@ -45,6 +45,53 @@ export function isServiceEnabled(id: string): boolean {
   return Object.prototype.hasOwnProperty.call(ENABLED, id)
     ? ENABLED[id as keyof typeof ENABLED]
     : false;
+}
+
+// ---------------------------------------------------------------------------
+// Annonsetekst (TG-NEW-281, T1): eget flagg med tre verdier
+// ---------------------------------------------------------------------------
+
+/**
+ * Hvem som ser Annonsetekst i frontend: kortet paa Tjenester, snarveien paa
+ * /start, lenken paa bildesiden og sidene under /annonsetekst.
+ *
+ * - "off": ingen. Kortet staar som «Kommer», og sidene er stengt.
+ * - "admin": bare brukere med `view_all` fra /me (i dag bare admin; K §9.3
+ *   punkt 6: redaktoeren er ikke med i v1).
+ * - "on": alle innloggede.
+ *
+ * Slaas paa i T6 ved aa endre EN linje under, samtidig med backend-flagget
+ * LISTING_TEXT (samme tre verdier, K §0). Egen konstant, ikke en linje i
+ * ENABLED, fordi ENABLED bare er av/paa.
+ */
+export type ListingTextUi = "off" | "admin" | "on";
+
+export const LISTING_TEXT_UI: ListingTextUi = "off";
+
+/** /annonsetekst: velg ordre eller ny adresse. Tekstsiden er /annonsetekst/[ordreId]. */
+export const LISTING_TEXT_PATH = "/annonsetekst";
+
+/** "pending": flagget er "admin", og svaret fra /me er ikke kommet ennaa. */
+export type ListingTextAccess = "yes" | "no" | "pending";
+
+/**
+ * Om brukeren slipper inn i Annonsetekst. Teksten gjelder en ordre, saa den
+ * er ogsaa stengt naar ordrene er av. `caps` er svaret fra /me (null foer det
+ * er kommet); feil fra /me gir NO_CAPABILITIES og dermed "no" for "admin".
+ */
+export function listingTextAccess(
+  caps: Capabilities | null,
+  flag: ListingTextUi = LISTING_TEXT_UI
+): ListingTextAccess {
+  if (flag === "off" || !isPageEnabled(ORDERS_PATH)) return "no";
+  if (flag === "on") return "yes";
+  if (caps === null) return "pending";
+  return caps.viewAll ? "yes" : "no";
+}
+
+/** Bare "admin" trenger /me. Med "off" og "on" sendes ikke kallet. */
+export function listingTextNeedsCapabilities(flag: ListingTextUi = LISTING_TEXT_UI): boolean {
+  return flag === "admin" && isPageEnabled(ORDERS_PATH);
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +157,8 @@ export function navLinks(): NavLink[] {
 // "scene"   = scene_transform med preset_id + scene-type-gate (TG-NEW-58).
 // "styling" = Digital styling: egen bestilling med 1–3 stiler (S2-f, S3-f, POST /v1/orders/styling).
 // "aarstid" = Aarstider: egen bestilling med kilden og 1–3 aarstider (TG-NEW-271, POST /v1/orders/aarstid).
-export type ToolKind = "simple" | "scene" | "styling" | "aarstid";
+// "page"    = egen side (`href`), ingen bestilling paa Tjenester: Annonsetekst (TG-NEW-281, T1).
+export type ToolKind = "simple" | "scene" | "styling" | "aarstid" | "page";
 
 export interface Tool {
   /** Id-en i ENABLED. Skiller Klart vaer fra skumring (samme service). */
@@ -129,6 +177,8 @@ export interface Tool {
    * (`Recipe.image_type_hints`). Mangler feltet, faar tjenesten ikke valget.
    */
   imageTypeHints?: readonly ImageTypeHint[];
+  /** Siden kortet aapner (bare kind "page"). */
+  href?: string;
   /** Tekstene staar i ordlista (D1c, brief §7); ikonet i tjenester/page.tsx. */
   titleKey: UiKey;
   descKey: UiKey;
@@ -220,6 +270,7 @@ const CATEGORIES: Category[] = [
   // «Kommer»-kortene (dag 45, demo-porten): vises paa Tjenester, men kan
   // ikke bestilles. Video og Annonsetekst er ikke i ENABLED, saa
   // isServiceEnabled gir av; Digital styling styres av ENABLED.digital_styling.
+  // Annonsetekst styres av LISTING_TEXT_UI (T1) og blir en lenke naar flagget slipper brukeren inn.
   {
     id: "furnishing",
     titleKey: "express.category.furnishing",
@@ -256,12 +307,14 @@ const CATEGORIES: Category[] = [
         titleKey: "express.tool.video.title",
         descKey: "express.tool.video.desc",
       },
+      // T1 (TG-NEW-281): het copywriter. Egen side, aldri en bestilling paa Tjenester.
       {
-        id: "copywriter",
-        service: "copywriter",
-        kind: "simple",
-        titleKey: "express.tool.copywriter.title",
-        descKey: "express.tool.copywriter.desc",
+        id: "annonsetekst",
+        service: "listing_text",
+        kind: "page",
+        href: LISTING_TEXT_PATH,
+        titleKey: "express.tool.annonsetekst.title",
+        descKey: "express.tool.annonsetekst.desc",
       },
     ],
   },
@@ -345,6 +398,34 @@ export function visibleCategories(): (Omit<Category, "items"> & { items: Visible
 /** Tjenestene som kan bestilles, i samme rekkefoelge som paa Tjenester. */
 export function orderableTools(): Tool[] {
   return expressCategories().flatMap((c) => c.items);
+}
+
+/** Kortene som er lenker til en egen side (kind "page"), bare naar Annonsetekst er aapen for brukeren. */
+export function pageCards(listingText: boolean): VisibleTool[] {
+  if (!listingText) return [];
+  return visibleCategories()
+    .flatMap((c) => c.items)
+    .filter((tool) => tool.kind === "page");
+}
+
+/** «Kommer» paa Tjenester: det som ikke kan bestilles, uten kortene som er lenker. */
+export function comingCards(listingText: boolean): VisibleTool[] {
+  const links = new Set(pageCards(listingText).map((tool) => tool.id));
+  return visibleCategories()
+    .flatMap((c) => c.items)
+    .filter((tool) => !tool.orderable && !links.has(tool.id));
+}
+
+/**
+ * Snarveiene paa /start: tjenestene som kan bestilles (til Tjenester med
+ * tjenesten valgt), og Annonsetekst til sin egen side naar flagget slipper
+ * brukeren inn.
+ */
+export function serviceShortcuts(listingText: boolean): { tool: Tool; href: string }[] {
+  return [
+    ...orderableTools().map((tool) => ({ tool, href: serviceHref(tool.id) })),
+    ...pageCards(listingText).map((tool) => ({ tool, href: tool.href ?? SERVICES_PATH })),
+  ];
 }
 
 // ---------------------------------------------------------------------------

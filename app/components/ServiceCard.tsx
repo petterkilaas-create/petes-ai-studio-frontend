@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { t, type Locale } from "../lib/i18n";
 import type { VisibleTool } from "../lib/services";
@@ -24,6 +25,9 @@ import { cardClass } from "./ui/Card";
  * Lite kort (`size="small"`, Dag 58 del 4): samme knapp og tekster, uten
  * bilde og med mindre tittel. De store staar tre i én rad fra 1024 px, saa
  * tittelen er 38 px foerst fra 1280 px.
+ *
+ * Med `href` (kind "page", Annonsetekst i T1) er kortet en lenke til siden i
+ * stedet for en knapp: samme utseende, uten aria-pressed og uten valgt-tilstand.
  */
 
 const FOCUS =
@@ -41,24 +45,39 @@ export function ServiceCard({
   tool,
   text,
   images,
-  selected,
-  disabled,
+  selected = false,
+  disabled = false,
   onSelect,
+  href,
   locale,
   size = "large",
 }: {
   tool: VisibleTool;
   text: ServiceCardText;
   images: CardImages | undefined;
-  selected: boolean;
-  disabled: boolean;
-  onSelect: () => void;
+  selected?: boolean;
+  disabled?: boolean;
+  onSelect?: () => void;
+  /** Kortet er en lenke hit (kind "page"), ikke en knapp. */
+  href?: string;
   locale: Locale;
   size?: CardSize;
 }) {
-  const small = size === "small";
   const titleId = `tjeneste-${tool.id}`;
   const descId = `tjeneste-${tool.id}-linje`;
+  const body = { tool, text, images, selected, locale, size, titleId, descId };
+  if (href !== undefined) {
+    return (
+      <Link
+        href={href}
+        aria-labelledby={titleId}
+        aria-describedby={descId}
+        className={cardClass("none", `flex h-full flex-col overflow-hidden text-left transition-colors ${FOCUS} hover:border-line-strong`)}
+      >
+        <CardBody {...body} />
+      </Link>
+    );
+  }
   return (
     <button
       type="button"
@@ -74,6 +93,34 @@ export function ServiceCard({
         }`
       )}
     >
+      <CardBody {...body} />
+    </button>
+  );
+}
+
+/** Innholdet i kortet, likt for knappen og lenken. */
+function CardBody({
+  tool,
+  text,
+  images,
+  selected,
+  locale,
+  size,
+  titleId,
+  descId,
+}: {
+  tool: VisibleTool;
+  text: ServiceCardText;
+  images: CardImages | undefined;
+  selected: boolean;
+  locale: Locale;
+  size: CardSize;
+  titleId: string;
+  descId: string;
+}) {
+  const small = size === "small";
+  return (
+    <>
       {!small && (
         <span className="relative block aspect-[3/2] w-full overflow-hidden bg-surface-2">
           {images?.after ? (
@@ -130,6 +177,6 @@ export function ServiceCard({
           )}
         </span>
       </span>
-    </button>
+    </>
   );
 }

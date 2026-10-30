@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SERVICE_CARD_TEXT, UPLOAD_CARD_ID, cardSize, splitBySize, uploadScrollBehavior } from "./serviceCards.ts";
-import { isServiceEnabled, orderableTools, visibleCategories } from "./services.ts";
+import { isServiceEnabled, orderableTools, pageCards, visibleCategories } from "./services.ts";
 import { DICTIONARIES } from "./i18n/index.ts";
 import { withoutComments } from "./testing/jsxText.ts";
 
@@ -19,7 +19,8 @@ const CARD = "components/ServiceCard.tsx";
 const IMAGES = "(app)/tjenester/cardImages.ts";
 
 test("D-1: hvert bestillbart kort har to brikker og en knappetekst paa nb og en, og ingen andre kort har det", () => {
-  const ids = orderableTools().map((t) => t.id);
+  // T1: ogsaa lenkekortet til Annonsetekst (kind "page"), som vises naar flagget slipper brukeren inn.
+  const ids = [...orderableTools(), ...pageCards(true)].map((t) => t.id);
   assert.deepEqual(Object.keys(SERVICE_CARD_TEXT).sort(), [...ids].sort());
   for (const id of ids) {
     const { chips, cta } = SERVICE_CARD_TEXT[id];
@@ -40,6 +41,7 @@ test("D-1: knappene sier «Velg …» til stegflyten kommer (D1_SVAR punkt 8)", 
     aarstider: "Velg årstider",
     digital_styling: "Velg digital styling",
     privacy_blur: "Velg Skjul ansikter",
+    annonsetekst: "Velg bolig",
   });
   assert.deepEqual(cta("en"), {
     skumring: "Choose dusk image",
@@ -47,6 +49,7 @@ test("D-1: knappene sier «Velg …» til stegflyten kommer (D1_SVAR punkt 8)", 
     aarstider: "Choose seasons",
     digital_styling: "Choose virtual staging",
     privacy_blur: "Choose Blur faces",
+    annonsetekst: "Choose property",
   });
 });
 
@@ -74,7 +77,15 @@ test("D-1: tittelen og linja er de samme noeklene som foer, og ingen tekst lover
 test("D-1: hele kortet er én knapp med aria-pressed, uten knapp eller lenke inni", () => {
   const card = withoutComments(read(CARD));
   assert.equal(card.match(/<button\b/g)?.length, 1);
-  assert.doesNotMatch(card, /<a\b|href=|<Link\b/);
+  // T1: lenkekortet (kind "page") er én <Link> rundt samme innhold, i stedet for knappen.
+  assert.equal(card.match(/<Link\b/g)?.length, 1);
+  assert.equal(card.match(/href=/g)?.length, 1);
+  assert.match(card, /<Link\s+href=\{href\}/);
+  assert.doesNotMatch(card, /<a\b/);
+  const body = card.slice(card.indexOf("function CardBody("));
+  assert.doesNotMatch(body, /<button\b|<a\b|href=|<Link\b/);
+  assert.equal(card.match(/<CardBody \{\.\.\.body\} \/>/g)?.length, 2);
+  assert.equal(card.match(/aria-pressed=/g)?.length, 1);
   assert.match(card, /aria-pressed=\{selected\}/);
   assert.match(card, /onClick=\{onSelect\}/);
   assert.match(card, /disabled=\{disabled\}/);
@@ -136,13 +147,13 @@ test("D-1: rekkefoelgen er kortene, saa opplastingen, saa «Kommer», og kortene
   const page = withoutComments(read(PAGE));
   const cards = page.indexOf("<ServiceCard");
   const upload = page.indexOf("<Card id={UPLOAD_CARD_ID}");
-  const coming = page.indexOf("{COMING_TOOLS.map(");
+  const coming = page.indexOf("{comingTools.map(");
   assert.ok(cards > 0 && cards < upload && upload < coming, `${cards} ${upload} ${coming}`);
   assert.match(page, /<div className="grid grid-cols-1 gap-6 lg:grid-cols-3">\s*\{LARGE_TOOLS\.map/);
   // «Kommer» har en overskrift, og alle kortene som ikke kan bestilles staar der.
   assert.match(page, /t\(locale, "express\.comingTitle"\)/);
   const coming_ = visibleCategories().flatMap((c) => c.items).filter((t) => !t.orderable).map((t) => t.id);
-  assert.deepEqual(coming_, ["magic_cleanup", "same_furniture_angles", "video", "copywriter"]);
+  assert.deepEqual(coming_, ["magic_cleanup", "same_furniture_angles", "video", "annonsetekst"]);
 });
 
 test("D-1: et valgt kort ruller opplastingskortet inn, uten animasjon ved redusert bevegelse", () => {
@@ -196,7 +207,8 @@ test("Dag 58: siden viser de små kortene uten bilde, med samme valg og bestilli
   assert.match(page, /splitBySize\(ORDERABLE_TOOLS\)/);
   assert.match(page, /LARGE_TOOLS\.map/);
   // De små vises naar det finnes noen, uten andre vilkaar.
-  assert.match(page, /\n\s*\{SMALL_TOOLS\.length > 0 && \(\s*<div[^>]*>\s*\{SMALL_TOOLS\.map/);
+  // T1: lenkekortet til Annonsetekst staar sist blant de små naar flagget slipper brukeren inn.
+  assert.match(page, /\n\s*\{SMALL_TOOLS\.length \+ linkTools\.length > 0 && \(\s*<div[^>]*>\s*\{SMALL_TOOLS\.map/);
   assert.match(page, /images=\{undefined\}[\s\S]*?size="small"/);
   // Begge kortstoerrelsene velger med selectTool, som foer.
   assert.equal(page.match(/onSelect=\{\(\) => selectTool\(tool\.id\)\}/g)?.length, 2);

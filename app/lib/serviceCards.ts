@@ -38,6 +38,11 @@ export const SERVICE_CARD_TEXT: Record<string, ServiceCardText> = {
     chips: ["express.card.privacy_blur.chip1", "express.card.privacy_blur.chip2"],
     cta: "express.card.privacy_blur.cta",
   },
+  // T1 (TG-NEW-281): lenken til /annonsetekst, bare naar LISTING_TEXT_UI slipper brukeren inn.
+  annonsetekst: {
+    chips: ["express.card.annonsetekst.chip1", "express.card.annonsetekst.chip2"],
+    cta: "express.card.annonsetekst.cta",
+  },
 };
 
 /**
