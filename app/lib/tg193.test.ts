@@ -46,9 +46,10 @@ test("TG193: siden regner admin fra caps med adminView, én gang", () => {
 // ---------------------------------------------------------------------------
 
 test("TG193 #3: job-id-en vises bare for admin", () => {
-  assert.match(page, /\{admin && <p className="text-ink-2 text-xs font-mono break-all">\{jobId\}<\/p>\}/);
+  // FE-4: én gang paa godkjenningssiden og én gang inne i ordresiden (embedded), begge bare for admin.
+  assert.equal(page.match(/\{admin && <p className="text-ink-2 text-xs font-mono break-all">\{jobId\}<\/p>\}/g)?.length, 2);
   // Ingen annen visning av jobId i siden (nedlastingen faar review.jobId som prop).
-  assert.equal(page.match(/>\{jobId\}</g)?.length, 1);
+  assert.equal(page.match(/>\{jobId\}</g)?.length, 2);
 });
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,12 @@
-import type { AdditionsLevel, BrightnessStep, DecisionAction, DecisionRequest, JobReviewDetail } from "./api";
-import type { UiKey } from "./i18n";
+import type {
+  AdditionsLevel,
+  BrightnessStep,
+  DecisionAction,
+  DecisionOutcome,
+  DecisionRequest,
+  JobReviewDetail,
+} from "./api";
+import type { Message, UiKey } from "./i18n";
 import { t, type Locale } from "./i18n/index.ts";
 import { checklistFor } from "./checklist.ts";
 import { brokerDiffersNote } from "./imageType.ts";
@@ -69,6 +76,46 @@ export function decisionControls(
     continueEnabled: canContinue && (!fireplaceQuestion || answer !== null),
     none: allowed.size === 0,
   };
+}
+
+/**
+ * «Angre godkjenning» (FE-4, K 2.10): bare naar `allowed_actions` har
+ * `reopen`. Backend gir den for en godkjent jobb og for en avvist innen 7
+ * dager, aldri for «Avbryt» i et stopp, for admin paa andres jobb eller med
+ * slettede bilder (`can_reopen`). Frontend regner ikke ut fristen selv.
+ */
+export function canReopen(review: Pick<JobReviewDetail, "allowedActions">): boolean {
+  return review.allowedActions.includes("reopen");
+}
+
+/**
+ * Tekstene til angreknappen ut fra statusen: «Angre godkjenning» etter
+ * Godkjenn, «Angre» etter Avvis. Spoersmaalet i bekreftelsen sier hva som skjer.
+ */
+export function reopenKeys(status: string): { button: UiKey; confirm: UiKey } {
+  return status === "succeeded"
+    ? { button: "reopen.approved", confirm: "reopen.confirmApproved" }
+    : { button: "reopen.rejected", confirm: "reopen.confirmRejected" };
+}
+
+/**
+ * Svaret paa «Angre» fra meldingen paa ordresiden (FE-4): null naar det gikk
+ * (200), ellers teksten. 409 med kode (f.eks. `action_not_allowed` etter 7
+ * dager) og `status_changed` har tekst i decisionError; resten er den
+ * vanlige feilen.
+ */
+export function reopenMessage(out: DecisionOutcome): Message | null {
+  switch (out.kind) {
+    case "updated":
+      return null;
+    case "status_changed":
+      return { group: "decisionError", code: "status_changed" };
+    case "blocked":
+    case "unavailable":
+      return { group: "decisionError", code: out.code };
+    default:
+      return { key: "decision.error" };
+  }
 }
 
 /**

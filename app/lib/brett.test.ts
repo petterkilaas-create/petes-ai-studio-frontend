@@ -73,7 +73,7 @@ import {
   orderStartedHref,
   parseStarted,
   positionOf,
-  resultReviewHref,
+  resultOpenHref,
 } from "./ordrer.ts";
 import { literalTextsInFile, withoutComments } from "./testing/jsxText.ts";
 
@@ -510,15 +510,13 @@ test("400 invalid_items peker paa bildet og feltet", async () => {
 
 // --- bildesiden: resultatene og pollingen ------------------------------------------------
 
-test("results: order_service og option fra #271 leses; lenke til godkjenning for til godkjenning, trenger svar og godkjent", () => {
+test("results: order_service og option fra #271 leses; «Åpne» til ordresiden (FE-4), ikke for det som ikke ble startet", () => {
   const r = result({ order_service: "styling", option: "styling_japandi" });
   assert.equal(r.orderService, "styling");
   assert.equal(r.option, "styling_japandi");
-  assert.equal(resultReviewHref(result({ display_status: "to_review" })), "/godkjenning/r1");
-  assert.equal(resultReviewHref(result({ display_status: "needs_answer" })), "/godkjenning/r1");
-  assert.equal(resultReviewHref(result({ display_status: "approved" })), "/godkjenning/r1");
-  assert.equal(resultReviewHref(result({ display_status: "processing" })), null);
-  assert.equal(resultReviewHref(result({ display_status: "failed" })), null);
+  assert.equal(resultOpenHref("a1", "i1", result({ display_status: "to_review" })), "/ordrer/a1?bilde=i1&resultat=r1");
+  assert.equal(resultOpenHref("a1", "i1", result({ display_status: "failed" })), "/ordrer/a1?bilde=i1&resultat=r1");
+  assert.equal(resultOpenHref("a1", "i1", result({ display_status: "not_started" })), null);
 });
 
 test("pollingen: mens noe behandles, og forrige lenke beholdes til den er gammel", () => {

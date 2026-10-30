@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { parseResult, type AssignmentResult } from "./assignments.ts";
 import type { ReviewOrder } from "./api";
 import { FROM_PARAM, orderTabs, parseFrom, reviewHref } from "./orderTabs.ts";
-import { resultReviewHref, reviewBackLink, showStartedBanner } from "./ordrer.ts";
+import { resultOpenHref, reviewBackLink, showStartedBanner } from "./ordrer.ts";
 import { DICTIONARIES } from "./i18n/index.ts";
 import { literalTextsInFile, withoutComments } from "./testing/jsxText.ts";
 
@@ -66,19 +66,23 @@ test("fra: bare en uuid godtas (smaa bokstaver), alt annet gir null", () => {
   assert.equal(parseFrom(["nei", ORDER]), null);
 });
 
-test("fra: «Åpne» lenker til godkjenningssiden med ordren, og uten gyldig ordre som foer", () => {
+test("fra: lenken til godkjenningssiden har ordren med, og uten gyldig ordre som foer", () => {
   assert.equal(reviewHref("j1"), "/godkjenning/j1");
   assert.equal(reviewHref("j1", ORDER), `/godkjenning/j1?fra=${ORDER}`);
   assert.equal(reviewHref("j1", "https://evil.example"), "/godkjenning/j1");
-  assert.equal(resultReviewHref(result(), ORDER), `/godkjenning/r1?fra=${ORDER}`);
-  assert.equal(resultReviewHref(result({ display_status: "needs_answer" }), ORDER), `/godkjenning/r1?fra=${ORDER}`);
-  assert.equal(resultReviewHref(result({ display_status: "approved" }), ORDER), `/godkjenning/r1?fra=${ORDER}`);
-  assert.equal(resultReviewHref(result({ display_status: "processing" }), ORDER), null);
-  assert.equal(resultReviewHref(result()), "/godkjenning/r1");
 });
 
-test("fra: tilbake-lenken bygges i koden: «Til ordren» til bildesiden, ellers Historikk", () => {
-  assert.deepEqual(reviewBackLink(ORDER), { href: `/ordrer/${ORDER}/bilder`, key: "review.backToOrder" });
+test("FE-4: «Åpne» gaar til ordresiden med bildet og resultatet, for alt som ble startet", () => {
+  const href = `/ordrer/${ORDER}?bilde=img_1&resultat=r1`;
+  assert.equal(resultOpenHref(ORDER, "img_1", result()), href);
+  for (const s of ["needs_answer", "approved", "processing", "not_used", "failed"]) {
+    assert.equal(resultOpenHref(ORDER, "img_1", result({ display_status: s })), href, s);
+  }
+  assert.equal(resultOpenHref(ORDER, "img_1", result({ display_status: "not_started" })), null);
+});
+
+test("fra: tilbake-lenken bygges i koden: «Til ordren» til ordresiden (FE-4), ellers Historikk", () => {
+  assert.deepEqual(reviewBackLink(ORDER), { href: `/ordrer/${ORDER}`, key: "review.backToOrder" });
   assert.deepEqual(reviewBackLink(null), { href: "/history", key: "review.back" });
   for (const bad of ["https://evil.example", "//evil.example", "../../x", ""]) {
     assert.deepEqual(reviewBackLink(bad), { href: "/history", key: "review.back" }, bad);
@@ -112,7 +116,7 @@ test("fra: siden leser ?fra= med parseFrom, og ResultReview har ingen fast lenke
   assert.doesNotMatch(review, /href="\/history"/);
   // «Åpne» paa bildesiden har ordren med.
   const list = withoutComments(read("components/ordre/ResultList.tsx"));
-  assert.match(list, /resultReviewHref\(result, assignmentId\)/);
+  assert.match(list, /resultOpenHref\(assignmentId, imageId, result\)/);
   assert.match(withoutComments(read("components/ordre/ImageCard.tsx")), /assignmentId=\{assignmentId\}/);
   assert.match(withoutComments(read("components/ordre/OrderImages.tsx")), /assignmentId=\{assignmentId\}/);
 });
@@ -160,7 +164,7 @@ test("resultatradene: navnet paa egen linje, saa status, versjon og «Åpne» i 
 test("kortene: resultatene i hele kortets bredde, og to kort i bredden fra 1024 px", () => {
   const card = withoutComments(read("components/ordre/ImageCard.tsx"));
   assert.match(card, /`relative flex min-w-0 flex-col gap-3 p-3 /);
-  assert.match(card, /<\/div>\n {6}<\/div>\n\n {6}<ResultList results=\{image\.results\} number=\{number\} assignmentId=\{assignmentId\} \/>\n {4}<\/li>/);
+  assert.match(card, /<\/div>\n {6}<\/div>\n\n {6}<ResultList results=\{image\.results\} number=\{number\} assignmentId=\{assignmentId\} imageId=\{image\.id\} \/>\n {4}<\/li>/);
   const page = withoutComments(read("components/ordre/OrderImages.tsx"));
   assert.match(page, /<ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">/);
   assert.doesNotMatch(page, /xl:grid-cols-3/);

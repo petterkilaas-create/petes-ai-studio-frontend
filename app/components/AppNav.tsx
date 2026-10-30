@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   CircleHelp,
   FolderOpen,
@@ -12,6 +12,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { navLinks, type NavId } from "../lib/services";
+import { isNavActive } from "../lib/nav";
+import { FROM_PARAM } from "../lib/orderTabs";
 import { t } from "../lib/i18n";
 import { useLocale } from "../lib/i18n/useLocale";
 import { site } from "../../content/marketing/nb/site";
@@ -31,6 +33,8 @@ import { site } from "../../content/marketing/nb/site";
  * Historikk). Under 640 px viser alle
  * lenkene bare ikonet, og ordet er for skjermlesere (375 px faar plass).
  * Start har LayoutDashboard, ikke et hus: merket er huset (Petter 05.10).
+ *
+ * Markert lenke: isNavActive i lib/nav.ts (FE-4: `?fra=` gir Ordrer).
  */
 const HELP_HREF = site.help.links[0].href;
 const ICONS: Record<NavId, LucideIcon> = {
@@ -41,21 +45,17 @@ const ICONS: Record<NavId, LucideIcon> = {
   history: History,
 };
 
-/** Godkjenningssiden hoerer til Historikk (dit «Tilbake» gaar). */
-function isActive(href: string, pathname: string): boolean {
-  if (pathname === href || pathname.startsWith(`${href}/`)) return true;
-  return href === "/history" && pathname.startsWith("/godkjenning/");
-}
-
 export function AppNav() {
   const pathname = usePathname() ?? "";
+  // FE-4: godkjenningssiden med `?fra=<ordre>` markerer Ordrer (isNavActive).
+  const from = useSearchParams()?.get(FROM_PARAM) ?? null;
   const locale = useLocale();
 
   return (
     <nav aria-label={t(locale, "nav.label")} className="flex items-center gap-1">
       {navLinks().map((l) => {
         const Icon = ICONS[l.id];
-        const active = isActive(l.href, pathname);
+        const active = isNavActive(l.href, pathname, from);
         return (
           <span key={l.href} className="flex items-center gap-1">
             {l.dividerBefore && <span aria-hidden className="mx-1 h-5 w-px bg-line" />}
