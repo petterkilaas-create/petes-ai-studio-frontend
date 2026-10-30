@@ -121,6 +121,26 @@ test("D-5a: ingen nye avhengigheter (dnd-kit lagt til i FE-3 med Petters OK 30.1
   ]);
 });
 
+// Dag 59 (Petter 30.10): next 16.3.8 hadde GHSA-2464-fhr4-w9xw, GHSA-673q-mjm6-r5xr og
+// GHSA-p3m5-59mp-jv5r (berørt 16.0.0–16.4.0). sharp brukes av bildeoptimeringen.
+test("Dag 59: next og eslint-config-next står på 16.4.3, eksakt i package.json og lockfila, og sharp er minst 0.35.5", () => {
+  const pkg = JSON.parse(readFileSync(join(REPO_DIR, "package.json"), "utf8")) as {
+    dependencies: Record<string, string>;
+    devDependencies: Record<string, string>;
+  };
+  const lock = JSON.parse(readFileSync(join(REPO_DIR, "package-lock.json"), "utf8")) as {
+    packages: Record<string, { version: string; dependencies?: Record<string, string>; devDependencies?: Record<string, string> }>;
+  };
+  assert.equal(pkg.dependencies.next, "16.4.3");
+  assert.equal(pkg.devDependencies["eslint-config-next"], "16.4.3");
+  assert.equal(lock.packages[""].dependencies?.next, "16.4.3");
+  assert.equal(lock.packages[""].devDependencies?.["eslint-config-next"], "16.4.3");
+  assert.equal(lock.packages["node_modules/next"].version, "16.4.3");
+  assert.equal(lock.packages["node_modules/eslint-config-next"].version, "16.4.3");
+  const [major, minor, patch] = lock.packages["node_modules/sharp"].version.split(".").map(Number);
+  assert.ok(major > 0 || minor > 35 || (minor === 35 && patch >= 5), `sharp ${lock.packages["node_modules/sharp"].version}`);
+});
+
 test("D-5a: de nye ordene finnes på nb og en", () => {
   for (const key of [
     "compare.hold",
