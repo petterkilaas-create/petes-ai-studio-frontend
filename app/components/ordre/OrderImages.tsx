@@ -52,6 +52,9 @@ import {
   type MoveAction,
 } from "../../lib/ordrer";
 import { deliveryFileCount, deliveryLinkText } from "../../lib/delivery";
+import { browserStorage } from "../../lib/board";
+import { draftCount } from "../../lib/orderProgress";
+import { nextState, playerHref, posLabel } from "../../lib/player";
 import { ORDER_REFRESH_MAX_MS, type RefreshResult } from "../../lib/autoRefresh";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { ORDERS_PATH } from "../../lib/services";
@@ -59,6 +62,7 @@ import { listingTextHref } from "../../lib/listingText";
 import { useListingTextAccess } from "../../hooks/useListingTextAccess";
 import { ImageCard, menuButtonId, type ImageAction } from "./ImageCard";
 import { UploadPanel } from "./UploadPanel";
+import { ApprovalNextButton, OrderProgress } from "./OrderProgress";
 import { Button, ButtonLink } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { PageHeader } from "../ui/PageHeader";
@@ -75,6 +79,11 @@ import { useLocale } from "../../lib/i18n/useLocale";
  * FE-3: resultatene vises under hvert bilde. Mens noe behandles, hentes hele
  * ordren paa nytt hvert 5. sekund (én henting, som Historikk), med tak paa 30
  * minutter. «Videre til tjenester» og «Bestill flere tjenester» gaar til brettet.
+ *
+ * Fremdriftslinja (Dag 59): uten resultater er siden steg 1, og «Videre til
+ * tjenester» staar i linja. Med resultater er den steg 4: linja har knappen
+ * til neste som venter (som spilleren), og «Bestill flere tjenester» er en
+ * vanlig knapp nederst paa siden.
  * `started` er antall som ble startet (fra oppsummeringen, `?startet=`).
  *
  * Banneret om startet (FE-3c): tallet holdes i tilstanden, og `startet` tas
@@ -340,6 +349,9 @@ export function OrderImages({ assignmentId, started = null }: { assignmentId: st
   const { assignment } = load;
   const summary = resultSummary(locale, assignment.counts);
   const hasResults = assignment.counts.results > 0;
+  const next = nextState(images, null);
+  // Antall bilder fra siden (opplastede er med foer ordren hentes paa nytt).
+  const progressCounts = { ...assignment.counts, images: images.length };
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8 md:py-12">
@@ -472,16 +484,34 @@ export function OrderImages({ assignmentId, started = null }: { assignmentId: st
           )}
         </section>
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-6">
-          {images.length === 0 ? (
+        {hasResults && (
+          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-6">
+            <ButtonLink variant="secondary" href={orderServicesHref(assignmentId)}>
+              {t(locale, "orders.orderMore")}
+            </ButtonLink>
+          </div>
+        )}
+      </div>
+
+      <OrderProgress
+        page="images"
+        assignment={{ id: assignmentId, counts: progressCounts }}
+        draftCount={draftCount(browserStorage(), assignmentId, images.map((img) => img.id))}
+        primary={
+          hasResults ? (
+            <ApprovalNextButton
+              state={next}
+              nextLabel={next.kind === "next" ? posLabel(locale, images, next.pos) : ""}
+              nextHref={next.kind === "next" ? playerHref(assignmentId, next.pos) : undefined}
+              deliveryHref={orderDeliveryHref(assignmentId)}
+            />
+          ) : images.length === 0 ? (
             <Button disabled>{t(locale, "orders.next")}</Button>
           ) : (
-            <ButtonLink href={orderServicesHref(assignmentId)}>
-              {t(locale, hasResults ? "orders.orderMore" : "orders.next")}
-            </ButtonLink>
-          )}
-        </div>
-      </div>
+            <ButtonLink href={orderServicesHref(assignmentId)}>{t(locale, "orders.next")}</ButtonLink>
+          )
+        }
+      />
     </main>
   );
 }

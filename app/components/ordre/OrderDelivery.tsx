@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useAssignment } from "../../hooks/useAssignment";
-import { assignmentErrorCode } from "../../lib/assignments";
+import { assignmentErrorCode, type Assignment } from "../../lib/assignments";
 import { resultLabel } from "../../lib/brett";
 import {
   deletedFileNames,
@@ -26,9 +26,12 @@ import {
   type DeliveryManifest,
 } from "../../lib/delivery";
 import { saveBlob } from "../../lib/download";
-import { orderImagesHref } from "../../lib/ordrer";
+import { browserStorage } from "../../lib/board";
+import { draftCount } from "../../lib/orderProgress";
+import { ORDERS_PATH } from "../../lib/services";
 import { DownloadButton } from "../godkjenning/DownloadButton";
 import { LoadState } from "./LoadState";
+import { OrderProgress } from "./OrderProgress";
 import { Button } from "../ui/Button";
 import { Card, cardClass } from "../ui/Card";
 import { PageHeader } from "../ui/PageHeader";
@@ -55,6 +58,11 @@ const PROGRESS_STEP = 100_000;
  * laster, og fremdriften er antall MB mottatt. Et godkjent, merket resultat
  * kan ogsaa lastes ned alene (DownloadButton, /v1/jobs/{id}/download).
  * Ingen beskjaering ved lansering.
+ *
+ * Fremdriftslinja (Dag 59) er steg 5: «Last ned ZIP (N filer)» staar i
+ * linja med samme handling og laas (valg 3A: dagens tekst). Fremdriften i MB
+ * og svaret blir staaende nederst paa siden, ikke lenger sticky. Lenken
+ * oeverst gaar til ordrene (valg 2A).
  */
 export function OrderDelivery({ assignmentId }: { assignmentId: string }) {
   const locale = useLocale();
@@ -100,7 +108,7 @@ export function OrderDelivery({ assignmentId }: { assignmentId: string }) {
 
   if (manifestLoad.kind === "error") {
     return (
-      <Shell assignmentId={assignmentId} address={assignment.address}>
+      <Shell assignment={assignment} primary={null}>
         <Card padding="lg" className="text-center max-w-lg mx-auto">
           <p className="text-red-fg font-medium mb-2">{t(locale, "delivery.loadError")}</p>
           <p className="text-ink-2 text-sm mb-6">{codeText(locale, "assignmentError", manifestLoad.code)}</p>
@@ -160,7 +168,16 @@ export function OrderDelivery({ assignmentId }: { assignmentId: string }) {
   }
 
   return (
-    <Shell assignmentId={assignmentId} address={assignment.address}>
+    <Shell
+      assignment={assignment}
+      primary={
+        manifest.files.length === 0 ? null : (
+          <Button onClick={() => void onZip()} disabled={running || counts.total === 0}>
+            {running ? t(locale, "review.downloading") : zipButtonText(locale, counts.total)}
+          </Button>
+        )
+      }
+    >
       {manifest.files.length === 0 ? (
         <Card padding="md">
           <p className="text-sm text-ink">{t(locale, "delivery.empty")}</p>
@@ -185,20 +202,15 @@ export function OrderDelivery({ assignmentId }: { assignmentId: string }) {
             ))}
           </ul>
 
-          <div className="sticky bottom-0 -mx-4 flex flex-col gap-3 border-t border-line bg-paper px-4 py-4 md:mx-0 md:px-0">
+          <div className="flex flex-col gap-3 border-t border-line pt-4">
             <p className="text-[13px] text-ink-2 md:hidden">{t(locale, "delivery.mobile")}</p>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={() => void onZip()} disabled={running || counts.total === 0}>
-                {running ? t(locale, "review.downloading") : zipButtonText(locale, counts.total)}
-              </Button>
-              {running && (
-                <p className="text-sm text-ink-2">
-                  {zip.bytes === 0
-                    ? t(locale, "delivery.preparing")
-                    : t(locale, "delivery.receiving", { mb: formatMegabytes(locale, zip.bytes) })}
-                </p>
-              )}
-            </div>
+            {running && (
+              <p className="text-sm text-ink-2">
+                {zip.bytes === 0
+                  ? t(locale, "delivery.preparing")
+                  : t(locale, "delivery.receiving", { mb: formatMegabytes(locale, zip.bytes) })}
+              </p>
+            )}
             <ZipStatus
               zip={zip}
               locale={locale}
@@ -212,22 +224,36 @@ export function OrderDelivery({ assignmentId }: { assignmentId: string }) {
   );
 }
 
-/** Tilbake-lenken og tittelen, felles for fillista og feilen. */
-function Shell({ assignmentId, address, children }: { assignmentId: string; address: string; children: React.ReactNode }) {
+/** Lenken til ordrene, tittelen og fremdriftslinja, felles for fillista og feilen. */
+function Shell({
+  assignment,
+  primary,
+  children,
+}: {
+  assignment: Assignment;
+  primary: React.ReactNode;
+  children: React.ReactNode;
+}) {
   const locale = useLocale();
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8 md:px-8 md:py-12">
       <Link
-        href={orderImagesHref(assignmentId)}
+        href={ORDERS_PATH}
         className={`mb-6 inline-flex min-h-11 items-center gap-2 rounded-button text-sm text-ink-2 hover:text-ink ${FOCUS}`}
       >
         <ArrowLeft aria-hidden className="size-4" strokeWidth={1.75} />
-        {t(locale, "delivery.back")}
+        {t(locale, "orders.back")}
       </Link>
       <div className="mb-8">
-        <PageHeader title={t(locale, "delivery.title")} subtitle={<span className="break-words">{address}</span>} />
+        <PageHeader title={t(locale, "delivery.title")} subtitle={<span className="break-words">{assignment.address}</span>} />
       </div>
       {children}
+      <OrderProgress
+        page="delivery"
+        assignment={assignment}
+        draftCount={draftCount(browserStorage(), assignment.id, assignment.images.map((img) => img.id))}
+        primary={primary}
+      />
     </main>
   );
 }

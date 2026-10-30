@@ -11,6 +11,7 @@ import { ServiceUnavailable } from "@/app/components/ServiceUnavailable";
 import { Button, ButtonLink } from "@/app/components/ui/Button";
 import { Card } from "@/app/components/ui/Card";
 import { PageHeader } from "@/app/components/ui/PageHeader";
+import { OrderProgress } from "@/app/components/ordre/OrderProgress";
 import { FOCUS } from "@/app/components/godkjenning/classes";
 import { codeText, t, type UiKey } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
@@ -19,6 +20,8 @@ import { useLocale } from "@/app/lib/i18n/useLocale";
  * Ny ordre (TG-NEW-277, FE-2; skissen «Bolig», foerste del): adresse
  * (paakrevd) og oppdragsnummer (valgfritt) → POST /v1/assignments (K 2.1) →
  * bildene. `replace`, saa tilbakeknappen ikke gir et nytt skjema for samme ordre.
+ * Fremdriftslinja (Dag 59) viser steg 1 uten hovedknapp: skjemaet beholder
+ * sin egen knapp, saa Enter virker.
  */
 export default function NewOrderPage() {
   if (!isPageEnabled(ORDERS_PATH)) return <ServiceUnavailable />;
@@ -124,6 +127,8 @@ function NewOrderForm() {
           </div>
         </form>
       </Card>
+
+      <OrderProgress page="new" assignment={null} draftCount={0} />
     </main>
   );
 }

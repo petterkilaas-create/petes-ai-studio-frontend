@@ -472,9 +472,9 @@ test("bildene: rom, flytt og fjern gaar til PATCH og DELETE; 409 image_has_resul
   // Et fjernet bilde tas ut av koeen, ellers kommer det tilbake med mergeUploaded.
   assert.match(src, /if \(row !== undefined\) queue\.remove\(row\.id\);/);
   assert.match(src, /queue\.setCapacity\(queueCapacity\(next\.length, queue\.rows\)\);/);
-  // FE-3: «Videre til tjenester» (eller «Bestill flere tjenester») gaar til brettet.
-  assert.match(src, /<ButtonLink href=\{orderServicesHref\(assignmentId\)\}>/);
-  assert.match(src, /t\(locale, hasResults \? "orders\.orderMore" : "orders\.next"\)/);
+  // FE-3: «Videre til tjenester» (i fremdriftslinja, Dag 59) og «Bestill flere tjenester» gaar til brettet.
+  assert.match(src, /<ButtonLink href=\{orderServicesHref\(assignmentId\)\}>\{t\(locale, "orders\.next"\)\}<\/ButtonLink>/);
+  assert.match(src, /<ButtonLink variant="secondary" href=\{orderServicesHref\(assignmentId\)\}>\s*\{t\(locale, "orders\.orderMore"\)\}/);
   assert.equal(t("nb", "orders.next"), "Videre til tjenester");
   assert.equal(t("nb", "orders.orderMore"), "Bestill flere tjenester");
 });
