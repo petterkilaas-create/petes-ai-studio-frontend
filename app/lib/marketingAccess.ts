@@ -35,6 +35,8 @@ export const SITE_URL = "https://husvy.com";
  * sjekker at de henger sammen og at sidene finnes.
  */
 export const FAQ_PATH = "/no/sporsmal-og-svar";
+/** Veiledningen for meglere (Dag 59): ordren fra opplasting til nedlasting. */
+export const GUIDE_PATH = "/no/veiledning";
 export const LABELING_PATH = "/no/merking";
 export const CONTACT_PATH = "/no/kontakt";
 
@@ -42,7 +44,13 @@ export const CONTACT_PATH = "/no/kontakt";
  * De offentlige markedssidene, som sitemap lister (MS4). Bare sider som
  * finnes (testen sjekker mappene under app/(marketing)/no). Ingen app-ruter.
  */
-export const MARKETING_PAGES: readonly string[] = [MARKETING_HOME, FAQ_PATH, LABELING_PATH, CONTACT_PATH];
+export const MARKETING_PAGES: readonly string[] = [
+  MARKETING_HOME,
+  FAQ_PATH,
+  GUIDE_PATH,
+  LABELING_PATH,
+  CONTACT_PATH,
+];
 
 /** `/no` og alt under `/no/`. Ikke `/nokke` eller `/no-x`. */
 export function isMarketingPath(pathname: string): boolean {

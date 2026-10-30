@@ -1,4 +1,4 @@
-import { ChevronDown } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { priceVars } from "../../../content/marketing/offer";
 import type { FaqItem, Site } from "../../../content/marketing/schema";
 import { PendingMark } from "./PendingMark";
@@ -11,6 +11,7 @@ import { FOCUS } from "./classes";
  * og paa spoersmaalssiden (alle). `id` er spoersmaalets id, saa merkesiden
  * kan lenke til et spoersmaal. Prisene i svaret fylles fra site.offer, og
  * det som venter, vises med merkelapp ([E-POST], [TID], [JURIDISK SJEKK], [SVAR: …]).
+ * Dag 59: lenken under svaret (`more`), for eksempel til veiledningen.
  */
 export function FaqList({ items, site }: { items: readonly FaqItem[]; site: Site }) {
   const vars = priceVars(site.offer);
@@ -31,6 +32,15 @@ export function FaqList({ items, site }: { items: readonly FaqItem[]; site: Site
             {item.a !== null && <TemplateText template={item.a} vars={{ ...vars, ...item.slots }} site={site} />}
             {item.pending && <PendingMark label={site.pendingLabels[item.pending]} />}
           </p>
+          {item.more && (
+            <a
+              href={item.more.href}
+              className={`-mt-3 mb-4 flex w-fit min-h-11 items-center gap-2 rounded-button text-[16px] font-medium text-ink underline underline-offset-4 ${FOCUS}`}
+            >
+              {item.more.label}
+              <ArrowRight aria-hidden="true" className="size-4 shrink-0" strokeWidth={2} />
+            </a>
+          )}
         </details>
       ))}
     </div>

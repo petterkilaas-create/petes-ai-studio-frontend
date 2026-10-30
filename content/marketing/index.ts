@@ -1,9 +1,10 @@
 import { contactPage } from "./nb/contact.ts";
 import { faq, faqPage } from "./nb/faq.ts";
+import { guidePage } from "./nb/guide.ts";
 import { home } from "./nb/home.ts";
 import { labelingPage } from "./nb/labeling.ts";
 import { site } from "./nb/site.ts";
-import type { ContactPage, FaqItem, FaqPage, Home, LabelingPage, Site } from "./schema.ts";
+import type { ContactPage, FaqItem, FaqPage, GuidePage, Home, LabelingPage, Site } from "./schema.ts";
 
 /** Spraakene markedssiden finnes paa. Bare norsk i foerste versjon. */
 export type MarketingLang = "no";
@@ -29,6 +30,12 @@ export function getFaq(lang: MarketingLang): readonly FaqItem[] {
 export function getFaqPage(lang: MarketingLang): FaqPage {
   void lang;
   return faqPage;
+}
+
+/** Veiledningen for meglere (Dag 59). */
+export function getGuidePage(lang: MarketingLang): GuidePage {
+  void lang;
+  return guidePage;
 }
 
 export function getLabelingPage(lang: MarketingLang): LabelingPage {

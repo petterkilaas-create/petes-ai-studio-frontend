@@ -1,4 +1,5 @@
 import type { Brand } from "../../lib/brand";
+import { fill } from "../../../content/marketing/fill";
 import { onPage } from "../../../content/marketing/links";
 import type { MaybeLink, Site } from "../../../content/marketing/schema";
 import { BrandMark } from "../BrandMark";
@@ -16,14 +17,17 @@ import { CONTAINER, FOCUS } from "./classes";
  * en underside (homePath satt) gaar ankrene til forsiden (onPage).
  *
  * F6b: linja nederst er en Claim, saa lappen [BILDE] vises etter den.
+ *
+ * Dag 59: lenketekstene kan ha {brand} («Slik bruker du {brand}»).
  */
 const LINK = `rounded-button text-ink no-underline hover:underline ${FOCUS}`;
 
-function Item({ link }: { link: MaybeLink }) {
-  if (link.href === undefined) return <span className="text-ink-2">{link.label}</span>;
+function Item({ link, brand }: { link: MaybeLink; brand: Brand }) {
+  const label = fill(link.label, { brand: brand.displayName });
+  if (link.href === undefined) return <span className="text-ink-2">{label}</span>;
   return (
     <a href={link.href} className={LINK}>
-      {link.label}
+      {label}
     </a>
   );
 }
@@ -43,7 +47,7 @@ export function Footer({ site, brand, homePath = null }: { site: Site; brand: Br
           <nav key={col.title} aria-label={col.title} className="flex flex-col gap-2 text-[15px]">
             <p className="m-0 font-semibold text-ink">{col.title}</p>
             {onPage(col.links, homePath).map((l) => (
-              <Item key={l.label} link={l} />
+              <Item key={l.label} link={l} brand={brand} />
             ))}
           </nav>
         ))}
@@ -59,7 +63,7 @@ export function Footer({ site, brand, homePath = null }: { site: Site; brand: Br
             </span>
           )}
           {onPage(footer.contact.links, homePath).map((l) => (
-            <Item key={l.label} link={l} />
+            <Item key={l.label} link={l} brand={brand} />
           ))}
         </div>
       </div>

@@ -44,6 +44,22 @@ export const faq = [
     slots: { time: { pending: "time" } },
     showOnHome: false,
   },
+  // Dag 59 (FE_BRUKERVEILEDNING_PROMPT): ordren og nedlastingen, med lenke
+  // til veiledningen. Ingen tall i svarene (testen); grensene staar der.
+  {
+    id: "bolig",
+    q: "Hvordan bestiller jeg for en hel bolig?",
+    a: "Lag en ordre for boligen med adressen, og last opp bildene fra fotografen. Kryss av bildene på bildebrettet og legg til tjenestene du vil ha. Du ser over bestillingen før noe startes, og resultatene kommer på bildesiden.",
+    showOnHome: false,
+    more: { label: "Les veiledningen", href: "/no/veiledning" },
+  },
+  {
+    id: "nedlasting",
+    q: "Hva får jeg når jeg laster ned?",
+    a: "En ZIP med alle originalbildene og de bearbeidingene du har godkjent, i full oppløsning. Originalen ligger foran sine bearbeidinger, og filnavnene følger rekkefølgen og rommene i ordren. Bearbeidede bilder har AI-merket, Skjul ansikter er uten merke. Det som ikke er godkjent ennå, kommer ikke med, og du kan ta ut et resultat før du laster ned.",
+    showOnHome: false,
+    more: { label: "Slik laster du ned", href: "/no/veiledning#last-ned" },
+  },
   {
     id: "fornoyd",
     q: "Hva om jeg ikke er fornøyd?",

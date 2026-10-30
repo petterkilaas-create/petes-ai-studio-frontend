@@ -390,6 +390,8 @@ export type FaqItem = {
   pending?: PendingKey;
   slots?: Record<string, PendingValue>;
   showOnHome: boolean;
+  /** Lenken under svaret (Dag 59), for eksempel til veiledningen. */
+  more?: Link;
 };
 
 /** Siste knapp (MS3b, utkastet linje 392-398; F6b, designet Main.dc.html linje 392-402). */
@@ -468,6 +470,38 @@ export type LabelingPage = {
   original: TextSection;
   /** `faqId`: spoersmaalet det lenkes til (spoersmaalet er lenketeksten). */
   rules: TextSection & { faqId: string };
+};
+
+/**
+ * Statusene til et resultat, som i ordlista (`assignment.status.<key>`).
+ * Veiledningen henter navnet derfra og har bare forklaringen selv.
+ */
+export type GuideStatus = "processing" | "toReview" | "needsAnswer" | "approved" | "notUsed" | "failed";
+
+/**
+ * En del av veiledningen: overskrift, nummererte steg og merknader under.
+ * `id` er ankeret (innholdslista og lenker fra spoersmaalene). Stegene og
+ * merknadene er maler med {maxImages}, {maxMb} og {maxBoxes}, som fylles
+ * fra grensene i appen (GuidePage.tsx).
+ */
+export type GuideSection = {
+  id: string;
+  title: string;
+  steps: readonly string[];
+  notes?: readonly string[];
+  statuses?: readonly { status: GuideStatus; text: string }[];
+  more?: Link;
+};
+
+/** Veiledningen for meglere (Dag 59). Tittelen er en mal med {brand}. */
+export type GuidePage = {
+  _type: "guidePage";
+  seo: PageSeo;
+  title: string;
+  lead: string;
+  /** aria-label paa innholdslista. */
+  tocLabel: string;
+  sections: readonly GuideSection[];
 };
 
 /** Kontaktsiden. E-posten og selskapsnavnet kommer fra site (ingen kopi). */

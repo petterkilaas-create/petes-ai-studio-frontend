@@ -7,6 +7,7 @@ import { DEFAULT_BRAND } from "../../app/lib/brand.ts";
 import {
   CONTACT_PATH,
   FAQ_PATH,
+  GUIDE_PATH,
   LABELING_PATH,
   MARKETING_HOME,
   MARKETING_PAGES,
@@ -16,7 +17,7 @@ import {
 import { ogText, robotsFor, sitemapFor } from "../../app/lib/seo.ts";
 import { literalTextsInFile, withoutComments } from "../../app/lib/testing/jsxText.ts";
 import { fill } from "./fill.ts";
-import { getContactPage, getFaq, getFaqPage, getHome, getLabelingPage, getSite } from "./index.ts";
+import { getContactPage, getFaq, getFaqPage, getGuidePage, getHome, getLabelingPage, getSite } from "./index.ts";
 import { pendingItems } from "./pending.ts";
 
 // MS4: SEO-grunnlaget. robots og sitemap foelger MARKETING_PUBLIC, metadata
@@ -274,7 +275,8 @@ test("MS5a: MARKETING_PAGES er sidene som finnes under (marketing)/no", () => {
     .map((f) => f.slice("app/(marketing)".length, -"/page.tsx".length))
     .sort();
   assert.deepEqual(pages, [...MARKETING_PAGES].sort());
-  assert.deepEqual(MARKETING_PAGES, [MARKETING_HOME, FAQ_PATH, LABELING_PATH, CONTACT_PATH]);
+  // Dag 59: veiledningen etter spoersmaalssiden, som i hjelpelista.
+  assert.deepEqual(MARKETING_PAGES, [MARKETING_HOME, FAQ_PATH, GUIDE_PATH, LABELING_PATH, CONTACT_PATH]);
   // Sitemap tar dem med ved lansering, med full adresse.
   assert.deepEqual(
     sitemapFor(true).map((e) => e.url),
@@ -284,6 +286,7 @@ test("MS5a: MARKETING_PAGES er sidene som finnes under (marketing)/no", () => {
 
 const SUBPAGES = [
   { file: "app/(marketing)/no/sporsmal-og-svar/page.tsx", path: FAQ_PATH, constName: "FAQ_PATH", content: getFaqPage("no") },
+  { file: "app/(marketing)/no/veiledning/page.tsx", path: GUIDE_PATH, constName: "GUIDE_PATH", content: getGuidePage("no") },
   { file: "app/(marketing)/no/merking/page.tsx", path: LABELING_PATH, constName: "LABELING_PATH", content: getLabelingPage("no") },
   { file: "app/(marketing)/no/kontakt/page.tsx", path: CONTACT_PATH, constName: "CONTACT_PATH", content: getContactPage("no") },
 ];
