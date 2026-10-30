@@ -1960,11 +1960,17 @@ test("Dag 59: ordene i «» i veiledningen og de nye svarene finnes i appen (ord
     ...strings(guidePage, "guidePage"),
     ...strings(faq.filter((i) => i.id === "bolig" || i.id === "nedlasting"), "faq"),
   ];
+  // Hele teksten (en plass som {n} kan staa som N), eller delen foer « (»
+  // eller «: » («Start behandling», «Finnes allerede»). Ikke bare starten:
+  // «Velg» skal ikke godtas fordi «Velg alle» finnes (FE-3b fjernet «Velg»).
+  const escape = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const shows = (quote: string, a: string) =>
+    new RegExp(`^${a.split(/\{\w+\}/).map(escape).join(".+")}$`).test(quote) || quote === a.split(/ \(|: /)[0];
   let quoted = 0;
   for (const [path, text] of texts) {
     for (const m of text.matchAll(/«([^»]+)»/g)) {
       quoted++;
-      assert.ok(app.some((a) => a.startsWith(m[1])), `${path}: «${m[1]}» finnes ikke i appen`);
+      assert.ok(app.some((a) => shows(m[1], a)), `${path}: «${m[1]}» finnes ikke i appen`);
     }
   }
   assert.ok(quoted >= 30, String(quoted));
