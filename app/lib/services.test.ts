@@ -93,12 +93,13 @@ test("Tjenester har ikke Magic Cleanup, men har Privacy Blur, skumring og Klart 
   for (const c of expressCategories()) assert.ok(c.items.length > 0, c.id);
 });
 
-test("menyen har Start, Tjenester og Historikk (TG-NEW-153)", () => {
+test("menyen har Start, Tjenester, Ordrer og Historikk (TG-NEW-153, FE-2)", () => {
   const hrefs = navLinks().map((l) => l.href);
   for (const h of [STAGING_PATH, EXPRESS_V2_PATH, "/video", "/copywriter", "/orders"]) {
     assert.ok(!hrefs.includes(h), h);
   }
-  assert.deepEqual(hrefs, ["/start", "/tjenester", "/history"]);
+  // FE-2: Ordrer ved siden av Historikk, som blir staaende (Petter 29.10).
+  assert.deepEqual(hrefs, ["/start", "/tjenester", "/ordrer", "/history"]);
 });
 
 test("ingen side har lenke til /staging eller /express-v2 skrevet rett inn", () => {
@@ -569,7 +570,7 @@ test("S3: «Samme møbler i flere vinkler» er et «Kommer»-kort etter Digital 
   }
 });
 
-test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENABLED er uendret (Dag 57: aarstider)", () => {
+test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENABLED er uendret (Dag 57: aarstider, Dag 59: ordrer)", () => {
   assert.deepEqual(
     visibleCategories()
       .filter((c) => c.id !== "privacy")
@@ -591,6 +592,7 @@ test("APP1: de andre kategoriene og tjenestene staar i samme rekkefoelge, og ENA
     skumring: true,
     digital_styling: true,
     aarstider: true,
+    ordrer: true,
   });
 });
 

@@ -53,7 +53,8 @@ export type CodeGroup =
   | "localOriginalError"
   | "disclosureLocal"
   | "uploadError"
-  | "assignmentNotStarted";
+  | "assignmentNotStarted"
+  | "assignmentError";
 
 const nbUi = {
   "review.title": "Kontroll av bildet",
@@ -708,6 +709,7 @@ const nbUi = {
   "nav.services": "Tjenester",
   "nav.history": "Historikk",
   "nav.staging": "Digital styling",
+  "nav.orders": "Ordrer",
   "nav.help": "Hjelp",
   "status.label": "Status",
   "status.idle": "Klar",
@@ -802,6 +804,7 @@ const nbUi = {
   "title.services": "Tjenester",
   "title.history": "Historikk",
   "title.review": "Godkjenning",
+  "title.orders": "Ordrer",
   // Ordren (TG-NEW-277, FE-0): statusene (K 1), opplastingen og fremdriften. Ikke i bruk ennå.
   "assignment.status.processing": "Behandles",
   "assignment.status.processingNew": "Ny versjon behandles",
@@ -825,6 +828,60 @@ const nbUi = {
   "player.nextToReview": "Neste til kontroll",
   "player.noneWaiting": "Ingen flere til kontroll nå",
   "player.allReviewed": "Alt er kontrollert",
+  // Ordrene (FE-2): lista, ny ordre og bildene.
+  "orders.title": "Ordrer",
+  "orders.subtitle": "Én ordre per boligoppdrag. Bildene fra fotografen ligger samlet.",
+  "orders.new": "Ny ordre",
+  "orders.loading": "Henter ordrene …",
+  "orders.loadError": "Kunne ikke hente ordrene.",
+  "orders.emptyTitle": "Ingen ordrer ennå",
+  "orders.emptyBody": "En ordre samler bildene fra ett boligoppdrag. Lag en ordre for boligen, og last opp bildene fra fotografen.",
+  "orders.loadMore": "Vis flere",
+  "orders.loadingMore": "Henter flere …",
+  "orders.assignmentNo": "Oppdrag {no}",
+  "orders.imageCountOne": "1 bilde",
+  "orders.imageCount": "{n} bilder",
+  "orders.back": "Til ordrene",
+  "orders.newTitle": "Ny ordre",
+  "orders.newSubtitle": "Hvilken bolig gjelder det?",
+  "orders.address": "Adresse",
+  "orders.addressExample": "For eksempel Storgata 12, 0182 Oslo",
+  "orders.assignmentNoLabel": "Oppdragsnummer (valgfritt)",
+  "orders.addressRequired": "Skriv inn adressen.",
+  "orders.create": "Videre til bildene",
+  "orders.creating": "Lager ordren …",
+  "orders.cancel": "Avbryt",
+  "orders.imagesLoading": "Henter ordren …",
+  "orders.notFound": "Fant ikke ordren",
+  "orders.notFoundHint": "Ordren finnes ikke, eller den tilhører en annen bruker.",
+  "orders.imagesLoadError": "Kunne ikke hente ordren.",
+  "orders.dropTitle": "Dra inn bildene fra fotografen",
+  "orders.dropActive": "Slipp bildene her",
+  "orders.chooseFiles": "Velg filer",
+  "orders.uploadsTitle": "Opplasting",
+  "orders.countDone": "{n} lastet opp",
+  "orders.countActive": "{n} lastes opp eller venter",
+  "orders.countFailed": "{n} ikke lastet opp",
+  "orders.removeRow": "Fjern fra lista",
+  "orders.imagesTitle": "Bildene i ordren ({n} av {max})",
+  "orders.imagesEmpty": "Ingen bilder ennå. Bildene vises her etter hvert som de er lastet opp.",
+  "orders.imageAlt": "Bilde {n}",
+  "orders.thumbMissing": "Miniatyren er ikke klar",
+  "orders.room": "Rom",
+  "orders.roomExample": "For eksempel Stue",
+  "orders.roomSaving": "Lagrer …",
+  "orders.roomSaved": "Rommet er lagret.",
+  "orders.moveUp": "Flytt bilde {n} opp",
+  "orders.moveDown": "Flytt bilde {n} ned",
+  "orders.moved": "Bildet er flyttet til plass {n}.",
+  "orders.remove": "Fjern",
+  "orders.removeAsk": "Fjerne bildet fra ordren?",
+  "orders.removeConfirm": "Ja, fjern",
+  "orders.removeCancel": "Behold",
+  "orders.removeLocked": "Bildet har resultater og blir værende i ordren.",
+  "orders.removed": "Bildet er fjernet.",
+  "orders.next": "Videre til tjenester",
+  "orders.soon": "Kommer",
 } as const;
 
 export type UiKey = keyof typeof nbUi;
@@ -1194,6 +1251,9 @@ const nb: Dictionary = {
       image_too_large: "Bildet er større enn 25 MB.",
       assignment_image_limit: "Ordren er full. Bildet ble ikke lastet opp.",
       network: "Bildet ble ikke lastet opp. Sjekk nettet og prøv igjen.",
+      // FE-2: grunnen «unreadable» og 503 fra backend (#270).
+      unreadable: "Bildet kunne ikke leses. Lagre det på nytt som JPG eller PNG.",
+      assignments_unavailable: "Bildet ble ikke lastet opp fordi tjenesten ikke svarer akkurat nå. Prøv igjen om litt.",
     },
     // Ordren (FE-0): hvorfor et element i bestillingen ikke ble startet (K 2.7).
     assignmentNotStarted: {
@@ -1203,6 +1263,17 @@ const nb: Dictionary = {
       job_create_failed: "Ikke startet. Prøv igjen senere.",
       submit_error: "Ikke startet. Prøv igjen senere.",
       service_already_on_image: "Bildet har allerede denne tjenesten.",
+    },
+    // Ordren (FE-2): feil fra kallene i backend #270 (K 2.1-2.6), og 404/503/nett (assignmentErrorCode).
+    assignmentError: {
+      invalid_assignment: "Sjekk adressen (høyst 200 tegn) og oppdragsnummeret (høyst 40 tegn).",
+      invalid_image_patch: "Endringen ble ikke lagret. Rommet kan ha høyst 40 tegn.",
+      image_has_results: "Bildet har resultater og kan ikke fjernes. Det blir værende i ordren.",
+      assignment_image_limit: "Ordren er full. Den har plass til 60 bilder.",
+      assignments_unavailable: "Ordrene er ikke tilgjengelige akkurat nå. Prøv igjen om litt.",
+      invalid_cursor: "Kunne ikke hente flere ordrer. Last siden på nytt.",
+      not_found: "Fant ikke ordren eller bildet. Last siden på nytt.",
+      network: "Fikk ikke kontakt med serveren. Sjekk nettet og prøv igjen.",
     },
   },
   generic: {
@@ -1243,6 +1314,7 @@ const nb: Dictionary = {
     disclosureLocal: "Merketeksten kunne ikke lages.",
     uploadError: "Bildet ble ikke lastet opp. Prøv igjen.",
     assignmentNotStarted: "Ikke startet. Prøv igjen senere.",
+    assignmentError: "Noe gikk galt. Prøv igjen.",
   },
 };
 
@@ -1859,6 +1931,7 @@ const en: Dictionary = {
     "nav.services": "Services",
     "nav.history": "History",
     "nav.staging": "Virtual staging",
+    "nav.orders": "Orders",
     "nav.help": "Help",
     "status.label": "Status",
     "status.idle": "Ready",
@@ -1946,6 +2019,7 @@ const en: Dictionary = {
     "title.services": "Services",
     "title.history": "History",
     "title.review": "Approval",
+    "title.orders": "Orders",
     "assignment.status.processing": "Processing",
     "assignment.status.processingNew": "New version processing",
     "assignment.status.toReview": "Awaiting approval",
@@ -1967,6 +2041,59 @@ const en: Dictionary = {
     "player.nextToReview": "Next to review",
     "player.noneWaiting": "Nothing more to review right now",
     "player.allReviewed": "Everything has been reviewed",
+    "orders.title": "Orders",
+    "orders.subtitle": "One order per property listing. The photographer's images are kept together.",
+    "orders.new": "New order",
+    "orders.loading": "Loading orders …",
+    "orders.loadError": "Could not load the orders.",
+    "orders.emptyTitle": "No orders yet",
+    "orders.emptyBody": "An order collects the images from one property listing. Create an order for the property and upload the photographer's images.",
+    "orders.loadMore": "Show more",
+    "orders.loadingMore": "Loading more …",
+    "orders.assignmentNo": "Assignment {no}",
+    "orders.imageCountOne": "1 image",
+    "orders.imageCount": "{n} images",
+    "orders.back": "Back to orders",
+    "orders.newTitle": "New order",
+    "orders.newSubtitle": "Which property is it?",
+    "orders.address": "Address",
+    "orders.addressExample": "For example Storgata 12, 0182 Oslo",
+    "orders.assignmentNoLabel": "Assignment number (optional)",
+    "orders.addressRequired": "Enter the address.",
+    "orders.create": "Continue to the images",
+    "orders.creating": "Creating the order …",
+    "orders.cancel": "Cancel",
+    "orders.imagesLoading": "Loading the order …",
+    "orders.notFound": "Order not found",
+    "orders.notFoundHint": "The order does not exist, or it belongs to another user.",
+    "orders.imagesLoadError": "Could not load the order.",
+    "orders.dropTitle": "Drag in the photographer's images",
+    "orders.dropActive": "Drop the images here",
+    "orders.chooseFiles": "Choose files",
+    "orders.uploadsTitle": "Upload",
+    "orders.countDone": "{n} uploaded",
+    "orders.countActive": "{n} uploading or waiting",
+    "orders.countFailed": "{n} not uploaded",
+    "orders.removeRow": "Remove from list",
+    "orders.imagesTitle": "Images in the order ({n} of {max})",
+    "orders.imagesEmpty": "No images yet. The images appear here as they are uploaded.",
+    "orders.imageAlt": "Image {n}",
+    "orders.thumbMissing": "The thumbnail is not ready",
+    "orders.room": "Room",
+    "orders.roomExample": "For example Living room",
+    "orders.roomSaving": "Saving …",
+    "orders.roomSaved": "The room has been saved.",
+    "orders.moveUp": "Move image {n} up",
+    "orders.moveDown": "Move image {n} down",
+    "orders.moved": "The image has been moved to position {n}.",
+    "orders.remove": "Remove",
+    "orders.removeAsk": "Remove the image from the order?",
+    "orders.removeConfirm": "Yes, remove",
+    "orders.removeCancel": "Keep",
+    "orders.removeLocked": "The image has results and stays in the order.",
+    "orders.removed": "The image has been removed.",
+    "orders.next": "Continue to services",
+    "orders.soon": "Coming",
   },
   codes: {
     reviewCode: {
@@ -2293,6 +2420,8 @@ const en: Dictionary = {
       image_too_large: "The image is larger than 25 MB.",
       assignment_image_limit: "The order is full. The image was not uploaded.",
       network: "The image was not uploaded. Check your connection and try again.",
+      unreadable: "The image could not be read. Save it again as JPG or PNG.",
+      assignments_unavailable: "The image was not uploaded because the service is not responding right now. Try again shortly.",
     },
     assignmentNotStarted: {
       free_quota_exhausted: "Not started: the free images have been used.",
@@ -2301,6 +2430,16 @@ const en: Dictionary = {
       job_create_failed: "Not started. Try again later.",
       submit_error: "Not started. Try again later.",
       service_already_on_image: "The image already has this service.",
+    },
+    assignmentError: {
+      invalid_assignment: "Check the address (up to 200 characters) and the assignment number (up to 40 characters).",
+      invalid_image_patch: "The change was not saved. The room can have up to 40 characters.",
+      image_has_results: "The image has results and cannot be removed. It stays in the order.",
+      assignment_image_limit: "The order is full. It has room for 60 images.",
+      assignments_unavailable: "Orders are not available right now. Try again shortly.",
+      invalid_cursor: "Could not load more orders. Reload the page.",
+      not_found: "The order or image was not found. Reload the page.",
+      network: "Could not reach the server. Check your connection and try again.",
     },
   },
   generic: {
@@ -2341,6 +2480,7 @@ const en: Dictionary = {
     disclosureLocal: "The disclosure text could not be created.",
     uploadError: "The image was not uploaded. Please try again.",
     assignmentNotStarted: "Not started. Please try again later.",
+    assignmentError: "Something went wrong. Please try again.",
   },
 };
 
@@ -2423,11 +2563,14 @@ export function aarstidBytteErrorText(locale: Locale, code: unknown): string {
 
 /**
  * Tekst for et bilde som ikke ble lastet opp til ordren (FE-0, K 2.4).
- * unsupported_image vises etter grunnen: heic, ellers formatet. Andre koder
- * (image_too_large, assignment_image_limit, network) fra uploadError.
+ * unsupported_image vises etter grunnen: heic, unreadable (FE-2), ellers
+ * formatet. Andre koder (image_too_large, assignment_image_limit, network)
+ * fra uploadError.
  */
 export function uploadErrorText(locale: Locale, code: unknown, reason: unknown): string {
-  if (code === "unsupported_image") return codeText(locale, "uploadError", reason === "heic" ? "heic" : "format");
+  if (code === "unsupported_image") {
+    return codeText(locale, "uploadError", reason === "heic" || reason === "unreadable" ? reason : "format");
+  }
   return codeText(locale, "uploadError", code);
 }
 

@@ -292,7 +292,7 @@ test("D1: ingen emoji i menyen (Lucide-ikoner)", () => {
   assert.doesNotMatch(layout, EMOJI);
 });
 
-const NAV_IDS: NavId[] = ["start", "services", "staging", "history"];
+const NAV_IDS: NavId[] = ["start", "services", "staging", "orders", "history"];
 
 test("D1: ordlista har de nye ordene paa nb og en", () => {
   const keys = [
@@ -1292,6 +1292,7 @@ const PAGE_TITLES = [
   ["tjenester", "title.services"],
   ["history", "title.history"],
   ["godkjenning", "title.review"],
+  ["ordrer", "title.orders"],
 ] as const;
 
 test("TG-129: fanetitlene har noekler paa nb og en", () => {
@@ -1309,6 +1310,7 @@ test("TG-129: fanetitlene har noekler paa nb og en", () => {
       ["Tjenester", "Services"],
       ["Historikk", "History"],
       ["Godkjenning", "Approval"],
+      ["Ordrer", "Orders"],
     ]
   );
 });

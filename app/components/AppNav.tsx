@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CircleHelp,
+  FolderOpen,
   History,
   LayoutDashboard,
   LayoutGrid,
@@ -26,7 +27,8 @@ import { site } from "../../content/marketing/nb/site";
  * finnes bare paa norsk). Vanlig <a>: markedssidene har egen rot-layout
  * (full sidelast).
  *
- * TG-NEW-153: Start, Tjenester, Historikk og Hjelp. Under 640 px viser alle
+ * TG-NEW-153: Start, Tjenester, Historikk og Hjelp (FE-2: Ordrer foer
+ * Historikk). Under 640 px viser alle
  * lenkene bare ikonet, og ordet er for skjermlesere (375 px faar plass).
  * Start har LayoutDashboard, ikke et hus: merket er huset (Petter 05.10).
  */
@@ -35,6 +37,7 @@ const ICONS: Record<NavId, LucideIcon> = {
   start: LayoutDashboard,
   services: LayoutGrid,
   staging: Sofa,
+  orders: FolderOpen,
   history: History,
 };
 

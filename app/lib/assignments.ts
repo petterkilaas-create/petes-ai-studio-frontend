@@ -8,8 +8,8 @@ import { parseQuota, type Quota } from "./quota.ts";
  *
  * Ren modul uten runtime-importer fra api.ts (den kaster ved import naar
  * NEXT_PUBLIC_API_BASE mangler). API-kallene tar derfor en `request` som
- * kobles til authedFetch og API_BASE der modulen tas i bruk, og testes med en
- * falsk. Ingen sider bruker modulen ennaa.
+ * kobles til authedFetch og API_BASE med `assignmentRequest` i api.ts (FE-2),
+ * og testes med en falsk. Feltene er sjekket mot backend #270 (Ordre 1).
  */
 
 /** Taket paa bilder per ordre (K 2.4, Petter 29.10). */
@@ -27,10 +27,21 @@ export const RESULT_STATUSES = [
 ] as const;
 export type ResultStatus = (typeof RESULT_STATUSES)[number];
 
-/** `display_status` for et bilde (K 2.3): som resultatet, eller «Leveres som original». */
-export type ImageStatus = "processing" | "to_review" | "needs_answer" | "approved" | "original_only";
+/**
+ * `display_status` for et bilde (K 2.3): som resultatet, eller «Leveres som
+ * original». Backend (#270, `image_display_status`) gir ogsaa `failed` naar
+ * ingen er godkjent og noe feilet (Petter 29.10, stopp 2 i Ordre 1).
+ */
+export type ImageStatus = "processing" | "to_review" | "needs_answer" | "approved" | "failed" | "original_only";
 
-const IMAGE_STATUSES: readonly ImageStatus[] = ["processing", "to_review", "needs_answer", "approved", "original_only"];
+const IMAGE_STATUSES: readonly ImageStatus[] = [
+  "processing",
+  "to_review",
+  "needs_answer",
+  "approved",
+  "failed",
+  "original_only",
+];
 
 export interface AssignmentCounts {
   images: number;
@@ -97,6 +108,7 @@ export interface Assignment {
   id: string;
   address: string;
   assignmentNo: string | null;
+  /** Backend (#270) sender ikke `slug`; da lages den fra adressen (slugify). */
   slug: string;
   createdAt: string;
   updatedAt: string;
@@ -369,6 +381,20 @@ export class AssignmentError extends Error {
     this.code = code;
     this.detail = detail;
   }
+}
+
+/**
+ * Koden til ordlista (`assignmentError`) for en feil fra kallene: `detail.code`
+ * fra backend, `not_found` for 404 (uten kode, K 3), `assignments_unavailable`
+ * for 503 uten kode, ellers `http_<status>`. Alt som ikke er et svar fra
+ * backend (nett, token), er `network`.
+ */
+export function assignmentErrorCode(err: unknown): string {
+  if (!(err instanceof AssignmentError)) return "network";
+  if (err.code !== null) return err.code;
+  if (err.httpStatus === 404) return "not_found";
+  if (err.httpStatus === 503) return "assignments_unavailable";
+  return `http_${err.httpStatus}`;
 }
 
 async function readJson(res: Response): Promise<unknown> {
