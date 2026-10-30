@@ -97,6 +97,8 @@ export const site = {
     title: "Hjelp",
     links: [
       { label: "Spørsmål og svar", href: "/no/sporsmal-og-svar" },
+      // Dag 59: veiledningen. Merkenavnet fylles inn der lenken vises.
+      { label: "Slik bruker du {brand}", href: "/no/veiledning" },
       { label: "Slik merker vi bildene", href: "/no/merking" },
       { label: "Kontakt", href: "/no/kontakt" },
     ],

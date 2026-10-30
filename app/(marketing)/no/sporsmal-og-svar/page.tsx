@@ -40,7 +40,7 @@ export default function FaqPage() {
             href={l.href}
             className={`flex min-h-11 items-center rounded-button text-[16px] font-medium text-ink underline underline-offset-4 ${FOCUS}`}
           >
-            {l.label}
+            {fill(l.label, { brand: brand.displayName })}
           </a>
         ))}
       </nav>
