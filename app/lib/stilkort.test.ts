@@ -121,7 +121,9 @@ const picker = code("components/DuskChoicePicker.tsx");
 
 test("Stilkort: velgeren har fire kort i rutenett med bilde, aria-pressed og ett trykk", () => {
   // Dag 57 (TG-NEW-145): fire per rad fra md, unntatt kompakt i «Rett».
-  assert.match(picker, /<ul className=\{`grid grid-cols-2 gap-2\$\{compact \? "" : " md:grid-cols-4"\}`\}/);
+  // FE-3b: i vinduet paa bildebrettet saa mange som faar plass (auto-fill).
+  assert.match(picker, /<ul className=\{inDialog \? DIALOG_GRID : `grid grid-cols-2 gap-2\$\{compact \? "" : " md:grid-cols-4"\}`\}/);
+  assert.match(picker, /const DIALOG_GRID = "grid grid-cols-\[repeat\(auto-fill,minmax\(9\.5rem,1fr\)\)\] gap-2";/);
   const cards = picker.slice(picker.indexOf("DUSK_STYLES.map"), picker.indexOf("</ul>"));
   assert.match(cards, /onClick=\{\(\) => onChange\(changeStyle\(value, style\)\)\}/);
   assert.match(cards, /aria-pressed=\{on\}/);

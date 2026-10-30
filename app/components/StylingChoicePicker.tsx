@@ -38,6 +38,10 @@ const LABEL = "text-sm font-medium text-ink";
 const ROOM_TILE =
   "flex min-h-14 items-center gap-2.5 rounded-button border px-2.5 py-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
 const ROOM_ON = "border-ink bg-surface ring-1 ring-ink text-ink";
+// Vinduet paa bildebrettet (FE-3b): minst 10rem per flis, saa mange som faar plass, uten sveiping.
+const ROOM_DIALOG_GRID = "grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-2";
+const ROOM_PAGE_GRID =
+  "-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pt-1 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:p-0 lg:grid-cols-5";
 const ROOM_OFF = "border-line bg-surface text-ink hover:border-line-strong";
 
 /** Prikkene i pyntknappene: ●○○ Lite, ●●○ Middels, ●●● Mye. */
@@ -66,18 +70,25 @@ const DECOR_DOTS: Record<DecorLevel, number> = { 1: 1, 3: 2, 5: 3 };
  *
  * Bildene kommer fra siden (styleImages.ts), fordi node --test ikke kan laste
  * .jpg og lib-filene derfor ikke importerer dem.
+ *
+ * `inDialog` (vinduet paa bildebrettet, FE-3b): flisene og stilkortene i et
+ * rutenett med saa mange per rad som vinduet har plass til (auto-fill), og
+ * utstillingsvinduet for stilen er foldet sammen til megleren aapner det.
+ * Knappen har navnet paa stilen i fokus, saa et trykk paa et kort synes.
  */
 export function StylingChoicePicker({
   value,
   onChange,
   disabled,
   images,
+  inDialog = false,
   locale,
 }: {
   value: StylingChoice;
   onChange: (value: StylingChoice) => void;
   disabled: boolean;
   images: Record<StylingStyle, StaticImageData>;
+  inDialog?: boolean;
   locale: Locale;
 }) {
   const helpId = useId();
@@ -88,6 +99,9 @@ export function StylingChoicePicker({
   const counter = wishesCounter(value.wishes);
   const [focus, setFocus] = useState<StylingStyle>(value.styles[0] ?? STYLING_STYLES[0]);
   const [sheet, setSheet] = useState<StylingStyle | null>(null);
+  // Utstillingsvinduet: alltid ute paa siden, foldet sammen i vinduet paa bildebrettet.
+  const [showFocus, setShowFocus] = useState(!inDialog);
+  const focusPanelId = useId();
   const opener = useRef<HTMLElement | null>(null);
   const atLimit = value.styles.length >= MAX_ORDER_JOBS;
   const toggle = (style: StylingStyle) => {
@@ -126,7 +140,7 @@ export function StylingChoicePicker({
             <span>{t(locale, "styling.roomEmpty")}</span>
           </label>
         </div>
-        <div className="-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pt-1 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:p-0 lg:grid-cols-5" role="group" aria-label={t(locale, "styling.furnishAs")}>
+        <div className={inDialog ? ROOM_DIALOG_GRID : ROOM_PAGE_GRID} role="group" aria-label={t(locale, "styling.furnishAs")}>
           {FURNISH_AS_CHOICES.map((room) => (
             <button
               key={room}
@@ -134,7 +148,7 @@ export function StylingChoicePicker({
               onClick={() => onChange({ ...value, furnishAs: room })}
               disabled={disabled}
               aria-pressed={value.furnishAs === room}
-              className={`${ROOM_TILE} w-[46%] shrink-0 snap-start sm:w-auto ${value.furnishAs === room ? ROOM_ON : ROOM_OFF}`}
+              className={`${ROOM_TILE} ${inDialog ? "" : "w-[46%] shrink-0 snap-start sm:w-auto "}${value.furnishAs === room ? ROOM_ON : ROOM_OFF}`}
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-button bg-paper">
                 <SvgArt node={ROOM_ICONS[room]} prefix="rom" className="size-5" />
@@ -170,19 +184,35 @@ export function StylingChoicePicker({
             onFocus={setFocus}
             onToggle={toggle}
             onOpen={openSheet}
+            inDialog={inDialog}
             locale={locale}
           />
-          <StyleFocusPanel
-            board={MOODBOARDS[focus]}
-            name={nameOf(focus)}
-            image={images[focus]}
-            on={focusOn}
-            locked={atLimit && !focusOn}
-            disabled={disabled}
-            onToggle={() => toggle(focus)}
-            onOpen={(from) => openSheet(focus, from)}
-            locale={locale}
-          />
+          {inDialog && (
+            <button
+              type="button"
+              onClick={() => setShowFocus(!showFocus)}
+              aria-expanded={showFocus}
+              aria-controls={focusPanelId}
+              className={`${OPTION} ${OFF}`}
+            >
+              {showFocus ? t(locale, "styling.focusHide") : t(locale, "styling.focusShow", { style: nameOf(focus) })}
+            </button>
+          )}
+          {showFocus && (
+            <div id={focusPanelId}>
+              <StyleFocusPanel
+                board={MOODBOARDS[focus]}
+                name={nameOf(focus)}
+                image={images[focus]}
+                on={focusOn}
+                locked={atLimit && !focusOn}
+                disabled={disabled}
+                onToggle={() => toggle(focus)}
+                onOpen={(from) => openSheet(focus, from)}
+                locale={locale}
+              />
+            </div>
+          )}
         </div>
         {sheet !== null && (
           <MoodboardDialog board={MOODBOARDS[sheet]} name={nameOf(sheet)} onClose={closeSheet} locale={locale} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import Link from "next/link";
 import type { StaticImageData } from "next/image";
 import { ArrowLeft, Check, ImageOff } from "lucide-react";
@@ -11,30 +11,35 @@ import {
   itemKey,
   itemsForImage,
   loadDraft,
-  removeFromImages,
   removeItem,
-  replaceItem,
   saveDraft,
   type BoardItem,
-  type BoardService,
 } from "../../lib/board";
 import {
   activeResults,
-  addChoices,
+  applySheet,
+  badgeLabel,
   boardTotals,
   EMPTY_PANEL,
   imageName,
-  itemLabel,
-  panelChoices,
-  panelForNewSelection,
-  panelFromItem,
+  indoorImages,
+  mixedText,
+  removeSheet,
+  removeText,
   resultLabel,
   selectedText,
   selectRange,
   serviceNameKey,
+  sheetButtons,
+  sheetImages,
+  sheetStart,
   toggleSelected,
   totalsText,
+  withService,
   type PanelState,
+  type SheetAction,
+  type SheetStart,
+  type SheetTarget,
 } from "../../lib/brett";
 import type { DuskStyle } from "../../lib/dusk";
 import { orderCheckHref, orderImagesHref } from "../../lib/ordrer";
@@ -42,6 +47,8 @@ import { stripKey } from "../../lib/player";
 import type { StylingStyle } from "../../lib/styling";
 import { BoardPanel } from "./BoardPanel";
 import { LoadState } from "./LoadState";
+import { ServiceBadge } from "./ServiceBadge";
+import { ServiceSheet } from "./ServiceSheet";
 import { Button, ButtonLink } from "../ui/Button";
 import { cardClass } from "../ui/Card";
 import { PageHeader } from "../ui/PageHeader";
@@ -50,19 +57,22 @@ import { t } from "../../lib/i18n";
 import { useLocale } from "../../lib/i18n/useLocale";
 
 /**
- * Bildebrettet (TG-NEW-277, FE-3; skissen «Tjenester»): megleren krysser av
- * bilder (klikk, Shift-klikk, «Velg alle», tastatur) og legger tjenester paa
- * dem i panelet. Hvert bilde viser hva som er valgt, med «Endre» og «Fjern»,
- * og hva det har fra foer. Et bilde uten tjeneste leveres som original.
+ * Bildebrettet (TG-NEW-277, FE-3 og FE-3b; skissen «Tjenester»): megleren
+ * krysser av bilder (klikk, Shift-klikk, «Velg alle», tastatur) og legger
+ * tjenester paa dem fra panelet. Hvert bildekort viser de valgte tjenestene
+ * som merkelapper (trykk aapner valgene, «×» fjerner) og hva bildet har fra
+ * foer. Et bilde uten tjeneste leveres som original.
+ *
+ * Valgene velges i et eget vindu (ServiceSheet), aapnet fra panelet for de
+ * avkryssede bildene eller fra en merkelapp for det ene elementet. Det som
+ * ble valgt sist (stilene, stemningen), huskes til neste gang (`memory`).
  * Utkastet lagres i localStorage ved hver endring (board.ts) og leses naar
  * ordren er hentet. Samme brett brukes for etterbestilling.
  */
 
-interface Editing {
-  key: string;
-  service: BoardService;
-  label: string;
-  name: string;
+interface OpenSheet {
+  target: SheetTarget;
+  start: SheetStart;
 }
 
 export function ServiceBoard({
@@ -78,11 +88,21 @@ export function ServiceBoard({
   const [items, setItems] = useState<BoardItem[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [anchor, setAnchor] = useState<string | null>(null);
-  const [panel, setPanel] = useState<PanelState>(EMPTY_PANEL);
-  const [open, setOpen] = useState<BoardService | null>(null);
-  const [editing, setEditing] = useState<Editing | null>(null);
+  const [memory, setMemory] = useState<PanelState>(EMPTY_PANEL);
+  const [sheet, setSheet] = useState<OpenSheet | null>(null);
   const [announcement, setAnnouncement] = useState("");
-  const panelRef = useRef<HTMLHeadingElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  // Fokus etter at vinduet er lukket eller en merkelapp er fjernet: knappen,
+  // eller bildet naar knappen er borte (merkelappen ble byttet eller fjernet).
+  const focusAfter = useRef<{ el: HTMLElement | null; imageId: string | null } | null>(null);
+
+  useEffect(() => {
+    const target = focusAfter.current;
+    if (sheet !== null || target === null) return;
+    focusAfter.current = null;
+    if (target.el?.isConnected) target.el.focus();
+    else if (target.imageId !== null) document.getElementById(tileId(target.imageId))?.focus();
+  }, [sheet, items]);
 
   // Utkastet leses naar ordren er hentet: bare bildene som finnes naa.
   const onLoaded = useCallback(
@@ -100,11 +120,8 @@ export function ServiceBoard({
     setAnnouncement(message);
   }
 
-  // Ny avkrysning: det som gjelder bildet, maa velges paa nytt (brett.ts), og en endring avbrytes.
   function select(next: string[]) {
     setSelected(next);
-    setPanel((p) => panelForNewSelection(p));
-    setEditing(null);
     setAnnouncement(selectedText(locale, next.length));
   }
 
@@ -115,6 +132,15 @@ export function ServiceBoard({
   const order = images.map((img) => img.id);
   const totals = boardTotals(images, items);
   const n = selected.length;
+
+  /** «1. Stue, 3. Fasade» for bildene, i rekkefoelgen paa brettet. */
+  function namesOf(list: readonly string[]): string {
+    const ids = new Set(list);
+    return images
+      .map((img, i) => (ids.has(img.id) ? imageName(img, i + 1) : null))
+      .filter((x) => x !== null)
+      .join(", ");
+  }
 
   function onTileClick(e: MouseEvent<HTMLButtonElement>, id: string) {
     select(e.shiftKey ? selectRange(order, selected, anchor, id) : toggleSelected(selected, id));
@@ -128,36 +154,55 @@ export function ServiceBoard({
     document.getElementById(tileId(images[next].id))?.focus();
   }
 
-  function add(service: BoardService) {
-    const choices = panelChoices(service, panel);
-    if (choices === null || n === 0) return;
-    update(addChoices(items, selected, choices), t(locale, "board.added", { label: t(locale, serviceNameKey(service)) }));
+  function openSheet(target: SheetTarget, from: HTMLElement) {
+    opener.current = from;
+    setSheet({ target, start: sheetStart(items, target, memory) });
   }
 
-  function removeService(service: BoardService) {
-    update(removeFromImages(items, selected, service), t(locale, "board.removed", { label: t(locale, serviceNameKey(service)) }));
+  function closeSheet() {
+    if (sheet === null) return;
+    focusAfter.current = { el: opener.current, imageId: sheet.target.kind === "item" ? sheet.target.imageId : null };
+    setSheet(null);
   }
 
-  function startEdit(item: BoardItem, name: string) {
-    setSelected([item.imageId]);
-    setAnchor(item.imageId);
-    setPanel(panelFromItem(item, panelForNewSelection(panel)));
-    setOpen(item.service);
-    setEditing({ key: itemKey(item), service: item.service, label: itemLabel(locale, item), name });
-    panelRef.current?.scrollIntoView({ block: "start" });
-    panelRef.current?.focus();
+  function submit(panel: PanelState, action: SheetAction) {
+    if (sheet === null) return;
+    const next = applySheet(items, sheet.target, action, panel);
+    if (next === null) return;
+    const label = t(locale, serviceNameKey(sheet.target.service));
+    update(next, action === "add" ? t(locale, "board.added", { label }) : t(locale, "board.updated"));
+    setMemory(panel);
+    closeSheet();
   }
 
-  function saveEdit() {
-    if (editing === null) return;
-    const choices = panelChoices(editing.service, panel);
-    if (choices === null) return;
-    update(replaceItem(items, editing.key, choices), t(locale, "board.updated"));
-    setEditing(null);
+  function removeFromSheet() {
+    if (sheet === null) return;
+    const label = t(locale, serviceNameKey(sheet.target.service));
+    update(removeSheet(items, sheet.target), t(locale, "board.removed", { label }));
+    closeSheet();
   }
+
+  function removeBadge(item: BoardItem, label: string) {
+    focusAfter.current = { el: null, imageId: item.imageId };
+    update(removeItem(items, itemKey(item)), t(locale, "board.removed", { label }));
+  }
+
+
+  /** Linja under navnet i vinduet: hvilke bilder, eller hvilket element som endres. */
+  function sheetIntro(target: SheetTarget): string {
+    if (target.kind === "images") return t(locale, "board.sheet.for", { names: namesOf(target.imageIds) });
+    const item = items.find((it) => itemKey(it) === target.key);
+    const index = order.indexOf(target.imageId);
+    const name = index < 0 ? "" : imageName(images[index], index + 1);
+    return t(locale, "board.editing", { label: item === undefined ? "" : badgeLabel(locale, item), image: name });
+  }
+
+  const sheetIds = sheet === null ? [] : sheetImages(sheet.target);
+  const sheetHas = sheet === null ? 0 : withService(items, sheetIds, sheet.target.service).length;
+  const indoor = sheet?.target.service === "aarstid" ? indoorImages(images, items, sheetIds) : [];
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 pb-32 md:px-8 md:py-12">
+    <main className="mx-auto w-full max-w-7xl px-4 py-8 pb-32 md:px-8 md:py-12">
       <Link
         href={orderImagesHref(assignmentId)}
         className={`mb-6 inline-flex min-h-11 items-center gap-2 rounded-button text-sm text-ink-2 hover:text-ink ${FOCUS}`}
@@ -178,12 +223,12 @@ export function ServiceBoard({
       {images.length === 0 ? (
         <p className="text-sm text-ink-2">{t(locale, "board.noImages")}</p>
       ) : (
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_26rem]">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <section aria-labelledby="board-images-title" className="flex min-w-0 flex-col gap-4">
+            <h2 id="board-images-title" className="sr-only">
+              {t(locale, "board.images")}
+            </h2>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 id="board-images-title" className="mr-auto text-lg font-medium text-ink">
-                {selectedText(locale, n)}
-              </h2>
               <Button variant="secondary" onClick={() => select([...order])} disabled={n === images.length}>
                 {t(locale, "board.selectAll")}
               </Button>
@@ -193,77 +238,63 @@ export function ServiceBoard({
             </div>
             <p className="text-[13px] text-ink-2">{t(locale, "board.selectHint")}</p>
 
-            <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {images.map((image, i) => {
                 const name = imageName(image, i + 1);
                 const on = selected.includes(image.id);
                 const chosen = itemsForImage(items, image.id);
                 const before = activeResults(image);
                 return (
-                  <li key={image.id} className={cardClass("none", `flex flex-col gap-3 p-3 ${on ? "ring-2 ring-ink" : ""}`)}>
+                  <li key={image.id} className={cardClass("none", `flex min-w-0 flex-col gap-2 p-2 ${on ? "ring-2 ring-ink" : ""}`)}>
                     <button
                       id={tileId(image.id)}
                       type="button"
                       aria-pressed={on}
                       onClick={(e) => onTileClick(e, image.id)}
                       onKeyDown={(e) => onTileKey(e, i)}
-                      className={`flex min-h-11 w-full items-center gap-3 rounded-button text-left ${FOCUS}`}
+                      className={`flex w-full flex-col gap-2 rounded-button text-left ${FOCUS}`}
                     >
-                      <span className="relative flex aspect-[4/3] w-24 shrink-0 items-center justify-center overflow-hidden rounded-button bg-surface-2">
+                      <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-button bg-surface-2">
                         {image.thumbUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={image.thumbUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
                         ) : (
-                          <ImageOff aria-hidden className="size-5 text-ink-2" strokeWidth={1.75} />
+                          <ImageOff aria-hidden className="size-6 text-ink-2" strokeWidth={1.75} />
                         )}
                         <span
                           aria-hidden
-                          className={`absolute left-1.5 top-1.5 flex size-6 items-center justify-center rounded-md border-2 ${
+                          className={`absolute left-2 top-2 flex size-6 items-center justify-center rounded-md border-2 ${
                             on ? "border-primary bg-primary text-on-primary" : "border-line-strong bg-surface"
                           }`}
                         >
                           {on && <Check className="size-4" strokeWidth={2.6} />}
                         </span>
                       </span>
-                      <span className="min-w-0 flex-1 break-words text-sm font-medium text-ink">{name}</span>
+                      <span className="min-w-0 break-words px-1 text-sm font-medium text-ink">{name}</span>
                     </button>
 
                     {chosen.length > 0 && (
-                      <div>
-                        <p className="mb-1 text-[13px] text-ink-2">{t(locale, "board.chosen")}</p>
-                        <ul className="flex flex-col gap-1">
-                          {chosen.map((item) => {
-                            const label = itemLabel(locale, item);
-                            const key = itemKey(item);
-                            return (
-                              <li key={key} className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span className="min-w-0 flex-1 text-sm text-ink">{label}</span>
-                                <Button
-                                  variant="secondary"
-                                  className="px-3"
-                                  onClick={() => startEdit(item, name)}
-                                  aria-label={t(locale, "board.editItem", { label, image: name })}
-                                >
-                                  {t(locale, "board.edit")}
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  className="px-3"
-                                  onClick={() => update(removeItem(items, key), t(locale, "board.removed", { label }))}
-                                  aria-label={t(locale, "board.removeItem", { label, image: name })}
-                                >
-                                  {t(locale, "board.remove")}
-                                </Button>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </div>
+                      <ul className="flex flex-wrap gap-x-1.5 gap-y-2 px-1">
+                        {chosen.map((item) => {
+                          const label = badgeLabel(locale, item);
+                          const key = itemKey(item);
+                          return (
+                            <ServiceBadge
+                              key={key}
+                              label={label}
+                              openLabel={t(locale, "board.editItem", { label, image: name })}
+                              removeLabel={t(locale, "board.removeItem", { label, image: name })}
+                              onOpen={(from) => openSheet({ kind: "item", service: item.service, imageId: image.id, key }, from)}
+                              onRemove={() => removeBadge(item, label)}
+                            />
+                          );
+                        })}
+                      </ul>
                     )}
 
                     {before.length > 0 && (
-                      <div>
-                        <p className="mb-1 text-[13px] text-ink-2">{t(locale, "board.hasBefore")}</p>
+                      <div className="px-1">
+                        <p className="text-[13px] text-ink-2">{t(locale, "board.hasBefore")}</p>
                         <ul className="flex flex-col gap-0.5 text-[13px] text-ink-2">
                           {before.map((r) => (
                             <li key={r.resultId}>
@@ -275,7 +306,7 @@ export function ServiceBoard({
                     )}
 
                     {chosen.length === 0 && before.length === 0 && (
-                      <p className="text-[13px] text-ink-2">{t(locale, "assignment.status.originalOnly")}</p>
+                      <p className="px-1 text-[13px] text-ink-2">{t(locale, "assignment.status.originalOnly")}</p>
                     )}
                   </li>
                 );
@@ -285,44 +316,43 @@ export function ServiceBoard({
 
           <section aria-labelledby="board-panel-title" className="min-w-0 lg:sticky lg:top-6 lg:self-start">
             <div className={cardClass("sm")}>
-              <h2
-                id="board-panel-title"
-                ref={panelRef}
-                tabIndex={-1}
-                className={`scroll-mt-6 rounded-button text-lg font-medium text-ink ${FOCUS}`}
-              >
+              <h2 id="board-panel-title" className="text-lg font-medium text-ink">
                 {selectedText(locale, n)}
               </h2>
               <p className="mt-1 break-words text-[13px] text-ink-2">
-                {n === 0
-                  ? t(locale, "board.selectFirst")
-                  : images
-                      .map((img, i) => (selected.includes(img.id) ? imageName(img, i + 1) : null))
-                      .filter((x) => x !== null)
-                      .join(", ")}
+                {n === 0 ? t(locale, "board.selectFirst") : namesOf(selected)}
               </p>
               <BoardPanel
                 items={items}
                 selected={selected}
-                panel={panel}
-                open={open}
-                editing={editing}
-                duskImages={duskImages}
-                styleImages={styleImages}
-                onPanel={setPanel}
-                onOpen={setOpen}
-                onAdd={add}
-                onRemove={removeService}
-                onSaveEdit={saveEdit}
-                onCancelEdit={() => setEditing(null)}
+                onOpen={(service, from) =>
+                  openSheet({ kind: "images", service, imageIds: order.filter((id) => selected.includes(id)) }, from)
+                }
               />
             </div>
           </section>
         </div>
       )}
 
+      {sheet !== null && (
+        <ServiceSheet
+          service={sheet.target.service}
+          buttons={sheetButtons(locale, sheet.start.mode, sheetIds.length, sheetHas)}
+          remove={removeText(locale, sheetIds.length, sheetHas)}
+          start={sheet.start.panel}
+          intro={sheetIntro(sheet.target)}
+          mixed={sheet.start.mixed ? mixedText(locale, items, sheetIds, sheet.target.service) : null}
+          indoor={indoor.length > 0 ? namesOf(indoor.map((img) => img.id)) : null}
+          duskImages={duskImages}
+          styleImages={styleImages}
+          onSubmit={submit}
+          onRemove={removeFromSheet}
+          onClose={closeSheet}
+        />
+      )}
+
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-3 px-4 py-3 md:px-8">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-3 md:px-8">
           <p className="mr-auto min-w-0 text-[13px] text-ink-2">
             {totalsText(locale, totals)}
           </p>

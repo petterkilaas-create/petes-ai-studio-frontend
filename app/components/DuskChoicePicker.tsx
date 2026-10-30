@@ -31,6 +31,9 @@ const CARD_OFF = "border-line hover:bg-surface-2";
 const SIZES = "(min-width: 768px) 270px, 50vw";
 // Kompakt (i «Rett», kolonnen paa 22rem): alltid to kort per rad.
 const SIZES_COMPACT = "(min-width: 1024px) 170px, 50vw";
+// Vinduet paa bildebrettet (FE-3b): minst 9,5rem per kort, saa mange som faar plass.
+const DIALOG_GRID = "grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-2";
+const SIZES_DIALOG = "(min-width: 768px) 220px, 50vw";
 
 /**
  * Stilkortene for Kveldsbilde (Dag 55, TG-NEW-259): fire kort med
@@ -50,6 +53,9 @@ const SIZES_COMPACT = "(min-width: 1024px) 170px, 50vw";
  * ingen skillelinje), og `value` kan vaere null naar bildet ble laget med en
  * gammel stil som ikke er et kort. Da er ingen kort valgt, og ingen himmel
  * vises foer et kort er valgt.
+ *
+ * `inDialog` (vinduet paa bildebrettet, FE-3b): saa mange kort per rad som
+ * vinduet har plass til (auto-fill). `value` er null naar bildene har ulike valg.
  */
 export function DuskChoicePicker({
   value,
@@ -57,6 +63,7 @@ export function DuskChoicePicker({
   disabled,
   images,
   compact = false,
+  inDialog = false,
   locale,
 }: {
   value: DuskChoice | null;
@@ -64,6 +71,7 @@ export function DuskChoicePicker({
   disabled: boolean;
   images: Record<DuskStyle, StaticImageData>;
   compact?: boolean;
+  inDialog?: boolean;
   locale: Locale;
 }) {
   const summer = value?.style === STYLE_SUMMER;
@@ -73,7 +81,7 @@ export function DuskChoicePicker({
   return (
     <div className={compact ? "space-y-4" : "border-t border-line pt-6 space-y-4"}>
       <p className={LABEL}>{t(locale, "dusk.title")}</p>
-      <ul className={`grid grid-cols-2 gap-2${compact ? "" : " md:grid-cols-4"}`} aria-label={t(locale, "dusk.style")}>
+      <ul className={inDialog ? DIALOG_GRID : `grid grid-cols-2 gap-2${compact ? "" : " md:grid-cols-4"}`} aria-label={t(locale, "dusk.style")}>
         {DUSK_STYLES.map((style) => {
           const name = codeText(locale, "duskStyle", style);
           const on = value?.style === style;
@@ -91,7 +99,7 @@ export function DuskChoicePicker({
                     src={images[style]}
                     alt={t(locale, "dusk.exampleAlt", { style: name })}
                     fill
-                    sizes={compact ? SIZES_COMPACT : SIZES}
+                    sizes={inDialog ? SIZES_DIALOG : compact ? SIZES_COMPACT : SIZES}
                     className="object-cover"
                   />
                   <span aria-hidden="true" className={TAG}>
