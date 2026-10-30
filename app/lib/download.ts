@@ -55,6 +55,8 @@ export async function downloadMarkedImage(opts: {
   jobId: string;
   /** Oppskriften fra review-svaret (G3); bestemmer filnavnet. */
   presetId?: string | null;
+  /** Filnavnet fra manifestet (FE-5, K 2.8); ellers lages det fra oppskriften. */
+  fileName?: string | null;
   /** Henter svaret med token (fetchJobDownload i api.ts). */
   fetchFile: () => Promise<Response>;
   save?: (blob: Blob, fileName: string) => void;
@@ -70,7 +72,7 @@ export async function downloadMarkedImage(opts: {
   if (res.status !== 200) {
     return { kind: "error", key: downloadErrorKey(res.status, await readJson(res)) };
   }
-  const fileName = downloadFileName(jobId, presetId);
+  const fileName = opts.fileName || downloadFileName(jobId, presetId);
   try {
     save(await res.blob(), fileName);
   } catch {

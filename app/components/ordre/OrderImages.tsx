@@ -39,6 +39,7 @@ import {
   keepImageUrls,
   menuTarget,
   mergeUploaded,
+  orderDeliveryHref,
   orderServicesHref,
   positionOf,
   queueCapacity,
@@ -47,6 +48,7 @@ import {
   URL_REFRESH_MS,
   type MoveAction,
 } from "../../lib/ordrer";
+import { deliveryFileCount, deliveryLinkText } from "../../lib/delivery";
 import { ORDER_REFRESH_MAX_MS, type RefreshResult } from "../../lib/autoRefresh";
 import { useAutoRefresh } from "../../hooks/useAutoRefresh";
 import { ORDERS_PATH } from "../../lib/services";
@@ -331,6 +333,13 @@ export function OrderImages({ assignmentId, started = null }: { assignmentId: st
         <PageHeader
           title={<span className="break-words">{assignment.address}</span>}
           subtitle={assignment.assignmentNo ? t(locale, "orders.assignmentNo", { no: assignment.assignmentNo }) : undefined}
+          actions={
+            images.length > 0 ? (
+              <ButtonLink variant="secondary" href={orderDeliveryHref(assignmentId)}>
+                {deliveryLinkText(locale, deliveryFileCount({ images: images.length, approved: assignment.counts.approved }))}
+              </ButtonLink>
+            ) : undefined
+          }
         />
       </div>
 
