@@ -6,6 +6,9 @@ import { MOODBOARDS } from "../../lib/moodboards";
 import { t, type Locale } from "../../lib/i18n";
 import { FOCUS } from "./classes";
 
+/** Kortene i vinduet paa bildebrettet: minst 8,5rem brede, saa mange som faar plass. */
+const DIALOG_GRID = "grid grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-2";
+
 /**
  * De 14 stilene som smaa fargekort (D-3 kompakt), i nr-rekkefoelge: en
  * stripe med de seks palettfargene og navnet. Tre knapper per kort, ved
@@ -22,6 +25,9 @@ import { FOCUS } from "./classes";
  * «Endre valg» (TG-NEW-145): `shown` er stilene som vises (uten stilene i
  * bestillingen), og `compact` gir to kort per rad (kolonnen i «Rett»).
  * `focus` kan vaere null (ingen stil valgt).
+ *
+ * `inDialog` (vinduet paa bildebrettet, FE-3b): saa mange kort per rad som
+ * vinduet har plass til (auto-fill), uten sveiping, saa navnet aldri kuttes.
  */
 export function StyleCards({
   styles,
@@ -33,6 +39,7 @@ export function StyleCards({
   onOpen,
   shown = STYLING_STYLES,
   compact = false,
+  inDialog = false,
   locale,
 }: {
   styles: readonly StylingStyle[];
@@ -45,12 +52,15 @@ export function StyleCards({
   onOpen: (style: StylingStyle, opener: HTMLElement) => void;
   shown?: readonly StylingStyle[];
   compact?: boolean;
+  inDialog?: boolean;
   locale: Locale;
 }) {
   return (
     <ul
       className={
-        compact
+        inDialog
+          ? DIALOG_GRID
+          : compact
           ? "grid grid-cols-2 gap-2"
           : "-mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pt-1 pb-2 md:mx-0 md:grid md:grid-cols-5 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-7"
       }
@@ -64,7 +74,7 @@ export function StyleCards({
         return (
           <li
             key={style}
-            className={`relative h-[88px] overflow-hidden rounded-button border ${compact ? "" : "w-[38%] shrink-0 snap-start md:w-auto "}${
+            className={`relative h-[88px] overflow-hidden rounded-button border ${compact || inDialog ? "" : "w-[38%] shrink-0 snap-start md:w-auto "}${
               on ? "border-ink ring-1 ring-ink" : "border-line"
             } ${focused ? "bg-surface-2" : "bg-surface"} ${locked ? "opacity-60" : ""}`}
           >

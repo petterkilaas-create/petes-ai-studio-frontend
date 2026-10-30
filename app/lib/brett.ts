@@ -1,8 +1,23 @@
 import type { AssignmentImage, AssignmentResult } from "./assignments.ts";
-import { aarstidParams, aarstidSummary, EMPTY_AARSTID, SEASONS, seasonKey, SOURCE_SEASONS, type AarstidChoice } from "./aarstid.ts";
+import {
+  aarstidParams,
+  aarstidSummary,
+  EMPTY_AARSTID,
+  MAX_SEASONS,
+  SEASONS,
+  seasonKey,
+  SOURCE_SEASONS,
+  targetsFor,
+  type AarstidChoice,
+} from "./aarstid.ts";
 import {
   addToImages,
   BOARD_SERVICES,
+  coverage,
+  itemKey,
+  removeFromImages,
+  removeItem,
+  replaceItem,
   type BoardChoice,
   type BoardItem,
   type BoardService,
@@ -16,6 +31,7 @@ import {
   DECOR_LEVELS,
   EMPTY_STYLING,
   FURNISH_AS_CHOICES,
+  MAX_ORDER_JOBS,
   STYLING_STYLES,
   stylingParams,
   stylingSummary,
@@ -67,9 +83,13 @@ export function boardImageTypeChoices(service: BoardService): ImageTypeChoice[] 
 
 // --- panelet -------------------------------------------------------------------
 
-/** Valgene i panelet. Samme velgere og samme standard som paa Tjenester. */
+/**
+ * Valgene i vinduet for en tjeneste (FE-3b; het panelet i FE-3). Samme
+ * velgere og samme standard som paa Tjenester. `dusk` er null naar ingen
+ * stemning er valgt (bildene har ulike valg, se sheetStart).
+ */
 export interface PanelState {
-  dusk: DuskChoice;
+  dusk: DuskChoice | null;
   /** «Hvor er bildet tatt?» for skumring. */
   duskImageType: ImageTypeChoice;
   /** «Hvor er bildet tatt?» for klart vaer. */
@@ -93,6 +113,7 @@ export const EMPTY_PANEL: PanelState = {
 export function panelForNewSelection(panel: PanelState): PanelState {
   return {
     ...panel,
+    dusk: panel.dusk ?? DEFAULT_DUSK,
     duskImageType: "auto",
     skyImageType: "auto",
     styling: { ...panel.styling, roomEmpty: false },
@@ -110,6 +131,7 @@ export function panelForNewSelection(panel: PanelState): PanelState {
 export function panelChoices(service: BoardService, panel: PanelState): BoardChoice[] | null {
   switch (service) {
     case "skumring":
+      if (panel.dusk === null) return null;
       return [
         {
           service,
@@ -144,6 +166,7 @@ export function panelChoices(service: BoardService, panel: PanelState): BoardCho
 
 /** Hvorfor «Legg til» er av (det foerste som mangler), eller null. */
 export function panelMissing(locale: Locale, service: BoardService, panel: PanelState): string | null {
+  if (service === "skumring") return panel.dusk === null ? t(locale, "board.missingDusk") : null;
   if (service === "styling") return stylingSummary(locale, panel.styling).missing;
   if (service === "aarstid") return aarstidSummary(locale, panel.aarstid).missing;
   return null;
@@ -217,12 +240,291 @@ export function coverageText(locale: Locale, state: Coverage, has: number, of: n
   return of === 1 ? t(locale, "board.coverage.one") : t(locale, "board.coverage.all", { n: of });
 }
 
-/** Knappen «Legg til paa …» etter hvor mange som er krysset av og hvor mange som har tjenesten. */
-export function addButtonText(locale: Locale, selected: number, has: number): string {
-  if (selected === 1) return t(locale, "board.addOne");
-  const rest = selected - has;
-  if (has > 0 && rest > 0) return t(locale, "board.addRest", { n: rest });
-  return t(locale, "board.addMany", { n: selected });
+// --- vinduet for valgene (FE-3b) ---------------------------------------------------
+
+/**
+ * Hva vinduet endrer: tjenesten paa de avkryssede bildene («Legg til…» og
+ * «Endre…» i panelet), eller ett element (merkelappen paa bildekortet).
+ */
+export type SheetTarget =
+  | { kind: "images"; service: BoardService; imageIds: readonly string[] }
+  | { kind: "item"; service: BoardService; imageId: string; key: string };
+
+/** «Legg til» naar ingen av bildene har tjenesten, ellers «Oppdater». */
+export type SheetMode = "add" | "edit";
+
+/**
+ * Knappene nederst i vinduet: «Legg til» legger valgene paa alle bildene i
+ * maalet (som panelet i FE-3), «Oppdater» bytter dem bare paa bildene som
+ * har tjenesten.
+ */
+export type SheetAction = "add" | "update";
+
+export interface SheetButton {
+  action: SheetAction;
+  text: string;
+}
+
+export interface SheetStart {
+  mode: SheetMode;
+  /** Valgene vinduet aapner med. */
+  panel: PanelState;
+  /** Bildene har ulike valg for tjenesten: ingenting er forhaandsvalgt. */
+  mixed: boolean;
+}
+
+/** Bildene i maalet (ett for merkelappen). */
+export function sheetImages(target: SheetTarget): readonly string[] {
+  return target.kind === "item" ? [target.imageId] : target.imageIds;
+}
+
+/** Bildene blant `imageIds` som har tjenesten, i samme rekkefoelge. */
+export function withService(items: readonly BoardItem[], imageIds: readonly string[], service: BoardService): string[] {
+  return imageIds.filter((id) => items.some((it) => it.imageId === id && it.service === service));
+}
+
+/** Valgene for tjenesten uten noe valgt (standardene der det finnes en, som «La analysen avgjøre»). */
+export function clearService(service: BoardService, panel: PanelState): PanelState {
+  switch (service) {
+    case "skumring":
+      return { ...panel, dusk: null, duskImageType: "auto" };
+    case "klart_vaer":
+      return { ...panel, skyImageType: "auto" };
+    case "styling":
+      return { ...panel, styling: EMPTY_STYLING };
+    case "aarstid":
+      return { ...panel, aarstid: EMPTY_AARSTID };
+    case "skjul_ansikter":
+      return panel;
+  }
+}
+
+/** Valget paa ett element som tekst, med oenskene (de skal ikke overskrives i det stille). */
+function choiceSignature(item: BoardItem): string {
+  const fields = item.fields ?? {};
+  const sorted = Object.keys(fields)
+    .sort()
+    .map((k) => [k, fields[k]]);
+  return JSON.stringify([item.option, item.sourceSeason, sorted]);
+}
+
+/** Alle valgene for tjenesten paa ett bilde, uavhengig av rekkefoelgen. */
+function imageSignature(items: readonly BoardItem[], imageId: string, service: BoardService): string {
+  return items
+    .filter((it) => it.imageId === imageId && it.service === service)
+    .map(choiceSignature)
+    .sort()
+    .join("|");
+}
+
+/**
+ * Vinduet med valgene fra elementene paa ett bilde, eller null naar vinduet
+ * ikke kan vise dem (to kveldsbilder, stiler med ulik romtype, flere enn
+ * tillatt). Styling og aarstid: ett element per stil eller aarstid, med
+ * samme felt ellers.
+ */
+export function panelFromItems(items: readonly BoardItem[], panel: PanelState): PanelState | null {
+  if (items.length === 0) return null;
+  const [first] = items;
+  const base = panelFromItem(first, panel);
+  if (first.service !== "styling" && first.service !== "aarstid") return items.length === 1 ? base : null;
+  const rest = (it: BoardItem) => JSON.stringify([it.sourceSeason, choiceSignature({ ...it, option: null, sourceSeason: null })]);
+  if (items.some((it) => it.service !== first.service || rest(it) !== rest(first))) return null;
+  if (first.service === "styling") {
+    const styles = STYLING_STYLES.filter((s) => items.some((it) => it.option === s));
+    if (styles.length !== items.length || styles.length > MAX_ORDER_JOBS) return null;
+    return { ...base, styling: { ...base.styling, styles } };
+  }
+  const allowed = targetsFor(base.aarstid.source);
+  const seasons = SEASONS.filter((s) => items.some((it) => it.option === s));
+  if (seasons.length !== items.length || seasons.length > MAX_SEASONS || seasons.some((s) => !allowed.includes(s))) {
+    return null;
+  }
+  return { ...base, aarstid: { ...base.aarstid, seasons } };
+}
+
+/**
+ * Hva vinduet aapner med. Ingen av bildene har tjenesten: «Legg til», med
+ * det som ble valgt sist (`memory`) og det som gjelder bildet nullstilt.
+ * Har noen av dem den: «Oppdater», med valgene fra bildene naar de er like,
+ * ellers ingenting forhaandsvalgt (`mixed`). Merkelappen: valgene fra elementet.
+ */
+export function sheetStart(items: readonly BoardItem[], target: SheetTarget, memory: PanelState): SheetStart {
+  const { service } = target;
+  const empty = clearService(service, memory);
+  if (target.kind === "item") {
+    const item = items.find((it) => itemKey(it) === target.key);
+    return { mode: "edit", panel: item === undefined ? empty : panelFromItem(item, empty), mixed: false };
+  }
+  const having = withService(items, target.imageIds, service);
+  if (having.length === 0) return { mode: "add", panel: panelForNewSelection(memory), mixed: false };
+  const signatures = new Set(having.map((id) => imageSignature(items, id, service)));
+  const panel =
+    signatures.size === 1
+      ? panelFromItems(
+          items.filter((it) => it.imageId === having[0] && it.service === service),
+          empty
+        )
+      : null;
+  return panel === null ? { mode: "edit", panel: empty, mixed: true } : { mode: "edit", panel, mixed: false };
+}
+
+/**
+ * Brettet etter en knapp i vinduet, eller null naar valget ikke er komplett.
+ * «Legg til» legger valgene paa alle bildene i maalet, uten dubletter (de
+ * samme elementene som panelet i FE-3, addChoices). «Oppdater» bytter
+ * tjenesten med valgene bare paa bildene som har den; de andre roeres ikke.
+ * Merkelappen bytter bare sitt element (replaceItem).
+ */
+export function applySheet(
+  items: readonly BoardItem[],
+  target: SheetTarget,
+  action: SheetAction,
+  panel: PanelState
+): BoardItem[] | null {
+  const choices = panelChoices(target.service, panel);
+  if (choices === null) return null;
+  if (target.kind === "item") return replaceItem(items, target.key, choices);
+  if (action === "add") return addChoices(items, target.imageIds, choices);
+  const having = withService(items, target.imageIds, target.service);
+  return addChoices(removeFromImages(items, having, target.service), having, choices);
+}
+
+/** «Fjern» i vinduet: tjenesten av bildene i maalet, eller bare elementet for merkelappen. */
+export function removeSheet(items: readonly BoardItem[], target: SheetTarget): BoardItem[] {
+  if (target.kind === "item") return removeItem(items, target.key);
+  return removeFromImages(items, target.imageIds, target.service);
+}
+
+/**
+ * Knappene nederst i vinduet. Ingen har tjenesten: «Legg til på 2 bilder».
+ * Alle har den: «Oppdater 2 bilder». Noen har den: «Oppdater de 2 som har
+ * den» og «Legg til på alle 3» (Petter 30.10). `total` er bildene i maalet,
+ * `has` de som har tjenesten.
+ */
+export function sheetButtons(locale: Locale, mode: SheetMode, total: number, has: number): SheetButton[] {
+  if (mode === "add") {
+    return [{ action: "add", text: total === 1 ? t(locale, "board.addOne") : t(locale, "board.addMany", { n: total }) }];
+  }
+  if (has >= total) {
+    return [{ action: "update", text: total === 1 ? t(locale, "board.updateOne") : t(locale, "board.updateMany", { n: total }) }];
+  }
+  return [
+    { action: "update", text: has === 1 ? t(locale, "board.updateSomeOne") : t(locale, "board.updateSome", { n: has }) },
+    { action: "add", text: t(locale, "board.addAll", { n: total }) },
+  ];
+}
+
+/** Den dempede knappen «Fjern fra de 2 bildene»; null naar ingen av bildene har tjenesten. */
+export function removeText(locale: Locale, total: number, has: number): string | null {
+  if (has === 0) return null;
+  if (has === 1) return total === 1 ? t(locale, "board.removeOne") : t(locale, "board.removeSomeOne");
+  return t(locale, "board.removeMany", { n: has });
+}
+
+// --- panelet (FE-3b) ------------------------------------------------------------------
+
+export interface ServiceRow {
+  coverage: Coverage;
+  /** Hvor mange av de avkryssede som har tjenesten. */
+  has: number;
+  /** «Ikke lagt til», «På 1 av 2», «På alle 2»; null uten avkryssede bilder. */
+  status: string | null;
+  /** Knappen: «Legg til…» eller «Endre…». */
+  action: SheetMode;
+  /** «Ulike stiler nå: Japandi, Sekelskifte», eller null naar valgene er like. */
+  mixed: string | null;
+}
+
+/** Raden for tjenesten i panelet, for de avkryssede bildene. */
+export function serviceRow(
+  locale: Locale,
+  items: readonly BoardItem[],
+  selected: readonly string[],
+  service: BoardService
+): ServiceRow {
+  const state = coverage(items, selected, service);
+  const has = withService(items, selected, service).length;
+  return {
+    coverage: state,
+    has,
+    status: selected.length === 0 ? null : coverageText(locale, state, has, selected.length),
+    action: has === 0 ? "add" : "edit",
+    mixed: mixedText(locale, items, selected, service),
+  };
+}
+
+const MIXED_KEY: Readonly<Partial<Record<BoardService, UiKey>>> = {
+  skumring: "board.mixed.skumring",
+  styling: "board.mixed.styling",
+  aarstid: "board.mixed.aarstid",
+};
+
+/**
+ * Har bildene som har tjenesten ulike valg for den: hvilke («Ulike stiler nå:
+ * Japandi, Sekelskifte»), eller bare at de er ulike naar forskjellen er noe
+ * annet (romtype, bildetype, oensker). Null naar valgene er like.
+ */
+export function mixedText(
+  locale: Locale,
+  items: readonly BoardItem[],
+  imageIds: readonly string[],
+  service: BoardService
+): string | null {
+  const having = withService(items, imageIds, service);
+  const signatures = new Set(having.map((id) => imageSignature(items, id, service)));
+  if (signatures.size < 2) return null;
+  // Valgene som merkelappene viser (stilene, stemningen), per bilde og samlet.
+  const perImage = new Set<string>();
+  const details: string[] = [];
+  for (const id of having) {
+    const mine: string[] = [];
+    for (const it of items) {
+      if (it.service !== service || it.imageId !== id) continue;
+      const detail = itemDetail(locale, it);
+      if (detail === null) continue;
+      mine.push(detail);
+      if (!details.includes(detail)) details.push(detail);
+    }
+    perImage.add([...mine].sort().join("|"));
+  }
+  const key = MIXED_KEY[service];
+  // Samme stiler paa alle: forskjellen er noe annet (romtype, bildetype, oensker).
+  return key !== undefined && perImage.size > 1 ? t(locale, key, { list: details.join(", ") }) : t(locale, "board.mixed.other");
+}
+
+// --- aarstider er for utebilder (FE-3b) ---------------------------------------------------
+
+/** Ord i rom-navnet som tyder paa et innerom. Hele ordet, eller slutten av et sammensatt ord. */
+const INDOOR_WORDS = ["inne", "innendørs", "gang", "hall", "entré", "entre", "bod", "wc", "toalett", "loft", "kjeller", "vindfang"];
+const INDOOR_ENDINGS = ["stue", "kjøkken", "rom", "bad", "kontor", "living", "kitchen", "bedroom", "bathroom", "hallway", "office", "room"];
+
+/**
+ * Tyder rom-navnet paa at bildet er tatt inne («Stue», «Hovedsoverom»,
+ * «Gang»)? Ord som begynner paa «ute» («Uterom», «Uteplass») teller ikke.
+ * Et anslag: det gir bare en advarsel, backend avgjoer.
+ */
+export function looksIndoor(room: string | null): boolean {
+  if (room === null) return false;
+  const words = room.toLowerCase().split(/[^a-zæøåé]+/).filter((w) => w.length > 0 && !w.startsWith("ute"));
+  return words.some((w) => INDOOR_WORDS.includes(w) || INDOOR_ENDINGS.some((end) => w.endsWith(end)));
+}
+
+/**
+ * Bildene i maalet som ser ut til aa vaere tatt inne: rom-navnet tyder paa det,
+ * eller megleren har valgt «Innendørs» for en annen tjeneste paa bildet.
+ */
+export function indoorImages(
+  images: readonly AssignmentImage[],
+  items: readonly BoardItem[],
+  imageIds: readonly string[]
+): AssignmentImage[] {
+  const ids = new Set(imageIds);
+  return images.filter(
+    (img) =>
+      ids.has(img.id) &&
+      (looksIndoor(img.room) || items.some((it) => it.imageId === img.id && it.fields?.image_type_hint === "interior"))
+  );
 }
 
 // --- navnene ---------------------------------------------------------------------
@@ -232,8 +534,22 @@ export function addButtonText(locale: Locale, selected: number, has: number): st
  * «Digital styling · Japandi», «Årstider · Vinter»).
  */
 export function itemLabel(locale: Locale, item: BoardItem): string {
-  const name = t(locale, serviceNameKey(item.service));
-  const detail = choiceText(locale, item.service, item.option, fieldString(item, "dusk_style"));
+  return withDetail(t(locale, serviceNameKey(item.service)), itemDetail(locale, item));
+}
+
+/**
+ * Merkelappen paa bildekortet (FE-3b, skissen): det korte navnet og valget
+ * («Kveldsbilde · Varm skumring», «Styling · Japandi», «Årstid · Vinter»).
+ */
+export function badgeLabel(locale: Locale, item: BoardItem): string {
+  return withDetail(t(locale, `board.badge.${item.service}`), itemDetail(locale, item));
+}
+
+function itemDetail(locale: Locale, item: BoardItem): string | null {
+  return choiceText(locale, item.service, item.option, fieldString(item, "dusk_style"));
+}
+
+function withDetail(name: string, detail: string | null): string {
   return detail === null ? name : `${name} · ${detail}`;
 }
 
