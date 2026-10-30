@@ -179,7 +179,8 @@ test("D-5c: fanene er lenker i en nav, den du er paa har aria-current, og raden 
 });
 
 test("D-5c: siden viser fanene over bildet og gir kortet rammen", () => {
-  assert.match(page, /const tabs = orderTabs\(review\.order, jobId, locale\);/);
+  // FE-3c: `from` foelger med fanene, saa «← Til ordren» staar etter bytte.
+  assert.match(page, /const tabs = orderTabs\(review\.order, jobId, locale, from\);/);
   const tabsAt = page.indexOf("{tabs !== null && <OrderTabs tabs={tabs} locale={locale} />}");
   assert.ok(tabsAt > 0);
   assert.ok(tabsAt > page.indexOf("{deleted && ("), "under bannerne");

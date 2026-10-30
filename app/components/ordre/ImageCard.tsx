@@ -17,7 +17,7 @@ import { useLocale } from "../../lib/i18n/useLocale";
  * naar feltet forlates eller med Enter) og «Fjern» (bare uten resultater, K
  * 2.6). Kallene ligger hos forelderen; de gir en feilkode (`assignmentError`)
  * eller null tilbake. Knappene er minst 44 px. Under staar resultatene paa
- * bildet (FE-3, ResultList).
+ * bildet (FE-3, ResultList), i hele kortets bredde (FE-3c).
  *
  * Rekkefoelgen (FE-3 tillegg, Petter 30.10): kortet dras med dnd-kit. Paa PC
  * kan hele kortet dras med musa (ikke fra feltet eller knappene); med finger og
@@ -37,6 +37,7 @@ const ICON_BUTTON = `inline-flex size-11 shrink-0 items-center justify-center ro
 const MENU_ITEM = `flex min-h-11 w-full items-center rounded-button px-3 text-left text-sm text-ink hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 ${FOCUS}`;
 
 export function ImageCard({
+  assignmentId,
   image,
   number,
   count,
@@ -44,6 +45,8 @@ export function ImageCard({
   onMove,
   onRemove,
 }: {
+  /** Ordren, som «Åpne» tar med til godkjenningssiden (`?fra=`, FE-3c). */
+  assignmentId: string;
   image: AssignmentImage;
   /** Plassen i lista (1..n), som vises. */
   number: number;
@@ -166,138 +169,140 @@ export function ImageCard({
       onMouseDown={onMouseDown as MouseEventHandler<HTMLLIElement> | undefined}
       className={cardClass(
         "none",
-        `relative flex gap-3 p-3 ${isDragging ? "z-10 border-dashed border-line-strong bg-surface-2 opacity-60" : ""}`
+        `relative flex min-w-0 flex-col gap-3 p-3 ${isDragging ? "z-10 border-dashed border-line-strong bg-surface-2 opacity-60" : ""}`
       )}
     >
-      <button
-        ref={setActivatorNodeRef}
-        type="button"
-        data-drag-handle=""
-        {...attributes}
-        {...handleListeners}
-        aria-label={t(locale, "orders.dragHandle", { n: number })}
-        className={`${ICON_BUTTON} -ml-1 cursor-grab touch-none self-start active:cursor-grabbing`}
-      >
-        <GripVertical aria-hidden className="size-5" strokeWidth={1.75} />
-      </button>
+      <div className="flex gap-3">
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          data-drag-handle=""
+          {...attributes}
+          {...handleListeners}
+          aria-label={t(locale, "orders.dragHandle", { n: number })}
+          className={`${ICON_BUTTON} -ml-1 cursor-grab touch-none self-start active:cursor-grabbing`}
+        >
+          <GripVertical aria-hidden className="size-5" strokeWidth={1.75} />
+        </button>
 
-      <span className="flex aspect-[4/3] w-24 shrink-0 items-center justify-center overflow-hidden rounded-button bg-surface-2 sm:w-32">
-        {image.thumbUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={image.thumbUrl}
-            alt={t(locale, "orders.imageAlt", { n: number })}
-            loading="lazy"
-            draggable={false}
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <>
-            <ImageOff aria-hidden className="size-5 text-ink-2" strokeWidth={1.75} />
-            <span className="sr-only">{t(locale, "orders.thumbMissing")}</span>
-          </>
-        )}
-      </span>
+        <span className="flex aspect-[4/3] w-24 shrink-0 items-center justify-center self-start overflow-hidden rounded-button bg-surface-2 sm:w-32">
+          {image.thumbUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={image.thumbUrl}
+              alt={t(locale, "orders.imageAlt", { n: number })}
+              loading="lazy"
+              draggable={false}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <>
+              <ImageOff aria-hidden className="size-5 text-ink-2" strokeWidth={1.75} />
+              <span className="sr-only">{t(locale, "orders.thumbMissing")}</span>
+            </>
+          )}
+        </span>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <div className="flex items-start gap-2">
-          <p className="flex min-w-0 flex-1 items-baseline gap-2 pt-3 text-sm">
-            <span className="font-medium text-ink">{number}.</span>
-            <span className="truncate text-ink-2">{image.fileName}</span>
-          </p>
-          <div className="relative">
-            <button
-              ref={menuButtonRef}
-              id={menuButtonId(image.id)}
-              type="button"
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              aria-controls={menuOpen ? menuId : undefined}
-              aria-label={t(locale, "orders.moveMenu", { n: number })}
-              className={ICON_BUTTON}
-            >
-              <MoreHorizontal aria-hidden className="size-5" strokeWidth={1.75} />
-            </button>
-            {menuOpen && (
-              <div
-                ref={menuRef}
-                id={menuId}
-                role="menu"
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex items-start gap-2">
+            <p className="flex min-w-0 flex-1 items-baseline gap-2 pt-3 text-sm">
+              <span className="font-medium text-ink">{number}.</span>
+              <span className="truncate text-ink-2">{image.fileName}</span>
+            </p>
+            <div className="relative">
+              <button
+                ref={menuButtonRef}
+                id={menuButtonId(image.id)}
+                type="button"
+                onClick={() => setMenuOpen((open) => !open)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                aria-controls={menuOpen ? menuId : undefined}
                 aria-label={t(locale, "orders.moveMenu", { n: number })}
-                onKeyDown={onMenuKey}
-                className="absolute right-0 top-12 z-20 w-44 rounded-button border border-line bg-surface p-1"
+                className={ICON_BUTTON}
               >
-                {MOVE_ACTIONS.map((action) => (
-                  <button
-                    key={action}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => chooseMove(action)}
-                    disabled={moveDisabled(action)}
-                    className={MENU_ITEM}
-                  >
-                    {t(locale, `orders.move.${action}`)}
-                  </button>
-                ))}
-              </div>
-            )}
+                <MoreHorizontal aria-hidden className="size-5" strokeWidth={1.75} />
+              </button>
+              {menuOpen && (
+                <div
+                  ref={menuRef}
+                  id={menuId}
+                  role="menu"
+                  aria-label={t(locale, "orders.moveMenu", { n: number })}
+                  onKeyDown={onMenuKey}
+                  className="absolute right-0 top-12 z-20 w-44 rounded-button border border-line bg-surface p-1"
+                >
+                  {MOVE_ACTIONS.map((action) => (
+                    <button
+                      key={action}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => chooseMove(action)}
+                      disabled={moveDisabled(action)}
+                      className={MENU_ITEM}
+                    >
+                      {t(locale, `orders.move.${action}`)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
+          <div>
+            <label htmlFor={roomId} className="sr-only">
+              {t(locale, "orders.room")}
+            </label>
+            <input
+              id={roomId}
+              type="text"
+              maxLength={ROOM_MAX}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => void saveRoom()}
+              onKeyDown={onRoomKey}
+              placeholder={t(locale, "orders.roomExample")}
+              aria-busy={saving}
+              className={`block w-full min-h-11 rounded-button border border-line-strong bg-surface px-3 py-2 text-sm text-ink ${FOCUS}`}
+            />
+            {saving && <p className="mt-1 text-[13px] text-ink-2">{t(locale, "orders.roomSaving")}</p>}
+          </div>
+
+          {confirming ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="w-full text-sm text-ink">{t(locale, "orders.removeAsk")}</p>
+              <button type="button" onClick={() => void remove()} disabled={removing} className={buttonClass("danger")}>
+                {t(locale, "orders.removeConfirm")}
+              </button>
+              <button
+                ref={keepRef}
+                type="button"
+                onClick={() => setConfirming(false)}
+                disabled={removing}
+                className={buttonClass("secondary")}
+              >
+                {t(locale, "orders.removeCancel")}
+              </button>
+            </div>
+          ) : removable ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <button ref={removeRef} type="button" onClick={() => setConfirming(true)} className={buttonClass("secondary")}>
+                {t(locale, "orders.remove")}
+              </button>
+            </div>
+          ) : (
+            <p className="text-[13px] text-ink-2">{t(locale, "orders.removeLocked")}</p>
+          )}
+
+          {errorCode !== null && (
+            <p className="text-sm text-red-fg" role="alert">
+              {codeText(locale, "assignmentError", errorCode)}
+            </p>
+          )}
         </div>
-
-        <div>
-          <label htmlFor={roomId} className="sr-only">
-            {t(locale, "orders.room")}
-          </label>
-          <input
-            id={roomId}
-            type="text"
-            maxLength={ROOM_MAX}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={() => void saveRoom()}
-            onKeyDown={onRoomKey}
-            placeholder={t(locale, "orders.roomExample")}
-            aria-busy={saving}
-            className={`block w-full min-h-11 rounded-button border border-line-strong bg-surface px-3 py-2 text-sm text-ink ${FOCUS}`}
-          />
-          {saving && <p className="mt-1 text-[13px] text-ink-2">{t(locale, "orders.roomSaving")}</p>}
-        </div>
-
-        {confirming ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="w-full text-sm text-ink">{t(locale, "orders.removeAsk")}</p>
-            <button type="button" onClick={() => void remove()} disabled={removing} className={buttonClass("danger")}>
-              {t(locale, "orders.removeConfirm")}
-            </button>
-            <button
-              ref={keepRef}
-              type="button"
-              onClick={() => setConfirming(false)}
-              disabled={removing}
-              className={buttonClass("secondary")}
-            >
-              {t(locale, "orders.removeCancel")}
-            </button>
-          </div>
-        ) : removable ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <button ref={removeRef} type="button" onClick={() => setConfirming(true)} className={buttonClass("secondary")}>
-              {t(locale, "orders.remove")}
-            </button>
-          </div>
-        ) : (
-          <p className="text-[13px] text-ink-2">{t(locale, "orders.removeLocked")}</p>
-        )}
-
-        {errorCode !== null && (
-          <p className="text-sm text-red-fg" role="alert">
-            {codeText(locale, "assignmentError", errorCode)}
-          </p>
-        )}
-
-        <ResultList results={image.results} number={number} />
       </div>
+
+      <ResultList results={image.results} number={number} assignmentId={assignmentId} />
     </li>
   );
 }

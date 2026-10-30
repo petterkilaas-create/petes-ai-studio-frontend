@@ -67,6 +67,7 @@ export type CodeGroup =
 const nbUi = {
   "review.title": "Kontroll av bildet",
   "review.back": "Tilbake til historikk",
+  "review.backToOrder": "Til ordren",
   "review.loading": "Henter jobben …",
   "review.notFound": "Fant ikke jobben",
   "review.notFoundHint": "Jobben finnes ikke, eller den tilhører en annen bruker.",
@@ -905,6 +906,7 @@ const nbUi = {
   "orders.orderMore": "Bestill flere tjenester",
   "orders.startedOne": "1 bearbeiding er startet. Resultatet kommer under bildet når det er klart.",
   "orders.startedMany": "{n} bearbeidinger er startet. Resultatene kommer under bildene når de er klare.",
+  "orders.startedClose": "Lukk meldingen",
   "orders.results.title": "Resultater",
   "orders.results.version": "Versjon {n}",
   "orders.results.open": "Åpne",
@@ -1643,6 +1645,7 @@ const en: Dictionary = {
   ui: {
     "review.title": "Image review",
     "review.back": "Back to history",
+    "review.backToOrder": "Back to the order",
     "review.loading": "Loading the job …",
     "review.notFound": "Job not found",
     "review.notFoundHint": "The job does not exist, or it belongs to another user.",
@@ -2428,6 +2431,7 @@ const en: Dictionary = {
     "orders.orderMore": "Order more services",
     "orders.startedOne": "1 edit has been started. The result appears under the image when it is ready.",
     "orders.startedMany": "{n} edits have been started. The results appear under the images when they are ready.",
+    "orders.startedClose": "Close the message",
     "orders.results.title": "Results",
     "orders.results.version": "Version {n}",
     "orders.results.open": "Open",
