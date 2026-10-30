@@ -21,12 +21,14 @@ import { codeText, t, type CodeGroup, type UiKey } from "@/app/lib/i18n";
 import { useLocale } from "@/app/lib/i18n/useLocale";
 import {
   buildDecision,
+  canReopen,
   decisionControls,
   isFireplaceStop,
   isStopped,
   mediaDeleted,
   outcome,
   noteText,
+  reopenKeys,
   resultImageUrl,
   reviewNotes,
   shouldPoll,
@@ -136,6 +138,7 @@ import { WishesPanel } from "@/app/components/godkjenning/WishesPanel";
 import { DetailsPanel } from "@/app/components/godkjenning/DetailsPanel";
 import { DisclosureBlock } from "@/app/components/godkjenning/DisclosureBlock";
 import { DownloadButton } from "@/app/components/godkjenning/DownloadButton";
+import { ReopenConfirm } from "@/app/components/godkjenning/ReopenConfirm";
 import { SeasonSwitchPanel } from "@/app/components/godkjenning/SeasonSwitchPanel";
 import { BrightnessApproved, BrightnessControl } from "@/app/components/godkjenning/BrightnessControl";
 import { choiceClass, FOCUS } from "@/app/components/godkjenning/classes";
@@ -230,6 +233,17 @@ import { choiceClass, FOCUS } from "@/app/components/godkjenning/classes";
  * parseFrom). Da gaar tilbake-lenken til bildesiden («← Til ordren») i stedet
  * for til Historikk, og fanene tar `fra` med seg. Avgjoerelser og retting
  * blir paa siden, saa lenken staar etterpaa ogsaa.
+ *
+ * Ordresiden (FE-4): med `embedded` staar kroppen inne i spilleren, uten
+ * tilbake-lenken og overskriften (spilleren har sine). `onChanged` faar
+ * handlingen (`approve`, `reject`, `reopen`), saa spilleren kan hoppe til
+ * neste til kontroll; uten handling (retting, poll, 409) henter den bare
+ * paa nytt. «Avbryt» i et stopp sendes uten handling (kan ikke angres).
+ *
+ * «Angre godkjenning» (FE-4, K 2.10): i kortet etter avgjoerelsen, bare naar
+ * `allowed_actions` har `reopen` (canReopen), med en bekreftelse
+ * (ReopenConfirm). Etterpaa hentes review paa nytt, og resultatet staar som
+ * «Til godkjenning» med knappene igjen.
  */
 
 type LoadState = { kind: "loading" } | ReviewFetchResult;
@@ -244,11 +258,15 @@ export function ResultReview({
   jobId,
   from = null,
   onChanged,
+  embedded = false,
 }: {
   jobId: string;
   /** Ordre-id-en fra `?fra=` (uuid), eller null. */
   from?: string | null;
-  onChanged?: () => void;
+  /** Etter en avgjoerelse (med handlingen) og naar en ny runde er ferdig (uten). */
+  onChanged?: (action?: DecisionAction) => void;
+  /** Inne i ordresiden: uten tilbake-lenken og overskriften. */
+  embedded?: boolean;
 }) {
   const { getToken } = useAuth();
   const locale = useLocale();
@@ -357,7 +375,7 @@ export function ResultReview({
   useEffect(() => {
     onChangedRef.current = onChanged;
   }, [onChanged]);
-  const changed = useCallback(() => onChangedRef.current?.(), []);
+  const changed = useCallback((action?: DecisionAction) => onChangedRef.current?.(action), []);
 
   // Ender pollingen uten at review er endret (f.eks. ukjent status), poller
   // vi ikke paa nytt: activePollId er den samme, saa useJobStatus starter ikke igjen.
@@ -365,7 +383,7 @@ export function ResultReview({
   useEffect(() => {
     // Som over: setState skjer etter await i fetchReview.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (pollDone) void fetchReview().then(changed);
+    if (pollDone) void fetchReview().then(() => changed());
   }, [pollDone, fetchReview, changed]);
 
   const retry = () => {
@@ -410,7 +428,9 @@ export function ResultReview({
             setReasonText("");
             // «Ja, avbryt» i et stopp: gratisbildet bare naar svaret sier "returned".
             if (fromStop) setStopDone(stopDoneKey(out.quotaReturn));
-            changed();
+            if (action === "reopen") setMessage({ key: "reopen.done" });
+            // «Avbryt» i et stopp kan ikke angres: ingen handling, saa ordresiden blir staaende.
+            changed(fromStop ? undefined : action);
             break;
           case "poll":
             setRejectOpen(false);
@@ -590,6 +610,576 @@ export function ResultReview({
         ? t(locale, message.key)
         : codeText(locale, message.group, message.code);
 
+  const body = (
+    <>
+      {load.kind === "loading" && (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <div className="w-8 h-8 border-4 border-line border-t-ink rounded-full animate-spin motion-reduce:animate-none" />
+          <p className="text-ink-2 text-sm">
+            {t(locale, waking ? "net.waking" : "review.loading")}
+          </p>
+        </div>
+      )}
+
+      {load.kind === "not_found" && (
+        <div className={`${CARD} text-center max-w-lg mx-auto`}>
+          <p className="text-ink font-bold text-lg mb-2">{t(locale, "review.notFound")}</p>
+          <p className="text-ink-2 text-sm">{t(locale, "review.notFoundHint")}</p>
+        </div>
+      )}
+
+      {(load.kind === "unavailable" || load.kind === "error") && (
+        <div className={`${CARD} text-center max-w-lg mx-auto`}>
+          <p className="text-ink text-sm mb-6">
+            {load.kind === "unavailable"
+              ? t(locale, "review.unavailable")
+              : t(locale, "review.loadError")}
+          </p>
+          <button onClick={retry} className={BTN_PRIMARY}>
+            {t(locale, "review.retry")}
+          </button>
+        </div>
+      )}
+
+      {load.kind === "ok" &&
+        (() => {
+          const review = load.review;
+          const controls = decisionControls(review, answer);
+          const done = outcome(review);
+          // TG-NEW-268: «Bildetype: … (valgt ved bestilling)», bare naar megleren valgte typen.
+          const typeLine = imageTypeLine(review);
+          // P3b: grunnene naar vi ikke laget bildet, og gratisbildet ved "returned".
+          // Rett etter «Ja, avbryt» staar bekreftelsen i stedet (den har gratisbildet med).
+          const doneLines =
+            stopDone !== null
+              ? [stopDone]
+              : failedLines({ ...review, imageType: review.imageType.value });
+          // «Rått fra modellen» skjules naar lysstyrke finnes (TG-NEW-147, valg (a)).
+          const variants = visibleVariants(
+            compareVariants(review.images, { isAdmin: caps.viewAll }),
+            review.brightness
+          );
+          const strip = versionStrip(review.images, variants);
+          const entry = selectedEntry(strip, variantId);
+          const originalShown = entry?.kind === "original";
+          // FE-3: råbildet står ikke i stripa; bryteren viser det for valgt versjon (bare admin).
+          const raw = rawCounterpart(variants, entry);
+          const rawOn = rawShown && raw !== null;
+          const shown = rawOn ? raw : entry?.kind === "variant" ? entry.variant : null;
+          // «Godkjenn» er låst når råbildet vises, som før (backend godkjenner gjeldende versjon).
+          const approveLock = approveLocked(strip, entry) || rawOn;
+          // FE-3: fra klikket på «Lag nytt bilde» eller «Lag bildet» til nytt resultat eller feil.
+          const making = makingImage(polling, pending) ? nextVersion(variants) : null;
+          const brightness = brightnessView(review, shown);
+          const step = brightness.kind === "control" ? selectedStep(brightness, chosenStep) : null;
+          // Gjeldende runde med slideren: trinnets lenke fra backend, aldri et CSS-filter.
+          const stepShown = brightness.kind === "control" && !brightness.locked ? step : null;
+          // Gamle jobber uten rounds: lenken velges fra de merkede feltene som foer.
+          // Runder: lenken som den er, null gir plassholder (ingen tilbakefall).
+          // «Original» i stripa: originalen, bare i lysboksen (siden viser den uten resultat).
+          const roundUrl = originalShown
+            ? review.images.originalUrl
+            : shown === null
+              ? null
+              : shown.source.kind === "legacy"
+                ? resultImageUrl(review.images, shown.source.variant)
+                : shown.source.url;
+          const shownUrl = stepShown !== null ? brightnessResultUrl(review.brightness, stepShown) : roundUrl;
+          const entryLabel =
+            entry === null
+              ? ""
+              : rawOn
+                ? variantLabel(locale, raw, { choices: admin, presetId: review.presetId })
+                : stripLabel(locale, entry, { choices: admin, presetId: review.presetId });
+          const shownLabel =
+            stepShown !== null
+              ? `${entryLabel} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
+              : entryLabel;
+          const correction = correctionControls(review);
+          const canCorrect = correction.show && !limitReached && done === null;
+          const isEditing = editing && canCorrect;
+          // Panelene per oppskrift (G3): uten peispanelet ingen peisspoersmaal.
+          const fireplaceShown = correctionFireplaceShown(review.fireplace) && panelShown(review, "fireplace");
+          const kind = correctionKind(review, fireplaceShown);
+          // «Endre valg» (TG-NEW-145): velgeren bare naar review-svaret sier det (choicesKind).
+          const choiceKind = choicesKind(review);
+          const choiceStart = initialChoices(review);
+          const choices = choicesBody(choiceKind, choiceStart, choiceState);
+          const correctionBody = buildCorrection(review, toggles, fireplaceShown, correctAnswer, choices);
+          const overrides = correctionBody.overrides ?? { promote: [], disable: [], add: [] };
+          const confirmNeeded = needsConfirmation(overrides);
+          const submitEnabled = canSubmitCorrection({
+            overrides,
+            confirmed,
+            fireplaceShown,
+            answer: correctAnswer,
+          });
+          // «Marker og beskriv» (FE-3): bare naar review-svaret sier det og resultatet har en forhaandsvisning.
+          const localAvailable = localShown(review) && review.images.previewUrl !== null;
+          const isLocal = isEditing && localMode && localAvailable;
+          // Etter en lokal runde: lista med status per endring, og forrige versjon mot ny (D1) for gjeldende versjon.
+          const results = editResults(review);
+          const compare = !approveLock && !originalShown ? localCompare(review) : null;
+          const compareOn = compare !== null && !isLocal;
+          const missing = localMissing({ studio: localStudio, drafts: localDrafts, aspect: localAspect });
+          const failedMessage = roundFailedMessage(review);
+          const correctionTitleKey = correctionView(kind, {
+            lightsShown: panelShown(review, "lights"),
+            lightCount: 0,
+            choices: choiceKind !== null,
+          }).titleKey;
+
+          const readOnly = isReadOnlyOther(review);
+          const deleted = mediaDeleted(review);
+          const tabs = orderTabs(review.order, jobId, locale, from);
+          const sw = seasonSwitch(review);
+          const feedback = feedbackMode(review);
+
+          return (
+            <>
+              {readOnly && (
+                // TG-NEW-127: admin paa en annen brukers jobb. Knappene styres
+                // fortsatt bare av allowed_actions, som da er tom.
+                <p
+                  className="text-sm text-neutral-fg bg-neutral-bg rounded-button p-3"
+                  role="status"
+                >
+                  {t(locale, "review.readOnlyOther")}
+                </p>
+              )}
+
+              {deleted && (
+                // TG-NEW-117: bildene i full stoerrelse er slettet; opplysningene er beholdt.
+                <p
+                  className="text-sm text-neutral-fg bg-neutral-bg rounded-button p-3"
+                  role="status"
+                >
+                  {t(locale, "review.mediaDeleted", { date: formatDate(review.mediaDeletedAt ?? null, locale) })}
+                </p>
+              )}
+
+              {tabs !== null && <OrderTabs tabs={tabs} locale={locale} />}
+
+              {/* Stort bilde til venstre, handlinger og stemning i en kolonne paa 22rem ved siden av. Paa mobil under hverandre. */}
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
+                <section className={`${CARD} flex flex-col gap-6 min-w-0`}>
+                  {deleted ? (
+                    // Ingen varianter, modusknapper eller lysstyrke: én boks (Petter 05.10, A1).
+                    <PreviewPlaceholder reason="deleted" />
+                  ) : (
+                    <>
+                      <VersionStrip
+                        strip={strip}
+                        selectedId={entry?.id ?? null}
+                        onSelect={setVariantId}
+                        choices={admin}
+                        presetId={review.presetId}
+                        making={making}
+                        locale={locale}
+                      />
+                      {/* FE-3: laget dekker visningen mens en ny versjon lages; den er inert så lenge. */}
+                      <div className="relative">
+                        <div inert={making !== null}>
+                          {isLocal && review.images.previewUrl !== null ? (
+                            <StudioCanvas
+                              src={review.images.previewUrl}
+                              alt={t(locale, "local.canvasAlt")}
+                              tool="box"
+                              width={STROKE_WIDTH_DEFAULT}
+                              studio={localStudio}
+                              onChange={(next) => {
+                                setLocalStudio(next);
+                                setLocalRejected(null);
+                              }}
+                              onBox={addBoxFromCanvas}
+                              numbered
+                              activeId={localActive}
+                              onActive={setLocalActive}
+                              onAspect={setLocalAspect}
+                              locale={locale}
+                            />
+                          ) : (
+                            <CompareViewer
+                              originalUrl={review.images.originalUrl}
+                              result={shown === null ? null : { url: shownUrl, label: shownLabel }}
+                              placeholder={<PreviewPlaceholder />}
+                              onResultLoad={() => setResultLoaded(true)}
+                              lightsView={
+                                canShowMarkers(review, { litOnly: !admin }) && review.images.originalUrl !== null ? (
+                                  <LightMarkers
+                                    url={review.images.originalUrl}
+                                    lights={review.lights}
+                                    inputOrientation={review.inputOrientation}
+                                    litOnly={!admin}
+                                    locale={locale}
+                                  />
+                                ) : null
+                              }
+                              additionsView={
+                                canShowAdditions(review) && review.images.previewUrl !== null ? (
+                                  <AdditionMarkers
+                                    url={review.images.previewUrl}
+                                    items={review.additionsCheck.items}
+                                    admin={admin}
+                                    locale={locale}
+                                  />
+                                ) : null
+                              }
+                              onExpand={() => setLightbox(true)}
+                              base={
+                                compareOn && compareBase === "previous"
+                                  ? {
+                                      url: compare.previousUrl,
+                                      label: t(locale, "local.previous"),
+                                      alt: t(locale, "local.previousAlt"),
+                                    }
+                                  : null
+                              }
+                              marks={
+                                compareOn && boxesShown ? (
+                                  <LocalEditBoxes boxes={compare.boxes} activeK={resultActive} />
+                                ) : null
+                              }
+                              locale={locale}
+                            />
+                          )}
+                        </div>
+                        {making !== null && <MakingOverlay version={making} locale={locale} />}
+                      </div>
+                      {raw !== null && (
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => setRawShown(!rawOn)}
+                            aria-pressed={rawOn}
+                            className={choiceClass(rawOn, "rounded-pill")}
+                          >
+                            {t(locale, "compare.showRaw")}
+                          </button>
+                        </div>
+                      )}
+                      {brightness.kind === "control" && step !== null && (
+                        <BrightnessControl
+                          view={brightness}
+                          step={step}
+                          onChange={setChosenStep}
+                          locked={locked}
+                          preload={preloadUrls(brightness.steps, step)}
+                          ready={resultLoaded}
+                          locale={locale}
+                        />
+                      )}
+                      {brightness.kind === "approved" && <BrightnessApproved step={brightness.step} locale={locale} />}
+                      {compareOn && (
+                        <div role="group" aria-label={t(locale, "local.compareLabel")} className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            aria-pressed={compareBase === "previous"}
+                            onClick={() => setCompareBase("previous")}
+                            className={choiceClass(compareBase === "previous", "rounded-pill")}
+                          >
+                            {t(locale, "local.vsPrevious")}
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={compareBase === "original"}
+                            onClick={() => setCompareBase("original")}
+                            className={choiceClass(compareBase === "original", "rounded-pill")}
+                          >
+                            {t(locale, "local.vsOriginal")}
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={boxesShown}
+                            onClick={() => setBoxesShown(!boxesShown)}
+                            className={choiceClass(boxesShown, "rounded-pill")}
+                          >
+                            {t(locale, "local.showBoxes")}
+                          </button>
+                        </div>
+                      )}
+                      {lightbox && review.images.originalUrl !== null && (
+                        <Lightbox
+                          originalUrl={review.images.originalUrl}
+                          aiUrl={shownUrl}
+                          aiAlt={
+                            originalShown
+                              ? t(locale, "compare.altOriginal")
+                              : t(locale, "compare.altResult", { label: shownLabel })
+                          }
+                          placeholder={<PreviewPlaceholder />}
+                          rounds={
+                            stripShown(strip, making) ? (
+                              <VersionStrip
+                                strip={strip}
+                                selectedId={entry?.id ?? null}
+                                onSelect={setVariantId}
+                                choices={admin}
+                                presetId={review.presetId}
+                                making={making}
+                                locale={locale}
+                              />
+                            ) : null
+                          }
+                          originalOnly={originalShown}
+                          onClose={() => setLightbox(false)}
+                          locale={locale}
+                        />
+                      )}
+                    </>
+                  )}
+                </section>
+
+                <div className="flex flex-col gap-6 min-w-0">
+                  {done !== null ? (
+                    <>
+                      {/* Nedlasting og tekst til annonsen der resultatet vises (etter godkjenning). */}
+                      <section className={CARD}>
+                        <p className="text-ink font-bold">{t(locale, doneTitleKey(done.key, stopDone))}</p>
+                        {done.reason && (
+                          <p className="text-sm text-ink mt-2 break-words">
+                            {t(locale, "review.reasonLabel")}: {done.reason}
+                          </p>
+                        )}
+                        {doneLines.map((key) => (
+                          <p key={key} className="text-sm text-ink mt-2">
+                            {t(locale, key)}
+                          </p>
+                        ))}
+                        {typeLine !== null && <p className="text-sm text-ink mt-2">{noteText(locale, typeLine)}</p>}
+                        {canDownload(review) && <DownloadButton jobId={review.jobId} presetId={review.presetId} locale={locale} />}
+                        {canReopen(review) && !readOnly && (
+                          <ReopenConfirm
+                            keys={reopenKeys(review.status)}
+                            onConfirm={() => decide("reopen", null)}
+                            locked={locked}
+                            working={pending === "reopen"}
+                            locale={locale}
+                          />
+                        )}
+                        {review.status === "succeeded" && (
+                          <DisclosureBlock disclosure={review.disclosure} locale={locale} />
+                        )}
+                        {messageText !== null && (
+                          <p
+                            className="mt-6 text-sm text-amber-fg bg-amber-bg rounded-button p-3"
+                            role="status"
+                          >
+                            {messageText}
+                          </p>
+                        )}
+                      </section>
+                      {/* Dag 58: tilbakemeldingen etter «Godkjenn» eller «Avvis»; admin leser andres. */}
+                      {feedback !== null && (
+                        <FeedbackCard
+                          jobId={review.jobId}
+                          readOnly={feedback === "read"}
+                          presetId={review.presetId}
+                          round={feedbackRound(review)}
+                          locale={locale}
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {results !== null && !isEditing && making === null && (
+                        <section className={CARD}>
+                          <LocalEditResults
+                            rows={results}
+                            activeK={resultActive}
+                            onActive={setResultActive}
+                            onRetry={retryEdit}
+                            locked={locked}
+                            locale={locale}
+                          />
+                        </section>
+                      )}
+                      <DecisionCard
+                        // Porten (Dag 56, P3a): stoppboksen og merknadene for alle roller.
+                        stop={
+                          isStopped(review)
+                            ? { reasons: stopReasons(review), fireplace: isFireplaceStop(review) }
+                            : null
+                        }
+                        notes={reviewNotes(review)}
+                        imageTypeLine={typeLine}
+                        controls={controls}
+                        canCorrect={canCorrect}
+                        roundFailed={correction.roundFailed}
+                        roundFailedText={
+                          "key" in failedMessage
+                            ? t(locale, failedMessage.key)
+                            : codeText(locale, failedMessage.group, failedMessage.code)
+                        }
+                        // Banneret sier det allerede: ingen «Ingen handlinger …» (C1).
+                        readOnly={readOnly || deleted}
+                        locked={locked}
+                        busy={busy}
+                        approving={isApproving(pending)}
+                        polling={polling}
+                        answer={answer}
+                        onAnswer={setAnswer}
+                        rejectOpen={rejectOpen}
+                        onRejectOpen={setRejectOpen}
+                        reasonText={reasonText}
+                        onReasonText={setReasonText}
+                        onDecide={(action) => decide(action, step)}
+                        onStartCorrection={startCorrection}
+                        correction={
+                          isEditing ? (
+                            <div className="flex flex-col gap-4">
+                              {localAvailable && (
+                                <div role="group" aria-label={t(locale, "local.modes")} className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    aria-pressed={!localMode}
+                                    onClick={() => setLocalMode(false)}
+                                    disabled={locked}
+                                    className={choiceClass(!localMode, "rounded-pill")}
+                                  >
+                                    {t(locale, correctionTitleKey)}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    aria-pressed={localMode}
+                                    onClick={() => setLocalMode(true)}
+                                    disabled={locked}
+                                    className={choiceClass(localMode, "rounded-pill")}
+                                  >
+                                    {t(locale, "local.title")}
+                                  </button>
+                                </div>
+                              )}
+                              {isLocal ? (
+                                <LocalEditPanel
+                                  studio={localStudio}
+                                  onStudio={(next) => {
+                                    setLocalStudio(next);
+                                    setLocalRejected(null);
+                                  }}
+                                  drafts={localDrafts}
+                                  onDraft={(id: number, draft: EditDraft) =>
+                                    setLocalDrafts((prev) => ({ ...prev, [id]: draft }))
+                                  }
+                                  activeId={localActive}
+                                  onActive={setLocalActive}
+                                  missing={missing === null ? null : missingText(missing)}
+                                  rejected={localRejected}
+                                  info={localInfo(review)}
+                                  onSubmit={submitLocal}
+                                  onCancel={cancelCorrection}
+                                  originalUrl={review.images.originalUrl}
+                                  aspect={localAspect}
+                                  locked={locked}
+                                  locale={locale}
+                                />
+                              ) : (
+                                <CorrectionPanel
+                                  lights={review.lights}
+                                  toggles={toggles}
+                                  onToggle={(light, uncertain, on) =>
+                                    setToggles((prev) => setToggle(prev, light, uncertain, on))
+                                  }
+                                  fireplaceShown={fireplaceShown}
+                                  lightsShown={panelShown(review, "lights")}
+                                  kind={kind}
+                                  answer={correctAnswer}
+                                  onAnswer={setCorrectAnswer}
+                                  confirmNeeded={confirmNeeded}
+                                  confirmed={confirmed}
+                                  onConfirmed={setConfirmed}
+                                  roundsLeft={correction.roundsLeft}
+                                  submitEnabled={submitEnabled}
+                                  onSubmit={submitCorrection}
+                                  onCancel={cancelCorrection}
+                                  locked={locked}
+                                  admin={admin}
+                                  choices={
+                                    choiceKind === "dusk" ? (
+                                      <DuskChoicePicker
+                                        value={choiceState.dusk}
+                                        onChange={(dusk) => setChoiceState((prev) => ({ ...prev, dusk }))}
+                                        disabled={locked}
+                                        images={DUSK_IMAGES}
+                                        compact
+                                        locale={locale}
+                                      />
+                                    ) : choiceKind === "styling" ? (
+                                      <StylingCorrectionPicker
+                                        styles={correctionStyles(review.order, jobId, choiceStart.style)}
+                                        style={choiceState.style}
+                                        decor={choiceState.decor}
+                                        onStyle={(style) => setChoiceState((prev) => ({ ...prev, style }))}
+                                        onDecor={(decor) => setChoiceState((prev) => ({ ...prev, decor }))}
+                                        disabled={locked}
+                                        locale={locale}
+                                      />
+                                    ) : null
+                                  }
+                                  submitKey={correctionSubmitKey(choices)}
+                                  locale={locale}
+                                />
+                              )}
+                            </div>
+                          ) : null
+                        }
+                        additions={review.additionsCheck}
+                        checklist={checklistFor(review.presetId)}
+                        compared={compared}
+                        onCompared={setCompared}
+                        acknowledged={acknowledged}
+                        onAcknowledged={setAcknowledged}
+                        approveLock={approveLock}
+                        framingPct={framingWarning(review.framing)}
+                        checkedVersion={checkedVersion(review)}
+                        message={messageText}
+                        locale={locale}
+                      />
+                    </>
+                  )}
+
+                  {sw !== null && (
+                    <SeasonSwitchPanel
+                      jobId={review.jobId}
+                      view={sw}
+                      quota={quota.quota}
+                      onQuota={quota.apply}
+                      locale={locale}
+                    />
+                  )}
+
+                  {/* TG-NEW-263: ønskene og svaret, for alle roller, under kortet med knappene. */}
+                  {review.wishes !== null && (
+                    <WishesPanel
+                      wishes={review.wishes}
+                      status={review.status}
+                      isOwner={review.isOwner}
+                      locale={locale}
+                    />
+                  )}
+
+                  <MoodPanel review={review} admin={admin} locale={locale} />
+
+                  {/* Analysen bare for admin (brief §3 punkt 6). */}
+                  {showDetails(caps) && <DetailsPanel review={review} locale={locale} />}
+                </div>
+              </div>
+            </>
+          );
+        })()}
+    </>
+  );
+
+  // FE-4: inne i ordresiden har spilleren tilbake-lenken og overskriften.
+  if (embedded) {
+    return (
+      <div className="flex min-w-0 flex-col gap-6">
+        {admin && <p className="text-ink-2 text-xs font-mono break-all">{jobId}</p>}
+        {body}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col">
       <main className="max-w-[1360px] mx-auto w-full p-4 sm:p-8 flex-1 flex flex-col gap-6">
@@ -605,553 +1195,7 @@ export function ResultReview({
           </h1>
           {admin && <p className="text-ink-2 text-xs font-mono break-all">{jobId}</p>}
         </div>
-
-        {load.kind === "loading" && (
-          <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <div className="w-8 h-8 border-4 border-line border-t-ink rounded-full animate-spin motion-reduce:animate-none" />
-            <p className="text-ink-2 text-sm">
-              {t(locale, waking ? "net.waking" : "review.loading")}
-            </p>
-          </div>
-        )}
-
-        {load.kind === "not_found" && (
-          <div className={`${CARD} text-center max-w-lg mx-auto`}>
-            <p className="text-ink font-bold text-lg mb-2">{t(locale, "review.notFound")}</p>
-            <p className="text-ink-2 text-sm">{t(locale, "review.notFoundHint")}</p>
-          </div>
-        )}
-
-        {(load.kind === "unavailable" || load.kind === "error") && (
-          <div className={`${CARD} text-center max-w-lg mx-auto`}>
-            <p className="text-ink text-sm mb-6">
-              {load.kind === "unavailable"
-                ? t(locale, "review.unavailable")
-                : t(locale, "review.loadError")}
-            </p>
-            <button onClick={retry} className={BTN_PRIMARY}>
-              {t(locale, "review.retry")}
-            </button>
-          </div>
-        )}
-
-        {load.kind === "ok" &&
-          (() => {
-            const review = load.review;
-            const controls = decisionControls(review, answer);
-            const done = outcome(review);
-            // TG-NEW-268: «Bildetype: … (valgt ved bestilling)», bare naar megleren valgte typen.
-            const typeLine = imageTypeLine(review);
-            // P3b: grunnene naar vi ikke laget bildet, og gratisbildet ved "returned".
-            // Rett etter «Ja, avbryt» staar bekreftelsen i stedet (den har gratisbildet med).
-            const doneLines =
-              stopDone !== null
-                ? [stopDone]
-                : failedLines({ ...review, imageType: review.imageType.value });
-            // «Rått fra modellen» skjules naar lysstyrke finnes (TG-NEW-147, valg (a)).
-            const variants = visibleVariants(
-              compareVariants(review.images, { isAdmin: caps.viewAll }),
-              review.brightness
-            );
-            const strip = versionStrip(review.images, variants);
-            const entry = selectedEntry(strip, variantId);
-            const originalShown = entry?.kind === "original";
-            // FE-3: råbildet står ikke i stripa; bryteren viser det for valgt versjon (bare admin).
-            const raw = rawCounterpart(variants, entry);
-            const rawOn = rawShown && raw !== null;
-            const shown = rawOn ? raw : entry?.kind === "variant" ? entry.variant : null;
-            // «Godkjenn» er låst når råbildet vises, som før (backend godkjenner gjeldende versjon).
-            const approveLock = approveLocked(strip, entry) || rawOn;
-            // FE-3: fra klikket på «Lag nytt bilde» eller «Lag bildet» til nytt resultat eller feil.
-            const making = makingImage(polling, pending) ? nextVersion(variants) : null;
-            const brightness = brightnessView(review, shown);
-            const step = brightness.kind === "control" ? selectedStep(brightness, chosenStep) : null;
-            // Gjeldende runde med slideren: trinnets lenke fra backend, aldri et CSS-filter.
-            const stepShown = brightness.kind === "control" && !brightness.locked ? step : null;
-            // Gamle jobber uten rounds: lenken velges fra de merkede feltene som foer.
-            // Runder: lenken som den er, null gir plassholder (ingen tilbakefall).
-            // «Original» i stripa: originalen, bare i lysboksen (siden viser den uten resultat).
-            const roundUrl = originalShown
-              ? review.images.originalUrl
-              : shown === null
-                ? null
-                : shown.source.kind === "legacy"
-                  ? resultImageUrl(review.images, shown.source.variant)
-                  : shown.source.url;
-            const shownUrl = stepShown !== null ? brightnessResultUrl(review.brightness, stepShown) : roundUrl;
-            const entryLabel =
-              entry === null
-                ? ""
-                : rawOn
-                  ? variantLabel(locale, raw, { choices: admin, presetId: review.presetId })
-                  : stripLabel(locale, entry, { choices: admin, presetId: review.presetId });
-            const shownLabel =
-              stepShown !== null
-                ? `${entryLabel} · ${t(locale, "brightness.altStep", { step: stepName(locale, stepShown) })}`
-                : entryLabel;
-            const correction = correctionControls(review);
-            const canCorrect = correction.show && !limitReached && done === null;
-            const isEditing = editing && canCorrect;
-            // Panelene per oppskrift (G3): uten peispanelet ingen peisspoersmaal.
-            const fireplaceShown = correctionFireplaceShown(review.fireplace) && panelShown(review, "fireplace");
-            const kind = correctionKind(review, fireplaceShown);
-            // «Endre valg» (TG-NEW-145): velgeren bare naar review-svaret sier det (choicesKind).
-            const choiceKind = choicesKind(review);
-            const choiceStart = initialChoices(review);
-            const choices = choicesBody(choiceKind, choiceStart, choiceState);
-            const correctionBody = buildCorrection(review, toggles, fireplaceShown, correctAnswer, choices);
-            const overrides = correctionBody.overrides ?? { promote: [], disable: [], add: [] };
-            const confirmNeeded = needsConfirmation(overrides);
-            const submitEnabled = canSubmitCorrection({
-              overrides,
-              confirmed,
-              fireplaceShown,
-              answer: correctAnswer,
-            });
-            // «Marker og beskriv» (FE-3): bare naar review-svaret sier det og resultatet har en forhaandsvisning.
-            const localAvailable = localShown(review) && review.images.previewUrl !== null;
-            const isLocal = isEditing && localMode && localAvailable;
-            // Etter en lokal runde: lista med status per endring, og forrige versjon mot ny (D1) for gjeldende versjon.
-            const results = editResults(review);
-            const compare = !approveLock && !originalShown ? localCompare(review) : null;
-            const compareOn = compare !== null && !isLocal;
-            const missing = localMissing({ studio: localStudio, drafts: localDrafts, aspect: localAspect });
-            const failedMessage = roundFailedMessage(review);
-            const correctionTitleKey = correctionView(kind, {
-              lightsShown: panelShown(review, "lights"),
-              lightCount: 0,
-              choices: choiceKind !== null,
-            }).titleKey;
-
-            const readOnly = isReadOnlyOther(review);
-            const deleted = mediaDeleted(review);
-            const tabs = orderTabs(review.order, jobId, locale, from);
-            const sw = seasonSwitch(review);
-            const feedback = feedbackMode(review);
-
-            return (
-              <>
-                {readOnly && (
-                  // TG-NEW-127: admin paa en annen brukers jobb. Knappene styres
-                  // fortsatt bare av allowed_actions, som da er tom.
-                  <p
-                    className="text-sm text-neutral-fg bg-neutral-bg rounded-button p-3"
-                    role="status"
-                  >
-                    {t(locale, "review.readOnlyOther")}
-                  </p>
-                )}
-
-                {deleted && (
-                  // TG-NEW-117: bildene i full stoerrelse er slettet; opplysningene er beholdt.
-                  <p
-                    className="text-sm text-neutral-fg bg-neutral-bg rounded-button p-3"
-                    role="status"
-                  >
-                    {t(locale, "review.mediaDeleted", { date: formatDate(review.mediaDeletedAt ?? null, locale) })}
-                  </p>
-                )}
-
-                {tabs !== null && <OrderTabs tabs={tabs} locale={locale} />}
-
-                {/* Stort bilde til venstre, handlinger og stemning i en kolonne paa 22rem ved siden av. Paa mobil under hverandre. */}
-                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
-                  <section className={`${CARD} flex flex-col gap-6 min-w-0`}>
-                    {deleted ? (
-                      // Ingen varianter, modusknapper eller lysstyrke: én boks (Petter 05.10, A1).
-                      <PreviewPlaceholder reason="deleted" />
-                    ) : (
-                      <>
-                        <VersionStrip
-                          strip={strip}
-                          selectedId={entry?.id ?? null}
-                          onSelect={setVariantId}
-                          choices={admin}
-                          presetId={review.presetId}
-                          making={making}
-                          locale={locale}
-                        />
-                        {/* FE-3: laget dekker visningen mens en ny versjon lages; den er inert så lenge. */}
-                        <div className="relative">
-                          <div inert={making !== null}>
-                            {isLocal && review.images.previewUrl !== null ? (
-                              <StudioCanvas
-                                src={review.images.previewUrl}
-                                alt={t(locale, "local.canvasAlt")}
-                                tool="box"
-                                width={STROKE_WIDTH_DEFAULT}
-                                studio={localStudio}
-                                onChange={(next) => {
-                                  setLocalStudio(next);
-                                  setLocalRejected(null);
-                                }}
-                                onBox={addBoxFromCanvas}
-                                numbered
-                                activeId={localActive}
-                                onActive={setLocalActive}
-                                onAspect={setLocalAspect}
-                                locale={locale}
-                              />
-                            ) : (
-                              <CompareViewer
-                                originalUrl={review.images.originalUrl}
-                                result={shown === null ? null : { url: shownUrl, label: shownLabel }}
-                                placeholder={<PreviewPlaceholder />}
-                                onResultLoad={() => setResultLoaded(true)}
-                                lightsView={
-                                  canShowMarkers(review, { litOnly: !admin }) && review.images.originalUrl !== null ? (
-                                    <LightMarkers
-                                      url={review.images.originalUrl}
-                                      lights={review.lights}
-                                      inputOrientation={review.inputOrientation}
-                                      litOnly={!admin}
-                                      locale={locale}
-                                    />
-                                  ) : null
-                                }
-                                additionsView={
-                                  canShowAdditions(review) && review.images.previewUrl !== null ? (
-                                    <AdditionMarkers
-                                      url={review.images.previewUrl}
-                                      items={review.additionsCheck.items}
-                                      admin={admin}
-                                      locale={locale}
-                                    />
-                                  ) : null
-                                }
-                                onExpand={() => setLightbox(true)}
-                                base={
-                                  compareOn && compareBase === "previous"
-                                    ? {
-                                        url: compare.previousUrl,
-                                        label: t(locale, "local.previous"),
-                                        alt: t(locale, "local.previousAlt"),
-                                      }
-                                    : null
-                                }
-                                marks={
-                                  compareOn && boxesShown ? (
-                                    <LocalEditBoxes boxes={compare.boxes} activeK={resultActive} />
-                                  ) : null
-                                }
-                                locale={locale}
-                              />
-                            )}
-                          </div>
-                          {making !== null && <MakingOverlay version={making} locale={locale} />}
-                        </div>
-                        {raw !== null && (
-                          <div>
-                            <button
-                              type="button"
-                              onClick={() => setRawShown(!rawOn)}
-                              aria-pressed={rawOn}
-                              className={choiceClass(rawOn, "rounded-pill")}
-                            >
-                              {t(locale, "compare.showRaw")}
-                            </button>
-                          </div>
-                        )}
-                        {brightness.kind === "control" && step !== null && (
-                          <BrightnessControl
-                            view={brightness}
-                            step={step}
-                            onChange={setChosenStep}
-                            locked={locked}
-                            preload={preloadUrls(brightness.steps, step)}
-                            ready={resultLoaded}
-                            locale={locale}
-                          />
-                        )}
-                        {brightness.kind === "approved" && <BrightnessApproved step={brightness.step} locale={locale} />}
-                        {compareOn && (
-                          <div role="group" aria-label={t(locale, "local.compareLabel")} className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              aria-pressed={compareBase === "previous"}
-                              onClick={() => setCompareBase("previous")}
-                              className={choiceClass(compareBase === "previous", "rounded-pill")}
-                            >
-                              {t(locale, "local.vsPrevious")}
-                            </button>
-                            <button
-                              type="button"
-                              aria-pressed={compareBase === "original"}
-                              onClick={() => setCompareBase("original")}
-                              className={choiceClass(compareBase === "original", "rounded-pill")}
-                            >
-                              {t(locale, "local.vsOriginal")}
-                            </button>
-                            <button
-                              type="button"
-                              aria-pressed={boxesShown}
-                              onClick={() => setBoxesShown(!boxesShown)}
-                              className={choiceClass(boxesShown, "rounded-pill")}
-                            >
-                              {t(locale, "local.showBoxes")}
-                            </button>
-                          </div>
-                        )}
-                        {lightbox && review.images.originalUrl !== null && (
-                          <Lightbox
-                            originalUrl={review.images.originalUrl}
-                            aiUrl={shownUrl}
-                            aiAlt={
-                              originalShown
-                                ? t(locale, "compare.altOriginal")
-                                : t(locale, "compare.altResult", { label: shownLabel })
-                            }
-                            placeholder={<PreviewPlaceholder />}
-                            rounds={
-                              stripShown(strip, making) ? (
-                                <VersionStrip
-                                  strip={strip}
-                                  selectedId={entry?.id ?? null}
-                                  onSelect={setVariantId}
-                                  choices={admin}
-                                  presetId={review.presetId}
-                                  making={making}
-                                  locale={locale}
-                                />
-                              ) : null
-                            }
-                            originalOnly={originalShown}
-                            onClose={() => setLightbox(false)}
-                            locale={locale}
-                          />
-                        )}
-                      </>
-                    )}
-                  </section>
-
-                  <div className="flex flex-col gap-6 min-w-0">
-                    {done !== null ? (
-                      <>
-                        {/* Nedlasting og tekst til annonsen der resultatet vises (etter godkjenning). */}
-                        <section className={CARD}>
-                          <p className="text-ink font-bold">{t(locale, doneTitleKey(done.key, stopDone))}</p>
-                          {done.reason && (
-                            <p className="text-sm text-ink mt-2 break-words">
-                              {t(locale, "review.reasonLabel")}: {done.reason}
-                            </p>
-                          )}
-                          {doneLines.map((key) => (
-                            <p key={key} className="text-sm text-ink mt-2">
-                              {t(locale, key)}
-                            </p>
-                          ))}
-                          {typeLine !== null && <p className="text-sm text-ink mt-2">{noteText(locale, typeLine)}</p>}
-                          {canDownload(review) && <DownloadButton jobId={review.jobId} presetId={review.presetId} locale={locale} />}
-                          {review.status === "succeeded" && (
-                            <DisclosureBlock disclosure={review.disclosure} locale={locale} />
-                          )}
-                          {messageText !== null && (
-                            <p
-                              className="mt-6 text-sm text-amber-fg bg-amber-bg rounded-button p-3"
-                              role="status"
-                            >
-                              {messageText}
-                            </p>
-                          )}
-                        </section>
-                        {/* Dag 58: tilbakemeldingen etter «Godkjenn» eller «Avvis»; admin leser andres. */}
-                        {feedback !== null && (
-                          <FeedbackCard
-                            jobId={review.jobId}
-                            readOnly={feedback === "read"}
-                            presetId={review.presetId}
-                            round={feedbackRound(review)}
-                            locale={locale}
-                          />
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        {results !== null && !isEditing && making === null && (
-                          <section className={CARD}>
-                            <LocalEditResults
-                              rows={results}
-                              activeK={resultActive}
-                              onActive={setResultActive}
-                              onRetry={retryEdit}
-                              locked={locked}
-                              locale={locale}
-                            />
-                          </section>
-                        )}
-                        <DecisionCard
-                          // Porten (Dag 56, P3a): stoppboksen og merknadene for alle roller.
-                          stop={
-                            isStopped(review)
-                              ? { reasons: stopReasons(review), fireplace: isFireplaceStop(review) }
-                              : null
-                          }
-                          notes={reviewNotes(review)}
-                          imageTypeLine={typeLine}
-                          controls={controls}
-                          canCorrect={canCorrect}
-                          roundFailed={correction.roundFailed}
-                          roundFailedText={
-                            "key" in failedMessage
-                              ? t(locale, failedMessage.key)
-                              : codeText(locale, failedMessage.group, failedMessage.code)
-                          }
-                          // Banneret sier det allerede: ingen «Ingen handlinger …» (C1).
-                          readOnly={readOnly || deleted}
-                          locked={locked}
-                          busy={busy}
-                          approving={isApproving(pending)}
-                          polling={polling}
-                          answer={answer}
-                          onAnswer={setAnswer}
-                          rejectOpen={rejectOpen}
-                          onRejectOpen={setRejectOpen}
-                          reasonText={reasonText}
-                          onReasonText={setReasonText}
-                          onDecide={(action) => decide(action, step)}
-                          onStartCorrection={startCorrection}
-                          correction={
-                            isEditing ? (
-                              <div className="flex flex-col gap-4">
-                                {localAvailable && (
-                                  <div role="group" aria-label={t(locale, "local.modes")} className="flex flex-wrap gap-2">
-                                    <button
-                                      type="button"
-                                      aria-pressed={!localMode}
-                                      onClick={() => setLocalMode(false)}
-                                      disabled={locked}
-                                      className={choiceClass(!localMode, "rounded-pill")}
-                                    >
-                                      {t(locale, correctionTitleKey)}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      aria-pressed={localMode}
-                                      onClick={() => setLocalMode(true)}
-                                      disabled={locked}
-                                      className={choiceClass(localMode, "rounded-pill")}
-                                    >
-                                      {t(locale, "local.title")}
-                                    </button>
-                                  </div>
-                                )}
-                                {isLocal ? (
-                                  <LocalEditPanel
-                                    studio={localStudio}
-                                    onStudio={(next) => {
-                                      setLocalStudio(next);
-                                      setLocalRejected(null);
-                                    }}
-                                    drafts={localDrafts}
-                                    onDraft={(id: number, draft: EditDraft) =>
-                                      setLocalDrafts((prev) => ({ ...prev, [id]: draft }))
-                                    }
-                                    activeId={localActive}
-                                    onActive={setLocalActive}
-                                    missing={missing === null ? null : missingText(missing)}
-                                    rejected={localRejected}
-                                    info={localInfo(review)}
-                                    onSubmit={submitLocal}
-                                    onCancel={cancelCorrection}
-                                    originalUrl={review.images.originalUrl}
-                                    aspect={localAspect}
-                                    locked={locked}
-                                    locale={locale}
-                                  />
-                                ) : (
-                                  <CorrectionPanel
-                                    lights={review.lights}
-                                    toggles={toggles}
-                                    onToggle={(light, uncertain, on) =>
-                                      setToggles((prev) => setToggle(prev, light, uncertain, on))
-                                    }
-                                    fireplaceShown={fireplaceShown}
-                                    lightsShown={panelShown(review, "lights")}
-                                    kind={kind}
-                                    answer={correctAnswer}
-                                    onAnswer={setCorrectAnswer}
-                                    confirmNeeded={confirmNeeded}
-                                    confirmed={confirmed}
-                                    onConfirmed={setConfirmed}
-                                    roundsLeft={correction.roundsLeft}
-                                    submitEnabled={submitEnabled}
-                                    onSubmit={submitCorrection}
-                                    onCancel={cancelCorrection}
-                                    locked={locked}
-                                    admin={admin}
-                                    choices={
-                                      choiceKind === "dusk" ? (
-                                        <DuskChoicePicker
-                                          value={choiceState.dusk}
-                                          onChange={(dusk) => setChoiceState((prev) => ({ ...prev, dusk }))}
-                                          disabled={locked}
-                                          images={DUSK_IMAGES}
-                                          compact
-                                          locale={locale}
-                                        />
-                                      ) : choiceKind === "styling" ? (
-                                        <StylingCorrectionPicker
-                                          styles={correctionStyles(review.order, jobId, choiceStart.style)}
-                                          style={choiceState.style}
-                                          decor={choiceState.decor}
-                                          onStyle={(style) => setChoiceState((prev) => ({ ...prev, style }))}
-                                          onDecor={(decor) => setChoiceState((prev) => ({ ...prev, decor }))}
-                                          disabled={locked}
-                                          locale={locale}
-                                        />
-                                      ) : null
-                                    }
-                                    submitKey={correctionSubmitKey(choices)}
-                                    locale={locale}
-                                  />
-                                )}
-                              </div>
-                            ) : null
-                          }
-                          additions={review.additionsCheck}
-                          checklist={checklistFor(review.presetId)}
-                          compared={compared}
-                          onCompared={setCompared}
-                          acknowledged={acknowledged}
-                          onAcknowledged={setAcknowledged}
-                          approveLock={approveLock}
-                          framingPct={framingWarning(review.framing)}
-                          checkedVersion={checkedVersion(review)}
-                          message={messageText}
-                          locale={locale}
-                        />
-                      </>
-                    )}
-
-                    {sw !== null && (
-                      <SeasonSwitchPanel
-                        jobId={review.jobId}
-                        view={sw}
-                        quota={quota.quota}
-                        onQuota={quota.apply}
-                        locale={locale}
-                      />
-                    )}
-
-                    {/* TG-NEW-263: ønskene og svaret, for alle roller, under kortet med knappene. */}
-                    {review.wishes !== null && (
-                      <WishesPanel
-                        wishes={review.wishes}
-                        status={review.status}
-                        isOwner={review.isOwner}
-                        locale={locale}
-                      />
-                    )}
-
-                    <MoodPanel review={review} admin={admin} locale={locale} />
-
-                    {/* Analysen bare for admin (brief §3 punkt 6). */}
-                    {showDetails(caps) && <DetailsPanel review={review} locale={locale} />}
-                  </div>
-                </div>
-              </>
-            );
-          })()}
+        {body}
       </main>
     </div>
   );

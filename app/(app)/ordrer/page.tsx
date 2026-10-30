@@ -6,7 +6,7 @@ import { useAuth } from "@clerk/nextjs";
 import { Download, ImageOff } from "lucide-react";
 import { assignmentRequest } from "@/app/lib/api";
 import { assignmentErrorCode, listAssignments, type AssignmentSummary } from "@/app/lib/assignments";
-import { appendOrders, NEW_ORDER_PATH, orderDeliveryHref, orderImagesHref, orderMeta, ORDERS_PAGE_SIZE } from "@/app/lib/ordrer";
+import { appendOrders, NEW_ORDER_PATH, orderDeliveryHref, orderHref, orderMeta, ORDERS_PAGE_SIZE } from "@/app/lib/ordrer";
 import { formatDay } from "@/app/lib/dates";
 import { ORDERS_PATH, isPageEnabled } from "@/app/lib/services";
 import { ServiceUnavailable } from "@/app/components/ServiceUnavailable";
@@ -20,8 +20,9 @@ import { useLocale } from "@/app/lib/i18n/useLocale";
 /**
  * Ordrelista (TG-NEW-277, FE-2): adresse, oppdragsnummer, antall bilder og
  * dato, nyeste foerst (K 2.2), med «Vis flere» etter `next_cursor`. Filtrene i
- * skissen er kuttet for lanseringen (audit punkt 9). Hver rad gaar til bildene
- * til ordresiden finnes (FE-4), og «Last ned» til nedlastingen (FE-5).
+ * skissen er kuttet for lanseringen (audit punkt 9). Hver rad gaar til
+ * ordresiden naar ordren har resultater, ellers til bildene (orderHref, FE-4),
+ * og «Last ned» til nedlastingen (FE-5).
  */
 export default function OrdersPage() {
   if (!isPageEnabled(ORDERS_PATH)) return <ServiceUnavailable />;
@@ -125,7 +126,7 @@ function OrdersContent() {
             {orders.map((order) => (
               <li key={order.id} className={cardClass("none", "flex flex-col sm:flex-row sm:items-center")}>
                 <Link
-                  href={orderImagesHref(order.id)}
+                  href={orderHref(order)}
                   className={`flex min-w-0 flex-1 items-center gap-4 rounded-card p-3 transition-colors hover:bg-surface-2 ${FOCUS}`}
                 >
                   <span className="flex aspect-[4/3] w-20 shrink-0 items-center justify-center overflow-hidden rounded-button bg-surface-2 sm:w-28">

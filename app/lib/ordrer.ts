@@ -5,7 +5,8 @@ import {
   type AssignmentResult,
   type AssignmentSummary,
 } from "./assignments.ts";
-import { parseFrom, reviewHref } from "./orderTabs.ts";
+import { parseFrom } from "./orderTabs.ts";
+import { playerHref } from "./player.ts";
 import { t, type Locale, type UiKey } from "./i18n/index.ts";
 import { ORDERS_PATH } from "./services.ts";
 import { retryable, type UploadRow } from "./uploadQueue.ts";
@@ -20,9 +21,17 @@ import { retryable, type UploadRow } from "./uploadQueue.ts";
 /** `/ordrer/ny`: adresse og oppdragsnummer. */
 export const NEW_ORDER_PATH = `${ORDERS_PATH}/ny`;
 
-/** Bildene i ordren. Ordresiden (`/ordrer/[id]`) kommer i FE-4; til da gaar lista hit. */
+/** Bildene i ordren: opplasting, rom og rekkefoelge. */
 export function orderImagesHref(id: string): string {
   return `${ORDERS_PATH}/${encodeURIComponent(id)}/bilder`;
+}
+
+/**
+ * Lenken fra ordrelista (FE-4): ordresiden naar ordren har resultater,
+ * ellers bildesiden (der lastes bildene opp foerst).
+ */
+export function orderHref(order: Pick<AssignmentSummary, "id" | "counts">): string {
+  return order.counts.results > 0 ? playerHref(order.id) : orderImagesHref(order.id);
 }
 
 /** Bildebrettet (FE-3): velg tjenester, ogsaa for etterbestilling. */
@@ -247,24 +256,21 @@ export function applyRoom(images: readonly AssignmentImage[], id: string, room: 
 // --- resultatene paa bildesiden (FE-3) ----------------------------------------------
 
 /**
- * Lenken til godkjenningssiden for det som kan aapnes der (til godkjenning,
- * trenger svar, godkjent), ellers null. Med ordren som `?fra=` (FE-3c), saa
- * megleren kommer tilbake til bildesiden.
+ * «Åpne» paa et resultat (FE-4): ordresiden med bildet og resultatet valgt.
+ * Alle resultater kan aapnes der, unntatt det som ikke ble startet.
  */
-export function resultReviewHref(result: AssignmentResult, assignmentId: string | null = null): string | null {
-  const s = result.displayStatus;
-  return s === "to_review" || s === "needs_answer" || s === "approved" ? reviewHref(result.resultId, assignmentId) : null;
+export function resultOpenHref(assignmentId: string, imageId: string, result: AssignmentResult): string | null {
+  return result.displayStatus === "not_started" ? null : playerHref(assignmentId, { imageId, resultId: result.resultId });
 }
 
 /**
  * Tilbake-lenken paa godkjenningssiden (FE-3c): «← Til ordren» med en gyldig
  * `fra` (stien bygges her, aldri fra adressen), ellers Historikk som foer.
+ * FE-4: «Til ordren» gaar til ordresiden.
  */
 export function reviewBackLink(from: string | null): { href: string; key: UiKey } {
   const order = parseFrom(from);
-  return order === null
-    ? { href: "/history", key: "review.back" }
-    : { href: orderImagesHref(order), key: "review.backToOrder" };
+  return order === null ? { href: "/history", key: "review.back" } : { href: playerHref(order), key: "review.backToOrder" };
 }
 
 /**

@@ -6,8 +6,8 @@ import {
   type AssignmentRequest,
   type AssignmentResult,
 } from "./assignments.ts";
-import { reviewHref } from "./orderTabs.ts";
 import { orderImagesHref } from "./ordrer.ts";
+import { playerHref } from "./player.ts";
 import { t, type Locale, type UiKey } from "./i18n/index.ts";
 
 /**
@@ -233,13 +233,16 @@ export function noteKey(code: string): UiKey {
 }
 
 /**
- * Hvor megleren kan gjoere noe med resultatet: godkjenningssiden for til
- * godkjenning og trenger svar, ellers bildesiden (foelge med, bestille paa
- * nytt). Teksten paa lenken foelger med.
+ * Hvor megleren kan gjoere noe med resultatet: ordresiden med bildet og
+ * resultatet valgt for til godkjenning og trenger svar (FE-4, Petter 30.10:
+ * playerHref, som «Åpne» paa bildesiden), ellers bildesiden (foelge med,
+ * bestille paa nytt). Teksten paa lenken foelger med.
  */
 export function noteLink(assignmentId: string, note: DeliveryNote): { href: string; key: UiKey } {
   const review = note.code === "result_to_review" || note.code === "result_needs_answer";
-  if (review && note.resultId !== null) return { href: reviewHref(note.resultId), key: "delivery.note.openReview" };
+  if (review && note.resultId !== null) {
+    return { href: playerHref(assignmentId, { imageId: note.imageId, resultId: note.resultId }), key: "delivery.note.openReview" };
+  }
   return { href: orderImagesHref(assignmentId), key: "delivery.note.openImages" };
 }
 
