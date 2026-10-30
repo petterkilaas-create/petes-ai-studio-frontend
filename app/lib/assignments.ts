@@ -75,6 +75,10 @@ export interface AssignmentResult {
   resultId: string;
   service: string;
   presetId: string | null;
+  /** Tjenestekoden i ordren (K 2.7: `skumring` …), eller null for eldre jobber uten den (#271). */
+  orderService: string | null;
+  /** Stilen eller maalaarstiden (`styling_japandi`, `vinter`), ellers null (#271). */
+  option: string | null;
   serviceLabel: string | null;
   optionLabel: string | null;
   status: string;
@@ -208,6 +212,8 @@ export function parseResult(raw: unknown): AssignmentResult | null {
     resultId,
     service: str(raw.service) ?? "",
     presetId: str(raw.preset_id),
+    orderService: str(raw.order_service),
+    option: str(raw.option),
     serviceLabel: str(raw.service_label),
     optionLabel: str(raw.option_label),
     status: str(raw.status) ?? "",
@@ -510,19 +516,29 @@ export interface OrderJobsWireItem {
   service: string;
   option?: string;
   source_season?: string;
+  dusk_style?: string;
+  dusk_time?: string;
+  dusk_sky?: string;
+  fireplace_fire?: boolean;
+  image_type_hint?: string;
+  furnish_as?: string;
+  room_empty_confirmed?: boolean;
+  decor_level?: number;
+  wishes?: string;
 }
 
 /**
  * POST /v1/assignments/{id}/jobs (K 2.7): hoeyst 80 elementer per kall
  * (board.ts deler opp), `Idempotency-Key` paakrevd. 202 gir svaret per element.
+ * `signal` gir tidsavbrudd (orderStart.ts).
  */
 export async function orderAssignmentJobs(
   request: AssignmentRequest,
-  opts: { id: string; items: OrderJobsWireItem[]; idempotencyKey: string }
+  opts: { id: string; items: OrderJobsWireItem[]; idempotencyKey: string; signal?: AbortSignal }
 ): Promise<OrderJobsResult> {
-  const res = await request(
-    `${assignmentPath(opts.id)}/jobs`,
-    jsonInit("POST", { items: opts.items }, { "Idempotency-Key": opts.idempotencyKey })
-  );
+  const res = await request(`${assignmentPath(opts.id)}/jobs`, {
+    ...jsonInit("POST", { items: opts.items }, { "Idempotency-Key": opts.idempotencyKey }),
+    signal: opts.signal,
+  });
   return parseOrderJobs(await expectJson(res, 202));
 }

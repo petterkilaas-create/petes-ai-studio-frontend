@@ -99,10 +99,10 @@ test("FE-2: alle tre sidene sjekker flagget paa /ordrer og viser ServiceUnavaila
     assert.match(src, /^"use client";/, rel);
     assert.match(src, /if \(!isPageEnabled\(ORDERS_PATH\)\) return <ServiceUnavailable \/>;/, rel);
   }
-  // Bildene: params med use(), og ny tilstand (og ny koe) per ordre.
+  // Bildene: params med use(), og ny tilstand (og ny koe) per ordre. FE-3: `?startet=` fra oppsummeringen.
   const images = withoutComments(read("(app)/ordrer/[id]/bilder/page.tsx"));
   assert.match(images, /const \{ id \} = use\(params\);/);
-  assert.match(images, /<OrderImages key=\{id\} assignmentId=\{id\} \/>/);
+  assert.match(images, /<OrderImages key=\{id\} assignmentId=\{id\} started=\{started\} \/>/);
 });
 
 test("FE-2: ingen synlig tekst skrevet rett inn i sidene og komponentene", () => {
@@ -472,22 +472,23 @@ test("bildene: rom, flytt og fjern gaar til PATCH og DELETE; 409 image_has_resul
   // Et fjernet bilde tas ut av koeen, ellers kommer det tilbake med mergeUploaded.
   assert.match(src, /if \(row !== undefined\) queue\.remove\(row\.id\);/);
   assert.match(src, /queue\.setCapacity\(queueCapacity\(next\.length, queue\.rows\)\);/);
-  // «Videre til tjenester» er synlig, men av, til FE-3.
-  assert.match(src, /<Button disabled aria-describedby="order-next-soon">\s*\{t\(locale, "orders\.next"\)\}/);
+  // FE-3: «Videre til tjenester» (eller «Bestill flere tjenester») gaar til brettet.
+  assert.match(src, /<ButtonLink href=\{orderServicesHref\(assignmentId\)\}>/);
+  assert.match(src, /t\(locale, hasResults \? "orders\.orderMore" : "orders\.next"\)/);
   assert.equal(t("nb", "orders.next"), "Videre til tjenester");
-  assert.equal(t("nb", "orders.soon"), "Kommer");
+  assert.equal(t("nb", "orders.orderMore"), "Bestill flere tjenester");
 });
 
-test("bildekortet: flytteknappene har navn og er 44 px; «Fjern» bare uten resultater, med spoersmaal foerst", () => {
+test("bildekortet: haandtaket og menyen har navn og er 44 px; «Fjern» bare uten resultater, med spoersmaal foerst", () => {
   const src = withoutComments(read("components/ordre/ImageCard.tsx"));
   assert.match(src, /const ICON_BUTTON = `inline-flex size-11 /);
-  assert.match(src, /aria-label=\{t\(locale, "orders\.moveUp", \{ n: number \}\)\}/);
-  assert.match(src, /aria-label=\{t\(locale, "orders\.moveDown", \{ n: number \}\)\}/);
-  assert.match(src, /disabled=\{first\}/);
-  assert.match(src, /disabled=\{last\}/);
-  assert.match(src, /\{removable \? \(/);
+  // FE-3 tillegg: pilknappene er borte; haandtaket og menyen «⋯» har navn.
+  assert.doesNotMatch(src, /<Arrow(Up|Down)\b/);
+  assert.match(src, /aria-label=\{t\(locale, "orders\.dragHandle", \{ n: number \}\)\}/);
+  assert.match(src, /aria-label=\{t\(locale, "orders\.moveMenu", \{ n: number \}\)\}/);
+  assert.match(src, /\) : removable \? \(/);
   assert.match(src, /t\(locale, "orders\.removeAsk"\)/);
   assert.match(src, /<label htmlFor=\{roomId\} className="sr-only">/);
   assert.match(src, /maxLength=\{ROOM_MAX\}/);
-  assert.equal(t("nb", "orders.moveUp", { n: 3 }), "Flytt bilde 3 opp");
+  assert.equal(t("nb", "orders.dragHandle", { n: 3 }), "Flytt bilde 3");
 });

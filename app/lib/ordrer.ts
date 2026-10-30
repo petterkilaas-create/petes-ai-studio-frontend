@@ -1,4 +1,11 @@
-import { MAX_IMAGES_PER_ASSIGNMENT, type AssignmentImage, type AssignmentSummary } from "./assignments.ts";
+import {
+  MAX_IMAGES_PER_ASSIGNMENT,
+  type Assignment,
+  type AssignmentImage,
+  type AssignmentResult,
+  type AssignmentSummary,
+} from "./assignments.ts";
+import { reviewHref } from "./orderTabs.ts";
 import { t, type Locale, type UiKey } from "./i18n/index.ts";
 import { ORDERS_PATH } from "./services.ts";
 import { retryable, type UploadRow } from "./uploadQueue.ts";
@@ -16,6 +23,30 @@ export const NEW_ORDER_PATH = `${ORDERS_PATH}/ny`;
 /** Bildene i ordren. Ordresiden (`/ordrer/[id]`) kommer i FE-4; til da gaar lista hit. */
 export function orderImagesHref(id: string): string {
   return `${ORDERS_PATH}/${encodeURIComponent(id)}/bilder`;
+}
+
+/** Bildebrettet (FE-3): velg tjenester, ogsaa for etterbestilling. */
+export function orderServicesHref(id: string): string {
+  return `${ORDERS_PATH}/${encodeURIComponent(id)}/tjenester`;
+}
+
+/** Oppsummeringen med «Start behandling» (FE-3). */
+export function orderCheckHref(id: string): string {
+  return `${ORDERS_PATH}/${encodeURIComponent(id)}/kontroll`;
+}
+
+/** Parameteren paa bildesiden etter start: antall resultater som ble startet. */
+export const STARTED_PARAM = "startet";
+
+export function orderStartedHref(id: string, started: number): string {
+  return `${orderImagesHref(id)}?${STARTED_PARAM}=${started}`;
+}
+
+/** Tallet fra `?startet=`, eller null naar det mangler eller ikke er et tall. */
+export function parseStarted(value: string | string[] | undefined): number | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw === undefined || !/^\d{1,4}$/.test(raw)) return null;
+  return Number(raw);
 }
 
 /** Ordrer per side i lista («Vis flere» henter neste med cursor). */
@@ -151,6 +182,36 @@ export function moveTarget(images: readonly AssignmentImage[], id: string, dir: 
   return j >= 0 && j < images.length ? j + 1 : null;
 }
 
+/** Valgene i menyen paa kortet (FE-3 tillegg, WCAG 2.5.7: flytt uten aa dra). */
+export const MOVE_ACTIONS = ["first", "up", "down", "last"] as const;
+export type MoveAction = (typeof MOVE_ACTIONS)[number];
+
+/** Plassen (1..n) for et menyvalg, eller null naar bildet allerede staar der. */
+export function menuTarget(images: readonly AssignmentImage[], id: string, action: MoveAction): number | null {
+  if (action === "up" || action === "down") return moveTarget(images, id, action);
+  const i = images.findIndex((img) => img.id === id);
+  if (i < 0) return null;
+  const j = action === "first" ? 0 : images.length - 1;
+  return i === j ? null : j + 1;
+}
+
+/**
+ * Plassen (1..n) bildet slippes paa naar det dras over et annet bilde
+ * (dra og slipp), eller null naar det slippes paa seg selv eller utenfor.
+ */
+export function dragTarget(images: readonly AssignmentImage[], activeId: string, overId: string | null): number | null {
+  if (overId === null || overId === activeId) return null;
+  const from = images.findIndex((img) => img.id === activeId);
+  const to = images.findIndex((img) => img.id === overId);
+  return from < 0 || to < 0 ? null : to + 1;
+}
+
+/** Plassen (1..n) bildet staar paa naa, eller null. */
+export function positionOf(images: readonly AssignmentImage[], id: string): number | null {
+  const i = images.findIndex((img) => img.id === id);
+  return i < 0 ? null : i + 1;
+}
+
 /** Nummer 1..n etter rekkefoelgen, som backend gjoer etter flytt og sletting (K 2.5-2.6). */
 function renumber(images: readonly AssignmentImage[]): AssignmentImage[] {
   return images.map((img, i) => (img.position === i + 1 ? img : { ...img, position: i + 1 }));
@@ -176,4 +237,72 @@ export function applyRemove(images: readonly AssignmentImage[], id: string): Ass
  */
 export function applyRoom(images: readonly AssignmentImage[], id: string, room: string | null): AssignmentImage[] {
   return images.map((img) => (img.id === id && img.room !== room ? { ...img, room } : img));
+}
+
+// --- resultatene paa bildesiden (FE-3) ----------------------------------------------
+
+/** Lenken til godkjenningssiden for det som kan aapnes der (til godkjenning, trenger svar, godkjent), ellers null. */
+export function resultReviewHref(result: AssignmentResult): string | null {
+  const s = result.displayStatus;
+  return s === "to_review" || s === "needs_answer" || s === "approved" ? reviewHref(result.resultId) : null;
+}
+
+/** Noe i ordren behandles: siden henter ordren paa nytt (én henting for hele ordren). */
+export function isProcessing(assignment: Pick<Assignment, "counts" | "images">): boolean {
+  return (
+    assignment.counts.processing > 0 ||
+    assignment.images.some((img) => img.results.some((r) => r.displayStatus === "processing"))
+  );
+}
+
+/**
+ * Lenkene fra backend er signerte og faar ny signatur ved hver henting (TTL
+ * 3600 s). Hvert 5. sekund ville nettleseren lastet miniatyrene paa nytt.
+ * Derfor beholdes forrige lenke for samme bilde naar `keep` er sann (kalleren
+ * gir false naar lenkene er eldre enn URL_REFRESH_MS).
+ */
+export const URL_REFRESH_MS = 45 * 60_000;
+
+export function keepImageUrls(
+  prev: readonly AssignmentImage[],
+  next: readonly AssignmentImage[],
+  keep: boolean
+): AssignmentImage[] {
+  if (!keep) return [...next];
+  const byId = new Map(prev.map((img) => [img.id, img]));
+  return next.map((img) => {
+    const old = byId.get(img.id);
+    if (old === undefined) return img;
+    return {
+      ...img,
+      thumbUrl: old.thumbUrl ?? img.thumbUrl,
+      originalUrl: old.originalUrl ?? img.originalUrl,
+    };
+  });
+}
+
+/** Linja over bildene mens noe behandles: «2 behandles · 1 til godkjenning». Tom naar ordren ikke har resultater. */
+export function resultSummary(locale: Locale, counts: Assignment["counts"]): string {
+  const parts: string[] = [];
+  if (counts.processing > 0) parts.push(t(locale, "orders.results.processing", { n: counts.processing }));
+  if (counts.toReview > 0) parts.push(t(locale, "orders.results.toReview", { n: counts.toReview }));
+  if (counts.needsAnswer > 0) parts.push(t(locale, "orders.results.needsAnswer", { n: counts.needsAnswer }));
+  if (counts.approved > 0) parts.push(t(locale, "orders.results.approved", { n: counts.approved }));
+  if (counts.failed > 0) parts.push(t(locale, "orders.results.failed", { n: counts.failed }));
+  return parts.join(" · ");
+}
+
+/** Fargen paa statuspillen (Pill): venter paa megleren er amber, godkjent groenn, feilet roed. */
+export function resultTone(status: AssignmentResult["displayStatus"]): "amber" | "green" | "neutral" | "red" {
+  switch (status) {
+    case "to_review":
+    case "needs_answer":
+      return "amber";
+    case "approved":
+      return "green";
+    case "failed":
+      return "red";
+    default:
+      return "neutral";
+  }
 }

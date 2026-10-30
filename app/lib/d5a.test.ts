@@ -105,11 +105,15 @@ test("D-5b2: Pointer Events og touch-action: none, og bevegelsen via ref i reque
   assert.match(lightbox, /isDoubleTap\(lastTap\.current, tap\)/);
 });
 
-test("D-5a: ingen nye avhengigheter", () => {
+test("D-5a: ingen nye avhengigheter (dnd-kit lagt til i FE-3 med Petters OK 30.10, eksakte versjoner)", () => {
   const pkg = JSON.parse(readFileSync(join(REPO_DIR, "package.json"), "utf8")) as { dependencies: Record<string, string> };
+  assert.equal(pkg.dependencies["@dnd-kit/core"], "6.3.1");
+  assert.equal(pkg.dependencies["@dnd-kit/sortable"], "10.0.0");
   assert.deepEqual(Object.keys(pkg.dependencies).sort(), [
     "@clerk/localizations",
     "@clerk/nextjs",
+    "@dnd-kit/core",
+    "@dnd-kit/sortable",
     "lucide-react",
     "next",
     "react",
