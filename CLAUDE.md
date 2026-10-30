@@ -17,7 +17,7 @@ utover det som staar her.
   problemer du ikke er sikker paa.
 
 ## Stack (kort)
-- Next.js 16 (16.3.8 per 2026-10-16) med App Router, paa Vercel.
+- Next.js 16 (16.4.3 per 2026-10-30) med App Router, paa Vercel.
   Push til `main` deployer prod.
 - Clerk-auth, prod-instansen (clerk.husvy.com; TG-NEW-71 lukket).
   Brukerne fra dev-instansen er et eget punkt (TG-NEW-163).
@@ -63,7 +63,7 @@ utover det som staar her.
 - Installer fra lockfila med `npm ci`. `npm install` kan endre
   `package-lock.json` - commit aldri lockfil-endringer du ikke ble bedt om.
 - Typesjekk (porten lokalt): `npx tsc --noEmit` - forventet rent.
-- `npm test` (node --test) - 1151 tester per 2026-10-30, forventet groent.
+- `npm test` (node --test) - 1152 tester per 2026-10-30, forventet groent.
 - Dev-server: `npm run dev`, aapne http://localhost:3000 - aldri 127.0.0.1
   (Clerk-cookies og cross-origin oppfoerer seg annerledes).
 - `npm run build` gaar gjennom lokalt (verifisert 2026-10-05, etter
