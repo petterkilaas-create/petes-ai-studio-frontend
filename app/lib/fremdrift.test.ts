@@ -332,6 +332,9 @@ test("linja: nav med ol, aria-current, lenker bare med href, fast nederst i samm
   assert.match(src, /className="flex flex-col gap-2 md:hidden"/);
   assert.match(src, /mobileStepText\(locale, current\)/);
   assert.match(src, /mobileNextText\(locale, current\)/);
+  // Mobil: underteksten for gjeldende steg under strekene (totalsText, «N behandles …»).
+  assert.match(src, /const currentSub = stepSub\(locale, currentStep, current, counts, servicesNow\);/);
+  assert.match(src, /<\/ol>\n\s*\{currentSub !== null && <p className="text-xs leading-4 text-ink-2">\{currentSub\}<\/p>\}\n\s*<\/div>\n\s*<\/nav>/);
   assert.match(src, /aria-label=\{t\(locale, "action\.back"\)\}/);
   // Linja tar ikke piltastene (spilleren bruker ← og →).
   assert.doesNotMatch(src, /onKeyDown|addEventListener\("keydown"/);

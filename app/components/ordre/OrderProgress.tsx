@@ -37,7 +37,8 @@ import { useLocale } from "../../lib/i18n/useLocale";
  * Fyllet glir fra forrige steg for ordren (sessionStorage) til dette;
  * `motion-reduce` slaar av glidingen. Linja har ingen tastaturhandler, saa
  * ←/→ i spilleren virker som foer. Under `md`: «Steg 2 av 5 · Tjenester»,
- * fem korte streker, en «Tilbake»-pil og knappen i hele bredden.
+ * fem korte streker, underteksten for steget kunden staar paa (Petter ved
+ * stopp 2), en «Tilbake»-pil og knappen i hele bredden.
  */
 export function OrderProgress({
   page,
@@ -93,6 +94,7 @@ export function OrderProgress({
   }, []);
 
   const currentStep = view.steps[current - 1];
+  const currentSub = stepSub(locale, currentStep, current, counts, servicesNow);
 
   return (
     <>
@@ -141,6 +143,7 @@ export function OrderProgress({
                   </li>
                 ))}
               </ol>
+              {currentSub !== null && <p className="text-xs leading-4 text-ink-2">{currentSub}</p>}
             </div>
           </nav>
 
