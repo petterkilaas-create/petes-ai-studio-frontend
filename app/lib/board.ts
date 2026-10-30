@@ -10,8 +10,8 @@ import type { OrderJobsWireItem } from "./assignments.ts";
  * av localStorage i appen: all lesing og skriving er i try/catch, og siden
  * virker uten (privat modus, blokkert lagring).
  *
- * Valgene per tjeneste (romtype, pyntenivaa, skumringsvalg) faar navn i
- * backend-PR 3; da utvides BoardItem. Ren modul uten React.
+ * Valgene per tjeneste ligger i `fields`, med navnene fra K 2.7 (FE-3, backend
+ * #271). Ren modul uten React.
  */
 
 /** Tjenestekodene i ordren (K 2.7). */
@@ -21,6 +21,21 @@ export type BoardService = (typeof BOARD_SERVICES)[number];
 /** Hoeyst saa mange elementer per bestillingskall (K 2.7, Petter 29.10). */
 export const MAX_ITEMS_PER_CALL = 80;
 
+/**
+ * De andre feltene per tjeneste i K 2.7 (`option` og `source_season` har egne
+ * felt i BoardItem). Bare disse sendes; et ukjent felt gir `unknown_field`.
+ */
+export const ITEM_FIELDS: Readonly<Record<BoardService, readonly string[]>> = {
+  skumring: ["dusk_style", "dusk_time", "dusk_sky", "fireplace_fire", "image_type_hint"],
+  klart_vaer: ["image_type_hint"],
+  styling: ["furnish_as", "room_empty_confirmed", "decor_level", "wishes"],
+  aarstid: ["image_type_hint"],
+  skjul_ansikter: [],
+};
+
+export type ItemFieldValue = string | number | boolean;
+export type ItemFields = Readonly<Record<string, ItemFieldValue>>;
+
 export interface BoardItem {
   imageId: string;
   service: BoardService;
@@ -28,41 +43,77 @@ export interface BoardItem {
   option: string | null;
   /** Aarstiden bildet er tatt i (bare aarstid). Gjelder bildet, ikke valget. */
   sourceSeason: string | null;
+  /** Valgene ellers (K 2.7, ITEM_FIELDS). Mangler for tjenester uten valg. */
+  fields?: ItemFields;
 }
 
-/** Samme bilde, tjeneste og valg er samme element (K 2.7 avviser dubletter). */
-export function itemKey(item: Pick<BoardItem, "imageId" | "service" | "option">): string {
-  return `${item.imageId}|${item.service}|${item.option ?? ""}`;
+/**
+ * Valget som tekst, som `choice_key` i backend: feltene sortert, uten
+ * `wishes` (oenskene er ikke en del av valget, beslutning 1).
+ */
+function fieldsKey(fields: ItemFields | undefined): string {
+  if (fields === undefined) return "";
+  return Object.keys(fields)
+    .filter((k) => k !== "wishes")
+    .sort()
+    .map((k) => `${k}=${String(fields[k])}`)
+    .join(",");
 }
 
-function sameChoice(item: BoardItem, service: BoardService, option: string | null): boolean {
-  return item.service === service && item.option === option;
+/**
+ * Samme bilde, tjeneste og valg er samme element (K 2.7 avviser dubletter).
+ * To kveldsbilder med ulik stil paa samme bilde er to elementer.
+ */
+export function itemKey(item: Pick<BoardItem, "imageId" | "service" | "option" | "fields">): string {
+  return `${item.imageId}|${item.service}|${item.option ?? ""}|${fieldsKey(item.fields)}`;
+}
+
+/** Valget slik panelet lager det (brett.ts), uten bildet. */
+export interface BoardChoice {
+  service: BoardService;
+  option?: string | null;
+  sourceSeason?: string | null;
+  fields?: ItemFields;
 }
 
 /**
  * Legg tjenesten med valget paa alle de valgte bildene. Bilder som har den
- * fra foer, faar ingen dublett; `sourceSeason` oppdateres paa dem.
+ * fra foer, faar ingen dublett; `sourceSeason` og oenskene oppdateres paa dem.
  */
-export function addToImages(
-  items: readonly BoardItem[],
-  imageIds: readonly string[],
-  choice: { service: BoardService; option?: string | null; sourceSeason?: string | null }
-): BoardItem[] {
+export function addToImages(items: readonly BoardItem[], imageIds: readonly string[], choice: BoardChoice): BoardItem[] {
   const option = choice.option ?? null;
   const sourceSeason = choice.sourceSeason ?? null;
+  const fields = choice.fields !== undefined && Object.keys(choice.fields).length > 0 ? { ...choice.fields } : undefined;
+  const make = (imageId: string): BoardItem =>
+    fields === undefined
+      ? { imageId, service: choice.service, option, sourceSeason }
+      : { imageId, service: choice.service, option, sourceSeason, fields };
   const targets = new Set(imageIds);
-  const out = items.map((it) =>
-    targets.has(it.imageId) && sameChoice(it, choice.service, option) ? { ...it, sourceSeason } : it
-  );
+  const wanted = new Set(imageIds.map((id) => itemKey(make(id))));
+  const out = items.map((it) => (targets.has(it.imageId) && wanted.has(itemKey(it)) ? make(it.imageId) : it));
   const have = new Set(out.map(itemKey));
   for (const imageId of imageIds) {
-    const item: BoardItem = { imageId, service: choice.service, option, sourceSeason };
+    const item = make(imageId);
     if (!have.has(itemKey(item))) {
       have.add(itemKey(item));
       out.push(item);
     }
   }
   return out;
+}
+
+/** Elementet byttes med valgene fra panelet («Endre»): det gamle tas ut, de nye legges til paa samme bilde. */
+export function replaceItem(items: readonly BoardItem[], key: string, choices: readonly BoardChoice[]): BoardItem[] {
+  const old = items.find((it) => itemKey(it) === key);
+  if (old === undefined) return [...items];
+  let out = items.filter((it) => itemKey(it) !== key);
+  for (const choice of choices) out = addToImages(out, [old.imageId], choice);
+  return out;
+}
+
+/** Ta ett element av brettet (krysset paa bildet). */
+export function removeItem(items: readonly BoardItem[], key: string): BoardItem[] {
+  return items.filter((it) => itemKey(it) !== key);
 }
 
 /** Ta tjenesten (alle valg, eller bare `option` naar den er gitt) av de valgte bildene. */
@@ -107,17 +158,24 @@ export function pruneItems(items: readonly BoardItem[], imageIds: Iterable<strin
   return items.filter((it) => ids.has(it.imageId));
 }
 
-/** Elementet slik backend vil ha det. Tomme valg sendes ikke. */
+/**
+ * Elementet slik backend vil ha det (K 2.7). Tomme valg sendes ikke, og bare
+ * feltene tjenesten har (ITEM_FIELDS); `option` bare for styling og aarstid.
+ */
 export function toWire(item: BoardItem): OrderJobsWireItem {
   const wire: OrderJobsWireItem = { image_id: item.imageId, service: item.service };
-  if (item.option !== null) wire.option = item.option;
+  if (item.option !== null && (item.service === "styling" || item.service === "aarstid")) wire.option = item.option;
   if (item.service === "aarstid" && item.sourceSeason !== null) wire.source_season = item.sourceSeason;
+  const fields = item.fields ?? {};
+  for (const name of ITEM_FIELDS[item.service]) {
+    const value = fields[name];
+    if (value !== undefined && value !== "") (wire as unknown as Record<string, ItemFieldValue>)[name] = value;
+  }
   return wire;
 }
 
-/** Brettet delt i kall paa hoeyst `size` elementer, i samme rekkefoelge. Dubletter tas ut. */
-export function orderChunks(items: readonly BoardItem[], size: number = MAX_ITEMS_PER_CALL): OrderJobsWireItem[][] {
-  if (!Number.isInteger(size) || size < 1) throw new RangeError("size");
+/** Brettet uten dubletter, i samme rekkefoelge (elementene som sendes). */
+export function uniqueItems(items: readonly BoardItem[]): BoardItem[] {
   const seen = new Set<string>();
   const unique: BoardItem[] = [];
   for (const it of items) {
@@ -126,9 +184,21 @@ export function orderChunks(items: readonly BoardItem[], size: number = MAX_ITEM
     seen.add(key);
     unique.push(it);
   }
-  const chunks: OrderJobsWireItem[][] = [];
-  for (let i = 0; i < unique.length; i += size) chunks.push(unique.slice(i, i + size).map(toWire));
+  return unique;
+}
+
+/** Elementene delt i biter paa hoeyst `size`, i samme rekkefoelge. Dubletter tas ut. */
+export function itemChunks(items: readonly BoardItem[], size: number = MAX_ITEMS_PER_CALL): BoardItem[][] {
+  if (!Number.isInteger(size) || size < 1) throw new RangeError("size");
+  const unique = uniqueItems(items);
+  const chunks: BoardItem[][] = [];
+  for (let i = 0; i < unique.length; i += size) chunks.push(unique.slice(i, i + size));
   return chunks;
+}
+
+/** Brettet delt i kall paa hoeyst `size` elementer, i samme rekkefoelge. Dubletter tas ut. */
+export function orderChunks(items: readonly BoardItem[], size: number = MAX_ITEMS_PER_CALL): OrderJobsWireItem[][] {
+  return itemChunks(items, size).map((chunk) => chunk.map(toWire));
 }
 
 // --- utkastet i localStorage -------------------------------------------------
@@ -169,7 +239,23 @@ function parseItem(raw: unknown): BoardItem | null {
   const r = raw as Record<string, unknown>;
   const imageId = optString(r.imageId);
   if (imageId === null || !isService(r.service)) return null;
-  return { imageId, service: r.service, option: optString(r.option), sourceSeason: optString(r.sourceSeason) };
+  const item: BoardItem = { imageId, service: r.service, option: optString(r.option), sourceSeason: optString(r.sourceSeason) };
+  const fields = parseFields(r.fields, r.service);
+  return fields === undefined ? item : { ...item, fields };
+}
+
+/** Feltene fra lagringen: bare de tjenesten har, og bare tekst, tall og sann/usann. */
+function parseFields(raw: unknown, service: BoardService): ItemFields | undefined {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined;
+  const r = raw as Record<string, unknown>;
+  const out: Record<string, ItemFieldValue> = {};
+  for (const name of ITEM_FIELDS[service]) {
+    const value = r[name];
+    if (typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
+      out[name] = value;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /** Lagre utkastet. Feil (full lagring, privat modus) svelges: gir false. */

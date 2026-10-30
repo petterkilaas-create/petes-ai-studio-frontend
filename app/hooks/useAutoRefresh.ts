@@ -6,12 +6,14 @@ import { startAutoRefresh, type RefreshResult } from "../lib/autoRefresh";
 /**
  * Henter paa nytt med jevne mellomrom mens `active` er sann (se
  * lib/autoRefresh.ts for reglene). `resetKey` starter telleren paa nytt,
- * f.eks. etter «Oppdater» eller bytte av filter.
+ * f.eks. etter «Oppdater» eller bytte av filter. `maxMs` er taket (standard
+ * 10 minutter som i Historikk; bildesiden i ordren bruker 30).
  */
 export function useAutoRefresh(
   active: boolean,
   refresh: () => Promise<RefreshResult>,
-  resetKey: number
+  resetKey: number,
+  maxMs?: number
 ): void {
   // Siste versjon av refresh uten at planleggeren startes paa nytt.
   const refreshRef = useRef(refresh);
@@ -27,6 +29,7 @@ export function useAutoRefresh(
       now: () => Date.now(),
       setTimer: (fn, ms) => window.setTimeout(fn, ms),
       clearTimer: (id) => window.clearTimeout(id as number),
+      maxMs,
     });
     const onVisibility = () => {
       if (document.visibilityState === "visible") control.visible();
@@ -36,5 +39,5 @@ export function useAutoRefresh(
       control.stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [active, resetKey]);
+  }, [active, resetKey, maxMs]);
 }
