@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import {
   closestCenter,
   DndContext,
@@ -40,10 +41,12 @@ import {
   menuTarget,
   mergeUploaded,
   orderDeliveryHref,
+  orderImagesHref,
   orderServicesHref,
   positionOf,
   queueCapacity,
   resultSummary,
+  showStartedBanner,
   uploadCounts,
   URL_REFRESH_MS,
   type MoveAction,
@@ -71,6 +74,12 @@ import { useLocale } from "../../lib/i18n/useLocale";
  * ordren paa nytt hvert 5. sekund (én henting, som Historikk), med tak paa 30
  * minutter. «Videre til tjenester» og «Bestill flere tjenester» gaar til brettet.
  * `started` er antall som ble startet (fra oppsummeringen, `?startet=`).
+ *
+ * Banneret om startet (FE-3c): tallet holdes i tilstanden, og `startet` tas
+ * ut av adressen med router.replace etter foerste visning, saa det ikke kommer
+ * tilbake ved ny lasting. Det skjules naar ingenting lenger behandles, og kan
+ * lukkes med ×. Kortene staar to i bredden fra 1024 px (ett under), og
+ * resultatene staar i hele kortets bredde (ImageCard).
  *
  * Rekkefoelgen endres med dra og slipp (dnd-kit, FE-3 tillegg) eller menyen
  * «⋯» paa kortet. Bildet flyttes med en gang, og PATCH sendes; feiler den,
@@ -100,6 +109,7 @@ type Load =
 export function OrderImages({ assignmentId, started = null }: { assignmentId: string; started?: number | null }) {
   const { getToken } = useAuth();
   const locale = useLocale();
+  const router = useRouter();
 
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const [images, setImages] = useState<readonly AssignmentImage[]>([]);
@@ -113,6 +123,9 @@ export function OrderImages({ assignmentId, started = null }: { assignmentId: st
   const movingRef = useRef(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<string | null>(null);
+  // Banneret: tallet fra `?startet=` ved foerste visning (adressen ryddes under), og om det er lukket.
+  const [startedCount] = useState(started);
+  const [bannerClosed, setBannerClosed] = useState(false);
 
   const request = useMemo(() => assignmentRequest(getToken), [getToken]);
   // Koeen lages én gang; den bruker siste versjon av kallet (nytt token fra Clerk).
@@ -161,6 +174,11 @@ export function OrderImages({ assignmentId, started = null }: { assignmentId: st
   useEffect(() => {
     void fetchAssignment();
   }, [fetchAssignment]);
+
+  // `startet` ut av adressen, saa banneret ikke kommer tilbake ved ny lasting (tallet staar i tilstanden).
+  useEffect(() => {
+    if (started !== null) router.replace(orderImagesHref(assignmentId), { scroll: false });
+  }, [started, assignmentId, router]);
 
   // Ikke lukk fanen midt i opplastingen (filene som venter, er bare i nettleseren).
   const counts = uploadCounts(rows);
@@ -347,11 +365,24 @@ export function OrderImages({ assignmentId, started = null }: { assignmentId: st
         {announcement}
       </p>
 
-      {started !== null && started > 0 && (
-        <Card padding="sm" className="mb-6" role="status">
-          <p className="text-sm text-ink">
-            {started === 1 ? t(locale, "orders.startedOne") : t(locale, "orders.startedMany", { n: started })}
+      {showStartedBanner(startedCount, bannerClosed, processing) && (
+        <Card padding="sm" className="mb-6 flex items-start gap-2">
+          <p className="min-w-0 flex-1 py-3 text-sm text-ink" role="status">
+            {startedCount === 1
+              ? t(locale, "orders.startedOne")
+              : t(locale, "orders.startedMany", { n: startedCount ?? 0 })}
           </p>
+          <button
+            type="button"
+            onClick={() => {
+              setBannerClosed(true);
+              titleRef.current?.focus();
+            }}
+            aria-label={t(locale, "orders.startedClose")}
+            className={`inline-flex size-11 shrink-0 items-center justify-center rounded-pill text-ink hover:bg-surface-2 ${FOCUS}`}
+          >
+            <X aria-hidden className="size-5" />
+          </button>
         </Card>
       )}
 
@@ -407,10 +438,11 @@ export function OrderImages({ assignmentId, started = null }: { assignmentId: st
                 onDragCancel={() => setActiveId(null)}
               >
                 <SortableContext items={images.map((img) => img.id)} strategy={rectSortingStrategy}>
-                  <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     {images.map((image, i) => (
                       <ImageCard
                         key={image.id}
+                        assignmentId={assignmentId}
                         image={image}
                         number={i + 1}
                         count={images.length}

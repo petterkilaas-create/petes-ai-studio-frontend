@@ -24,9 +24,25 @@ export interface OrderTab {
   current: boolean;
 }
 
-/** Lenken til godkjenningssiden for en jobb (som OpenReviewLink). */
-export function reviewHref(jobId: string): string {
-  return `/godkjenning/${encodeURIComponent(jobId)}`;
+/**
+ * `?fra=<ordre-id>` paa godkjenningssiden (FE-3c): siden ble aapnet fra ordren,
+ * og tilbake-lenken gaar dit i stedet for til Historikk.
+ */
+export const FROM_PARAM = "fra";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Ordre-id-en fra `?fra=`, eller null naar den mangler eller ikke er en uuid. */
+export function parseFrom(value: string | string[] | undefined | null): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return typeof raw === "string" && UUID.test(raw) ? raw.toLowerCase() : null;
+}
+
+/** Lenken til godkjenningssiden for en jobb (som OpenReviewLink), med `?fra=` naar den kommer fra en ordre. */
+export function reviewHref(jobId: string, from: string | null = null): string {
+  const path = `/godkjenning/${encodeURIComponent(jobId)}`;
+  const order = parseFrom(from);
+  return order === null ? path : `${path}?${FROM_PARAM}=${order}`;
 }
 
 /**
@@ -61,13 +77,19 @@ export function orderStatusKey(status: string, code: string | null = null): UiKe
  * Fanene for bestillingen, i rekkefoelgen fra backend (eldst foerst). null
  * uten bestilling eller med faerre enn to jobber: da vises ingen rad.
  * Navnet er stilen (styleText) eller aarstiden (seasonText, «Høst»); noe
- * ukjent heter «Digital styling».
+ * ukjent heter «Digital styling». `from` (FE-3c) foelger med lenkene, saa
+ * «← Til ordren» staar ogsaa etter bytte av fane.
  */
-export function orderTabs(order: ReviewOrder | null, jobId: string, locale: Locale): OrderTab[] | null {
+export function orderTabs(
+  order: ReviewOrder | null,
+  jobId: string,
+  locale: Locale,
+  from: string | null = null
+): OrderTab[] | null {
   if (order === null || order.jobs.length < 2) return null;
   return order.jobs.map((job) => ({
     jobId: job.jobId,
-    href: reviewHref(job.jobId),
+    href: reviewHref(job.jobId, from),
     label: styleText(locale, job.presetId) ?? seasonText(locale, job.presetId) ?? t(locale, "service.virtual_stage"),
     statusKey: orderStatusKey(job.status, job.code),
     thumbUrl: job.thumbUrl,

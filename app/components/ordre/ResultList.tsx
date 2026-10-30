@@ -15,31 +15,47 @@ import { useLocale } from "../../lib/i18n/useLocale";
  * tekst og versjonen, med lenke til godkjenningssiden for det som er til
  * godkjenning, trenger svar eller er godkjent. Kjeden virker slik uten
  * ordresiden (FE-4).
+ *
+ * FE-3c: navnet staar paa egen linje i full bredde og brytes som vanlig tekst;
+ * under staar statusen, versjonen og «Åpne» i én rad som brytes ved behov.
+ * «Åpne» har ordren med som `?fra=`, saa godkjenningssiden lenker tilbake hit.
  */
-export function ResultList({ results, number }: { results: readonly AssignmentResult[]; number: number }) {
+export function ResultList({
+  results,
+  number,
+  assignmentId,
+}: {
+  results: readonly AssignmentResult[];
+  number: number;
+  assignmentId: string;
+}) {
   const locale = useLocale();
   if (results.length === 0) return null;
   return (
-    <ul className="flex flex-col gap-2 border-t border-line pt-3" aria-label={t(locale, "orders.results.title")}>
+    <ul className="flex flex-col gap-3 border-t border-line pt-3" aria-label={t(locale, "orders.results.title")}>
       {results.map((result) => {
         const label = resultLabel(locale, result);
-        const href = resultReviewHref(result);
+        const href = resultReviewHref(result, assignmentId);
         return (
-          <li key={result.resultId} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <span className="min-w-0 flex-1 text-ink">{label}</span>
-            <Pill tone={resultTone(result.displayStatus)} pulse={result.displayStatus === "processing"}>
-              {t(locale, resultStatusKey(result.displayStatus, result.previousVersion))}
-            </Pill>
-            <span className="text-[13px] text-ink-2">{t(locale, "orders.results.version", { n: result.version })}</span>
-            {href !== null && (
-              <Link
-                href={href}
-                aria-label={t(locale, "orders.results.openLabel", { label, n: number })}
-                className={buttonClass("secondary", "px-4")}
-              >
-                {t(locale, "orders.results.open")}
-              </Link>
-            )}
+          <li key={result.resultId} className="flex min-w-0 flex-col gap-1.5 text-sm">
+            <p className="break-words text-ink">{label}</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <Pill tone={resultTone(result.displayStatus)} pulse={result.displayStatus === "processing"}>
+                {t(locale, resultStatusKey(result.displayStatus, result.previousVersion))}
+              </Pill>
+              <span className="whitespace-nowrap text-[13px] text-ink-2">
+                {t(locale, "orders.results.version", { n: result.version })}
+              </span>
+              {href !== null && (
+                <Link
+                  href={href}
+                  aria-label={t(locale, "orders.results.openLabel", { label, n: number })}
+                  className={buttonClass("secondary", "px-4")}
+                >
+                  {t(locale, "orders.results.open")}
+                </Link>
+              )}
+            </div>
           </li>
         );
       })}
