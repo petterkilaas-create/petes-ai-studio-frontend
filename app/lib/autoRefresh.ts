@@ -12,6 +12,8 @@
  *
  * Bildesiden i ordren (FE-3) bruker samme planlegger med tak paa 30 minutter
  * (`maxMs`): 25 resultater kan ta 15-20 minutter (audit punkt 3).
+ * Annonseteksten (T2) henter hvert 4. sekund (`intervalMs`) i hoeyst 15
+ * minutter (backend gir `stale` etter 900 s).
  */
 
 export const AUTO_REFRESH_MS = 5_000;
@@ -34,6 +36,8 @@ export interface AutoRefreshDeps {
   clearTimer: (id: unknown) => void;
   /** Taket fra start; standard AUTO_REFRESH_MAX_MS (Historikk). */
   maxMs?: number;
+  /** Tiden mellom hentingene; standard AUTO_REFRESH_MS. Annonseteksten (T2) bruker 4 s. */
+  intervalMs?: number;
 }
 
 export interface AutoRefreshControl {
@@ -45,6 +49,7 @@ export interface AutoRefreshControl {
 export function startAutoRefresh(deps: AutoRefreshDeps): AutoRefreshControl {
   const startedAt = deps.now();
   const maxMs = deps.maxMs ?? AUTO_REFRESH_MAX_MS;
+  const intervalMs = deps.intervalMs ?? AUTO_REFRESH_MS;
   let timer: unknown = null;
   let inFlight = false;
   let paused = false;
@@ -62,7 +67,7 @@ export function startAutoRefresh(deps: AutoRefreshDeps): AutoRefreshControl {
     timer = deps.setTimer(() => {
       timer = null;
       void tick();
-    }, AUTO_REFRESH_MS);
+    }, intervalMs);
   };
 
   const tick = async () => {
