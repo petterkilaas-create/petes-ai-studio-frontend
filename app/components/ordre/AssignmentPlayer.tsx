@@ -33,6 +33,8 @@ import {
   type PlayerPos,
 } from "../../lib/player";
 import { ORDERS_PATH } from "../../lib/services";
+import { listingTextHref } from "../../lib/listingText";
+import { useListingTextAccess } from "../../hooks/useListingTextAccess";
 import { ResultReview } from "../godkjenning/ResultReview";
 import { FOCUS } from "../godkjenning/classes";
 import { ButtonLink, Button } from "../ui/Button";
@@ -85,6 +87,8 @@ export function AssignmentPlayer({
 }) {
   const locale = useLocale();
   const router = useRouter();
+  // Annonsetekst (T2): lenken i toppen, samme regel som bildesiden.
+  const listingText = useListingTextAccess() === "yes";
 
   const [images, setImages] = useState<readonly AssignmentImage[]>([]);
   // Siste bildene, til hoppet etter en avgjoerelse (staten er ikke oppdatert rett etter reload).
@@ -222,14 +226,23 @@ export function AssignmentPlayer({
           title={<span className="break-words">{assignment.address}</span>}
           subtitle={assignment.assignmentNo ? t(locale, "orders.assignmentNo", { no: assignment.assignmentNo }) : undefined}
           actions={
-            images.length > 0 ? (
+            listingText || images.length > 0 ? (
               <>
-                <ButtonLink variant="secondary" href={orderDeliveryHref(assignmentId)}>
-                  {deliveryLinkText(locale, deliveryFileCount({ images: images.length, approved: assignment.counts.approved }))}
-                </ButtonLink>
-                <ButtonLink variant="secondary" href={orderServicesHref(assignmentId)}>
-                  {t(locale, "player.orderMore")}
-                </ButtonLink>
+                {images.length > 0 && (
+                  <>
+                    <ButtonLink variant="secondary" href={orderDeliveryHref(assignmentId)}>
+                      {deliveryLinkText(locale, deliveryFileCount({ images: images.length, approved: assignment.counts.approved }))}
+                    </ButtonLink>
+                    <ButtonLink variant="secondary" href={orderServicesHref(assignmentId)}>
+                      {t(locale, "player.orderMore")}
+                    </ButtonLink>
+                  </>
+                )}
+                {listingText && (
+                  <ButtonLink variant="secondary" href={listingTextHref(assignmentId)}>
+                    {t(locale, "listingText.page.fromOrder")}
+                  </ButtonLink>
+                )}
               </>
             ) : undefined
           }

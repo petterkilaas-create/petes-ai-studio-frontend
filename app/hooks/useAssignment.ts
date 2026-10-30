@@ -22,13 +22,17 @@ export type AssignmentLoad =
  * FE-4: `reload` gir svaret til useAutoRefresh (ordresiden henter paa nytt
  * mens noe behandles). En henting som feiler etter at ordren er vist,
  * beholder siden som den er (som bildesiden).
+ *
+ * T2: `override` er kallet fra mock-modusen paa tekstsiden (bare i
+ * `next dev`); da gaar ingenting til backend.
  */
 export function useAssignment(
   assignmentId: string,
-  onLoaded?: (assignment: Assignment) => void
+  onLoaded?: (assignment: Assignment) => void,
+  override?: AssignmentRequest
 ): { load: AssignmentLoad; reload: () => Promise<RefreshResult>; request: AssignmentRequest } {
   const { getToken } = useAuth();
-  const request = useMemo(() => assignmentRequest(getToken), [getToken]);
+  const request = useMemo(() => override ?? assignmentRequest(getToken), [getToken, override]);
   const [load, setLoad] = useState<AssignmentLoad>({ kind: "loading" });
   const onLoadedRef = useRef(onLoaded);
   useEffect(() => {

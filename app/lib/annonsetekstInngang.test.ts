@@ -175,12 +175,12 @@ test("sidene: kallene gaar via assignments.ts og assignmentRequest, ikke fetch d
   assert.match(picker, /listAssignments\(assignmentRequest\(getToken, onRetry\), \{ limit: ORDERS_PAGE_SIZE \}\)/);
   assert.match(picker, /listAssignments\(request, \{ limit: ORDERS_PAGE_SIZE, cursor \}\)/);
   assert.match(picker, /href=\{listingTextHref\(order\.id\)\}/);
-  // Tekstsiden: ordren med useAssignment, og tilbake til Annonsetekst.
+  // Tekstsiden: ordren med useAssignment (T2: med kallet fra mock-modusen), og tilbake til Annonsetekst.
   const order = withoutComments(read("components/annonsetekst/ListingTextOrder.tsx"));
-  assert.match(order, /const \{ load, reload \} = useAssignment\(assignmentId\);/);
+  assert.match(order, /const \{ load, reload, request \} = useAssignment\(assignmentId, undefined, deps\?\.request\);/);
   assert.match(order, /<LoadState load=\{load\} onRetry=\{\(\) => void reload\(\)\} back=\{BACK\} \/>/);
   assert.match(order, /title=\{t\(locale, "listingText\.page\.title"\)\}/);
-  assert.match(order, /\{load\.assignment\.address\}/);
+  assert.match(order, /\{assignment\.address\}/);
 });
 
 // --- ny adresse --------------------------------------------------------------------
