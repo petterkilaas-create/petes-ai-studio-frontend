@@ -6,7 +6,10 @@ import type { GuidePage } from "../schema.ts";
 // hentes fra ordlista (assignment.status.*). Nedlastingen er fra FE-5
 // (RAPPORT_FE5.md). Grensene ({maxImages}, {maxMb}, {maxBoxes}) fylles fra
 // konstantene i appen (GuidePage.tsx). Ordresiden og «Angre godkjenning» er
-// fra FE-4 (del 5 og 6).
+// fra FE-4 (del 5 og 6). «Lag annonsetekst» er fra T6 (Dag 60, RAPPORT_TEKST_T3.md):
+// bare bestillingen og visningen; redigering, godkjenning og eksport kommer i T4.
+// Delen vises for alle, fordi siden er statisk og uten Clerk; intro sier at
+// tjenesten er under utproeving.
 export const guidePage = {
   _type: "guidePage",
   seo: {
@@ -148,6 +151,31 @@ export const guidePage = {
         "Bearbeidede bilder har et synlig AI-merke nede til venstre. Teksten sier hva som er redigert.",
       ],
       more: { label: "Les mer om merkingen", href: "/no/merking" },
+    },
+    {
+      id: "annonsetekst",
+      title: "Lag annonsetekst",
+      intro: "Annonsetekst er under utprøving og er ennå bare tilgjengelig for utvalgte kontoer.",
+      steps: [
+        "Trykk «Lag annonsetekst for denne boligen» på bildesiden eller ordresiden. Du kan også trykke «Annonsetekst» under «Tjenester» og velge ordren der.",
+        "Dra inn salgsoppgaven, tilstandsrapporten og andre dokumenter, eller trykk «Velg PDF-er». Bildene i ordren brukes automatisk.",
+        "Skriv gjerne det teksten bør få med, i «Noe vi bør vite?».",
+        "Trykk «Bestill tekstpakke».",
+        "Når teksten er klar, ser du den for hver kanal i fanene «FINN», «SoMe» og «E-post».",
+      ],
+      notes: [
+        "Bare PDF, høyst {maxDocs} dokumenter og {docMb} MB per fil. Du kan bestille {dailyRuns} tekstpakker per døgn.",
+        "Det du skriver i notatet, merkes «Oppgitt av megler».",
+        "Mens teksten lages, står den som «Behandles», og du ser trinnene «Leser dokumentene», «Ser på bildene», «Velger vinkel», «Skriver» og «Kontrollerer». Det tar noen minutter. Du kan gå fra siden; teksten ligger der når den er klar.",
+        "Øverst står statusen og versjonen. Under hvert felt står antallet og målet. Hovedteksten på FINN bør være {bodyMin}–{bodyMax} ord og måles uten «Verdt å vite». «Utenfor målet» betyr at feltet er kortere eller lengre enn målet.",
+        "«Delvis støttet av grunnlaget» betyr at bare noe av avsnittet finnes i dokumentene, bildene eller notatet. «Ikke støttet av grunnlaget» betyr at det ikke finnes der. Sjekk slike avsnitt før du bruker dem.",
+        "Under «Avvik» bør du se på det som er «Vesentlig» før du bruker teksten. «Til orientering» er til informasjon. Trykk på feltnavnet ved et avvik for å gå til feltet.",
+        "Avvikene er råd til deg. Du kan bruke teksten selv om det står avvik.",
+        "«Nøkkelopplysningene» er de seks opplysningene Forbrukertilsynet ber om i boligannonser. «mangler» betyr at opplysningen ikke ble funnet i grunnlaget, og «uavklart» at kildene ikke sier det samme.",
+        "«Kopier» kopierer hele feltet. Høydepunktene får et punkt foran hver linje, og SoMe-teksten kommer med emneknaggene. Går ikke kopieringen, blir teksten markert, og du kan kopiere den selv.",
+        "«Vis kilder» viser hvor teksten i et felt kommer fra: en side i en PDF, et bilde, «Oppgitt av megler» eller «Regnet ut». «Se grunnlag» viser alle faktaene teksten bygger på.",
+        "«Åpne PDF» åpner dokumentet på riktig side i en ny fane. Bare den som bestilte, kan åpne PDF-en. Stopper nettleseren fanen, må du tillate sprettoppvinduer for siden.",
+      ],
     },
   ],
 } as const satisfies GuidePage;

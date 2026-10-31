@@ -37,14 +37,40 @@ const ENTRIES = ["(app)/tjenester/page.tsx", "(app)/start/page.tsx", "components
 
 // --- flagget ---------------------------------------------------------------------
 
-test("flagget: av i denne PR-en, og av gir nei uten kall til /me", () => {
-  assert.equal(LISTING_TEXT_UI, "off");
-  assert.equal(listingTextAccess(null), "no");
-  assert.equal(listingTextAccess({ viewAll: true }), "no");
+test("flagget: av gir nei uten kall til /me", () => {
   assert.equal(listingTextAccess(null, "off"), "no");
   assert.equal(listingTextAccess({ viewAll: true }, "off"), "no");
-  assert.equal(listingTextNeedsCapabilities(), false);
   assert.equal(listingTextNeedsCapabilities("off"), false);
+});
+
+test("flagget: admin i T6, saa bare admin med view_all slipper inn, og /me som feiler gir nei", () => {
+  assert.equal(LISTING_TEXT_UI, "admin");
+  assert.equal(listingTextNeedsCapabilities(), true);
+  // Foer svaret fra /me: vent (vakten viser spinneren, lenkene er skjult).
+  assert.equal(listingTextAccess(null), "pending");
+  assert.equal(listingTextAccess({ viewAll: true }), "yes");
+  // Megler uten view_all: samme som foer (ingen lenke, sidene stengt).
+  assert.equal(listingTextAccess({ viewAll: false }), "no");
+  // getCapabilities gir { viewAll: false } (NO_CAPABILITIES) naar /me feiler (api.test.ts).
+  const api = withoutComments(read("lib/api.ts"));
+  assert.match(api, /export const NO_CAPABILITIES: Capabilities = \{ viewAll: false \};/);
+  assert.match(api, /if \(res\.status !== 200\) return NO_CAPABILITIES;/);
+  assert.match(api, /\} catch \{\s*return NO_CAPABILITIES;/);
+});
+
+test("lenkene: bare med tilgang, ogsaa naar flagget er admin", () => {
+  for (const [access, open] of [["yes", true], ["no", false], ["pending", false]] as const) {
+    const listingText = access === "yes";
+    assert.equal(pageCards(listingText).length, open ? 1 : 0, access);
+    assert.equal(comingCards(listingText).some((tool) => tool.id === "annonsetekst"), !open, access);
+    assert.equal(serviceShortcuts(listingText).some((s) => s.tool.id === "annonsetekst"), open, access);
+  }
+  // Alle stedene med lenken bruker samme regel: bare svaret "yes" fra hooken.
+  for (const rel of [...ENTRIES.filter((e) => !e.includes("ServiceCard")), "components/ordre/AssignmentPlayer.tsx"]) {
+    const src = withoutComments(read(rel));
+    assert.equal(src.match(/useListingTextAccess\(\)/g)?.length, 1, rel);
+    assert.match(src, /const listingText = useListingTextAccess\(\) === "yes";/, rel);
+  }
 });
 
 test("flagget: admin slipper bare inn med view_all, og venter paa /me", () => {
@@ -65,8 +91,8 @@ test("flagget: teksten gjelder en ordre, saa tilgangen sjekker ogsaa ordrene", (
   const src = withoutComments(read("lib/services.ts"));
   assert.match(src, /if \(flag === "off" \|\| !isPageEnabled\(ORDERS_PATH\)\) return "no";/);
   assert.match(src, /return flag === "admin" && isPageEnabled\(ORDERS_PATH\);/);
-  // Én linje aa endre i T6, og ikke en linje i ENABLED (som bare er av/paa).
-  assert.match(src, /^export const LISTING_TEXT_UI: ListingTextUi = "off";$/m);
+  // Én linje (endret i T6), og ikke en linje i ENABLED (som bare er av/paa).
+  assert.match(src, /^export const LISTING_TEXT_UI: ListingTextUi = "admin";$/m);
   assert.ok(!Object.keys(ENABLED).includes("annonsetekst"));
 });
 

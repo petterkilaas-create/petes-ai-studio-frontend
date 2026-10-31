@@ -66,7 +66,8 @@ export function isServiceEnabled(id: string): boolean {
  */
 export type ListingTextUi = "off" | "admin" | "on";
 
-export const LISTING_TEXT_UI: ListingTextUi = "off";
+// T6 (Dag 60): "admin". Rulles tilbake ved aa sette "off" i en ny PR.
+export const LISTING_TEXT_UI: ListingTextUi = "admin";
 
 /** /annonsetekst: velg ordre eller ny adresse. Tekstsiden er /annonsetekst/[ordreId]. */
 export const LISTING_TEXT_PATH = "/annonsetekst";
