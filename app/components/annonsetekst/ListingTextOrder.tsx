@@ -25,6 +25,18 @@ import {
   refetchAfter,
 } from "../../lib/listingTextOrder";
 import { browserOpenTab, type PdfTab } from "../../lib/listingTextPackage";
+import {
+  browserTextStorage,
+  clearOrderDraft,
+  initialOrderDraft,
+  loadOrderDraft,
+  propertyErrors,
+  propertyForOrder,
+  propertyHasMaterial,
+  saveOrderDraft,
+  type OrderDraft,
+  type PropertyKey,
+} from "../../lib/listingTextProperty";
 import { CallKeys } from "../../lib/orderStart";
 import { LISTING_TEXT_PATH } from "../../lib/services";
 import { LoadState } from "../ordre/LoadState";
@@ -53,13 +65,17 @@ export interface ListingTextDeps {
  * Tekstsiden for en ordre (TG-NEW-281, T2). Ordren hentes med GET
  * /v1/assignments/{id} og pakken med GET …/listing-text (uten grunnlaget).
  * `display_status` velger delen (listingTextView): bestillingen med bildene,
- * dokumentene og notatet; «Behandles» med trinnlista, hentet hvert 4. sekund
+ * Boligfakta, dokumentene og notatet; «Behandles» med trinnlista, hentet hvert 4. sekund
  * til statusen ikke lenger er `processing`; eller tekstpakken
  * (ListingTextPackage, T3).
  *
  * «Bestill tekstpakke» faar en ny Idempotency-Key per bestilling og samme
  * noekkel bare ved nytt forsoek med samme kropp etter nettfeil (CallKeys, som
  * FE-3).
+ *
+ * Skjemaet (Boligfakta og «Om boligen») huskes i nettleseren per ordre til
+ * bestillingen er sendt (listingTextProperty.ts). Uten utkast fylles det fra
+ * `property` og `note` i GET, ellers med adressen fra ordren.
  */
 export function ListingTextOrder({ assignmentId, deps }: { assignmentId: string; deps?: ListingTextDeps }) {
   const locale = useLocale();
@@ -81,7 +97,8 @@ export function ListingTextOrder({ assignmentId, deps }: { assignmentId: string;
       })
   );
   const [keys] = useState(() => new CallKeys());
-  const [note, setNote] = useState("");
+  // null til megleren endrer noe: da regnes skjemaet fra utkastet, pakken og ordren ved hver visning.
+  const [draft, setDraft] = useState<OrderDraft | null>(null);
   const [sending, setSending] = useState(false);
   const [orderError, setOrderError] = useState<{ err: unknown; at: Date } | null>(null);
 
@@ -95,15 +112,30 @@ export function ListingTextOrder({ assignmentId, deps }: { assignmentId: string;
 
   if (load.kind !== "ok") return <LoadState load={load} onRetry={() => void reload()} back={BACK} />;
   const { assignment } = load;
+  const form =
+    draft ??
+    initialOrderDraft(loadOrderDraft(browserTextStorage(), assignmentId), pkg ?? { property: null, note: null }, assignment.address);
+
+  function changeForm(next: OrderDraft) {
+    setDraft(next);
+    saveOrderDraft(browserTextStorage(), assignmentId, next);
+  }
 
   async function order() {
-    const body: OrderBody = { note, documentIds: queue.readyIds.length > 0 ? queue.readyIds : undefined };
+    const body: OrderBody = {
+      note: form.note,
+      property: propertyForOrder(form.property, pkg?.property ?? null, assignment.address),
+      documentIds: queue.readyIds.length > 0 ? queue.readyIds : undefined,
+    };
     const key = keys.keyFor(orderCallSignature("order", assignmentId, body));
     setSending(true);
     setOrderError(null);
     try {
       const next = await orderListingText(requestRef.current, { id: assignmentId, order: body, idempotencyKey: key });
       keys.received();
+      // Sendt: utkastet slettes, og skjemaet kommer fra `property` i GET heretter.
+      clearOrderDraft(browserTextStorage(), assignmentId);
+      setDraft(null);
       text.setPackage(next);
     } catch (err) {
       // Et svar fra backend glemmer noekkelen; en nettfeil beholder den til samme kall sendes igjen.
@@ -118,7 +150,9 @@ export function ListingTextOrder({ assignmentId, deps }: { assignmentId: string;
   const block = orderBlock({
     images: assignment.images.length,
     readyDocuments: rows.filter((r) => r.state === "ready").length,
-    note,
+    note: form.note,
+    propertyMaterial: propertyHasMaterial(form.property, assignment.address),
+    propertyInvalid: Object.keys(propertyErrors(form.property)).length > 0,
     uploading: rows.some((r) => r.state === "queued" || r.state === "starting" || r.state === "uploading" || r.state === "checking"),
     sending,
   });
@@ -159,8 +193,11 @@ export function ListingTextOrder({ assignmentId, deps }: { assignmentId: string;
         <ListingTextOrderForm
           images={assignment.images}
           rows={rows}
-          note={note}
-          onNote={setNote}
+          property={form.property}
+          orderAddress={assignment.address}
+          onProperty={(key: PropertyKey, value: string) => changeForm({ ...form, property: { ...form.property, [key]: value } })}
+          note={form.note}
+          onNote={(note) => changeForm({ ...form, note })}
           block={block}
           error={orderError === null ? null : orderErrorText(locale, orderError.err, orderError.at)}
           runError={runCode === null ? null : codeText(locale, "listingTextRunError", runCode)}

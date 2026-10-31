@@ -9,6 +9,7 @@ import { DICTIONARIES, t, type UiKey } from "./i18n/index.ts";
 import {
   getListingText,
   ListingTextError,
+  NOTE_MAX_CHARS,
   orderCallSignature,
   orderListingText,
   parseListingText,
@@ -105,10 +106,11 @@ test("bestill: graa mens et dokument lastes opp, mens bestillingen sendes, og me
   const base = { images: 3, readyDocuments: 1, note: "", uploading: false, sending: false };
   assert.equal(orderBlock({ ...base, uploading: true }), "uploading");
   assert.equal(orderBlock({ ...base, sending: true }), "sending");
-  assert.equal(orderBlock({ ...base, note: "x".repeat(1000) }), null);
-  assert.equal(orderBlock({ ...base, note: "x".repeat(1001) }), "note_too_long");
+  assert.equal(NOTE_MAX_CHARS, 3000, "«Om boligen» er 3000 tegn (K §10.1)");
+  assert.equal(orderBlock({ ...base, note: "x".repeat(NOTE_MAX_CHARS) }), null);
+  assert.equal(orderBlock({ ...base, note: "x".repeat(NOTE_MAX_CHARS + 1) }), "note_too_long");
   // Tegn etter NFC: «å» fra macOS (a + ring) er ett tegn.
-  assert.equal(orderBlock({ ...base, note: "å".repeat(1000) }), null);
+  assert.equal(orderBlock({ ...base, note: "å".repeat(NOTE_MAX_CHARS) }), null);
 });
 
 test("bestill: siden regner «laster opp» av alle radene i arbeid, og sender bare dokumentene som er klare", () => {
@@ -454,11 +456,11 @@ test("ordlista: de nye noeklene paa nb og en, med samme plassholdere", () => {
   assert.equal(t("nb", "listingText.docs.rejected", { reason: DICTIONARIES.nb.codes.listingTextDocumentReject.not_pdf }), "Avvist: Ikke en PDF.");
   assert.equal(t("nb", "listingText.docs.checking"), "Kontrolleres");
   assert.equal(t("nb", "listingText.docs.ready"), "Klar");
-  assert.equal(t("nb", "listingText.order.noteLabel"), "Noe vi bør vite?");
+  assert.equal(t("nb", "listingText.order.noteLabel"), "Om boligen");
   assert.equal(t("nb", "listingText.order.submit"), "Bestill tekstpakke");
   assert.equal(t("nb", "listingText.order.imagesHint"), "Bildene i ordren brukes automatisk.");
   assert.equal(t("nb", "listingText.ready.title"), "Tekstpakken er klar");
-  assert.match(t("nb", "listingText.order.noteHint"), /«oppgitt av megler»/);
+  assert.match(t("nb", "listingText.order.noteHint"), /«Oppgitt av megler»/);
 });
 
 test("ordlista: feilkodene for opplastingen og avvisningene paa nb og en", () => {

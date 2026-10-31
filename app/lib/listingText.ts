@@ -1,6 +1,7 @@
 import type { UiKey } from "./i18n/index.ts";
 import type { AssignmentRequest, AssignmentSummary } from "./assignments.ts";
 import { LISTING_TEXT_PATH } from "./services.ts";
+import { parsePropertyWire, type PropertyWire } from "./listingTextProperty.ts";
 
 /**
  * Annonsetekst per ordre (TG-NEW-281, T0). Typer, parsing, feltstier, teller
@@ -26,7 +27,8 @@ export const LISTING_TEXT_LOCALE = "nb" as const;
 export const MAX_DOCUMENTS = 10;
 export const MAX_DOCUMENT_BYTES = 100 * 1024 * 1024;
 export const DOCUMENT_CONTENT_TYPE = "application/pdf";
-export const NOTE_MAX_CHARS = 1000;
+/** «Om boligen» (K §10.1: fra 1000 til 3000 tegn). */
+export const NOTE_MAX_CHARS = 3000;
 export const DAILY_RUNS = 10;
 export const EMAIL_SIGNATURE_MAX_CHARS = 500;
 export const EMAIL_CTA_MAX_CHARS = 80;
@@ -65,7 +67,8 @@ export const PARAGRAPH_CHECKS = ["supported", "partial", "unsupported"] as const
 export type ParagraphCheck = (typeof PARAGRAPH_CHECKS)[number];
 
 /**
- * Dokumenttypene etter skjemaet (`DocumentKind`, K §9.3 punkt 3 rettet 30.10).
+ * Dokumenttypene etter skjemaet (`DocumentKind`, K §9.3 punkt 3 rettet 30.10,
+ * og `neighbourhood_profile` fra K §10.4).
  * Egenerklaering, plantegning og annet er `other` i v1. Ukjent kode vises med
  * den generiske teksten i ordlista, saa `kind` leses som tekst.
  */
@@ -75,6 +78,7 @@ export const DOCUMENT_KINDS = [
   "energy_certificate",
   "association_info",
   "area_report",
+  "neighbourhood_profile",
   "other",
 ] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
@@ -176,6 +180,8 @@ export interface FactSource {
   imageId: string | null;
   position: number | null;
   note: boolean;
+  /** Fra Boligfakta i bestillingen (K §10.2, `{"form": true}`). Vises som «Oppgitt av megler». */
+  form: boolean;
 }
 
 export interface Fact {
@@ -265,6 +271,8 @@ export interface ListingText {
   documents: ListingTextDocument[];
   imagesUsed: { imageId: string; position: number }[];
   note: string | null;
+  /** Boligfakta slik de ble lagret (K §10.3), eller null. */
+  property: PropertyWire | null;
   keyFacts: KeyFact[];
   issues: ListingTextIssue[];
   /** `null` foer foerste versjon og etter sletting. */
@@ -477,6 +485,7 @@ function parseSource(raw: unknown): FactSource | null {
     imageId: str(rec.image_id),
     position: int(rec.position),
     note: rec.note === true,
+    form: rec.form === true,
   };
 }
 
@@ -624,6 +633,7 @@ export function parseListingText(raw: unknown): ListingText | null {
       documents,
       imagesUsed,
       note: str(raw.note),
+      property: parsePropertyWire(raw.property),
       keyFacts: parseKeyFacts(raw.key_facts),
       issues: parseIssues(raw.issues, "issues"),
       channels: parseChannels(raw.channels),
@@ -1147,6 +1157,11 @@ export async function deleteListingTextDocument(
 /** Kroppen i bestillingen og «Lag paa nytt» (K §3). Alt er valgfritt. */
 export interface ListingTextOrder {
   note?: string;
+  /**
+   * Boligfakta (K §10.1): bare feltene som er fylt ut. `null` fjerner det
+   * lagrede; mangler noekkelen, beholder backend det lagrede.
+   */
+  property?: PropertyWire | null;
   documentIds?: string[];
   imageIds?: string[];
 }
@@ -1155,6 +1170,7 @@ export interface ListingTextOrder {
 export function orderWireBody(order: ListingTextOrder): Record<string, unknown> {
   const body: Record<string, unknown> = {};
   if (order.note !== undefined && order.note.trim().length > 0) body.note = order.note;
+  if (order.property !== undefined) body.property = order.property;
   if (order.documentIds !== undefined) body.document_ids = order.documentIds;
   if (order.imageIds !== undefined) body.image_ids = order.imageIds;
   return body;

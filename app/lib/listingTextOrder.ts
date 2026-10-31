@@ -63,11 +63,13 @@ export function stepStates(step: RunStep | null): { step: RunStep; state: StepSt
 }
 
 /** Hvorfor «Bestill tekstpakke» er graa, eller null naar den er aktiv. */
-export type OrderBlock = "uploading" | "no_material" | "note_too_long" | "sending";
+export type OrderBlock = "uploading" | "no_material" | "note_too_long" | "property_invalid" | "sending";
 
 /**
- * Aktiv naar det finnes minst ett bilde, et dokument som er `ready` eller et
- * notat (ellers `no_material`, K §3). Graa mens et dokument lastes opp.
+ * Aktiv naar det finnes minst ett bilde, et dokument som er `ready`, et
+ * notat eller Boligfakta med grunnlag (ellers `no_material`, K §3 og §10.1).
+ * Graa mens et dokument lastes opp, og mens et felt i Boligfakta er ugyldig.
+ * Tomme felt sperrer aldri.
  */
 export function orderBlock(input: {
   images: number;
@@ -75,11 +77,18 @@ export function orderBlock(input: {
   note: string;
   uploading: boolean;
   sending: boolean;
+  /** `propertyHasMaterial` (listingTextProperty.ts). */
+  propertyMaterial?: boolean;
+  /** Minst ett felt i Boligfakta har en feil. */
+  propertyInvalid?: boolean;
 }): OrderBlock | null {
   if (input.sending) return "sending";
   if (input.uploading) return "uploading";
+  if (input.propertyInvalid === true) return "property_invalid";
   if (countChars(input.note) > NOTE_MAX_CHARS) return "note_too_long";
-  if (input.images === 0 && input.readyDocuments === 0 && input.note.trim().length === 0) return "no_material";
+  if (input.images === 0 && input.readyDocuments === 0 && input.note.trim().length === 0 && input.propertyMaterial !== true) {
+    return "no_material";
+  }
   return null;
 }
 
