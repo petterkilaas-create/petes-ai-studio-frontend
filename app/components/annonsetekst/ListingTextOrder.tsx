@@ -24,6 +24,7 @@ import {
   orderErrorText,
   refetchAfter,
 } from "../../lib/listingTextOrder";
+import { browserOpenTab, type PdfTab } from "../../lib/listingTextPackage";
 import { CallKeys } from "../../lib/orderStart";
 import { LISTING_TEXT_PATH } from "../../lib/services";
 import { LoadState } from "../ordre/LoadState";
@@ -32,16 +33,20 @@ import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { FOCUS } from "../godkjenning/classes";
 import { ListingTextOrderForm } from "./ListingTextOrderForm";
+import { ListingTextPackage } from "./ListingTextPackage";
 import { ListingTextSteps } from "./ListingTextSteps";
 import { codeText, t } from "../../lib/i18n";
 import { useLocale } from "../../lib/i18n/useLocale";
 
 const BACK = { href: LISTING_TEXT_PATH, key: "listingText.page.back" } as const;
+const NO_CHANNELS = { finn: null, social: null, email: null } as const;
 
 /** Kallene utenfra: bare mock-modusen i `next dev` (ListingTextMock). */
 export interface ListingTextDeps {
   request: AssignmentRequest;
   xhr: XhrFactory;
+  /** «Åpne PDF»: mock aapner ingen fane. */
+  openTab: () => PdfTab | null;
 }
 
 /**
@@ -49,8 +54,8 @@ export interface ListingTextDeps {
  * /v1/assignments/{id} og pakken med GET …/listing-text (uten grunnlaget).
  * `display_status` velger delen (listingTextView): bestillingen med bildene,
  * dokumentene og notatet; «Behandles» med trinnlista, hentet hvert 4. sekund
- * til statusen ikke lenger er `processing`; eller «Tekstpakken er klar»
- * (selve pakken vises i T3).
+ * til statusen ikke lenger er `processing`; eller tekstpakken
+ * (ListingTextPackage, T3).
  *
  * «Bestill tekstpakke» faar en ny Idempotency-Key per bestilling og samme
  * noekkel bare ved nytt forsoek med samme kropp etter nettfeil (CallKeys, som
@@ -170,10 +175,13 @@ export function ListingTextOrder({ assignmentId, deps }: { assignmentId: string;
       {pkg !== null && view === "processing" && <ListingTextSteps step={pkg.lastRun?.step ?? null} />}
 
       {pkg !== null && view === "ready" && (
-        <Card className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium text-ink">{t(locale, "listingText.ready.title")}</h2>
-          <p className="text-sm text-ink-2">{t(locale, "listingText.ready.placeholder")}</p>
-        </Card>
+        <ListingTextPackage
+          pkg={pkg}
+          channels={pkg.channels ?? NO_CHANNELS}
+          assignmentId={assignmentId}
+          request={request}
+          openTab={deps?.openTab ?? browserOpenTab}
+        />
       )}
 
       {pkg !== null && view === "deleted" && (

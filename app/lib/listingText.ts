@@ -896,13 +896,20 @@ export function countChars(value: string): number {
 
 export type LengthUnit = "chars" | "words" | "items";
 
-/** Maalene per felt (K §5, `LENGTH_TARGETS`): [enhet, min, maks]. Aldri en sperre. */
+/**
+ * Maalene per felt (K §5): [enhet, min, maks]. Aldri en sperre. Kilden er
+ * `LENGTH_TARGETS` i backend (`services/listing_text_checks.py`, lt3: ingressen
+ * 50-90 ord og naermiljoeet 50-120 ord). Hovedteksten er 180-350 ord for alle
+ * boliger, maalt uten «Verdt å vite» (Petters valg b 31.10, i backend med lt4).
+ * Om et felt er utenfor maalet, avgjoer backend med et avvik (`outsideTarget`
+ * i listingTextPackage.ts), ikke maalene her.
+ */
 export const LENGTH_TARGETS = {
   "finn.headline": ["chars", 50, 90],
-  "finn.intro": ["words", 80, 120],
+  "finn.intro": ["words", 50, 90],
   "finn.body": ["words", 180, 350],
   "finn.highlights": ["items", 4, 6],
-  "finn.neighbourhood": ["words", 80, 150],
+  "finn.neighbourhood": ["words", 50, 120],
   "social.post": ["words", 40, 90],
   "social.hashtags": ["items", 0, 3],
   "email.subject": ["chars", 35, 55],
@@ -911,9 +918,6 @@ export const LENGTH_TARGETS = {
 } as const satisfies Record<string, readonly [LengthUnit, number, number]>;
 
 export type LengthPath = keyof typeof LENGTH_TARGETS;
-
-/** Hovedteksten for komplekse boliger (K §5). */
-export const BODY_WORDS_COMPLEX = [350, 600] as const;
 
 /** Overskrift over dette er `material` (`headline_too_long`). */
 export const HEADLINE_HARD_MAX = 120;
@@ -947,9 +951,8 @@ export interface LengthCheck {
 }
 
 /** Maalt verdi mot maalet for feltet, som `check_lengths`. */
-export function checkLength(path: LengthPath, value: number, opts: { complexProperty?: boolean } = {}): LengthCheck {
-  const [unit, lo, hi] = LENGTH_TARGETS[path];
-  const [min, max] = path === "finn.body" && opts.complexProperty ? BODY_WORDS_COMPLEX : [lo, hi];
+export function checkLength(path: LengthPath, value: number): LengthCheck {
+  const [unit, min, max] = LENGTH_TARGETS[path];
   let status: LengthCheck["status"] = "ok";
   if (path === "finn.headline" && value > HEADLINE_HARD_MAX) status = "too_long";
   else if (value < min) status = "short";
@@ -957,9 +960,28 @@ export function checkLength(path: LengthPath, value: number, opts: { complexProp
   return { unit, value, min, max, status };
 }
 
+/** Starten paa siste avsnitt naar det er «Verdt å vite» (lt3). Teksten i pakken er alltid norsk. */
+export const WORTH_KNOWING_LEAD = "Verdt å vite:";
+
+/** Avsnittet delt i «Verdt å vite:» (uthevet) og resten, eller null naar det ikke starter slik. */
+export function splitWorthKnowing(text: string): { lead: string; rest: string } | null {
+  const nfc = text.normalize("NFC");
+  const start = nfc.length - nfc.trimStart().length;
+  if (!nfc.startsWith(WORTH_KNOWING_LEAD, start)) return null;
+  const end = start + WORTH_KNOWING_LEAD.length;
+  return { lead: nfc.slice(start, end), rest: nfc.slice(end) };
+}
+
+/** Avsnittene i hovedteksten som maales: uten et siste avsnitt som starter med «Verdt å vite:» (valg b). */
+export function measuredBody(body: readonly TextItem[]): readonly TextItem[] {
+  const last = body.at(-1);
+  return last !== undefined && splitWorthKnowing(last.text) !== null ? body.slice(0, -1) : body;
+}
+
 /**
- * Lengdene i pakken, som `_measure`: hovedteksten er summen av avsnittene,
- * hoeydepunktene og emneknaggene telles som antall.
+ * Lengdene i pakken, som `_measure`: hovedteksten er summen av avsnittene
+ * uten «Verdt å vite» (`measuredBody`), hoeydepunktene og emneknaggene telles
+ * som antall.
  */
 export function measureChannels(channels: ListingTextChannels): Partial<Record<LengthPath, number>> {
   const m: Partial<Record<LengthPath, number>> = {};
@@ -967,7 +989,7 @@ export function measureChannels(channels: ListingTextChannels): Partial<Record<L
   if (finn) {
     m["finn.headline"] = countChars(finn.headline.text);
     m["finn.intro"] = countWords(finn.intro.text);
-    m["finn.body"] = finn.body.reduce((n, p) => n + countWords(p.text), 0);
+    m["finn.body"] = measuredBody(finn.body).reduce((n, p) => n + countWords(p.text), 0);
     m["finn.highlights"] = finn.highlights.length;
     if (finn.neighbourhood !== null) m["finn.neighbourhood"] = countWords(finn.neighbourhood.text);
   }
@@ -1211,6 +1233,21 @@ export async function approveListingText(
     jsonInit("POST", { version: opts.version, content_sha256: opts.contentSha256 })
   );
   return expectPackage(res, 200);
+}
+
+/**
+ * GET …/documents/{document_id}/url (K §5): signert lenke til PDF-en i 3600 s,
+ * bare for eieren (admin faar 404). Lenken gis bare tilbake til den som
+ * kalte; den logges aldri og staar aldri i feilen (`ListingTextError` har bare
+ * status og kode).
+ */
+export async function getListingTextDocumentUrl(
+  request: AssignmentRequest,
+  opts: { id: string; documentId: string }
+): Promise<string> {
+  const res = await request(`${documentPath(opts.id, opts.documentId)}/url`, { method: "GET" });
+  const body = await expectJson(res, 200);
+  return required(isRecord(body) ? str(body.url) : null, "url");
 }
 
 /** GET /v1/office-profile (K §1): standardverdiene med `isDefault` uten lagret profil. */
