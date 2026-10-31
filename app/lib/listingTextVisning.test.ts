@@ -199,15 +199,15 @@ test("avvikene: feltnavnene paa norsk, med avsnitt og punkt etter plassen i list
   const p = pkg();
   assert.ok(p.channels);
   assert.deepEqual(fieldRef("nb", "finn.intro", p.channels), {
-    text: "FINN · ingress",
+    text: "Boligportal · ingress",
     channel: "finn",
     anchor: "lt-field-finn-intro",
   });
-  assert.equal(fieldRef("nb", "finn.body.p3", p.channels).text, "FINN · hovedtekst, avsnitt 3");
-  assert.equal(fieldRef("nb", "finn.highlights.h2", p.channels).text, "FINN · høydepunkter, punkt 2");
+  assert.equal(fieldRef("nb", "finn.body.p3", p.channels).text, "Boligportal · hovedtekst, avsnitt 3");
+  assert.equal(fieldRef("nb", "finn.highlights.h2", p.channels).text, "Boligportal · høydepunkter, punkt 2");
   assert.equal(fieldRef("nb", "social.post", p.channels).text, "SoMe · innlegg");
   assert.equal(fieldRef("nb", "email.preheader", p.channels).text, "E-post · forhåndstekst");
-  assert.equal(fieldRef("en", "finn.intro", p.channels).text, "FINN · intro");
+  assert.equal(fieldRef("en", "finn.intro", p.channels).text, "Listing portal · intro");
   // Ukjent sti, avsnitt som ikke finnes og kanal som mangler: tekst uten lenke.
   assert.deepEqual(fieldRef("nb", "finn.ukjent", p.channels), { text: "Felt", channel: null, anchor: null });
   assert.equal(fieldRef("nb", "finn.body.p9", p.channels).anchor, null);
@@ -274,7 +274,7 @@ test("kanalene: fast rekkefoelge, bare de som finnes, og nabolag som kan mangle"
   assert.deepEqual(presentChannels(p.channels), ["finn", "social", "email"]);
   assert.deepEqual(presentChannels({ email: p.channels.email, finn: p.channels.finn, social: null }), ["finn", "email"]);
   assert.deepEqual(presentChannels({ finn: null, social: null, email: null }), []);
-  assert.deepEqual(["finn", "social", "email"].map((c) => channelName("nb", c as "finn")), ["FINN", "SoMe", "E-post"]);
+  assert.deepEqual(["finn", "social", "email"].map((c) => channelName("nb", c as "finn")), ["Boligportal", "SoMe", "E-post"]);
   const raw = clone(SAMPLE);
   (raw.channels as Record<string, Record<string, unknown>>).finn.neighbourhood = null;
   assert.equal(pkg(raw).channels?.finn?.neighbourhood, null);

@@ -2,6 +2,7 @@ import type { AssignmentRequest } from "./assignments.ts";
 import type { UploadXhr, XhrFactory } from "./documentUpload.ts";
 import { countWords, RUN_STEPS } from "./listingText.ts";
 import type { PdfTab } from "./listingTextPackage.ts";
+import { formatNorwegianNumber, PROPERTY_KEYS, PROPERTY_SPECS, type PropertyWire } from "./listingTextProperty.ts";
 
 /**
  * Mock-modusen for annonseteksten (TG-NEW-281, T2; K §9.3 punkt 10, valg b):
@@ -17,6 +18,12 @@ import type { PdfTab } from "./listingTextPackage.ts";
  * (Mockveien 1, 0000 Oslo), med grunnlaget bare ved `include=basis`, og
  * `documents/{d}/url` gir en `mock://`-lenke som aldri aapnes. Ingen tekst er
  * hentet fra ekte salgsoppgaver.
+ *
+ * K §10: bestillingen tar `property` (Boligfakta). Ukjente noekler gir `400
+ * invalid_listing_text` med `field: property.<noekkel>`, og fargen i
+ * energimerket uten bokstaven gir det samme (K §10.7). Det lagrede kommer
+ * tilbake i GET, og hvert felt blir et faktum `p1`, `p2` … med kilden
+ * `{"form": true}` i grunnlaget (utenom `target_group`).
  */
 
 /** Staar bare i denne modulen. Testen sjekker at strengen ikke finnes i prod-bygget. */
@@ -169,7 +176,7 @@ const MOCK_CONTENT = {
       text:
         "Lys 3-roms med sørvestvendt balkong og nytt kjøkken fra 2023! Bildene viser en stue med store vinduer mot sør og en " +
         "åpen løsning mot kjøkkenet. Leiligheten har to soverom og ligger i et rolig borettslag med felles hage. Skole og " +
-        "barnehage ligger i gangavstand. Se hele annonsen på FINN, og meld deg på visning.",
+        "barnehage ligger i gangavstand. Se hele annonsen, og meld deg på visning.",
       fact_ids: ["f10", "f13", "f11", "f12", "f5", "f16"],
     },
     fact_line: {
@@ -268,6 +275,20 @@ function mockIssues() {
   ];
 }
 
+/** Boligfakta som fakta (K §10.2): `p1`, `p2` … med `source: {form: true}`, uten `target_group`. Enkel visning, bare for mock. */
+function propertyFacts(property: PropertyWire | null) {
+  if (property === null) return [];
+  const out: Record<string, unknown>[] = [];
+  for (const key of PROPERTY_KEYS) {
+    const value = property[key];
+    if (value === undefined || key === "target_group") continue;
+    const spec = PROPERTY_SPECS[key];
+    const text = typeof value === "number" ? formatNorwegianNumber(value, spec.kind === "number" && spec.group) : value;
+    out.push({ id: `p${out.length + 1}`, field: key === "address" ? "location" : key, label: key, value_text: text, kind: "broker", source: { form: true }, material: false });
+  }
+  return out;
+}
+
 const MOCK_BASIS = {
   schema_version: 1,
   facts: MOCK_FACTS,
@@ -298,6 +319,7 @@ export function createListingTextMock(assignmentId: string, opts: { latencyMs?: 
   let status: "not_ordered" | "processing" | "to_review" = "not_ordered";
   let stepIndex = 0;
   let note: string | null = null;
+  let property: PropertyWire | null = null;
   const orderKeys = new Set<string>();
 
   const assignment = {
@@ -359,10 +381,11 @@ export function createListingTextMock(assignmentId: string, opts: { latencyMs?: 
           ]
         : docs.map(wireDoc),
       note,
+      property,
       key_facts: ready ? MOCK_KEY_FACTS : [],
       issues: ready ? mockIssues() : [],
       channels: ready ? mockChannels() : null,
-      basis: ready && includeBasis ? MOCK_BASIS : null,
+      basis: ready && includeBasis ? { ...MOCK_BASIS, facts: [...MOCK_BASIS.facts, ...propertyFacts(property)] } : null,
       limits: { daily_runs: 10, runs_left_today: 9 },
       media_deleted_at: null,
       created_at: now,
@@ -445,9 +468,23 @@ export function createListingTextMock(assignmentId: string, opts: { latencyMs?: 
       const key = headers.get("Idempotency-Key");
       if (key === null) return json(400, { detail: { code: "idempotency_key_required" } });
       if (!orderKeys.has(key) && status === "processing") return json(409, { detail: { code: "listing_text_busy" } });
+      if (body.property !== undefined && body.property !== null) {
+        if (typeof body.property !== "object" || Array.isArray(body.property)) {
+          return json(400, { detail: { code: "invalid_listing_text", field: "property" } });
+        }
+        const unknown = Object.keys(body.property).find((k) => !(PROPERTY_KEYS as readonly string[]).includes(k));
+        if (unknown !== undefined) return json(400, { detail: { code: "invalid_listing_text", field: `property.${unknown}` } });
+        const sent = body.property as Record<string, unknown>;
+        // K §10.7: fargen uten bokstav gir 400.
+        if (sent.energy_color != null && sent.energy_letter == null) {
+          return json(400, { detail: { code: "invalid_listing_text", field: "property.energy_color" } });
+        }
+      }
       if (!orderKeys.has(key)) {
         orderKeys.add(key);
         note = typeof body.note === "string" ? body.note : null;
+        // Som `note` i backend: mangler noekkelen, beholdes det lagrede; null fjerner det.
+        if (body.property !== undefined) property = (body.property as PropertyWire | null) ?? null;
         status = "processing";
         stepIndex = 0;
       }

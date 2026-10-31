@@ -6,7 +6,9 @@ import type { AssignmentImage } from "../../lib/assignments";
 import type { DocRow } from "../../lib/documentUpload";
 import { countChars, NOTE_MAX_CHARS } from "../../lib/listingText";
 import type { OrderBlock } from "../../lib/listingTextOrder";
+import type { PropertyDraft, PropertyKey } from "../../lib/listingTextProperty";
 import { DocumentUploadPanel } from "./DocumentUploadPanel";
+import { ListingTextPropertyForm } from "./ListingTextPropertyForm";
 import { FOCUS } from "../godkjenning/classes";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
@@ -14,20 +16,25 @@ import { t, type UiKey } from "../../lib/i18n";
 import { useLocale } from "../../lib/i18n/useLocale";
 
 /**
- * Bestillingen av tekstpakken (TG-NEW-281, T2): bildene i ordren som
- * miniatyrer, dokumentene, «Noe vi bør vite?» og «Bestill tekstpakke».
- * Tilstanden (notatet, koeen, feilen) eies av ListingTextOrder.
+ * Bestillingen av tekstpakken (TG-NEW-281, T2 og K §10): bildene i ordren
+ * som miniatyrer, Boligfakta, dokumentene, «Om boligen» og «Bestill
+ * tekstpakke». Tilstanden (skjemaet, notatet, koeen, feilen) eies av
+ * ListingTextOrder.
  */
 
 const BLOCK_KEYS: Record<Exclude<OrderBlock, "sending">, UiKey> = {
   uploading: "listingText.order.blockUploading",
   no_material: "listingText.order.blockNoMaterial",
   note_too_long: "listingText.order.blockNoteTooLong",
+  property_invalid: "listingText.order.blockPropertyInvalid",
 };
 
 export function ListingTextOrderForm({
   images,
   rows,
+  property,
+  orderAddress,
+  onProperty,
   note,
   onNote,
   block,
@@ -41,6 +48,10 @@ export function ListingTextOrderForm({
 }: {
   images: readonly AssignmentImage[];
   rows: readonly DocRow[];
+  property: PropertyDraft;
+  /** Adressen i ordren: fyller adressefeltet og telleren. */
+  orderAddress: string;
+  onProperty: (key: PropertyKey, value: string) => void;
   note: string;
   onNote: (note: string) => void;
   block: OrderBlock | null;
@@ -94,6 +105,8 @@ export function ListingTextOrderForm({
         )}
       </section>
 
+      <ListingTextPropertyForm draft={property} orderAddress={orderAddress} onField={onProperty} />
+
       <DocumentUploadPanel rows={rows} onAdd={onAdd} onAbort={onAbort} onRetry={onRetry} onRemove={onRemove} />
 
       <section className="flex flex-col gap-2">
@@ -106,7 +119,7 @@ export function ListingTextOrderForm({
         <textarea
           id={noteId}
           lang="nb"
-          rows={4}
+          rows={6}
           maxLength={NOTE_MAX_CHARS}
           value={note}
           onChange={(e) => onNote(e.target.value)}
