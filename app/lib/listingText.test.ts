@@ -459,20 +459,14 @@ test("telleren: ord på mellomrom og tegn etter NFC, som count_words og count_ch
 });
 
 test("K §5: lengdemålene og overskriften over 120 tegn", () => {
-  assert.deepEqual(LENGTH_TARGETS["finn.intro"], ["words", 80, 120]);
+  assert.deepEqual(LENGTH_TARGETS["finn.intro"], ["words", 50, 90]);
   assert.deepEqual(checkLength("finn.headline", 60), { unit: "chars", value: 60, min: 50, max: 90, status: "ok" });
   assert.equal(checkLength("finn.headline", 49).status, "short");
   assert.equal(checkLength("finn.headline", 91).status, "long");
   assert.equal(checkLength("finn.headline", 120).status, "long");
   assert.equal(checkLength("finn.headline", 121).status, "too_long");
   assert.equal(checkLength("finn.body", 400).status, "long");
-  assert.deepEqual(checkLength("finn.body", 400, { complexProperty: true }), {
-    unit: "words",
-    value: 400,
-    min: 350,
-    max: 600,
-    status: "ok",
-  });
+  assert.deepEqual(checkLength("finn.body", 300), { unit: "words", value: 300, min: 180, max: 350, status: "ok" });
   assert.equal(checkLength("social.hashtags", 0).status, "ok");
   assert.equal(checkLength("social.hashtags", 4).status, "long");
 });

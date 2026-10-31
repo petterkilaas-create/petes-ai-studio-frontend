@@ -1,6 +1,7 @@
 import type { AssignmentRequest } from "./assignments.ts";
 import type { UploadXhr, XhrFactory } from "./documentUpload.ts";
-import { RUN_STEPS } from "./listingText.ts";
+import { countWords, RUN_STEPS } from "./listingText.ts";
+import type { PdfTab } from "./listingTextPackage.ts";
 
 /**
  * Mock-modusen for annonseteksten (TG-NEW-281, T2; K §9.3 punkt 10, valg b):
@@ -11,6 +12,11 @@ import { RUN_STEPS } from "./listingText.ts";
  *
  * Ingen kall gaar ut: ordren, bildene, pakken og opplastingen er falske, og
  * ingenting sendes til backend eller Supabase.
+ *
+ * T3: etter «Behandles» gir mock en full pakke for en oppdiktet bolig
+ * (Mockveien 1, 0000 Oslo), med grunnlaget bare ved `include=basis`, og
+ * `documents/{d}/url` gir en `mock://`-lenke som aldri aapnes. Ingen tekst er
+ * hentet fra ekte salgsoppgaver.
  */
 
 /** Staar bare i denne modulen. Testen sjekker at strengen ikke finnes i prod-bygget. */
@@ -52,7 +58,232 @@ interface MockDoc {
 export interface ListingTextMock {
   request: AssignmentRequest;
   xhr: XhrFactory;
+  /** Mock aapner ingen fane (siden viser en melding i stedet). */
+  openTab: () => PdfTab | null;
 }
+
+// --- den oppdiktede pakken (T3) ----------------------------------------------
+
+/** Dokumentene grunnlaget viser til. Arealmaalingen gir 404 paa lenken, som for admin. */
+const MOCK_DOCS = [
+  { id: "mock_doc_sp", file_name: "Salgsoppgave_Mockveien_1.pdf", kind: "sales_prospectus", pages: 48 },
+  { id: "mock_doc_tr", file_name: "Tilstandsrapport_Mockveien_1.pdf", kind: "condition_report", pages: 18 },
+  { id: "mock_doc_area", file_name: "Arealmaaling_Mockveien_1.pdf", kind: "area_report", pages: 3 },
+] as const;
+const MOCK_URL_404 = "mock_doc_area";
+
+const doc = (id: string, kind: string, page: number) => ({ document_id: id, document_kind: kind, page, excerpt: null });
+const sp = (page: number) => doc("mock_doc_sp", "sales_prospectus", page);
+
+const MOCK_FACTS = [
+  { id: "f1", field: "location", label: "Sted", value_text: "Mockbyen, Oslo", kind: "document", source: sp(2), material: false },
+  { id: "f2", field: "property_type", label: "Boligtype", value_text: "Leilighet (borettslag)", kind: "document", source: sp(2), material: false },
+  { id: "f3", field: "bra_i", label: "BRA-i", value_text: "68 m²", value: 68, unit: "m2", kind: "document", source: sp(4), material: false },
+  { id: "f4", field: "bra_i", label: "BRA-i", value_text: "66 m²", value: 66, unit: "m2", kind: "document", source: doc("mock_doc_area", "area_report", 1), material: false },
+  { id: "f5", field: "bedrooms", label: "Soverom", value_text: "2", value: 2, kind: "document", source: sp(4), material: false },
+  { id: "f6", field: "asking_price", label: "Prisantydning", value_text: "kr 4 900 000", value: 4900000, unit: "NOK", kind: "document", source: sp(3), material: false },
+  { id: "f7", field: "costs", label: "Omkostninger", value_text: "kr 125 000", value: 125000, unit: "NOK", kind: "document", source: sp(3), material: false },
+  { id: "f8", field: "common_debt", label: "Andel fellesgjeld", value_text: "kr 350 000", value: 350000, unit: "NOK", kind: "document", source: sp(3), material: false },
+  { id: "c_total_price", field: "total_price", label: "Totalpris", value_text: "kr 5 375 000", value: 5375000, unit: "NOK", kind: "computed", source: null, inputs: ["f6", "f7", "f8"], material: false },
+  { id: "f10", field: "balcony", label: "Balkong", value_text: "Sørvestvendt, 7 m²", kind: "document", source: sp(5), material: false },
+  { id: "f11", field: "observation", label: "Synlig i bilde", value_text: "Store vinduer mot sør i stua", kind: "visual", source: { image_id: "mock_img_1", position: 1 }, material: false },
+  { id: "f12", field: "observation", label: "Synlig i bilde", value_text: "Åpen løsning mellom kjøkken og stue", kind: "visual", source: { image_id: "mock_img_2", position: 2 }, material: false },
+  { id: "f13", field: "kitchen_year", label: "Kjøkken", value_text: "Nytt kjøkken 2023", kind: "broker", source: { note: true }, material: false },
+  { id: "f14", field: "condition", label: "Bad", value_text: "TG2: Avvik i ventilasjonen", kind: "document", source: doc("mock_doc_tr", "condition_report", 9), material: true },
+  { id: "f15", field: "condition", label: "Kjellerbod", value_text: "TG3: Fukt i kjellerboden", kind: "document", source: doc("mock_doc_tr", "condition_report", 12), material: true },
+  { id: "f16", field: "neighbourhood", label: "Nærmiljø", value_text: "Skole og barnehage i gangavstand", kind: "document", source: sp(7), material: false },
+  { id: "f17", field: "heating", label: "Oppvarming", value_text: "Fjernvarme, inkludert i felleskostnadene", kind: "document", source: sp(6), material: false },
+  { id: "f18", field: "common_costs", label: "Felleskostnader", value_text: "kr 4 250 per måned", value: 4250, unit: "NOK", kind: "document", source: sp(3), material: false },
+];
+
+const NEIGHBOURHOOD = "Mockbyen er et rolig boligområde med skole, barnehage og butikk i gangavstand. Bussen går ofte til sentrum.";
+
+const MOCK_CONTENT = {
+  finn: {
+    headline: { text: "Lys 3-roms med sørvestvendt balkong og nytt kjøkken i Mockbyen", fact_ids: ["f10", "f13", "f1"] },
+    intro: {
+      text:
+        "Velkommen til en lys og romslig 3-roms leilighet i et rolig borettslag i Mockbyen. Stua har store vinduer mot sør, " +
+        "og den åpne løsningen mot kjøkkenet gir god plass til både hverdag og besøk. Kjøkkenet er nytt fra 2023. Fra stua " +
+        "går du ut på en sørvestvendt balkong på 7 m², med plass til bord og stoler. Leiligheten har to soverom og 68 m² " +
+        "BRA-i. Skole og barnehage ligger i gangavstand.",
+      fact_ids: ["f11", "f12", "f13", "f10", "f5", "f3", "f16"],
+    },
+    body: [
+      {
+        id: "p1",
+        text:
+          "Leiligheten ligger i andre etasje i et godt vedlikeholdt borettslag. Entreen har plass til yttertøy og sko, og " +
+          "herfra når du alle rommene. Stua er lys, med store vinduer mot sør og god plass til sofagruppe og spisebord. Den " +
+          "åpne løsningen mot kjøkkenet gjør rommet både sosialt og praktisk i hverdagen.",
+        fact_ids: ["f11", "f12"],
+        check: "supported",
+      },
+      {
+        id: "p2",
+        text:
+          "Kjøkkenet ble skiftet ut i 2023 og har god benkeplass, integrerte hvitevarer og plass til et lite spisebord ved " +
+          "vinduet. Fra stua går du ut på balkongen på 7 m², som vender mot sørvest og har plass til både bord og stoler.",
+        fact_ids: ["f13", "f10"],
+        check: "supported",
+      },
+      {
+        id: "p3",
+        text:
+          "Begge soverommene har plass til dobbeltseng, og det største har en romslig garderobe. Badet har dusj, toalett og " +
+          "opplegg for vaskemaskin. Leiligheten varmes opp med fjernvarme, som er inkludert i felleskostnadene på kr 4 250 " +
+          "per måned.",
+        fact_ids: ["f5", "f17", "f18"],
+        check: "partial",
+      },
+      {
+        id: "p4",
+        text:
+          "Borettslaget har felles vaskeri, sykkelbod og en stor felles hage med lekeplass. Hver leilighet har sin egen " +
+          "kjellerbod. Det er kort vei til butikk og buss, og skole og barnehage ligger i gangavstand. Totalprisen er " +
+          "kr 5 375 000, med andel fellesgjeld. Området har flere turstier og en liten park, og det er bare noen minutter å " +
+          "gå til nærmeste holdeplass.",
+        fact_ids: ["f16", "c_total_price"],
+        check: "supported",
+      },
+      {
+        id: "p5",
+        text:
+          "Verdt å vite: Det er påvist fukt i kjellerboden (TG3), og ventilasjonen på badet har avvik (TG2). Energimerket er " +
+          "ikke oppgitt. Tilstandsrapporten har detaljene.",
+        fact_ids: ["f14", "f15"],
+        check: "supported",
+      },
+    ],
+    highlights: [
+      { id: "h1", text: "Sørvestvendt balkong på 7 m²", fact_ids: ["f10"], check: "supported" },
+      { id: "h2", text: "Nytt kjøkken fra 2023", fact_ids: ["f13"], check: "supported" },
+      { id: "h3", text: "To soverom og 68 m² BRA-i", fact_ids: ["f5", "f3"], check: "supported" },
+      { id: "h4", text: "Fjernvarme inkludert i felleskostnadene", fact_ids: ["f17"], check: "supported" },
+      { id: "h5", text: "Felles hage med lekeplass", fact_ids: [], check: "partial" },
+    ],
+    neighbourhood: { text: NEIGHBOURHOOD, fact_ids: ["f16"] },
+  },
+  social: {
+    post: {
+      text:
+        "Lys 3-roms med sørvestvendt balkong og nytt kjøkken fra 2023! Bildene viser en stue med store vinduer mot sør og en " +
+        "åpen løsning mot kjøkkenet. Leiligheten har to soverom og ligger i et rolig borettslag med felles hage. Skole og " +
+        "barnehage ligger i gangavstand. Se hele annonsen på FINN, og meld deg på visning.",
+      fact_ids: ["f10", "f13", "f11", "f12", "f5", "f16"],
+    },
+    fact_line: {
+      text: "kr 5 375 000 · Mockbyen, Oslo · Leilighet (borettslag) · 68 m² BRA-i · 2 soverom · Energimerke mangler",
+      fact_ids: ["c_total_price", "f1", "f2", "f3", "f5"],
+    },
+    hashtags: ["#mockbyen", "#oslo", "#nyttkjøkken"],
+  },
+  email: {
+    subject: { text: "Ny i salg: lys 3-roms med balkong i Mockbyen", fact_ids: ["f1"] },
+    preheader: { text: "Nytt kjøkken fra 2023, to soverom og sørvestvendt balkong på 7 m².", fact_ids: ["f13", "f5", "f10"] },
+    body: {
+      text:
+        "Hei!\n\nVi har en ny bolig i salg som kanskje passer for deg. Leiligheten i Mockveien 1 er en lys 3-roms på 68 m² " +
+        "BRA-i, med to soverom og sørvestvendt balkong på 7 m². Kjøkkenet er nytt fra 2023, og stua har store vinduer mot " +
+        "sør.\n\nBorettslaget har felles hage med lekeplass, og skole og barnehage ligger i gangavstand. Fjernvarme er " +
+        "inkludert i felleskostnadene.\n\nKjellerboden har en fuktskade. Se hele annonsen for alle detaljer, og meld deg " +
+        "på visning. Vi svarer gjerne på spørsmål før visningen, på telefon eller e-post.",
+      fact_ids: ["f3", "f5", "f10", "f13", "f16", "f17", "f15"],
+    },
+    signature: "Mock Megler\nEiendomsmegler\nMockmegling AS",
+  },
+};
+
+/** «Kopier» som backend lager den (`copy_texts`): avsnitt med tom linje, «• » per hoeydepunkt, knaggene til slutt. */
+function mockCopyTexts() {
+  const { finn, social, email } = MOCK_CONTENT;
+  const tags = social.hashtags.join(" ");
+  return {
+    finn: {
+      headline: finn.headline.text,
+      intro: finn.intro.text,
+      body: finn.body.map((p) => p.text).join("\n\n"),
+      highlights: finn.highlights.map((h) => `• ${h.text}`).join("\n"),
+      neighbourhood: finn.neighbourhood.text,
+    },
+    social: { post: `${social.post.text}\n\n${tags}`, fact_line: social.fact_line.text, hashtags: tags },
+    email: {
+      subject: email.subject.text,
+      preheader: email.preheader.text,
+      body: email.body.text,
+      signature: email.signature,
+    },
+  };
+}
+
+function mockChannels() {
+  const copy = mockCopyTexts();
+  return {
+    finn: { ...MOCK_CONTENT.finn, copy_text: copy.finn },
+    social: { ...MOCK_CONTENT.social, copy_text: copy.social },
+    email: { ...MOCK_CONTENT.email, copy_text: copy.email },
+  };
+}
+
+const MOCK_KEY_FACTS = [
+  { key: "total_price", status: "found", value_text: "kr 5 375 000", fact_ids: ["c_total_price"] },
+  { key: "location", status: "found", value_text: "Mockbyen, Oslo", fact_ids: ["f1"] },
+  { key: "property_type", status: "found", value_text: "Leilighet (borettslag)", fact_ids: ["f2"] },
+  { key: "bra_i", status: "conflict", value_text: "68 m² / 66 m²", fact_ids: ["f3", "f4"] },
+  { key: "bedrooms", status: "found", value_text: "2", fact_ids: ["f5"] },
+  { key: "energy_label", status: "missing", value_text: null, fact_ids: [] },
+];
+
+/** Avvikene: `length_outside_target` (info) foerst, saa sorteringen i siden synes. */
+function mockIssues() {
+  const n = countWords(NEIGHBOURHOOD);
+  return [
+    {
+      id: "i3",
+      code: "length_outside_target",
+      severity: "info",
+      message: `${n} ord; målet er 50–120 ord.`,
+      suggestion: "Utvid litt hvis det finnes mer å si.",
+      fact_ids: [],
+      fields: ["finn.neighbourhood"],
+    },
+    {
+      id: "i1",
+      code: "meta_reference",
+      severity: "material",
+      message: "Teksten viser til kildene i stedet for boligen.",
+      suggestion: "Skriv om boligen direkte, uten å nevne bildene.",
+      fact_ids: [],
+      fields: ["social.post"],
+    },
+    {
+      id: "i2",
+      code: "conflicting_bra_i",
+      severity: "material",
+      message: "BRA-i er 68 m² i salgsoppgaven og 66 m² i arealmålingen.",
+      suggestion: "Bruk tallet fra salgsoppgaven, eller rett det ene dokumentet.",
+      fact_ids: ["f3", "f4"],
+      fields: ["finn.intro", "finn.highlights.h3"],
+    },
+  ];
+}
+
+const MOCK_BASIS = {
+  schema_version: 1,
+  facts: MOCK_FACTS,
+  plan: { angle: "outdoor_living", qualities: [{ text: "Sørvestvendt balkong", fact_ids: ["f10"] }], must_include: ["f14", "f15"], unknowns: ["energy_label"] },
+  issues: [
+    {
+      id: "b1",
+      code: "conflicting_bra_i",
+      severity: "material",
+      message: "BRA-i er ulikt i salgsoppgaven og arealmålingen.",
+      suggestion: null,
+      fact_ids: ["f3", "f4"],
+      fields: [],
+    },
+  ],
+};
 
 /**
  * En ny falsk backend for én ordre. Pakken gaar gjennom de fem trinnene, ett
@@ -71,7 +302,7 @@ export function createListingTextMock(assignmentId: string, opts: { latencyMs?: 
 
   const assignment = {
     id: assignmentId,
-    address: "Mockveien 1, 0150 Oslo",
+    address: "Mockveien 1, 0000 Oslo",
     assignment_no: "MOCK-1",
     created_at: now,
     updated_at: now,
@@ -102,8 +333,9 @@ export function createListingTextMock(assignmentId: string, opts: { latencyMs?: 
     created_at: now,
   });
 
-  const pkg = () => {
+  const pkg = (includeBasis = false) => {
     const processing = status === "processing";
+    const ready = status === "to_review";
     return {
       assignment_id: assignmentId,
       display_status: status,
@@ -120,10 +352,17 @@ export function createListingTextMock(assignmentId: string, opts: { latencyMs?: 
             created_at: now,
             updated_at: new Date().toISOString(),
           },
-      documents: docs.map(wireDoc),
+      documents: ready
+        ? [
+            ...MOCK_DOCS.map((d) => ({ ...d, bytes: 2_000_000, status: "ready", reject_code: null, used_in_version: true, created_at: now })),
+            ...docs.map(wireDoc),
+          ]
+        : docs.map(wireDoc),
       note,
-      channels: null,
-      basis: null,
+      key_facts: ready ? MOCK_KEY_FACTS : [],
+      issues: ready ? mockIssues() : [],
+      channels: ready ? mockChannels() : null,
+      basis: ready && includeBasis ? MOCK_BASIS : null,
       limits: { daily_runs: 10, runs_left_today: 9 },
       media_deleted_at: null,
       created_at: now,
@@ -137,7 +376,8 @@ export function createListingTextMock(assignmentId: string, opts: { latencyMs?: 
   const request: AssignmentRequest = async (path, init) => {
     await wait(latency);
     const method = init.method ?? "GET";
-    const url = path.split("?")[0];
+    const [url, qs = ""] = path.split("?");
+    const query = new URLSearchParams(qs);
     const body = typeof init.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : {};
     const headers = new Headers(init.headers);
 
@@ -147,7 +387,14 @@ export function createListingTextMock(assignmentId: string, opts: { latencyMs?: 
         if (stepIndex < RUN_STEPS.length - 1) stepIndex++;
         else status = "to_review";
       }
-      return json(200, pkg());
+      return json(200, pkg(query.get("include") === "basis"));
+    }
+    const docUrl = url.match(/\/documents\/([^/]+)\/url$/);
+    if (method === "GET" && docUrl !== null) {
+      const id = decodeURIComponent(docUrl[1]);
+      const known = MOCK_DOCS.some((d) => d.id === id) || docs.some((d) => d.id === id && d.status === "ready");
+      if (!known || id === MOCK_URL_404) return json(404, { detail: "not found" });
+      return json(200, { url: `mock://document/${id}` });
     }
     if (method === "POST" && url === `${text}/documents`) {
       const live = docs.length;
@@ -209,7 +456,7 @@ export function createListingTextMock(assignmentId: string, opts: { latencyMs?: 
     return json(404, { detail: "not found" });
   };
 
-  return { request, xhr: () => new MockXhr() };
+  return { request, xhr: () => new MockXhr(), openTab: () => null };
 }
 
 export { MockXhr };

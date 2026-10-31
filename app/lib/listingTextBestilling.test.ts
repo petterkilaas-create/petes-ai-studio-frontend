@@ -437,7 +437,6 @@ const NEW_UI: UiKey[] = [
   "listingText.processing.hint",
   "listingText.processing.steps",
   "listingText.ready.title",
-  "listingText.ready.placeholder",
   "listingText.load.error",
   "listingText.mock.banner",
 ];
