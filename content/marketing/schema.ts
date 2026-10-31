@@ -482,11 +482,13 @@ export type GuideStatus = "processing" | "toReview" | "needsAnswer" | "approved"
  * En del av veiledningen: overskrift, nummererte steg og merknader under.
  * `id` er ankeret (innholdslista og lenker fra spoersmaalene). Stegene og
  * merknadene er maler med {maxImages}, {maxMb} og {maxBoxes}, som fylles
- * fra grensene i appen (GuidePage.tsx).
+ * fra grensene i appen (GuidePage.tsx). `intro` er en setning foer stegene
+ * (Dag 60: at Annonsetekst er under utproeving).
  */
 export type GuideSection = {
   id: string;
   title: string;
+  intro?: string;
   steps: readonly string[];
   notes?: readonly string[];
   statuses?: readonly { status: GuideStatus; text: string }[];

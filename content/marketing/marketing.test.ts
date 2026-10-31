@@ -23,6 +23,7 @@ import { DISCLOSURE_DETAIL, DISCLOSURE_LOCALE, disclosureText } from "../../app/
 import { isServiceEnabled } from "../../app/lib/services.ts";
 import { MAX_IMAGES_PER_ASSIGNMENT } from "../../app/lib/assignments.ts";
 import { MAX_LOCAL_EDITS } from "../../app/lib/local.ts";
+import { DAILY_RUNS, LENGTH_TARGETS, MAX_DOCUMENT_BYTES, MAX_DOCUMENTS, WORTH_KNOWING_LEAD } from "../../app/lib/listingText.ts";
 import { MAX_UPLOAD_BYTES } from "../../app/lib/uploadQueue.ts";
 import { tabKey } from "../../app/lib/tabs.ts";
 import { fill, fillParts } from "./fill.ts";
@@ -1940,6 +1941,7 @@ test("Dag 59: veiledningen har delene fra oppdraget, i rekkefoelge, med steg og 
       ["godkjenn", "Godkjenn eller rett"],
       ["last-ned", "Last ned"],
       ["merking", "Merking og tekst til annonsen"],
+      ["annonsetekst", "Lag annonsetekst"],
     ]
   );
   for (const s of guidePage.sections) {
@@ -1955,6 +1957,8 @@ test("Dag 59: ordene i «» i veiledningen og de nye svarene finnes i appen (ord
   const app = [
     ...Object.values(nb.ui),
     ...Object.values(nb.codes).flatMap((group) => Object.values(group)),
+    // T6: «Verdt å vite» staar ikke i ordlista; visningen uthever starten av avsnittet (listingText.ts).
+    WORTH_KNOWING_LEAD.replace(/:$/, ""),
   ];
   const texts = [
     ...strings(guidePage, "guidePage"),
@@ -1996,8 +2000,22 @@ test("Dag 59: grensene i veiledningen er konstantene i appen, ikke tall i tekste
   assert.match(src, /maxImages: MAX_IMAGES_PER_ASSIGNMENT,/);
   assert.match(src, /maxMb: MAX_UPLOAD_BYTES \/ \(1024 \* 1024\),/);
   assert.match(src, /maxBoxes: MAX_LOCAL_EDITS,/);
-  const vars = { maxImages: MAX_IMAGES_PER_ASSIGNMENT, maxMb: MAX_UPLOAD_BYTES / (1024 * 1024), maxBoxes: MAX_LOCAL_EDITS };
-  assert.deepEqual(vars, { maxImages: 60, maxMb: 25, maxBoxes: 4 });
+  assert.match(src, /maxDocs: MAX_DOCUMENTS,/);
+  assert.match(src, /docMb: MAX_DOCUMENT_BYTES \/ \(1024 \* 1024\),/);
+  assert.match(src, /dailyRuns: DAILY_RUNS,/);
+  assert.match(src, /bodyMin: LENGTH_TARGETS\["finn\.body"\]\[1\],/);
+  assert.match(src, /bodyMax: LENGTH_TARGETS\["finn\.body"\]\[2\],/);
+  const vars = {
+    maxImages: MAX_IMAGES_PER_ASSIGNMENT,
+    maxMb: MAX_UPLOAD_BYTES / (1024 * 1024),
+    maxBoxes: MAX_LOCAL_EDITS,
+    maxDocs: MAX_DOCUMENTS,
+    docMb: MAX_DOCUMENT_BYTES / (1024 * 1024),
+    dailyRuns: DAILY_RUNS,
+    bodyMin: LENGTH_TARGETS["finn.body"][1],
+    bodyMax: LENGTH_TARGETS["finn.body"][2],
+  };
+  assert.deepEqual(vars, { maxImages: 60, maxMb: 25, maxBoxes: 4, maxDocs: 10, docMb: 100, dailyRuns: 10, bodyMin: 180, bodyMax: 350 });
   const upload = guidePage.sections.find((s) => s.id === "last-opp")!;
   assert.equal(fill(upload.notes![0], vars), "JPG eller PNG, høyst 25 MB per bilde og 60 bilder per ordre.");
   for (const [path, text] of strings(guidePage, "guidePage")) {
@@ -2006,6 +2024,37 @@ test("Dag 59: grensene i veiledningen er konstantene i appen, ikke tall i tekste
     }
     // Tall bare i eksempelet paa filnavn.
     if (!text.includes(".jpg")) assert.doesNotMatch(text, /\d/, path);
+  }
+});
+
+test("T6 (Dag 60): «Lag annonsetekst» etter merkingen, for alle, med utproevingen foerst og uten T4", () => {
+  const ids = guidePage.sections.map((s) => s.id);
+  assert.equal(ids.indexOf("annonsetekst"), ids.indexOf("merking") + 1);
+  const section = guidePage.sections.find((s) => s.id === "annonsetekst")!;
+  assert.equal(section.intro, "Annonsetekst er under utprøving og er ennå bare tilgjengelig for utvalgte kontoer.");
+  // Bare denne delen har en innledning, og GuidePage viser den foer stegene.
+  assert.deepEqual(guidePage.sections.filter((s) => "intro" in s).map((s) => s.id), ["annonsetekst"]);
+  const src = withoutComments(read("app/components/marketing/GuidePage.tsx"));
+  assert.match(src, /<h2 className=\{H2_PAGE\}>\{section\.title\}<\/h2>\s*\{section\.intro && <p className=\{TEXT\}>\{section\.intro\}<\/p>\}\s*<ol/);
+  const all = [section.intro, ...section.steps, ...(section.notes ?? [])].join("\n");
+  // Petters valg B (31.10): avvik er raad, ikke en sperre.
+  assert.ok(section.notes!.includes("Avvikene er råd til deg. Du kan bruke teksten selv om det står avvik."));
+  assert.match(all, /noen minutter/);
+  const vars = {
+    maxDocs: MAX_DOCUMENTS,
+    docMb: MAX_DOCUMENT_BYTES / (1024 * 1024),
+    dailyRuns: DAILY_RUNS,
+    bodyMin: LENGTH_TARGETS["finn.body"][1],
+    bodyMax: LENGTH_TARGETS["finn.body"][2],
+  };
+  assert.match(fill(all, vars), /høyst 10 dokumenter og 100 MB per fil/);
+  assert.match(fill(all, vars), /10 tekstpakker per døgn/);
+  assert.match(fill(all, vars), /180–350 ord og måles uten «Verdt å vite»/);
+  // Redigering, godkjenning, «Lag på nytt» og eksport kommer i T4.
+  assert.doesNotMatch(all, /redig|godkjenn|Lag på nytt|eksport|lagr/i);
+  // Delen vises for alle: veiledningen er statisk og uten Clerk (ingen tilgangssjekk).
+  for (const f of [src, read("app/(marketing)/no/veiledning/page.tsx")]) {
+    assert.doesNotMatch(f, /listingTextAccess|useListingTextAccess|@clerk/);
   }
 });
 

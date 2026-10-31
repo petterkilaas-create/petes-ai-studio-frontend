@@ -61,6 +61,8 @@ appen og sender `/` til `/start`.
 `aarstider`, `klart_vaer`, `privacy_blur`, `ordrer` (på) og `magic_cleanup`, `virtual_stage`, `express_v2` (av).
 En side som er av, vises ikke i menyen. Backend har sin egen liste, som må åpnes samtidig.
 
+Annonsetekst: `LISTING_TEXT_UI` i `app/lib/services.ts` er `"admin"` (bare `view_all` fra `/me`); rulles tilbake ved å sette `"off"` i en ny PR.
+
 ## Ordlista
 
 All tekst i appen står i `app/lib/i18n/index.ts`, på norsk (`nb`) og engelsk (`en`), og hentes med `t(locale, nøkkel)`.
